@@ -1,0 +1,305 @@
+# Academia - Academic Project Management System
+
+## Project Overview
+
+Academia is a comprehensive academic project management platform designed to streamline the collaboration between students, advisors, coordinators, and department heads in managing academic projects, theses, and defense processes.
+
+### Core Features
+- **Multi-tenant architecture** with subdomain support for different institutions
+- **Role-based access control** with 5 distinct user roles
+- **Project lifecycle management** from proposal to defense
+- **Real-time notifications** and communication
+- **Evaluation and grading system**
+- **Defense scheduling and management**
+- **Analytics and reporting dashboard**
+
+## Tech Stack
+
+### Frontend
+- **Next.js 16** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS** for styling
+- **shadcn/ui** for component library
+- **Lucide React** for icons
+- **Zustand** for state management
+- **React Hook Form** for form handling
+- **TanStack Query** for data fetching
+
+### Backend Architecture
+- **Next.js API Routes** for backend logic
+- **Multi-tenant middleware** for institution isolation
+- **RESTful API design** with consistent patterns
+
+### Development Tools
+- **ESLint** for code linting
+- **TypeScript** for compilation checking
+- **GitHub Actions** for CI/CD
+- **Prettier** for code formatting (when configured)
+
+## User Roles & Permissions
+
+### 1. Department Head
+- View all projects across the department
+- Manage coordinators and faculty
+- Access comprehensive reports and analytics
+- Approve major departmental decisions
+
+### 2. Coordinator
+- Manage projects within their area
+- Assign advisors to students
+- Schedule and oversee defenses
+- Generate reports for their projects
+
+### 3. Advisor
+- Guide assigned students
+- Review project proposals and progress
+- Participate in defense committees
+- Provide evaluations and feedback
+
+### 4. Student
+- Submit project proposals
+- Track project progress and milestones
+- Communicate with advisors
+- Prepare for and attend defenses
+
+### 5. Department Committee Member
+- Participate in defense evaluations
+- Review projects for compliance
+- Provide expert feedback
+- Vote on defense outcomes
+
+## Code Architecture
+
+### File Structure
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── (marketing)/       # Public marketing pages
+│   ├── dashboard/         # Protected dashboard routes
+│   ├── api/               # API routes
+│   ├── layout.tsx         # Root layout
+│   └── globals.css        # Global styles
+├── components/            # Reusable components
+│   ├── ui/               # shadcn/ui components
+│   ├── layout/           # Layout components
+│   └── dashboard/        # Dashboard-specific components
+├── config/               # Configuration files
+│   └── navigation.ts     # Role-based navigation config
+├── lib/                  # Utility libraries
+│   ├── utils.ts          # General utilities
+│   └── api/              # API client and utilities
+├── store/                # State management
+│   └── sidebar-store.ts  # Sidebar state with Zustand
+└── types/                # TypeScript type definitions
+```
+
+### Component Patterns
+
+#### 1. UI Components (shadcn/ui)
+- Located in `src/components/ui/`
+- Follow shadcn/ui conventions
+- Fully typed with TypeScript
+- Consistent API design
+
+#### 2. Layout Components
+- Dashboard layout with sidebar and header
+- Mobile-responsive design
+- Role-based navigation
+- Consistent spacing and theming
+
+#### 3. Page Components
+- Server components by default
+- Client components only when needed (interactivity)
+- Proper loading states and error handling
+- SEO-friendly with metadata
+
+### State Management
+
+#### Zustand Stores
+- Centralized state for UI interactions
+- Type-safe with TypeScript
+- Minimal re-renders
+- Easy testing
+
+#### Server State (TanStack Query)
+- API data fetching and caching
+- Optimistic updates
+- Background refetching
+- Error handling and retries
+
+## Development Guidelines
+
+### Code Style
+- **TypeScript strict mode** enabled
+- **ESLint** rules enforced
+- **Consistent naming** (camelCase for variables/functions, PascalCase for components)
+- **Descriptive variable names** - prefer clarity over brevity
+- **Single responsibility** principle for components and functions
+
+### Component Guidelines
+- Use **functional components** with hooks
+- Prefer **server components** when possible
+- **Client components** only for interactivity (forms, state, effects)
+- **Proper TypeScript typing** for all props and state
+- **Accessibility** considerations (ARIA labels, keyboard navigation)
+
+### API Design
+- **RESTful conventions** with consistent URL patterns
+- **HTTP status codes** properly used
+- **Error handling** with meaningful messages
+- **Request/response typing** with TypeScript interfaces
+- **Pagination** for list endpoints
+
+### Git Workflow
+- **Feature branches** from main
+- **Descriptive commit messages** following conventional commits
+- **Pull requests** with clear descriptions
+- **Code review** required before merge
+- **CI/CD** checks must pass
+
+## Multi-Tenant Architecture
+
+### Subdomain Routing
+- Each institution gets a subdomain (e.g., `university.academia.com`)
+- Middleware extracts tenant ID from hostname
+- Database isolation by tenant
+- Shared codebase with tenant-specific data
+
+### Tenant Context
+- `x-tenant-id` header set by middleware
+- All API calls include tenant context
+- User roles scoped to tenant
+- Data isolation enforced at database level
+
+## Security Considerations
+
+### Authentication
+- Secure session management
+- Role-based access control (RBAC)
+- Password policies and validation
+- Account lockout protection
+
+### Authorization
+- Route-level protection
+- Component-level permissions
+- API endpoint authorization
+- Data access filtering
+
+### Data Protection
+- Input validation and sanitization
+- SQL injection prevention
+- XSS protection
+- CSRF protection
+
+## Testing Strategy
+
+### Unit Tests
+- Component testing with React Testing Library
+- Utility function testing with Jest
+- API route testing
+- Custom hook testing
+
+### Integration Tests
+- API endpoint testing
+- Database integration
+- Authentication flow testing
+- Multi-tenant isolation testing
+
+### E2E Tests (Future)
+- Critical user journey testing
+- Cross-browser compatibility
+- Mobile responsiveness testing
+
+## Deployment & DevOps
+
+### Environment Configuration
+- `.env.local` for local development
+- Environment-specific configs
+- Secret management
+- Database connection strings
+
+### Build Process
+- TypeScript compilation
+- ESLint checking
+- Bundle optimization
+- Static asset handling
+
+### Monitoring & Logging
+- Error tracking and reporting
+- Performance monitoring
+- User analytics
+- Audit logging
+
+## Common Patterns
+
+### Form Handling
+```typescript
+'use client'
+
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+
+export function MyForm() {
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { /* ... */ }
+  })
+
+  // Form implementation
+}
+```
+
+### API Calls
+```typescript
+'use client'
+
+import { useQuery, useMutation } from '@tanstack/react-query'
+
+export function useProjects() {
+  return useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.get('/projects')
+  })
+}
+```
+
+### Component Structure
+```typescript
+interface ComponentProps {
+  // Props typing
+}
+
+export function Component({ prop }: ComponentProps) {
+  // Component logic
+  return (
+    // JSX
+  )
+}
+```
+
+## Getting Started
+
+1. **Clone the repository**
+2. **Install dependencies**: `npm install`
+3. **Set up environment**: Copy `.env.example` to `.env.local`
+4. **Run development server**: `npm run dev`
+5. **Access the application**: `http://localhost:3000`
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Follow the code style guidelines
+3. Write tests for new functionality
+4. Ensure all CI checks pass
+5. Submit a pull request with clear description
+
+## Support
+
+For questions or issues:
+- Check existing documentation
+- Create an issue in the repository
+- Contact the development team
+
+---
+
+**Remember**: This is an educational institution management system. Always prioritize data security, user privacy, and academic integrity in all implementations.
