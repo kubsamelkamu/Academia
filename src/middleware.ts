@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export function middleware(request: NextRequest) {
+export default function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") || ""
   const subdomain = hostname.split(".")[0]
 
@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
 
   // Extract tenant from subdomain
   const tenantId = subdomain
-  
+
   // Clone the request headers and add tenant ID
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-tenant-id", tenantId)
