@@ -1,12 +1,15 @@
-# 🎓 Academia - Academic Project Management Platform
+# 🎓 [Academia](https://github.com/kubsamelkamu/academia) - Academic Project Management Platform
 
-> A comprehensive multi-tenant platform designed for academic institutions to streamline project management, advisor-student collaboration, and defense coordination.
+> A comprehensive multi-universities platform designed for academic institutions to streamline project management, advisor-student collaboration, and defense coordination.
+
+This repository contains the source code for **Academia**, an open-source academic project management platform. Visit the [GitHub repository](https://github.com/kubsamelkamu/academia) for the latest updates, issues, and contributions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8)](https://tailwindcss.com/)
-[![GitHub Actions](https://img.shields.io/badge/CI-CD-2088FF)](https://github.com/features/actions)
+[![CI](https://github.com/kubsamelkamu/academia/actions/workflows/ci.yml/badge.svg)](https://github.com/kubsamelkamu/academia/actions/workflows/ci.yml)
+[![Lint](https://github.com/kubsamelkamu/academia/actions/workflows/lint.yml/badge.svg)](https://github.com/kubsamelkamu/academia/actions/workflows/lint.yml)
 
 **Academia** empowers universities and academic institutions with a modern, scalable platform for managing student projects, coordinating advisors, scheduling defenses, and maintaining academic excellence through streamlined workflows and real-time collaboration.
 
@@ -152,7 +155,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/academia.git
+   git clone https://github.com/kubsamelkamu/academia.git
    cd academia
    ```
 
@@ -308,7 +311,7 @@ We welcome contributions from the community! Please read our [Contributing Guide
 ### Development Setup for Contributors
 ```bash
 # Fork and clone
-git clone https://github.com/yourusername/academia.git
+git clone https://github.com/kubsamelkamu/academia.git
 cd academia
 
 # Install dependencies
@@ -357,8 +360,8 @@ Academia takes security seriously. If you discover a security vulnerability, ple
 
 ### Getting Help
 - **📖 Documentation**: [docs.academia.com](https://docs.academia.com)
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/yourusername/academia/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourusername/academia/discussions)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/kubsamelkamu/academia/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/kubsamelkamu/academia/discussions)
 - **📧 Email**: support@academia.com
 
 ### Community
@@ -382,7 +385,7 @@ Academia takes security seriously. If you discover a security vulnerability, ple
 
 *Built with ❤️ for universities, colleges, and educational institutions worldwide*
 
-[🌐 Website](https://academia.com) • [📚 Documentation](https://docs.academia.com) • [🐛 Issues](https://github.com/yourusername/academia/issues)
+[🌐 Website](https://academia.com) • [📚 Documentation](https://docs.academia.com) • [🐛 Issues](https://github.com/kubsamelkamu/academia/issues)
 
 </div>
 
@@ -390,9 +393,9 @@ Academia takes security seriously. If you discover a security vulnerability, ple
 
 ### Getting Help
 - **📖 Documentation**: Check our [Copilot Instructions](.github/COPILOT_INSTRUCTIONS.md) for detailed guidance
-- **🐛 Bug Reports**: [Create an issue](https://github.com/yourusername/academia/issues/new?template=bug_report.md)
-- **💡 Feature Requests**: [Submit ideas](https://github.com/yourusername/academia/issues/new?template=feature_request.md)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourusername/academia/discussions)
+- **🐛 Bug Reports**: [Create an issue](https://github.com/kubsamelkamu/academia/issues/new?template=bug_report.md)
+- **💡 Feature Requests**: [Submit ideas](https://github.com/kubsamelkamu/academia/issues/new?template=feature_request.md)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/kubsamelkamu/academia/discussions)
 - **📧 Security Issues**: See [Security Policy](SECURITY.md)
 
 ### Community Guidelines
@@ -421,11 +424,11 @@ Academia takes security seriously. If you discover a security vulnerability, ple
 
 ---
 
-[🚀 Live Demo](https://academia.com) • [📚 Documentation](https://docs.academia.com) • [🐛 Report Bug](https://github.com/yourusername/academia/issues) • [💡 Request Feature](https://github.com/yourusername/academia/issues)
+[🚀 Live Demo](https://academia.com) • [📚 Documentation](https://docs.academia.com) • [🐛 Report Bug](https://github.com/kubsamelkamu/academia/issues) • [💡 Request Feature](https://github.com/kubsamelkamu/academia/issues)
 
 **Built with ❤️ for educational excellence**
 
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/academia?style=social)](https://github.com/yourusername/academia)
-[![GitHub forks](https://img.shields.io/github/forks/yourusername/academia?style=social)](https://github.com/yourusername/academia)
+[![GitHub stars](https://img.shields.io/github/stars/kubsamelkamu/academia?style=social)](https://github.com/kubsamelkamu/academia)
+[![GitHub forks](https://img.shields.io/github/forks/kubsamelkamu/academia?style=social)](https://github.com/kubsamelkamu/academia)
 
 </div>
