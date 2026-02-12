@@ -2,7 +2,7 @@
 
 ## 🎓 Welcome to Academia - Academic Project Management System
 
-**Academia** is a comprehensive academic project management platform designed to streamline collaboration between students, advisors, coordinators, and department heads in managing academic projects, theses, and defense processes.
+**Academia**   is a comprehensive academic project management platform designed to streamline collaboration between students, advisors, coordinators, and department heads in managing academic projects, theses, and defense processes.
 
 ## 🏗️ Architecture Overview
 
