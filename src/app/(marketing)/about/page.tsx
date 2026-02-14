@@ -11,7 +11,6 @@ import {
   Lightbulb,
   Award,
   Heart,
-  BookOpen,
   Shield,
 } from 'lucide-react'
 

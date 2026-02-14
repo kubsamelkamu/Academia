@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { GraduationCap, Menu, X } from "lucide-react"
+import { Menu, X } from "lucide-react"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -16,7 +17,7 @@ export function Header() {
     <header className="border-b bg-white sticky top-0 z-50">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2" onClick={closeMenu}>
-          <GraduationCap className="h-6 w-6 text-primary" />
+          <Image src="/favicon.png" alt="Academia" width={24} height={24} />
           <span className="text-xl font-bold">Academia</span>
         </Link>
 

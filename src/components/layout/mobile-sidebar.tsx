@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { useSidebarStore } from "@/store/sidebar-store"
 import { Sidebar } from "./sidebar"
 import { type UserRole } from "@/config/navigation"
+import { useEffect, useState } from "react"
 
 interface MobileSidebarProps {
   user: {
@@ -16,7 +17,17 @@ interface MobileSidebarProps {
 }
 
 export function MobileSidebar({ user }: MobileSidebarProps) {
+  const [isClient, setIsClient] = useState(false)
   const { isOpen, close } = useSidebarStore()
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsClient(true)
+  }, [])
+
+  if (!isClient) {
+    return null
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={close}>

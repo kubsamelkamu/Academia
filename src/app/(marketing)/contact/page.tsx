@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
   Mail,
-  Phone,
   Send,
   CheckCircle,
   MessageSquare,
@@ -65,7 +64,7 @@ export default function ContactPage() {
               Contact Us
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Have questions about Academia? Need support or want to learn more? We're here to help.
+              Have questions about Academia? Need support or want to learn more? We&apos;re here to help.
             </p>
           </motion.div>
         </div>
@@ -116,7 +115,7 @@ export default function ContactPage() {
                 <CardHeader>
                   <CardTitle className="text-2xl">Send us a Message</CardTitle>
                   <CardDescription>
-                    Fill out the form below and we'll get back to you within 24 hours.
+                    Fill out the form below and we&apos;ll get back to you within 24 hours.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -128,7 +127,7 @@ export default function ContactPage() {
                     >
                       <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                       <h3 className="text-xl font-semibold mb-2">Message Sent!</h3>
-                      <p className="text-muted-foreground">Thank you for contacting us. We'll respond soon.</p>
+                      <p className="text-muted-foreground">Thank you for contacting us. We&apos;ll respond soon.</p>
                     </motion.div>
                   ) : (
                     <form onSubmit={handleSubmit} className="space-y-6">

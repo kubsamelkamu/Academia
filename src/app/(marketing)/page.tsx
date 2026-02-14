@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Users, 
-  FileText, 
-  Calendar, 
+import { useEffect, useState } from "react"
+import {
+  Users,
+  FileText,
+  Calendar,
   CheckCircle2,
   Shield,
   Zap,
@@ -22,22 +23,31 @@ import {
 } from "lucide-react"
 
 export default function HomePage() {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsClient(true)
+  }, [])
+
   return (
     <>
       {/* Hero Section with Parallax */}
       <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5 py-20 md:py-32">
-        <motion.div 
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-          animate={{ x: [0, 100, 0] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-        />
+        {isClient && (
+          <motion.div
+            className="absolute inset-0 opacity-40"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+            animate={{ x: [0, 100, 0] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          />
+        )}
         <div className="container relative">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={isClient ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="mx-auto max-w-4xl text-center"
           >
@@ -51,7 +61,7 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Streamline your university's academic project workflow from proposal to defense. 
+              Streamline your university&apos;s academic project workflow from proposal to defense. 
               Collaborate seamlessly, track progress, and manage student projects effortlessly with AI-powered insights.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -71,11 +81,11 @@ export default function HomePage() {
             <p className="mt-6 text-sm text-muted-foreground">
               ✨ Free for small departments • No credit card required • 14-day trial
             </p>
-            <motion.div 
+            <motion.div
               className="mt-12 flex items-center justify-center gap-8 text-sm text-muted-foreground"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1, duration: 0.5 }}
+              animate={isClient ? { opacity: 1 } : { opacity: 1 }}
+              transition={{ delay: isClient ? 1 : 0, duration: 0.5 }}
             >
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-green-500" />
@@ -201,7 +211,7 @@ export default function HomePage() {
                       ))}
                     </div>
                     <p className="text-muted-foreground mb-6 italic">
-                      "{testimonial.quote}"
+                      &quot;{testimonial.quote}&quot;
                     </p>
                     <div className="flex items-center gap-3">
                       <Avatar>
