@@ -1,5 +1,5 @@
 
-'use client'
+
 
 import type { Metadata } from 'next'
 // SEO meta tags for Features page
