@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Features | Academia - Academic Project Management',
+  title: 'Features | Academia - Academic Project Management and Collaboration Platform',
   description: 'Explore the powerful features of Academia for academic project management, defense scheduling, real-time collaboration, and more.',
   openGraph: {
-    title: 'Features | Academia - Academic Project Management and Collaboration platform',
+    title: 'Features | Academia - Academic Project Management and Collaboration Platform',
     description: 'Explore the powerful features of Academia for academic project management, defense scheduling, real-time collaboration, and more.',
     url: 'https://academia.et/features',
     siteName: 'Academia',
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'Features | Academia - Academic Project Management',
+    title: 'Features | Academia - Academic Project Management and Collaboration Platform',
     description: 'Explore the powerful features of Academia for academic project management, defense scheduling, real-time collaboration, and more.',
     images: ['/favicon.png'],
     site: '@academia',

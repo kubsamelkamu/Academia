@@ -1,13 +1,11 @@
-
-
-
+'use client'
 import type { Metadata } from 'next'
 // SEO meta tags for Contact page
 export const metadata: Metadata = {
-  title: 'Contact | Academia - Academic Project Management',
+  title: 'Contact | Academia - Academic Project Management and Collaboration Platform',
   description: 'Contact Academia for support, partnership, or general inquiries. We are here to help academic institutions and students succeed.',
   openGraph: {
-    title: 'Contact | Academia - Academic Project Management',
+    title: 'Contact | Academia - Academic Project Management and Collaboration Platform',
     description: 'Contact Academia for support, partnership, or general inquiries. We are here to help academic institutions and students succeed.',
     url: 'https://academia.et/contact',
     siteName: 'Academia',
