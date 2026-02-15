@@ -32,7 +32,6 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Hero Section with Parallax */}
       <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5 py-20 md:py-32">
         {isClient && (
           <motion.div

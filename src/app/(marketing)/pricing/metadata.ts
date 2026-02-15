@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Pricing | Academia - Academic Project Management and Collaboration platform',
     description: 'See Academia pricing plans for academic institutions. Simple, transparent pricing to help you scale your project management needs.',
-    url: 'https://academia.com/pricing',
+    url: 'https://academia.et/pricing',
     siteName: 'Academia',
     images: [
       {
