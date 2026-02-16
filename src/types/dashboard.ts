@@ -29,3 +29,28 @@ export interface DepartmentHeadDashboardData {
   coordinatorStatus: DepartmentHeadCoordinatorStatus[]
   upcomingDefenses: DepartmentHeadDefense[]
 }
+
+export interface CoordinatorKpi {
+  title: string
+  value: string
+  note: string
+  icon: "folderKanban" | "graduationCap" | "calendar" | "clipboardList"
+}
+
+export interface CoordinatorQueueItem {
+  title: string
+  detail: string
+  priority: "High" | "Medium" | "Low"
+}
+
+export interface CoordinatorDefenseItem {
+  team: string
+  date: string
+  room: string
+}
+
+export interface CoordinatorDashboardData {
+  kpis: CoordinatorKpi[]
+  pendingQueue: CoordinatorQueueItem[]
+  upcomingDefenses: CoordinatorDefenseItem[]
+}

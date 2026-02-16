@@ -53,7 +53,6 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
-      {/* Logo */}
       <div className="border-b px-6 py-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           <GraduationCap className="h-6 w-6 text-primary" />
@@ -62,14 +61,13 @@ export function Sidebar({ user }: SidebarProps) {
         <p className="mt-1 text-xs text-muted-foreground">Academic Project Management</p>
       </div>
 
-      {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
         <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Navigation
         </p>
         <nav className="flex flex-col gap-1">
           {navItems.map((item: NavItem) => {
-            const isRootDashboard = item.href === "/dashboard"
+            const isRootDashboard = /^\/dashboard\/[^/]+$/.test(item.href)
             const isActive = isRootDashboard
               ? pathname === item.href
               : pathname === item.href || pathname.startsWith(item.href + "/")
@@ -106,7 +104,6 @@ export function Sidebar({ user }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      {/* User Profile */}
       <div className="border-t p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
