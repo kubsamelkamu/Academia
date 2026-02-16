@@ -8,7 +8,6 @@ import {
   Settings,
   ClipboardList,
   GraduationCap,
-  Building2,
   CheckSquare,
   Clock,
   type LucideIcon,
@@ -30,11 +29,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Dashboard",
       href: "/dashboard",
       icon: LayoutDashboard,
-    },
-    {
-      title: "Departments",
-      href: "/dashboard/departments",
-      icon: Building2,
     },
     {
       title: "Coordinators",

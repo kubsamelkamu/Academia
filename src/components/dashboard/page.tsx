@@ -1,85 +1,238 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FolderKanban, Users, Calendar, CheckCircle2 } from "lucide-react"
+"use client"
 
-export default function DashboardPage() {
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { type UserRole } from "@/config/navigation"
+import { useDepartmentHeadDashboard } from "@/lib/hooks/use-department-head-dashboard"
+import { DepartmentHeadKpi } from "@/types/dashboard"
+import {
+  Building2,
+  Calendar,
+  CheckCircle2,
+  FileClock,
+  ShieldAlert,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
+
+interface DashboardPageProps {
+  role: UserRole
+}
+
+const kpiIcons: Record<DepartmentHeadKpi["icon"], LucideIcon> = {
+  building2: Building2,
+  users: Users,
+  checkCircle2: CheckCircle2,
+  shieldAlert: ShieldAlert,
+}
+
+function DashboardKpiSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {[1, 2, 3, 4].map((item) => (
+        <Card key={item}>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+          </CardHeader>
+          <CardContent>
+            <div className="h-8 w-14 animate-pulse rounded bg-muted" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function DashboardSectionsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="rounded-lg border p-3 space-y-2">
+                <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-72 animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="rounded-lg border p-3 space-y-2">
+                <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader>
+          <div className="h-5 w-44 animate-pulse rounded bg-muted" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-24 animate-pulse rounded-lg border border-dashed bg-muted/30" />
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+function DepartmentHeadDashboard() {
+  
+  const { data, isLoading } = useDepartmentHeadDashboard()
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Department Head Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back! Here&apos;s what&apos;s happening with your projects.
+          Monitor departments, approvals, and academic execution from one place.
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">+2 from last month</p>
-          </CardContent>
-        </Card>
+      {isLoading ? (
+        <DashboardKpiSkeleton />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {data?.kpis.map((card) => {
+            const Icon = kpiIcons[card.icon]
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">+12 from last month</p>
-          </CardContent>
-        </Card>
+            return (
+              <Card key={card.title}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{card.value}</p>
+                  <p className="text-xs text-muted-foreground">{card.note}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming Defenses</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">Next 30 days</p>
-          </CardContent>
-        </Card>
+      {isLoading ? (
+        <DashboardSectionsSkeleton />
+      ) : (
+        <>
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileClock className="h-4 w-4" />
+                  Urgent Approvals
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!data || data.urgentApprovals.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No urgent approvals right now.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {data.urgentApprovals.map((item) => (
+                      <div key={item.title} className="rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{item.title}</p>
+                            <p className="text-xs text-muted-foreground">{item.detail}</p>
+                          </div>
+                          <Badge variant={item.priority === "High" ? "destructive" : "secondary"}>
+                            {item.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">42</div>
-            <p className="text-xs text-muted-foreground">This academic year</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-start gap-4">
-                <div className="h-2 w-2 rounded-full bg-primary mt-2" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Project submission received</p>
-                  <p className="text-xs text-muted-foreground">
-                    Student Team Alpha submitted their proposal document
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">2 hours ago</p>
+            <Card>
+              <CardHeader>
+                <CardTitle>Coordinator & Faculty Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {data?.coordinatorStatus.map((row) => (
+                    <div key={row.name} className="rounded-lg border p-3">
+                      <p className="text-sm font-medium">{row.name}</p>
+                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">Active {row.active}</Badge>
+                        <Badge variant={row.blocked > 0 ? "destructive" : "secondary"}>
+                          Blocked {row.blocked}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Upcoming Defenses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!data || data.upcomingDefenses.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <p className="text-sm font-medium">No defenses scheduled yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Upcoming defense sessions will appear here once coordinators publish schedules.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {data.upcomingDefenses.map((item) => (
+                    <div key={`${item.title}-${item.date}`} className="rounded-lg border p-3">
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.date}</p>
+                      <p className="text-xs text-muted-foreground">{item.committee}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
+}
+
+function RoleFallbackDashboard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Dashboard</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Role-specific dashboard content for this user type will be added in the next steps.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function DashboardPage({ role }: DashboardPageProps) {
+  if (role === "department_head") {
+    return <DepartmentHeadDashboard />
+  }
+
+  return <RoleFallbackDashboard />
 }
