@@ -31,7 +31,7 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={close}>
-      <SheetContent side="left" className="p-0 w-64">
+      <SheetContent side="left" className="w-72 p-0 sm:max-w-sm">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <SheetDescription className="sr-only">
           Main navigation menu for the application
