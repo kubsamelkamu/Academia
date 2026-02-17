@@ -53,19 +53,24 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b px-6">
+      <div className="border-b px-6 py-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           <GraduationCap className="h-6 w-6 text-primary" />
           <span className="text-xl">Academia</span>
         </Link>
+        <p className="mt-1 text-xs text-muted-foreground">Academic Project Management</p>
       </div>
 
-      {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
+        <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Navigation
+        </p>
         <nav className="flex flex-col gap-1">
           {navItems.map((item: NavItem) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+            const isRootDashboard = /^\/dashboard\/[^/]+$/.test(item.href)
+            const isActive = isRootDashboard
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/")
             const Icon = item.icon
 
             return (
@@ -73,16 +78,23 @@ export function Sidebar({ user }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "group flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "border-primary/20 bg-primary/10 text-foreground"
+                    : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-accent-foreground"
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <span
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-md",
+                    isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
                 <span className="flex-1">{item.title}</span>
                 {item.badge && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground">
                     {item.badge}
                   </span>
                 )}
@@ -92,13 +104,12 @@ export function Sidebar({ user }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      {/* User Profile */}
       <div className="border-t p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 px-2"
+              className="h-auto w-full justify-start gap-3 rounded-lg border px-3 py-2"
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user.avatar} alt={user.name} />
@@ -134,7 +145,7 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-red-600">
+            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
