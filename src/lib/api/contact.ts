@@ -1,12 +1,18 @@
-import apiClient from './client'
 import type { ContactData } from '@/store/contact-store'
 
 export const submitContact = async (data: ContactData): Promise<ContactData> => {
-  try {
-    const response = await apiClient.post<ContactData>('https://api.academia.et/api/v1/contact', data)
-    return response.data
-  } catch (error) {
-    // Re-throw the error so it can be handled by the calling component
-    throw error
+  const response = await fetch('/api/contact', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => '')
+    throw new Error(message || `Contact submission failed (${response.status})`)
   }
+
+  return response.json()
 }
