@@ -8,6 +8,7 @@ import { Favicon } from "@/components/Favicon"
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://academia.et"),
   title: "Academia - Academic Project Management and Collaboration Platform",
   description: "Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities.",
   icons: {
@@ -36,6 +37,17 @@ export const metadata: Metadata = {
     images: ["/favicon.png"],
     site: "@academia",
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 }
 
 export default function RootLayout({
@@ -49,13 +61,11 @@ export default function RootLayout({
         <link rel="icon" type="image/png" href="/favicon.png" />
         <meta name="theme-color" content="#2563eb" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* Open Graph Meta Tags */}
         <meta property="og:title" content="Academia - Academic Project Management and Collaboration Platform" />
         <meta property="og:description" content="Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities." />
         <meta property="og:image" content="/favicon.png" />
         <meta property="og:url" content="https://academia.et/" />
         <meta property="og:type" content="website" />
-        {/* Twitter Meta Tags */}
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content="Academia - Academic Project Management and Collaboration Platform" />
         <meta name="twitter:description" content="Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities." />
