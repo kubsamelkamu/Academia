@@ -1,13 +1,17 @@
 'use client'
 
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
+import { useForm, useWatch, UseFormRegisterReturn } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { useContactSubmission } from '@/hooks/use-contact-submission'
+import { contactSchema, type ContactFormData } from '@/validations/contact'
 import type { LucideIcon } from 'lucide-react'
 import {
   Mail,
@@ -197,30 +201,30 @@ const ContactCard = ({ info, index, onSelect }: ContactCardProps) => {
   )
 }
 
-// Animated input field with floating labels
 type AnimatedInputProps = {
   id: string
   label: string
   type?: React.HTMLInputTypeAttribute
-  value: string
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  register: UseFormRegisterReturn
+  value?: string
+  error?: string
   required?: boolean
   isTextarea?: boolean
 }
 
-const AnimatedInput = ({ id, label, type = "text", value, onChange, required, isTextarea = false }: AnimatedInputProps) => {
+const AnimatedInput = ({ id, label, type = "text", register, value = '', error, required, isTextarea = false }: AnimatedInputProps) => {
   const [isFocused, setIsFocused] = useState(false)
   const hasValue = value.length > 0
 
   const Component = isTextarea ? Textarea : Input
 
   return (
-    <motion.div 
+    <motion.div
       className="relative"
       animate={{ y: isFocused ? -2 : 0 }}
       transition={{ duration: 0.2 }}
     >
-      <Label 
+      <Label
         htmlFor={id}
         className={`absolute left-3 transition-all pointer-events-none ${
           isFocused || hasValue
@@ -233,18 +237,24 @@ const AnimatedInput = ({ id, label, type = "text", value, onChange, required, is
       </Label>
       <Component
         id={id}
-        name={id}
         type={type}
-        value={value}
-        onChange={onChange}
-        required={required}
+        {...register}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         className={`mt-1 transition-all duration-200 ${
           isFocused ? 'border-primary ring-2 ring-primary/20' : ''
-        }`}
+        } ${error ? 'border-destructive' : ''}`}
         rows={isTextarea ? 5 : undefined}
       />
+      {error && (
+        <motion.p
+          className="text-sm text-destructive mt-1"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {error}
+        </motion.p>
+      )}
       <motion.div
         className="absolute bottom-0 left-0 h-0.5 bg-primary"
         initial={{ width: 0 }}
@@ -255,7 +265,6 @@ const AnimatedInput = ({ id, label, type = "text", value, onChange, required, is
   )
 }
 
-// Interactive FAQ item with enhanced animations
 const FAQItem = ({ faq, index }: { faq: { question: string; answer: string }, index: number }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -329,17 +338,30 @@ const FAQItem = ({ faq, index }: { faq: { question: string; answer: string }, in
 
 export default function ContactPage() {
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [ticketNumber, setTicketNumber] = useState<number | null>(null)
   const [selectedContact, setSelectedContact] = useState<ContactInfoItem | null>(null)
-  
+
+  const form = useForm<ContactFormData>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      subject: '',
+      message: '',
+    },
+  })
+
+  const { submitContactForm, isSubmitting, isSuccess, error, resetForm } = useContactSubmission()
+
+  // Auto-hide success message after 5 seconds.
+  // This only resets the mutation/store state (no form.reset here), so it won't cause render loops.
+  useEffect(() => {
+    if (!isSuccess) return
+    const timer = setTimeout(() => {
+      resetForm()
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [isSuccess, resetForm])
+
   const heroRef = useRef(null)
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -348,33 +370,21 @@ export default function ContactPage() {
   
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0.3])
   const heroScale = useTransform(scrollYProgress, [0, 1], [1, 0.95])
+  const watchedValues = useWatch({ control: form.control })
 
   const formProgress = useMemo(() => {
-    const values = Object.values(formData)
-    if (values.length === 0) return 0
-    const filledFields = values.filter((val) => val.trim().length > 0).length
-    return (filledFields / values.length) * 100
-  }, [formData])
+    const values = watchedValues
+    const filledFields = Object.values(values || {}).filter((val) => val && val.trim().length > 0).length
+    return (filledFields / 4) * 100
+  }, [watchedValues])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    for (let i = 0; i <= 100; i += 20) {
-      await new Promise(resolve => setTimeout(resolve, 200))
+  const handleSubmit = async (data: ContactFormData) => {
+    try {
+      await submitContactForm(data)
+      form.reset()
+    } catch {
+      // Errors are handled by the mutation + store; don't reset the form.
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 500))
-    setIsSubmitting(false)
-    setSubmitted(true)
-    setTicketNumber(Math.floor(Math.random() * 10000))
-    setFormData({ name: '', email: '', subject: '', message: '' })
-    
-    setTimeout(() => setSubmitted(false), 5000)
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   return (
@@ -546,7 +556,7 @@ export default function ContactPage() {
 
                 <CardContent className="p-6">
                   <AnimatePresence mode="wait">
-                    {submitted ? (
+                    {isSuccess ? (
                       <motion.div
                         key="success"
                         initial={{ opacity: 0, scale: 0.8 }}
@@ -573,15 +583,14 @@ export default function ContactPage() {
                             Response time: ~2h
                           </Badge>
                           <Badge variant="outline" className="px-4 py-2">
-                            <Users className="h-4 w-4 mr-2" />
-                            Ticket #: ACD{ticketNumber ?? '----'}
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Message sent successfully
                           </Badge>
                         </div>
                       </motion.div>
                     ) : (
                       <motion.form
-                        key="form"
-                        onSubmit={handleSubmit}
+                        onSubmit={form.handleSubmit(handleSubmit)}
                         className="space-y-6"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -591,16 +600,18 @@ export default function ContactPage() {
                           <AnimatedInput
                             id="name"
                             label="Full Name"
-                            value={formData.name}
-                            onChange={handleChange}
+                            register={form.register('name')}
+                            value={watchedValues?.name}
+                            error={form.formState.errors.name?.message}
                             required
                           />
                           <AnimatedInput
                             id="email"
                             label="Email Address"
                             type="email"
-                            value={formData.email}
-                            onChange={handleChange}
+                            register={form.register('email')}
+                            value={watchedValues?.email}
+                            error={form.formState.errors.email?.message}
                             required
                           />
                         </div>
@@ -608,27 +619,39 @@ export default function ContactPage() {
                         <AnimatedInput
                           id="subject"
                           label="Subject"
-                          value={formData.subject}
-                          onChange={handleChange}
+                          register={form.register('subject')}
+                          value={watchedValues?.subject}
+                          error={form.formState.errors.subject?.message}
                           required
                         />
                         
                         <AnimatedInput
                           id="message"
                           label="Your Message"
-                          value={formData.message}
-                          onChange={handleChange}
+                          register={form.register('message')}
+                          value={watchedValues?.message}
+                          error={form.formState.errors.message?.message}
                           required
                           isTextarea
                         />
 
-                        {formData.message.length > 0 && (
+                        {watchedValues?.message && watchedValues.message.length > 0 && (
                           <motion.div 
                             className="text-xs text-right text-muted-foreground"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                           >
-                            {formData.message.length}/500 characters
+                            {watchedValues.message.length}/500 characters
+                          </motion.div>
+                        )}
+
+                        {error && (
+                          <motion.div
+                            className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                          >
+                            {error}
                           </motion.div>
                         )}
 
