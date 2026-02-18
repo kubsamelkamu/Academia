@@ -127,10 +127,10 @@ export default function FeaturesPage() {
           <div className="mb-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Built for Every Role</h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Tailored features for departments, advisors, and students
+              Tailored features for department heads, coordinators, advisors, evaluators, and students
             </p>
           </div>
-          <div className="flex flex-col md:flex-row md:justify-center gap-6 mb-8">
+          <div className="flex flex-col md:flex-row md:flex-wrap md:justify-center gap-6 mb-8">
             {roleFeatures.map((role, idx) => {
               const Icon = role.icon
               return (
@@ -334,25 +334,48 @@ const coreFeatures = [
 
 const roleFeatures = [
   {
-    role: 'For Departments',
+    role: 'For Department Heads',
     icon: Shield,
-    description: 'Administrative tools to manage the entire department efficiently',
+    description: 'Administrative oversight to keep programs, people, and policies aligned',
     features: [
       {
+        title: 'Program Oversight',
+        description: 'Track projects, defenses, and outcomes across the department',
+      },
+      {
+        title: 'Role & Access Control',
+        description: 'Ensure the right people have the right access at the right time',
+      },
+      {
         title: 'Advisor Management',
-        description: 'Easily manage advisor profiles, workload, and availability',
-      },
-      {
-        title: 'Project Oversight',
-        description: 'Monitor all projects across the department in real-time',
-      },
-      {
-        title: 'Defense Coordination',
-        description: 'Schedule and manage defense sessions with automated logistics',
+        description: 'Balance workloads, approvals, and advisor assignments',
       },
       {
         title: 'Reporting & Analytics',
         description: 'Generate comprehensive reports on department performance',
+      },
+    ],
+  },
+  {
+    role: 'For Coordinators',
+    icon: Calendar,
+    description: 'Operational tools to keep projects moving and defenses on schedule',
+    features: [
+      {
+        title: 'Project Assignment',
+        description: 'Coordinate student placement, advisor assignment, and approvals',
+      },
+      {
+        title: 'Defense Scheduling',
+        description: 'Organize defenses with conflict checks and clear timelines',
+      },
+      {
+        title: 'Communication Hub',
+        description: 'Send announcements and keep stakeholders aligned in one place',
+      },
+      {
+        title: 'Operational Reporting',
+        description: 'Spot bottlenecks early with status dashboards and exports',
       },
     ],
   },
@@ -376,6 +399,29 @@ const roleFeatures = [
       {
         title: 'Progress Tracking',
         description: 'Monitor student progress and identify issues early',
+      },
+    ],
+  },
+  {
+    role: 'For Evaluators',
+    icon: CheckCircle,
+    description: 'Structured evaluation tools for committee members and reviewers',
+    features: [
+      {
+        title: 'Evaluation Forms',
+        description: 'Use consistent rubrics to review submissions and defenses',
+      },
+      {
+        title: 'Scoring & Notes',
+        description: 'Capture scores and qualitative feedback in one workflow',
+      },
+      {
+        title: 'Defense Participation',
+        description: 'Access schedules, project materials, and committee context',
+      },
+      {
+        title: 'Final Recommendations',
+        description: 'Submit outcomes and recommendations with an audit trail',
       },
     ],
   },

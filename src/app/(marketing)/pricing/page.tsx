@@ -1,6 +1,3 @@
-
-
-
 'use client'
 
 import { motion } from 'framer-motion'
@@ -9,7 +6,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
 import { useState } from 'react'
 
 export default function PricingPage() {
