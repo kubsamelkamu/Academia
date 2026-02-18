@@ -3,13 +3,12 @@
 import { motion } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 import Link from 'next/link'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useState } from 'react'
 
 export default function PricingPage() {
-  const [billing, setBilling] = useState<'annual' | 'monthly'>('annual')
   return (
     <>
       <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5 py-20 md:py-32">
@@ -32,26 +31,9 @@ export default function PricingPage() {
               Simple, Transparent Pricing
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Choose the perfect plan for your institution. Start free and scale as you grow.
+              Plans built for universities and departments of any size.
             </p>
-            <div className="mt-8 flex items-center justify-center gap-4">
-              <span className="text-sm text-muted-foreground">Billed</span>
-              <button
-                className={`px-4 py-2 rounded-full border transition-colors ${billing === 'annual' ? 'bg-primary text-white border-primary' : 'bg-background border-muted-foreground text-muted-foreground'}`}
-                onClick={() => setBilling('annual')}
-                aria-pressed={billing === 'annual'}
-              >
-                Annually
-              </button>
-              <button
-                className={`px-4 py-2 rounded-full border transition-colors ${billing === 'monthly' ? 'bg-primary text-white border-primary' : 'bg-background border-muted-foreground text-muted-foreground'}`}
-                onClick={() => setBilling('monthly')}
-                aria-pressed={billing === 'monthly'}
-              >
-                Monthly
-              </button>
-            </div>
-            <p className="mt-4 text-sm text-muted-foreground">14-day free trial • No credit card required</p>
+            <p className="mt-6 text-sm text-muted-foreground">Start on Free • Upgrade anytime</p>
           </motion.div>
         </div>
       </section>
@@ -59,11 +41,6 @@ export default function PricingPage() {
         <div className="container">
           <div className="grid gap-8 lg:grid-cols-2 lg:max-w-4xl lg:mx-auto">
             {plans.map((plan, index) => {
-              const price = plan.price === 0
-                ? 0
-                : billing === 'annual'
-                  ? plan.price
-                  : Math.round(plan.price * 1.2)
               return (
                 <motion.div
                   key={plan.name}
@@ -72,26 +49,18 @@ export default function PricingPage() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   whileHover={{ scale: 1.03, y: -5 }}
                 >
-                  <Card className={plan.popular ? 'border-primary shadow-lg ring-2 ring-primary/20' : 'hover:shadow-lg transition-shadow'}>
+                  <Card className={plan.popular ? 'border-primary ring-2 ring-primary/20' : 'hover:shadow-lg transition-shadow'}>
                     <CardHeader>
                       {plan.popular && (
-                        <Badge className="mb-2 w-fit animate-pulse">Most Popular</Badge>
+                        <Badge className="mb-2 w-fit">Most Popular</Badge>
                       )}
                       <CardTitle className="text-2xl">{plan.name}</CardTitle>
                       <CardDescription>{plan.description}</CardDescription>
                       <div className="mt-4">
-                        <span className="text-4xl font-bold">{price === 0 ? 'Free' : `$${price}`}</span>
-                        {price > 0 && (
-                          <span className="text-muted-foreground">/month</span>
-                        )}
+                        <span className="text-4xl font-bold">{plan.price === 0 ? 'Free' : `$${plan.price}`}</span>
+                        {plan.price > 0 && <span className="text-muted-foreground">/month</span>}
                       </div>
-                      {plan.price > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          {billing === 'annual'
-                            ? 'Billed annually for best rate'
-                            : `Billed monthly, cancel anytime`}
-                        </p>
-                      )}
+                      {plan.price > 0 && <p className="text-sm text-muted-foreground">Billed monthly</p>}
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-3">
@@ -175,9 +144,8 @@ export default function PricingPage() {
 }
 
 // FAQItem: animated accordion for FAQ
-import { useState as useReactState } from 'react'
 function FAQItem({ faq, index }: { faq: { question: string; answer: string }, index: number }) {
-  const [open, setOpen] = useReactState(false)
+  const [open, setOpen] = useState(false)
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -207,38 +175,36 @@ function FAQItem({ faq, index }: { faq: { question: string; answer: string }, in
 const plans = [
   {
     name: 'Free',
-    description: 'Perfect for small departments getting started',
+    description: 'For small departments getting started',
     price: 0,
     cta: 'Get Started Free',
     popular: false,
     features: [
-      { name: 'Up to 50 active projects', included: true },
-      { name: 'Up to 5 advisors', included: true },
-      { name: 'Basic project tracking', included: true },
-      { name: 'Email notifications', included: true },
-      { name: 'Community support', included: true },
-      { name: 'Defense scheduling', included: false },
-      { name: 'Analytics dashboard', included: false },
-      { name: 'Custom workflows', included: false },
+      { name: 'Up to 100 users', included: true },
+      { name: 'Up to 40 projects', included: true },
+      { name: '10 GB storage', included: true },
+      { name: 'Basic reports', included: true },
+      { name: 'Email limit: 1,500/month', included: true },
+      { name: 'Report exports: 0/month', included: true },
+      { name: 'API access', included: false },
       { name: 'Priority support', included: false },
     ],
   },
   {
-    name: 'Premium',
-    description: 'For departments needing advanced features and support',
-    price: 199,
-    cta: 'Start Free Trial',
+    name: 'Pro',
+    description: 'For scaling departments that need advanced reporting and integrations',
+    price: 129,
+    cta: 'Upgrade to Pro',
     popular: true,
     features: [
+      { name: 'Up to 400 users', included: true },
       { name: 'Unlimited projects', included: true },
-      { name: 'Unlimited advisors', included: true },
-      { name: 'Advanced project tracking', included: true },
-      { name: 'Email & SMS notifications', included: true },
+      { name: '20 GB storage', included: true },
+      { name: 'Advanced reports', included: true },
+      { name: 'Email limit: 25,000/month', included: true },
+      { name: 'Report exports: 100/month', included: true },
+      { name: 'API access', included: true },
       { name: 'Priority support', included: true },
-      { name: 'Defense scheduling', included: true },
-      { name: 'Analytics dashboard', included: true },
-      { name: 'Custom workflows', included: true },
-      { name: 'Dedicated account manager', included: true },
     ],
   },
 ]
@@ -246,19 +212,19 @@ const plans = [
 const faqs = [
   {
     question: 'Can I change plans later?',
-    answer: 'Yes! You can upgrade from Free to Premium at any time. Changes take effect immediately.',
+    answer: 'Yes. You can upgrade from Free to Pro at any time. Changes take effect immediately.',
   },
   {
-    question: 'What happens after the free trial?',
-    answer: 'You can continue using the Free plan indefinitely, or upgrade to Premium to unlock advanced features.',
+    question: 'Is there a free trial?',
+    answer: 'You can use the Free plan indefinitely and upgrade to Pro whenever you are ready.',
   },
   {
     question: 'How is billing handled?',
-    answer: 'We bill annually by default for the best rate, but monthly billing is also available. All payments are processed securely.',
+    answer: 'Billing is monthly for Pro. You can cancel anytime.',
   },
   {
     question: 'Is there a setup fee?',
-    answer: 'No setup fees ever. You only pay for your Premium subscription, and you can cancel anytime.',
+    answer: 'No setup fees. You only pay for Pro when you upgrade.',
   },
   {
     question: 'Do you offer educational discounts?',
