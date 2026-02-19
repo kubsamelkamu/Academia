@@ -1,6 +1,3 @@
-
-
-
 'use client'
 
 import { motion } from 'framer-motion'
@@ -27,11 +24,11 @@ export default function FeaturesPage() {
   const [activeRole, setActiveRole] = useState(0)
   return (
     <>
-      <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5 py-20 md:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32">
         <motion.div 
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%233B82F6' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
           animate={{ x: [0, 100, 0] }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -43,40 +40,22 @@ export default function FeaturesPage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="mx-auto max-w-4xl text-center"
           >
-            <Badge variant="secondary" className="mb-4 animate-pulse">All-in-One Academic Platform</Badge>
+            <Badge variant="secondary" className="mb-4 animate-pulse bg-blue-400/10 text-blue-400 border-blue-400/20">
+              All-in-One Academic Platform
+            </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
-              Everything you need to manage academic projects
+              <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Everything you need
+              </span>
+              <br />to manage academic projects
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               From proposal to defense, Academia provides every tool for departments, advisors, and students to collaborate, track, and succeed—beautifully and efficiently.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button size="lg" className="px-8 py-3 text-lg" asChild>
-                  <Link href="/register/department">Start Free Trial</Link>
-                </Button>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button size="lg" variant="outline" className="px-8 py-3 text-lg" asChild>
-                  <Link href="/pricing">View Pricing</Link>
-                </Button>
-              </motion.div>
-            </div>
-            <motion.div 
-              className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1, duration: 0.5 }}
-            >
-              <span>✨ Free for small departments</span>
-              <span>• No credit card required</span>
-              <span>• 14-day trial</span>
-            </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* Core Features Section - Animated Cards */}
       <section className="py-20 bg-muted/40">
         <div className="container">
           <div className="mb-12 text-center">
@@ -98,8 +77,8 @@ export default function FeaturesPage() {
               >
                 <Card className="h-full hover:shadow-lg transition-shadow">
                   <CardHeader>
-                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                      <feature.icon className="h-6 w-6 text-primary" />
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10">
+                      <feature.icon className="h-6 w-6 text-blue-400" />
                     </div>
                     <CardTitle>{feature.title}</CardTitle>
                     <CardDescription>{feature.description}</CardDescription>
@@ -108,7 +87,7 @@ export default function FeaturesPage() {
                     <ul className="space-y-2 text-sm">
                       {feature.details.map((detail) => (
                         <li key={detail} className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                          <CheckCircle className="h-4 w-4 shrink-0 text-blue-400 mt-0.5" />
                           <span className="text-muted-foreground">{detail}</span>
                         </li>
                       ))}
@@ -121,7 +100,6 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* Role Features Section - Tabbed & Animated */}
       <section className="py-20">
         <div className="container">
           <div className="mb-12 text-center">
@@ -138,10 +116,10 @@ export default function FeaturesPage() {
                   key={role.role}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-6 py-2 rounded-full border border-primary/20 bg-background hover:bg-primary/10 transition-colors text-primary font-semibold shadow-sm"
+                  className="flex items-center gap-2 px-6 py-2 rounded-full border border-blue-400/20 bg-background hover:bg-blue-400/10 transition-colors text-blue-400 font-semibold shadow-sm"
                   onClick={() => setActiveRole(idx)}
                   aria-selected={activeRole === idx}
-                  style={{ outline: activeRole === idx ? '2px solid var(--primary)' : undefined }}
+                  style={{ outline: activeRole === idx ? '2px solid #60A5FA' : undefined }}
                 >
                   <Icon className="h-5 w-5" />
                   {role.role}
@@ -158,10 +136,10 @@ export default function FeaturesPage() {
             <Card className="max-w-3xl mx-auto">
               <CardHeader>
                 <div className="flex items-center gap-4">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-lg bg-blue-400/10">
                     {(() => {
                       const Icon = roleFeatures[activeRole].icon
-                      return <Icon className="h-8 w-8 text-primary" />
+                      return <Icon className="h-8 w-8 text-blue-400" />
                     })()}
                   </div>
                   <div>
@@ -207,8 +185,8 @@ export default function FeaturesPage() {
                 <Card className="h-full hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-start gap-4">
-                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <feature.icon className="h-5 w-5 text-primary" />
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-400/10">
+                        <feature.icon className="h-5 w-5 text-blue-400" />
                       </div>
                       <div className="flex-1">
                         <CardTitle>{feature.title}</CardTitle>
@@ -223,10 +201,9 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container">
-          <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-2 border-primary/20">
+          <Card className="bg-gradient-to-r from-blue-400/10 via-blue-400/5 to-background border-2 border-blue-400/20">
             <CardContent className="p-12 text-center">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -242,13 +219,8 @@ export default function FeaturesPage() {
                 </p>
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button size="lg" className="px-8 py-3 text-lg" asChild>
+                    <Button size="lg" className="px-8 py-3 text-lg bg-blue-400 hover:bg-blue-500" asChild>
                       <Link href="/register/department">Start Free Trial</Link>
-                    </Button>
-                  </motion.div>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button size="lg" variant="outline" className="px-8 py-3 text-lg" asChild>
-                      <Link href="/pricing">View Pricing</Link>
                     </Button>
                   </motion.div>
                 </div>
@@ -260,8 +232,6 @@ export default function FeaturesPage() {
     </>
   )
 }
-
-
 
 const coreFeatures = [
   {

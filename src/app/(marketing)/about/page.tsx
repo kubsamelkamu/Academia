@@ -1,6 +1,3 @@
-
-
-
 'use client'
 
 import { motion } from 'framer-motion'
@@ -20,11 +17,11 @@ import {
 export default function AboutPage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/50 to-primary/5 py-20 md:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32">
         <motion.div 
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%233B82F6' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
           animate={{ x: [0, 100, 0] }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -36,18 +33,23 @@ export default function AboutPage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="mx-auto max-w-4xl text-center"
           >
-            <Badge variant="secondary" className="mb-4 animate-pulse">About Us</Badge>
+            <Badge variant="secondary" className="mb-4 animate-pulse bg-blue-400/10 text-blue-400 border-blue-400/20">
+              About Us
+            </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
-              Empowering Academic Excellence
+              <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Empowering
+              </span>
+              <br />Academic Excellence
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Academia is dedicated to revolutionizing academic project management, fostering collaboration between students, advisors, and departments.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button asChild size="lg" className="px-8 py-3 text-lg">
+              <Button asChild size="lg" className="px-8 py-3 text-lg bg-blue-400 hover:bg-blue-500">
                 <Link href="/register">Get Started</Link>
               </Button>
-              <Button variant="outline" size="lg" asChild className="px-8 py-3 text-lg">
+              <Button variant="outline" size="lg" asChild className="px-8 py-3 text-lg border-blue-400 text-blue-400 hover:bg-blue-400/10">
                 <Link href="/features">Learn More</Link>
               </Button>
             </div>
@@ -72,7 +74,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Target className="h-8 w-8 text-primary" />
+                  <Target className="h-8 w-8 text-blue-400" />
                   <CardTitle>Streamlined Processes</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -90,7 +92,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Users className="h-8 w-8 text-primary" />
+                  <Users className="h-8 w-8 text-blue-400" />
                   <CardTitle>Enhanced Collaboration</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -108,7 +110,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Award className="h-8 w-8 text-primary" />
+                  <Award className="h-8 w-8 text-blue-400" />
                   <CardTitle>Quality Assurance</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -130,32 +132,33 @@ export default function AboutPage() {
               Founded to transform academic project management, Academia bridges gaps in traditional workflows. Our founders—educators and technologists—recognized the challenges faced by students and faculty in managing complex projects.
             </p>
           </div>
-          <ol className="relative border-l-2 border-primary/20 max-w-2xl mx-auto">
+          <ol className="relative border-l-2 border-blue-400/20 max-w-2xl mx-auto">
             <li className="mb-12 ml-6">
-              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">1</span>
+              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-400 text-white">1</span>
               <h3 className="text-xl font-semibold">The Vision</h3>
               <p className="mt-2 text-muted-foreground">A desire to empower academic excellence and collaboration sparked the idea for Academia.</p>
             </li>
             <li className="mb-12 ml-6">
-              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">2</span>
+              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-400 text-white">2</span>
               <h3 className="text-xl font-semibold">Research & Collaboration</h3>
               <p className="mt-2 text-muted-foreground">We partnered with universities to understand real-world needs and pain points in project management.</p>
             </li>
             <li className="mb-12 ml-6">
-              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">3</span>
+              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-400 text-white">3</span>
               <h3 className="text-xl font-semibold">Building Academia</h3>
               <p className="mt-2 text-muted-foreground">Our team designed and built a platform that anticipates the future of academic project management.</p>
             </li>
             <li className="ml-6">
-              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">4</span>
+              <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-400 text-white">4</span>
               <h3 className="text-xl font-semibold">Ongoing Innovation</h3>
               <p className="mt-2 text-muted-foreground">We continue to evolve, driven by feedback from the academic community worldwide.</p>
             </li>
           </ol>
         </div>
       </section>
+      
       {/* Stats Section - Animated */}
-      <section className="py-20 bg-muted/30">
+      <section className="py-20 bg-gradient-to-r from-blue-400/10 to-blue-500/10">
         <div className="container">
           <div className="grid gap-8 md:grid-cols-3">
             {[
@@ -171,7 +174,7 @@ export default function AboutPage() {
                 transition={{ duration: 0.5, delay: index * 0.2 }}
                 viewport={{ once: true }}
               >
-                <div className="text-5xl font-bold text-primary mb-2">{stat.value}</div>
+                <div className="text-5xl font-bold text-blue-400 mb-2">{stat.value}</div>
                 <div className="text-muted-foreground font-medium">{stat.label}</div>
               </motion.div>
             ))}
@@ -194,7 +197,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Lightbulb className="h-8 w-8 text-primary" />
+                  <Lightbulb className="h-8 w-8 text-blue-400" />
                   <CardTitle>Innovation</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -212,7 +215,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Heart className="h-8 w-8 text-primary" />
+                  <Heart className="h-8 w-8 text-blue-400" />
                   <CardTitle>Community</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -230,7 +233,7 @@ export default function AboutPage() {
             >
               <Card>
                 <CardHeader>
-                  <Shield className="h-8 w-8 text-primary" />
+                  <Shield className="h-8 w-8 text-blue-400" />
                   <CardTitle>Integrity</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -259,10 +262,10 @@ export default function AboutPage() {
               Be part of the revolution in academic project management. Start your journey today.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="bg-blue-400 hover:bg-blue-500">
                 <Link href="/register">Get Started</Link>
               </Button>
-              <Button variant="outline" size="lg" asChild>
+              <Button variant="outline" size="lg" asChild className="border-blue-400 text-blue-400 hover:bg-blue-400/10">
                 <Link href="/features">Learn More</Link>
               </Button>
             </div>

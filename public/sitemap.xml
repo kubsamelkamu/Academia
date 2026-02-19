@@ -16,8 +16,4 @@
     <loc>https://academia.et/features</loc>
     <priority>0.7</priority>
   </url>
-  <url>
-    <loc>https://academia.et/pricing</loc>
-    <priority>0.7</priority>
-  </url>
 </urlset>

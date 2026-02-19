@@ -17,7 +17,17 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#4F46E5", // Indigo
+          DEFAULT: "#3B82F6", // Softer blue - more approachable
+          50: "#EFF6FF",
+          100: "#DBEAFE",
+          200: "#BFDBFE",
+          300: "#93C5FD",
+          400: "#60A5FA",
+          500: "#3B82F6", // Main softer blue
+          600: "#2563EB",
+          700: "#1D4ED8",
+          800: "#1E40AF",
+          900: "#1E3A8A",
           foreground: "#FFFFFF",
         },
         secondary: {
@@ -25,12 +35,17 @@ const config: Config = {
           foreground: "#FFFFFF",
         },
         accent: {
-          DEFAULT: "#10B981", // Emerald
+          DEFAULT: "#0EA5E9", // Sky blue
           foreground: "#FFFFFF",
         },
         muted: {
           DEFAULT: "#F8FAFC",
           foreground: "#64748B",
+        },
+        academic: {
+          blue: "#3B82F6",
+          light: "#60A5FA",
+          dark: "#2563EB",
         },
       },
       fontFamily: {
