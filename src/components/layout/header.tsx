@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -67,6 +66,13 @@ export function Header() {
             About
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-200" />
           </Link>
+          <Link
+            href="/docs"
+            className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-all duration-200 relative group"
+          >
+            Docs
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-200" />
+          </Link>
         </nav>
 
         {/* Desktop Buttons */}
@@ -117,6 +123,13 @@ export function Header() {
                   onClick={closeMenu}
                 >
                   About
+                </Link>
+                <Link
+                  href="/docs"
+                  className="text-base font-medium text-muted-foreground hover:text-blue-500 hover:bg-blue-500/5 transition-all duration-200 py-3 px-4 rounded-lg"
+                  onClick={closeMenu}
+                >
+                  Docs
                 </Link>
               </nav>
 
