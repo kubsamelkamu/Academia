@@ -32,6 +32,7 @@ interface AuthState {
   verifyEmailOtp: (dto: VerifyEmailOtpDto) => Promise<void>;
   resendEmailOtp: (dto: ResendEmailOtpDto) => Promise<void>;
   login: (dto: LoginDto) => Promise<void>;
+  clearAuthSession: () => void;
   logout: () => void;
   clearError: () => void;
 }
@@ -122,6 +123,15 @@ export const useAuthStore = create<AuthState>()(
           set({ error: message, isLoading: false });
           throw new Error(message);
         }
+      },
+
+      clearAuthSession: () => {
+        set({
+          accessToken: undefined,
+          refreshToken: undefined,
+          user: undefined,
+          error: undefined,
+        });
       },
 
       logout: () => {

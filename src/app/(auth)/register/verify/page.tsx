@@ -47,6 +47,7 @@ export default function VerifyPage() {
     isLoading,
     error,
     clearError,
+    clearAuthSession,
     registration,
     tenantDomain,
   } = useAuthStore();
@@ -93,6 +94,9 @@ export default function VerifyPage() {
         email: registration!.departmentHead.email,
         otp: data.otp,
       });
+
+      // Ensure we don't get redirected to /dashboard due to a previously persisted session.
+      clearAuthSession();
       router.push('/login');
     } catch (err) {
       // Error handled by store
