@@ -98,7 +98,7 @@ export default function VerifyPage() {
       // Ensure we don't get redirected to /dashboard due to a previously persisted session.
       clearAuthSession();
       router.push('/login');
-    } catch (err) {
+    } catch (_err) {
       // Error handled by store
     }
   };
@@ -113,7 +113,7 @@ export default function VerifyPage() {
       });
       setResendMessage('OTP sent successfully! Check your email.');
       setCountdown(60); // 60 second cooldown
-    } catch (err) {
+    } catch (_err) {
       setResendMessage('Failed to resend OTP. Please try again.');
     } finally {
       setResendLoading(false);
@@ -148,7 +148,7 @@ export default function VerifyPage() {
             Verify Your Email
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We've sent a verification code to secure your academic institution account
+            We&apos;ve sent a verification code to secure your academic institution account
           </p>
         </motion.div>
 
@@ -194,7 +194,7 @@ export default function VerifyPage() {
               <CheckCircle2 className="w-8 h-8 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Secure & Protected</h3>
               <p className="text-green-100">
-                Your verification code ensures only authorized personnel can access your institution's academic management system.
+                Your verification code ensures only authorized personnel can access your institution&apos;s academic management system.
               </p>
             </motion.div>
           </motion.div>
@@ -282,7 +282,7 @@ export default function VerifyPage() {
 
                 <div className="mt-6 pt-6 border-t">
                   <p className="text-sm text-gray-600 text-center mb-4">
-                    Didn't receive the code?
+                    Didn&apos;t receive the code?
                   </p>
 
                   <form onSubmit={handleResendSubmit(onResend)} className="space-y-2">

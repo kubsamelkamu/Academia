@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { loginSchema, LoginFormData } from '@/validations/auth';
+import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from '@/lib/auth/dashboard-role-paths';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -52,10 +53,20 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  // Helper function to handle role-based redirection
+  const redirectToDashboard = (userRoles?: string[]) => {
+    const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
+    if (primaryRole) {
+      router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   useEffect(() => {
     // Redirect if already logged in
     if (user) {
-      router.push('/dashboard');
+      redirectToDashboard(user.roles);
       return;
     }
   }, [user, router]);
@@ -64,8 +75,10 @@ export default function LoginPage() {
     try {
       clearError();
       await login(data);
-      router.push('/dashboard');
-    } catch (err) {
+
+      const state = useAuthStore.getState();
+      redirectToDashboard(state.user?.roles);
+    } catch (_err) {
       // Error handled by store
     }
   };
@@ -94,7 +107,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Access your institution's academic management dashboard
+            Access your institution&apos;s academic management dashboard
           </p>
         </motion.div>
 
@@ -139,7 +152,7 @@ export default function LoginPage() {
               <BarChart3 className="w-8 h-8 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Powerful Analytics</h3>
               <p className="text-purple-100">
-                Get insights into your institution's academic performance with comprehensive analytics and reporting tools.
+                Get insights into your institution&apos;s academic performance with comprehensive analytics and reporting tools.
               </p>
             </motion.div>
           </motion.div>
@@ -257,7 +270,7 @@ export default function LoginPage() {
                   variants={itemVariants}
                 >
                   <p className="text-sm text-gray-600 mb-2">
-                    Don't have an account?
+                    Don&apos;t have an account?
                   </p>
                   <motion.div
                     whileHover={{ scale: 1.05 }}
