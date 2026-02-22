@@ -1,24 +1,12 @@
 import { type UserRole } from "@/config/navigation"
-import { type ReactElement } from "react"
-import { AdvisorDashboard } from "./roles/advisor-dashboard"
-import { CoordinatorDashboard } from "./roles/coordinator-dashboard"
-import { DepartmentCommitteeDashboard } from "./roles/department-committee-dashboard"
-import { DepartmentHeadDashboard } from "./roles/department-head-dashboard"
-import { RoleFallbackDashboard } from "./roles/role-fallback-dashboard"
-import { StudentDashboard } from "./roles/student-dashboard"
+import { getDashboardUser } from "@/lib/auth/mock-session"
+import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard"
 
 interface DashboardPageProps {
   role: UserRole
 }
 
-export default function DashboardPage({ role }: DashboardPageProps) {
-  const roleDashboards: Record<UserRole, ReactElement> = {
-    department_head: <DepartmentHeadDashboard />,
-    coordinator: <CoordinatorDashboard />,
-    advisor: <AdvisorDashboard />,
-    student: <StudentDashboard />,
-    department_committee: <DepartmentCommitteeDashboard />,
-  }
-
-  return roleDashboards[role] ?? <RoleFallbackDashboard />
+export default async function DashboardPage({ role }: DashboardPageProps) {
+  const user = await getDashboardUser()
+  return <CustomizableDashboard role={role} userId={user.id} userName={user.name} />
 }

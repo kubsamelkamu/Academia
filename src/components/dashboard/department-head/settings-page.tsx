@@ -74,6 +74,10 @@ const initialConfigs: DepartmentConfig[] = [
 ]
 
 export function DepartmentHeadSettingsPage() {
+  return <DepartmentHeadSettingsPageContent />
+}
+
+export function DepartmentHeadSettingsPageContent({ embedded = false }: { embedded?: boolean }) {
   const [phases, setPhases] = useState<AcademicPhase[]>(initialPhases)
   const [configs, setConfigs] = useState<DepartmentConfig[]>(initialConfigs)
   const [calendarPublished, setCalendarPublished] = useState(false)
@@ -112,22 +116,26 @@ export function DepartmentHeadSettingsPage() {
     setConfigs((current) => current.map((item) => (item.key === key ? { ...item, value } : item)))
   }
 
+  const header = (
+    <DashboardPageHeader
+      title="Department Account & Settings"
+      description="Create the academic calendar for project phases and manage governance configuration professionally."
+      badge="Department Head"
+      actions={
+        <Button
+          type="button"
+          variant={calendarPublished ? "secondary" : "default"}
+          onClick={() => setCalendarPublished((current) => !current)}
+        >
+          {calendarPublished ? "Published" : "Publish Calendar"}
+        </Button>
+      }
+    />
+  )
+
   return (
-    <div className="space-y-6">
-      <DashboardPageHeader
-        title="Department Account & Settings"
-        description="Create the academic calendar for project phases and manage governance configuration professionally."
-        badge="Department Head"
-        actions={
-          <Button
-            type="button"
-            variant={calendarPublished ? "secondary" : "default"}
-            onClick={() => setCalendarPublished((current) => !current)}
-          >
-            {calendarPublished ? "Published" : "Publish Calendar"}
-          </Button>
-        }
-      />
+    <div className={embedded ? "space-y-6" : "space-y-6"}>
+      {embedded ? null : header}
 
       <DashboardKpiGrid
         items={[

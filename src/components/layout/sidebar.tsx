@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -15,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navigationConfig, type UserRole, type NavItem } from "@/config/navigation"
-import { LogOut, ChevronDown, User, Settings, GraduationCap } from "lucide-react"
+import { LogOut, ChevronDown, Settings, GraduationCap, Bell } from "lucide-react"
 import { motion } from "framer-motion"
 
 interface SidebarProps {
@@ -31,6 +32,17 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const navItems = navigationConfig[user.role]
+  const sidebarNav = React.useMemo(() => {
+    const filtered = navItems.filter((i) => i.href !== "/dashboard/settings" && i.href !== "/dashboard/profile")
+    const hasNotifications = filtered.some((i) => i.href === "/dashboard/notifications")
+    if (!hasNotifications) {
+      return [
+        ...filtered,
+        ({ href: "/dashboard/notifications", title: "Notifications", icon: Bell } as NavItem),
+      ]
+    }
+    return filtered
+  }, [navItems])
 
   const getRoleLabel = (role: UserRole): string => {
     const labels: Record<UserRole, string> = {
@@ -54,42 +66,34 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <motion.div
-      className="flex h-full w-64 flex-col border-r border-blue-200/50 bg-gradient-to-b from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20"
+      className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       initial={{ x: -64, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
       <motion.div
-        className="border-b border-blue-100/50 px-6 py-4 bg-gradient-to-r from-blue-500/5 to-blue-600/5"
+        className="border-b border-sidebar-border px-6 py-4"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
       >
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold group">
+        <div className="flex items-center gap-2 font-semibold select-none">
           <motion.div
             whileHover={{ rotate: 10, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400, damping: 10 }}
           >
-            <GraduationCap className="h-6 w-6 text-blue-600 group-hover:text-blue-700 transition-colors" />
+            <GraduationCap className="h-6 w-6 text-sidebar-primary transition-colors" />
           </motion.div>
-          <span className="text-xl bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+          <span className="text-xl text-sidebar-primary">
             Academia
           </span>
-        </Link>
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">Academic Project Management</p>
       </motion.div>
 
       <ScrollArea className="flex-1 px-3 py-4">
-        <motion.p
-          className="px-3 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          Navigation
-        </motion.p>
         <nav className="flex flex-col gap-1" aria-label="Sidebar navigation">
-          {navItems.map((item: NavItem, index) => {
+          {sidebarNav.map((item: NavItem, index) => {
             const isRootDashboard = /^\/dashboard\/[^/]+$/.test(item.href)
             const isActive = isRootDashboard
               ? pathname === item.href
@@ -109,13 +113,13 @@ export function Sidebar({ user }: SidebarProps) {
                   className={cn(
                     "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 overflow-hidden",
                     isActive
-                      ? "bg-gradient-to-r from-blue-100 to-blue-200 text-blue-900 shadow-sm"
-                      : "text-muted-foreground hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-700"
+                      ? "bg-sidebar-accent text-sidebar-primary shadow-sm"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary"
                   )}
                 >
                   {isActive && (
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-600/10"
+                      className="absolute inset-0 bg-sidebar-primary/10"
                       layoutId="activeNav"
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
@@ -124,8 +128,8 @@ export function Sidebar({ user }: SidebarProps) {
                     className={cn(
                       "relative flex h-7 w-7 items-center justify-center rounded-md transition-all duration-300",
                       isActive
-                        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm"
-                        : "bg-muted text-muted-foreground group-hover:bg-gradient-to-r group-hover:from-blue-100 group-hover:to-blue-200 group-hover:text-blue-600"
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                        : "bg-sidebar-accent/60 text-sidebar-accent-foreground group-hover:bg-sidebar-primary/10 group-hover:text-sidebar-primary"
                     )}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -135,7 +139,7 @@ export function Sidebar({ user }: SidebarProps) {
                   <span className="relative flex-1">{item.title}</span>
                   {item.badge && (
                     <motion.span
-                      className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-blue-600 px-1 text-xs text-white shadow-sm"
+                      className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-xs text-sidebar-primary-foreground shadow-sm"
                       whileHover={{ scale: 1.1 }}
                     >
                       {item.badge}
@@ -149,7 +153,7 @@ export function Sidebar({ user }: SidebarProps) {
       </ScrollArea>
 
       <motion.div
-        className="border-t border-blue-100/50 p-4 bg-gradient-to-r from-blue-500/5 to-blue-600/5"
+        className="border-t border-sidebar-border p-4"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}
@@ -159,16 +163,16 @@ export function Sidebar({ user }: SidebarProps) {
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button
                 variant="ghost"
-                className="h-auto w-full justify-start gap-3 rounded-lg border border-blue-200/50 px-3 py-2 bg-white/50 backdrop-blur-sm hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-all duration-300"
+                className="h-auto w-full justify-start gap-3 rounded-lg border border-sidebar-border px-3 py-2 bg-sidebar/60 backdrop-blur-sm hover:bg-sidebar-accent transition-all duration-300"
               >
-                <Avatar className="h-8 w-8 ring-2 ring-blue-200/50">
+                <Avatar className="h-8 w-8 ring-2 ring-sidebar-ring/20">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                  <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-1 flex-col items-start text-sm">
-                  <span className="font-medium text-gray-900">{user.name}</span>
+                  <span className="font-medium text-sidebar-foreground">{user.name}</span>
                   <span className="text-xs text-muted-foreground">
                     {getRoleLabel(user.role)}
                   </span>
@@ -183,7 +187,7 @@ export function Sidebar({ user }: SidebarProps) {
               </Button>
             </motion.div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-white/95 backdrop-blur-sm border-blue-200/50">
+          <DropdownMenuContent align="end" className="w-56 bg-popover/95 backdrop-blur-sm border-border">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">{user.name}</p>
@@ -192,19 +196,13 @@ export function Sidebar({ user }: SidebarProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/dashboard/profile" className="cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/settings" className="cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+              <Link href="/dashboard/settings" className="cursor-pointer transition-colors hover:bg-accent">
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-red-50 transition-colors">
+            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors">
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>

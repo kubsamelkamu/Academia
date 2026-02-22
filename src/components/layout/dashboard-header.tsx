@@ -72,7 +72,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
 
   return (
     <motion.header
-      className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-blue-200/50 bg-gradient-to-r from-white/95 via-blue-50/30 to-blue-100/30 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:px-6 shadow-sm"
+      className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 shadow-sm"
       initial={{ y: -64, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
@@ -84,7 +84,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden hover:bg-gradient-to-r hover:from-blue-100 hover:to-blue-200 transition-all duration-300"
+          className="lg:hidden hover:bg-accent transition-all duration-300"
           onClick={toggle}
           aria-label="Toggle navigation"
         >
@@ -107,17 +107,17 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                 animate={{ scale: 1 }}
                 transition={{ delay: index * 0.1 + 0.2 }}
               >
-                <ChevronRight className="h-4 w-4 text-blue-400" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </motion.div>
             )}
             {index === breadcrumbs.length - 1 ? (
-              <span className="truncate font-medium text-foreground bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+              <span className="truncate font-medium text-primary">
                 {crumb.label}
               </span>
             ) : (
               <Link
                 href={crumb.href}
-                className="hidden truncate transition-all duration-300 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:px-2 hover:py-1 hover:rounded-md sm:inline"
+                className="hidden truncate rounded-md px-2 py-1 transition-all duration-300 hover:bg-accent hover:text-primary sm:inline"
               >
                 {crumb.label}
               </Link>
@@ -136,7 +136,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative hover:bg-gradient-to-r hover:from-blue-100 hover:to-blue-200 transition-all duration-300"
+                className="relative hover:bg-accent transition-all duration-300"
               >
                 <Bell className="h-5 w-5" />
                 {notificationCount > 0 && (
@@ -147,7 +147,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                   >
                     <Badge
                       variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-red-500 to-red-600 shadow-sm"
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-destructive text-destructive-foreground shadow-sm"
                     >
                       {notificationCount}
                     </Badge>
@@ -155,8 +155,8 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-white/95 backdrop-blur-sm border-blue-200/50">
-              <DropdownMenuLabel className="text-blue-700">Notifications</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-80 bg-popover/95 backdrop-blur-sm border-border">
+              <DropdownMenuLabel className="text-primary">Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <div className="max-h-96 overflow-y-auto">
                 {notificationCount === 0 ? (
@@ -165,11 +165,11 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                   </div>
                 ) : (
                   <>
-                    <DropdownMenuItem className="flex flex-col items-start p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+                    <DropdownMenuItem className="flex flex-col items-start p-4 transition-colors hover:bg-accent">
                       <span className="font-medium">New project submitted</span>
                       <span className="text-xs text-muted-foreground">2 minutes ago</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="flex flex-col items-start p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+                    <DropdownMenuItem className="flex flex-col items-start p-4 transition-colors hover:bg-accent">
                       <span className="font-medium">Defense scheduled</span>
                       <span className="text-xs text-muted-foreground">1 hour ago</span>
                     </DropdownMenuItem>
@@ -178,7 +178,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/notifications" className="w-full cursor-pointer text-center hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+                <Link href="/dashboard/notifications" className="w-full cursor-pointer text-center transition-colors hover:bg-accent">
                   View all notifications
                 </Link>
               </DropdownMenuItem>
@@ -192,16 +192,16 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-gradient-to-r hover:from-blue-100 hover:to-blue-200 transition-all duration-300">
-                <Avatar className="h-10 w-10 ring-2 ring-blue-200/50 hover:ring-blue-300/50 transition-all duration-300">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent transition-all duration-300">
+                <Avatar className="h-10 w-10 ring-2 ring-border transition-all duration-300">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-white/95 backdrop-blur-sm border-blue-200/50" align="end" forceMount>
+            <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-sm border-border" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">{user.name}</p>
@@ -215,19 +215,19 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/profile" className="cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+                <Link href="/dashboard/profile" className="cursor-pointer transition-colors hover:bg-accent">
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings" className="cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors">
+                <Link href="/dashboard/settings" className="cursor-pointer transition-colors hover:bg-accent">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-red-50 transition-colors">
+              <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
