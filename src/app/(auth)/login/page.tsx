@@ -53,15 +53,20 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  // Helper function to handle role-based redirection
+  const redirectToDashboard = (userRoles?: string[]) => {
+    const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
+    if (primaryRole) {
+      router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   useEffect(() => {
     // Redirect if already logged in
     if (user) {
-      const primaryRole = getPrimaryRoleFromBackendRoles(user.roles);
-      if (primaryRole) {
-        router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
-      } else {
-        router.push('/dashboard');
-      }
+      redirectToDashboard(user.roles);
       return;
     }
   }, [user, router]);
@@ -72,12 +77,7 @@ export default function LoginPage() {
       await login(data);
 
       const state = useAuthStore.getState();
-      const primaryRole = getPrimaryRoleFromBackendRoles(state.user?.roles);
-      if (primaryRole) {
-        router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
-      } else {
-        router.push('/dashboard');
-      }
+      redirectToDashboard(state.user?.roles);
     } catch (_err) {
       // Error handled by store
     }
