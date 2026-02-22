@@ -35,7 +35,7 @@ interface RoleSectionDashboardPageProps {
   }>
 }
 
-type SectionComponent = () => ReactElement
+type SectionComponent = () => ReactElement | Promise<ReactElement>
 
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
@@ -121,6 +121,11 @@ export default async function RoleSectionDashboardPage({ params }: RoleSectionDa
   const normalizedSection = normalizeSection(sectionInput)
   const canonicalSection = getCanonicalSectionForRole(role, normalizedSection)
   const isSectionAlias = canonicalSection !== normalizedSection
+
+  // Canonicalize settings under a single top-level route.
+  if (canonicalSection === "settings") {
+    redirect("/dashboard/settings")
+  }
 
   if (roleSlugInput.toLowerCase() !== canonicalRoleSlug || isSectionAlias) {
     redirect(`/dashboard/${canonicalRoleSlug}/${canonicalSection}`)

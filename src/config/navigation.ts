@@ -52,7 +52,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
     },
     {
       title: "Settings",
-      href: "/dashboard/department-head/settings",
+      href: "/dashboard/settings",
       icon: Settings,
     },
   ],
@@ -94,7 +94,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
     },
     {
       title: "Settings",
-      href: "/dashboard/coordinator/settings",
+      href: "/dashboard/settings",
       icon: Settings,
     },
   ],
