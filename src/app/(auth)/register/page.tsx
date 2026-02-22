@@ -22,7 +22,6 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
-import { RegistrationProgress } from '@/components/auth/registration-progress';
 import { useAuthStore } from '@/store/auth-store';
 import { registerInstitutionSchema, RegisterInstitutionFormData } from '@/validations/auth';
 
@@ -59,13 +58,13 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterInstitutionFormData) => {
     try {
       clearError();
-      const result = await registerInstitution(data);
+      await registerInstitution(data);
       setSuccessMessage(`Institution registered successfully! Check ${data.email} for verification code.`);
       // Navigate to verification page after a short delay
       setTimeout(() => {
         router.push('/register/verify');
       }, 2000);
-    } catch (err) {
+    } catch (_err) {
       // Error is handled by the store
     }
   };

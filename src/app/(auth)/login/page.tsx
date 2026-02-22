@@ -78,7 +78,7 @@ export default function LoginPage() {
       } else {
         router.push('/dashboard');
       }
-    } catch (err) {
+    } catch (_err) {
       // Error handled by store
     }
   };
@@ -107,7 +107,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Access your institution's academic management dashboard
+            Access your institution&apos;s academic management dashboard
           </p>
         </motion.div>
 
@@ -152,7 +152,7 @@ export default function LoginPage() {
               <BarChart3 className="w-8 h-8 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Powerful Analytics</h3>
               <p className="text-purple-100">
-                Get insights into your institution's academic performance with comprehensive analytics and reporting tools.
+                Get insights into your institution&apos;s academic performance with comprehensive analytics and reporting tools.
               </p>
             </motion.div>
           </motion.div>
@@ -270,7 +270,7 @@ export default function LoginPage() {
                   variants={itemVariants}
                 >
                   <p className="text-sm text-gray-600 mb-2">
-                    Don't have an account?
+                    Don&apos;t have an account?
                   </p>
                   <motion.div
                     whileHover={{ scale: 1.05 }}

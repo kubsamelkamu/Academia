@@ -22,7 +22,7 @@ apiClient.interceptors.request.use((config) => {
       if (authData.state?.accessToken) {
         config.headers["Authorization"] = `Bearer ${authData.state.accessToken}`;
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore parsing errors
     }
   }

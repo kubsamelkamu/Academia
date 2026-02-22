@@ -8,7 +8,6 @@ import {
   ResendEmailOtpDto,
   LoginDto,
   LoginResult,
-  ApiResponse,
 } from '@/types/auth';
 import apiClient from '@/lib/api/client';
 
@@ -61,8 +60,9 @@ export const useAuthStore = create<AuthState>()(
           });
 
           return result;
-        } catch (error: any) {
-          const message = error.message || error.response?.data?.message || 'Registration failed';
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Registration failed';
           set({ error: message, isLoading: false });
           throw new Error(message);
         }
@@ -78,8 +78,9 @@ export const useAuthStore = create<AuthState>()(
             pendingEmailVerification: false,
             isLoading: false,
           });
-        } catch (error: any) {
-          const message = error.message || error.response?.data?.message || 'OTP verification failed';
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'OTP verification failed';
           set({ error: message, isLoading: false });
           throw new Error(message);
         }
@@ -91,8 +92,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           await apiClient.post('/auth/email-verification/resend', dto);
           set({ isLoading: false });
-        } catch (error: any) {
-          const message = error.message || error.response?.data?.message || 'Failed to resend OTP';
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to resend OTP';
           set({ error: message, isLoading: false });
           throw new Error(message);
         }
@@ -118,8 +120,9 @@ export const useAuthStore = create<AuthState>()(
             tenantDomain: loginData.tenantDomain,
             isLoading: false,
           });
-        } catch (error: any) {
-          const message = error.message || error.response?.data?.message || 'Login failed';
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Login failed';
           set({ error: message, isLoading: false });
           throw new Error(message);
         }
