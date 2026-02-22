@@ -49,7 +49,18 @@ const mockDepartmentHeadDashboardData: DepartmentHeadDashboardData = {
     { name: "Computer Science", active: 5, blocked: 0 },
     { name: "Information Systems", active: 3, blocked: 1 },
   ],
-  upcomingDefenses: [],
+  upcomingDefenses: [
+    {
+      title: "Team Atlas • Thesis Defense",
+      date: "Feb 26 • 10:00 AM",
+      committee: "Committee: Prof. Hana G., Dr. Selamawit T.",
+    },
+    {
+      title: "Team Nova • Proposal Defense",
+      date: "Feb 28 • 02:30 PM",
+      committee: "Committee: Prof. Abebe K., Dr. Dawit M.",
+    },
+  ],
 }
 
 const mockCoordinatorDashboardData: CoordinatorDashboardData = {

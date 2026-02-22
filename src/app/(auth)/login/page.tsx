@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { loginSchema, LoginFormData } from '@/validations/auth';
+import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from '@/lib/auth/dashboard-role-paths';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -55,7 +56,12 @@ export default function LoginPage() {
   useEffect(() => {
     // Redirect if already logged in
     if (user) {
-      router.push('/dashboard');
+      const primaryRole = getPrimaryRoleFromBackendRoles(user.roles);
+      if (primaryRole) {
+        router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
+      } else {
+        router.push('/dashboard');
+      }
       return;
     }
   }, [user, router]);
@@ -64,7 +70,14 @@ export default function LoginPage() {
     try {
       clearError();
       await login(data);
-      router.push('/dashboard');
+
+      const state = useAuthStore.getState();
+      const primaryRole = getPrimaryRoleFromBackendRoles(state.user?.roles);
+      if (primaryRole) {
+        router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       // Error handled by store
     }

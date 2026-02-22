@@ -1,7 +1,21 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import {
+  DashboardEmptyState,
+  DashboardKpiGrid,
+  DashboardPageHeader,
+  DashboardSectionCard,
+} from "@/components/dashboard/page-primitives"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useDepartmentHeadDashboard } from "@/lib/hooks/use-department-head-dashboard"
 import { DepartmentHeadKpi } from "@/types/dashboard"
 import {
@@ -27,34 +41,25 @@ export function DepartmentHeadDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Department Head Dashboard</h1>
-        <p className="text-muted-foreground">
-          Monitor departments, approvals, and academic execution from one place.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Department Head Dashboard"
+        description="Monitor departments, approvals, and academic execution from one place."
+      />
 
       {isLoading ? (
         <DashboardKpiSkeleton />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {data?.kpis.map((card) => {
+        <DashboardKpiGrid
+          items={(data?.kpis ?? []).map((card) => {
             const Icon = kpiIcons[card.icon]
-
-            return (
-              <Card key={card.title}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">{card.value}</p>
-                  <p className="text-xs text-muted-foreground">{card.note}</p>
-                </CardContent>
-              </Card>
-            )
+            return {
+              title: card.title,
+              value: card.value,
+              note: card.note,
+              icon: Icon,
+            }
           })}
-        </div>
+        />
       )}
 
       {isLoading ? (
@@ -62,86 +67,134 @@ export function DepartmentHeadDashboard() {
       ) : (
         <>
           <div className="grid gap-4 xl:grid-cols-3">
-            <Card className="xl:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileClock className="h-4 w-4" />
-                  Urgent Approvals
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!data || data.urgentApprovals.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No urgent approvals right now.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {data.urgentApprovals.map((item) => (
-                      <div key={item.title} className="rounded-lg border p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium">{item.title}</p>
-                            <p className="text-xs text-muted-foreground">{item.detail}</p>
-                          </div>
-                          <Badge variant={item.priority === "High" ? "destructive" : "secondary"}>
-                            {item.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Coordinator & Faculty Status</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <DashboardSectionCard
+              className="xl:col-span-2"
+              title="Urgent Approvals"
+              description="Requests and conflicts requiring your attention."
+            >
+              {!data || data.urgentApprovals.length === 0 ? (
+                <DashboardEmptyState
+                  title="No urgent approvals"
+                  description="Approval requests and conflicts will appear here when ready."
+                />
+              ) : (
                 <div className="space-y-3">
-                  {data?.coordinatorStatus.map((row) => (
-                    <div key={row.name} className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">{row.name}</p>
-                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">Active {row.active}</Badge>
-                        <Badge variant={row.blocked > 0 ? "destructive" : "secondary"}>
-                          Blocked {row.blocked}
+                  {data.urgentApprovals.map((item) => (
+                    <div key={item.title} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileClock className="h-4 w-4 text-muted-foreground" />
+                            <p className="truncate text-sm font-medium">{item.title}</p>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+                        </div>
+                        <Badge
+                          className="shrink-0"
+                          variant={
+                            item.priority === "High"
+                              ? "destructive"
+                              : item.priority === "Medium"
+                                ? "secondary"
+                                : "outline"
+                          }
+                        >
+                          {item.priority}
                         </Badge>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </DashboardSectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Upcoming Defenses
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!data || data.upcomingDefenses.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-center">
-                  <p className="text-sm font-medium">No defenses scheduled yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Upcoming defense sessions will appear here once coordinators publish schedules.
-                  </p>
-                </div>
+            <DashboardSectionCard
+              title="Coordinator & Faculty Status"
+              description="Active capacity and blocked items by unit."
+            >
+              {!data || data.coordinatorStatus.length === 0 ? (
+                <DashboardEmptyState
+                  title="No status available"
+                  description="Coordinator and faculty capacity will appear here."
+                />
               ) : (
-                <div className="space-y-3">
-                  {data.upcomingDefenses.map((item) => (
-                    <div key={`${item.title}-${item.date}`} className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">{item.date}</p>
-                      <p className="text-xs text-muted-foreground">{item.committee}</p>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Unit</TableHead>
+                        <TableHead className="text-right">Active</TableHead>
+                        <TableHead className="text-right">Blocked</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.coordinatorStatus.map((row) => (
+                        <TableRow key={row.name}>
+                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell className="text-right">{row.active}</TableCell>
+                          <TableCell className="text-right">{row.blocked}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  <div className="space-y-3">
+                    {data.coordinatorStatus.map((row) => {
+                      const total = row.active + row.blocked
+                      const blockedPercent = total > 0 ? Math.round((row.blocked / total) * 100) : 0
+
+                      return (
+                        <div key={`${row.name}-progress`} className="rounded-lg border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium">{row.name}</p>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">Active {row.active}</Badge>
+                              <Badge variant={row.blocked > 0 ? "destructive" : "secondary"}>
+                                Blocked {row.blocked}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <Progress value={blockedPercent} />
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {blockedPercent}% blocked
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </DashboardSectionCard>
+          </div>
+
+          <DashboardSectionCard
+            title="Upcoming Defenses"
+            description="Scheduled sessions published by coordinators."
+          >
+            {!data || data.upcomingDefenses.length === 0 ? (
+              <DashboardEmptyState
+                title="No defenses scheduled yet"
+                description="Upcoming defense sessions will appear once schedules are published."
+              />
+            ) : (
+              <div className="space-y-3">
+                {data.upcomingDefenses.map((item) => (
+                  <div key={`${item.title}-${item.date}`} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.date}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.committee}</p>
+                      </div>
+                      <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DashboardSectionCard>
         </>
       )}
     </div>
