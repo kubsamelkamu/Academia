@@ -22,8 +22,8 @@ function roleHeader(role: UserRole): { title: string; description: string; badge
   switch (role) {
     case "department_head":
       return {
-        title: "Department Head Dashboard",
-        description: "Monitor departments, approvals, and academic execution from one place.",
+        title: "Department Head",
+        description: "",
       }
     case "coordinator":
       return {
@@ -70,9 +70,8 @@ function toGridLayouts(layouts: RglLayouts): GridLayouts {
 export function CustomizableDashboard(props: { role: UserRole; userId: string; userName?: string }) {
   const { containerRef, width, mounted } = useContainerWidth({ measureBeforeMount: true })
 
-  const [welcomeOpen, setWelcomeOpen] = React.useState(true)
-
   const tenantDomain = useAuthStore((s) => s.tenantDomain)
+  const departmentName = useAuthStore((s) => s.user?.departmentName ?? s.user?.department?.name ?? null)
   const key = React.useMemo(
     () =>
       getDashboardLayoutKey({
@@ -188,22 +187,16 @@ export function CustomizableDashboard(props: { role: UserRole; userId: string; u
         actions={actions}
       />
 
-      {props.role === "department_head" && welcomeOpen ? (
-        <div className="rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-500 text-white p-4 flex items-center justify-between">
-          <div>
-            <p className="text-lg font-semibold">Welcome back{props.userName ? `, ${props.userName}` : ""} 👋</p>
-            <p className="text-sm opacity-90">Here’s an at-a-glance view of your department. You can customize widgets or visit settings to manage department details.</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="text-sm opacity-90 mr-2">{new Date().toLocaleDateString()}</div>
-            <Button asChild variant="secondary">
-              <Link href="/dashboard/settings">Department settings</Link>
-            </Button>
-            <Button variant="ghost" onClick={() => setWelcomeOpen(false)}>
-              Dismiss
-            </Button>
-          </div>
+      {props.role === "department_head" ? (
+        <div className="rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-500 p-4 text-white">
+          <p className="text-lg font-semibold">
+            Welcome back{props.userName ? `, ${props.userName}` : ""}
+          </p>
+          <p className="text-sm opacity-90">
+            {departmentName
+              ? `Here’s an at-a-glance view of ${departmentName}.`
+              : "Here’s an at-a-glance view of your department."}
+          </p>
         </div>
       ) : null}
 

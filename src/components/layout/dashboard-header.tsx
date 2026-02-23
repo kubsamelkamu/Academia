@@ -1,6 +1,6 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,6 +17,7 @@ import { useSidebarStore } from "@/store/sidebar-store"
 import Link from "next/link"
 import { type UserRole } from "@/config/navigation"
 import { motion } from "framer-motion"
+import { useAuthStore } from "@/store/auth-store"
 
 interface DashboardHeaderProps {
   user: {
@@ -32,6 +33,12 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeaderProps) {
   const { toggle } = useSidebarStore()
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    useAuthStore.getState().logout()
+    router.replace("/login")
+  }
 
   const generateBreadcrumbs = () => {
     const paths = pathname.split("/").filter(Boolean)
@@ -227,7 +234,13 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors">
+              <DropdownMenuItem
+                className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors"
+                onSelect={(event) => {
+                  event.preventDefault()
+                  handleLogout()
+                }}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>

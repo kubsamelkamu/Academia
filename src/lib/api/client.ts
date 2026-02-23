@@ -11,21 +11,36 @@ const apiClient = axios.create({
 
 // Request interceptor for tenant headers
 apiClient.interceptors.request.use((config) => {
-  // Get tenant domain from localStorage (persisted by Zustand)
-  const authStorage = localStorage.getItem('auth-storage');
-  if (authStorage) {
-    try {
-      const authData = JSON.parse(authStorage);
-      if (authData.state?.tenantDomain) {
-        config.headers["X-Tenant-Domain"] = authData.state.tenantDomain;
+  if (typeof window === "undefined") {
+    return config
+  }
+
+  const authState = useAuthStore.getState()
+  let tenantDomain = authState.tenantDomain
+  let accessToken = authState.accessToken
+
+  // Fallback to persisted auth-storage (useful very early in app init)
+  if (!tenantDomain || !accessToken) {
+    const authStorage = window.localStorage.getItem("auth-storage")
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage)
+        tenantDomain = tenantDomain ?? parsed.state?.tenantDomain
+        accessToken = accessToken ?? parsed.state?.accessToken
+      } catch {
+        // ignore
       }
-      if (authData.state?.accessToken) {
-        config.headers["Authorization"] = `Bearer ${authData.state.accessToken}`;
-      }
-    } catch (_error) {
-      // Ignore parsing errors
     }
   }
+
+  const headers = (config.headers ?? {}) as Record<string, string>
+  if (tenantDomain) {
+    headers["X-Tenant-Domain"] = tenantDomain
+  }
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`
+  }
+  config.headers = headers
 
   return config
 })

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,6 +18,7 @@ import {
 import { navigationConfig, type UserRole, type NavItem } from "@/config/navigation"
 import { LogOut, ChevronDown, Settings, GraduationCap, Bell } from "lucide-react"
 import { motion } from "framer-motion"
+import { useAuthStore } from "@/store/auth-store"
 
 interface SidebarProps {
   user: {
@@ -31,7 +32,13 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const navItems = navigationConfig[user.role]
+
+  const handleLogout = React.useCallback(() => {
+    useAuthStore.getState().logout()
+    router.replace("/login")
+  }, [router])
   const sidebarNav = React.useMemo(() => {
     const filtered = navItems.filter((i) => i.href !== "/dashboard/settings" && i.href !== "/dashboard/profile")
     const hasNotifications = filtered.some((i) => i.href === "/dashboard/notifications")
@@ -202,7 +209,13 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors">
+            <DropdownMenuItem
+              className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors"
+              onSelect={(event) => {
+                event.preventDefault()
+                handleLogout()
+              }}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
