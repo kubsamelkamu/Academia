@@ -22,7 +22,7 @@ export default function SettingsPage() {
   }, [accessToken, isLoading, router])
 
   if (!accessToken || !user) {
-    return null
+    return <></>
   }
 
   return <SettingsPageClient role={primaryRole ?? "student"} />

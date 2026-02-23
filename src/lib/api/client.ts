@@ -1,4 +1,4 @@
-import axios from "axios"
+import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from "axios"
 import { useAuthStore } from "@/store/auth-store"
 
 const apiClient = axios.create({
@@ -10,7 +10,7 @@ const apiClient = axios.create({
 })
 
 // Request interceptor for tenant headers
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window === "undefined") {
     return config
   }
@@ -33,12 +33,12 @@ apiClient.interceptors.request.use((config) => {
     }
   }
 
-  const headers = (config.headers ?? {}) as Record<string, string>
+  const headers = AxiosHeaders.from(config.headers)
   if (tenantDomain) {
-    headers["X-Tenant-Domain"] = tenantDomain
+    headers.set("X-Tenant-Domain", tenantDomain)
   }
   if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`
+    headers.set("Authorization", `Bearer ${accessToken}`)
   }
   config.headers = headers
 
