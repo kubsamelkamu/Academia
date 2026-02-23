@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const DEPARTMENT_NAME_OPTIONS = [
+  'Software Engineering',
+  'Computer Science',
+  'Information Science',
+  'Information Systems',
+] as const;
+
 export const registerInstitutionSchema = z.object({
   universityName: z
     .string()
@@ -7,8 +14,11 @@ export const registerInstitutionSchema = z.object({
     .max(100, 'University name must be less than 100 characters'),
   departmentName: z
     .string()
-    .min(2, 'Department name must be at least 2 characters')
-    .max(100, 'Department name must be less than 100 characters'),
+    .min(1, 'Please select a department')
+    .refine(
+      (value) => (DEPARTMENT_NAME_OPTIONS as readonly string[]).includes(value),
+      'Please select a valid department'
+    ),
   departmentCode: z
     .string()
     .min(2, 'Department code must be at least 2 characters')

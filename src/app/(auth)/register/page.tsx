@@ -23,7 +23,20 @@ import {
   Info
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { registerInstitutionSchema, RegisterInstitutionFormData } from '@/validations/auth';
+import { DEPARTMENT_NAME_OPTIONS, registerInstitutionSchema, RegisterInstitutionFormData } from '@/validations/auth';
+
+const UNIVERSITY_SUGGESTIONS = [
+  'Addis Ababa University',
+  'Adama Science and Technology University',
+  'Jimma University',
+  'Bahir Dar University',
+  'University of Gondar',
+  'Hawassa University',
+  'Mekelle University',
+  'Haramaya University',
+  'Arba Minch University',
+  'Wollo University',
+] as const;
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -173,10 +186,16 @@ export default function RegisterPage() {
                       </Label>
                       <Input
                         id="universityName"
+                        list="university-suggestions"
                         {...register('universityName')}
                         placeholder="Addis Ababa University"
                         className="transition-all duration-200 focus:ring-2 focus:ring-blue-500/20"
                       />
+                      <datalist id="university-suggestions">
+                        {UNIVERSITY_SUGGESTIONS.map((name) => (
+                          <option key={name} value={name} />
+                        ))}
+                      </datalist>
                       {errors.universityName && (
                         <motion.p
                           className="text-sm text-red-600 flex items-center gap-1"
@@ -202,12 +221,22 @@ export default function RegisterPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <motion.div className="space-y-2" variants={itemVariants}>
                         <Label htmlFor="departmentName">Department Name</Label>
-                        <Input
+                        <select
                           id="departmentName"
                           {...register('departmentName')}
-                          placeholder="Computer Science"
-                          className="transition-all duration-200 focus:ring-2 focus:ring-purple-500/20"
-                        />
+                          defaultValue=""
+                          className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs outline-none transition-[color,box-shadow] md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                          aria-invalid={errors.departmentName ? 'true' : 'false'}
+                        >
+                          <option value="" disabled>
+                            Select a department
+                          </option>
+                          {DEPARTMENT_NAME_OPTIONS.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                         {errors.departmentName && (
                           <motion.p
                             className="text-sm text-red-600"
