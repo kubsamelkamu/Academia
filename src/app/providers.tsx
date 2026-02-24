@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes"
 import { useEffect, useState } from "react"
 import { ThemeCustomizer } from "@/components/providers/theme-customizer"
 import { useAuthStore } from "@/store/auth-store"
+import { Toaster } from "@/components/ui/sonner"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -30,6 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ThemeCustomizer />
         {children}
+        <Toaster />
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </ThemeProvider>

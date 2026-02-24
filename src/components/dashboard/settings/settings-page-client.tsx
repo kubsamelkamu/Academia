@@ -13,11 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { themes, type ThemeFont } from "@/lib/themes"
 import { useThemeStore } from "@/store/theme-store"
 import { useTheme } from "next-themes"
-import { Bell, ShieldCheck, SlidersHorizontal, Users, Clipboard } from "lucide-react"
+import { Bell, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
 import * as React from "react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
+import { ProfileSettings } from "@/components/dashboard/settings/profile-settings"
 
 interface PolicyToggle {
   id: string
@@ -108,63 +108,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
 
   const showGovernance = role === "department_head" || role === "coordinator"
   const showDepartment = role === "department_head"
-  const showProfile = role === "department_head"
-
-  // Profile form state (client-only demo)
-  const [name, setName] = useState("Department Head")
-  const [email] = useState("head@university.edu")
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string>("")
-
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [passwordMessage, setPasswordMessage] = useState("")
-
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
-  const [twoFactorSecret] = useState("ABCD-EFGH-IJKL")
-
-  const [saveMessage, setSaveMessage] = useState("")
-
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setAvatarFile(file)
-    const url = URL.createObjectURL(file)
-    setAvatarPreview(url)
-  }
-
-  function handleChangePassword() {
-    if (!currentPassword || !newPassword) {
-      setPasswordMessage("Enter both current and new passwords")
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage("New passwords do not match")
-      return
-    }
-    // Fake change success
-    setPasswordMessage("Password updated")
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-  }
-
-  function toggleTwoFactor() {
-    setTwoFactorEnabled((v) => !v)
-  }
-
-  function copyToClipboard(text: string) {
-    navigator.clipboard?.writeText(text)
-    setSaveMessage("Copied secret")
-    setTimeout(() => setSaveMessage(""), 2000)
-  }
-
-  function handleSaveProfile() {
-    // Persist locally (Zustand/server integration can be added later)
-    setSaveMessage("Profile saved")
-    setTimeout(() => setSaveMessage(""), 2000)
-  }
+  const showProfile = true
 
   const defaultTab = "appearance"
 
@@ -398,86 +342,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
         {showProfile ? (
           <TabsContent value="profile">
             <DashboardSectionCard title="Profile" description="Update your account profile and security settings.">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Profile</p>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      {avatarPreview ? (
-                        <AvatarImage src={avatarPreview} alt={name} />
-                      ) : (
-                        <AvatarFallback>{(name || "").slice(0, 2).toUpperCase()}</AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="flex-1">
-                      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
-                      <div className="mt-2 flex items-center gap-2">
-                        <input
-                          id="avatar-upload"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleAvatarChange(e)}
-                          className="hidden"
-                        />
-                        <label htmlFor="avatar-upload">
-                          <Button size="sm" type="button">Upload avatar</Button>
-                        </label>
-                        <Button size="sm" variant="outline" onClick={() => { setAvatarFile(null); setAvatarPreview("") }}>Remove</Button>
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">Recommended: 128×128 PNG or JPEG.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Account</p>
-                  <Input value={email} readOnly />
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4">
-                <div>
-                  <p className="text-sm font-medium">Change Password</p>
-                  <div className="mt-2 grid gap-2">
-                    <Input type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-                    <Input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-                    <Input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={handleChangePassword}>Change password</Button>
-                      {passwordMessage ? <span className="text-sm text-muted-foreground">{passwordMessage}</span> : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium">Two-Factor Authentication</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Protect your account with an additional verification step.</p>
-                  <div className="mt-3 flex items-start gap-4">
-                    <div className="flex-1">
-                      <Button size="sm" variant={twoFactorEnabled ? "secondary" : "outline"} onClick={() => toggleTwoFactor()}>
-                        {twoFactorEnabled ? "Disable 2FA" : "Enable 2FA"}
-                      </Button>
-                      {twoFactorEnabled ? (
-                        <div className="mt-3 rounded-md border p-3">
-                          <div className="mb-2 text-xs text-muted-foreground">Scan this QR with your authenticator app</div>
-                          <div className="h-36 w-36 bg-muted/20 flex items-center justify-center text-sm">QR</div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Input value={twoFactorSecret} readOnly />
-                            <Button size="sm" variant="outline" onClick={() => copyToClipboard(twoFactorSecret)}>
-                              <Clipboard className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleSaveProfile}>Save profile</Button>
-                  {saveMessage ? <span className="text-sm text-muted-foreground">{saveMessage}</span> : null}
-                </div>
-              </div>
+              <ProfileSettings />
             </DashboardSectionCard>
           </TabsContent>
         ) : null}

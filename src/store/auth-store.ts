@@ -12,6 +12,15 @@ import {
 import apiClient from '@/lib/api/client';
 import { getPrimaryRoleFromBackendRoles } from '@/lib/auth/dashboard-role-paths';
 import { getAuthMe } from '@/lib/api/auth';
+import {
+  changeProfilePassword,
+  deleteProfileAvatar,
+  getProfile,
+  updateProfileName,
+  uploadProfileAvatar,
+  type ChangePasswordDto,
+  type UpdateProfileNameDto,
+} from '@/lib/api/profile';
 
 interface AuthState {
   // Temporary onboarding state
@@ -28,16 +37,26 @@ interface AuthState {
   isLoading: boolean;
   error?: string;
 
+  // Profile operation states (kept separate from auth flows)
+  profileIsLoading: boolean;
+  profileError?: string;
+
   // Actions
   registerInstitution: (dto: RegisterInstitutionDto) => Promise<RegisterResult>;
   verifyEmailOtp: (dto: VerifyEmailOtpDto) => Promise<void>;
   resendEmailOtp: (dto: ResendEmailOtpDto) => Promise<void>;
   login: (dto: LoginDto) => Promise<void>;
   fetchMe: () => Promise<void>;
+  fetchProfile: () => Promise<void>;
+  updateProfileName: (dto: UpdateProfileNameDto) => Promise<void>;
+  uploadProfileAvatar: (file: File) => Promise<void>;
+  deleteProfileAvatar: () => Promise<void>;
+  changePassword: (dto: ChangePasswordDto) => Promise<void>;
   bootstrap: () => Promise<void>;
   clearAuthSession: () => void;
   logout: () => void;
   clearError: () => void;
+  clearProfileError: () => void;
 }
 
 function setRoleCookieFromBackendRoles(roles: string[] | undefined) {
@@ -58,6 +77,7 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       isLoading: false,
+      profileIsLoading: false,
 
       registerInstitution: async (dto: RegisterInstitutionDto): Promise<RegisterResult> => {
         set({ isLoading: true, error: undefined });
@@ -175,6 +195,105 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      fetchProfile: async (): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const profile = await getProfile()
+          const currentUser = get().user
+
+          // Merge to avoid losing auth-derived fields (roles/tenantId) if profile endpoint omits them.
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(profile as AuthUser),
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to load profile';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
+      updateProfileName: async (dto: UpdateProfileNameDto): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const updated = await updateProfileName(dto)
+          const currentUser = get().user
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(updated as AuthUser),
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to update name';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
+      uploadProfileAvatar: async (file: File): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const updated = await uploadProfileAvatar(file)
+          const currentUser = get().user
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(updated as AuthUser),
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to upload avatar';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
+      deleteProfileAvatar: async (): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const updated = await deleteProfileAvatar()
+          const currentUser = get().user
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(updated as AuthUser),
+              avatarUrl: null,
+              avatarPublicId: null,
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to delete avatar';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
+      changePassword: async (dto: ChangePasswordDto): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          await changeProfilePassword(dto)
+          set({ profileIsLoading: false })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to change password';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
       bootstrap: async (): Promise<void> => {
         const { accessToken, user } = get();
         if (!accessToken) {
@@ -220,6 +339,10 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => {
         set({ error: undefined });
+      },
+
+      clearProfileError: () => {
+        set({ profileError: undefined })
       },
     }),
     {
