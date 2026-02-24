@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -12,12 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Bell, Menu, ChevronRight, User, Settings, LogOut } from "lucide-react"
+import { Menu, ChevronRight, User, Settings, LogOut } from "lucide-react"
 import { useSidebarStore } from "@/store/sidebar-store"
 import Link from "next/link"
 import { type UserRole } from "@/config/navigation"
 import { motion } from "framer-motion"
 import { useAuthStore } from "@/store/auth-store"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 interface DashboardHeaderProps {
   user: {
@@ -138,59 +138,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-accent transition-all duration-300"
-              >
-                <Bell className="h-5 w-5" />
-                {notificationCount > 0 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 15 }}
-                  >
-                    <Badge
-                      variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-destructive text-destructive-foreground shadow-sm"
-                    >
-                      {notificationCount}
-                    </Badge>
-                  </motion.div>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-popover/95 backdrop-blur-sm border-border">
-              <DropdownMenuLabel className="text-primary">Notifications</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <div className="max-h-96 overflow-y-auto">
-                {notificationCount === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    No new notifications
-                  </div>
-                ) : (
-                  <>
-                    <DropdownMenuItem className="flex flex-col items-start p-4 transition-colors hover:bg-accent">
-                      <span className="font-medium">New project submitted</span>
-                      <span className="text-xs text-muted-foreground">2 minutes ago</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex flex-col items-start p-4 transition-colors hover:bg-accent">
-                      <span className="font-medium">Defense scheduled</span>
-                      <span className="text-xs text-muted-foreground">1 hour ago</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/notifications" className="w-full cursor-pointer text-center transition-colors hover:bg-accent">
-                  View all notifications
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <NotificationBell initialCount={notificationCount} />
         </motion.div>
 
         <motion.div

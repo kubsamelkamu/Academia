@@ -7,6 +7,7 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar"
 import { DashboardHeader } from "@/components/layout/dashboard-header"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
+import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,8 @@ export default function DashboardLayout({
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
+
+  const { data: unreadCount } = useNotificationsUnreadCount()
 
   useEffect(() => {
     if (!accessToken && !isLoading) {
@@ -51,17 +54,13 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:block">
         <Sidebar user={shellUser} />
       </aside>
-
-      {/* Mobile Sidebar */}
       <MobileSidebar user={shellUser} />
 
-      {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader user={shellUser} notificationCount={3} />
+        <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
         <main className="flex-1 overflow-y-auto bg-muted/10 p-6">
           {children}
         </main>

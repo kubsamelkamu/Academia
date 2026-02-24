@@ -2,80 +2,129 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { NotificationItem } from '@/components/notifications/notification-item'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotificationsList,
+} from '@/lib/hooks/use-notifications'
+import type { ListNotificationsParams } from '@/types/notifications'
 
-type Notification = {
-  id: string
-  title: string
-  body?: string
-  createdAt: string
-  read?: boolean
-}
+type FilterValue = 'all' | 'unread'
+
+const PAGE_SIZE = 10
 
 export default function NotificationListClient() {
-  const [items, setItems] = React.useState<Notification[]>(() => [
-    {
-      id: '1',
-      title: 'New project submission: AI in Education',
-      body: 'Student A submitted a new project for review.',
-      createdAt: new Date().toISOString(),
-      read: false,
-    },
-    {
-      id: '2',
-      title: 'Defense scheduled',
-      body: 'Defense for Project B scheduled on 2026-03-05.',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      read: false,
-    },
-  ])
+  const [filter, setFilter] = React.useState<FilterValue>('all')
+  const [page, setPage] = React.useState(1)
 
-  function markRead(id: string) {
-    setItems((cur) => cur.map((it) => (it.id === id ? { ...it, read: true } : it)))
-  }
+  const params: ListNotificationsParams = React.useMemo(() => {
+    const base: ListNotificationsParams = {
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    }
 
-  function markAllRead() {
-    setItems((cur) => cur.map((it) => ({ ...it, read: true })))
-  }
+    if (filter === 'unread') {
+      base.status = 'UNREAD'
+    }
+
+    return base
+  }, [filter, page])
+
+  const { data, isLoading, isError } = useNotificationsList(params)
+  const markOne = useMarkNotificationRead()
+  const markAll = useMarkAllNotificationsRead()
+
+  const items = data?.notifications ?? []
+  const hasUnread = (data?.unreadCount ?? 0) > 0
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [filter])
+
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Recent</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-medium">Recent</h3>
+          <Tabs value={filter} onValueChange={(v) => setFilter((v as FilterValue) || 'all')}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="unread">Unread</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={markAllRead}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => markAll.mutate()}
+            disabled={!hasUnread || markAll.isPending}
+          >
             Mark all read
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
-        {items.length === 0 ? (
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : isError ? (
+          <div className="text-sm text-destructive">Failed to load notifications</div>
+        ) : items.length === 0 ? (
           <div className="text-sm text-muted-foreground">No notifications</div>
         ) : (
           items.map((n) => (
-            <div key={n.id} className="flex items-start justify-between gap-4 rounded-md border p-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{n.title}</p>
-                  {!n.read ? <Badge variant="secondary">New</Badge> : null}
-                </div>
-                {n.body ? <p className="text-sm text-muted-foreground mt-1">{n.body}</p> : null}
-                <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-              </div>
-
-              <div className="flex-shrink-0">
-                {!n.read ? (
-                  <Button size="sm" variant="outline" onClick={() => markRead(n.id)}>
-                    Mark read
-                  </Button>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Read</span>
-                )}
-              </div>
-            </div>
+            <NotificationItem
+              key={n.id}
+              notification={n}
+              onMarkRead={async (id) => {
+                if (markOne.isPending) return
+                await markOne.mutateAsync(id)
+              }}
+            />
           ))
         )}
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <div className="text-xs text-muted-foreground">
+          {total > 0 ? (
+            <span>
+              Page {page} of {totalPages} • {total} total
+            </span>
+          ) : (
+            <span>Page 1 of 1</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || isLoading}
+          >
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || isLoading}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <DashboardPageHeader
         title="Notifications"
-        description="Recent notifications for your department."
+        description="Recent notifications for your account."
         actions={null}
       />
 
