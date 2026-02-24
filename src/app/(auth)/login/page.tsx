@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,8 @@ import {
   LogIn,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   ArrowRight,
   CheckCircle2,
   Users,
@@ -44,6 +46,7 @@ const itemVariants = {
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading, error, clearError, tenantDomain, user } = useAuthStore();
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const {
     register,
@@ -54,14 +57,14 @@ export default function LoginPage() {
   });
 
   // Helper function to handle role-based redirection
-  const redirectToDashboard = (userRoles?: string[]) => {
+  const redirectToDashboard = useCallback((userRoles?: string[]) => {
     const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
     if (primaryRole) {
       router.push(`/dashboard/${getDashboardRoleSlug(primaryRole)}`);
     } else {
       router.push('/dashboard');
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     // Redirect if already logged in
@@ -69,7 +72,7 @@ export default function LoginPage() {
       redirectToDashboard(user.roles);
       return;
     }
-  }, [user, router]);
+  }, [user, redirectToDashboard]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -78,7 +81,7 @@ export default function LoginPage() {
 
       const state = useAuthStore.getState();
       redirectToDashboard(state.user?.roles);
-    } catch (_err) {
+    } catch {
       // Error handled by store
     }
   };
@@ -204,13 +207,25 @@ export default function LoginPage() {
                       <Lock className="w-4 h-4" />
                       Password
                     </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      {...register('password')}
-                      placeholder="••••••••"
-                      className="transition-all duration-200 focus:ring-2 focus:ring-purple-500/20"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={isPasswordVisible ? 'text' : 'password'}
+                        {...register('password')}
+                        placeholder="••••••••"
+                        className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-purple-500/20"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setIsPasswordVisible((prev) => !prev)}
+                        aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                      >
+                        {isPasswordVisible ? <EyeOff /> : <Eye />}
+                      </Button>
+                    </div>
                     {errors.password && (
                       <motion.p
                         className="text-sm text-red-600 flex items-center gap-1"

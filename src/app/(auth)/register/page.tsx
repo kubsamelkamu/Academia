@@ -16,6 +16,8 @@ import {
   GraduationCap,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   User,
   CheckCircle2,
   Sparkles,
@@ -59,6 +61,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { registerInstitution, isLoading, error, clearError } = useAuthStore();
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const {
     register,
@@ -77,7 +80,7 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push('/register/verify');
       }, 2000);
-    } catch (_err) {
+    } catch {
       // Error is handled by the store
     }
   };
@@ -366,13 +369,25 @@ export default function RegisterPage() {
                         <Lock className="w-4 h-4" />
                         Password
                       </Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        {...register('password')}
-                        placeholder="••••••••"
-                        className="transition-all duration-200 focus:ring-2 focus:ring-green-500/20"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={isPasswordVisible ? 'text' : 'password'}
+                          {...register('password')}
+                          placeholder="••••••••"
+                          className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-green-500/20"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setIsPasswordVisible((prev) => !prev)}
+                          aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                          className="absolute right-1 top-1/2 -translate-y-1/2"
+                        >
+                          {isPasswordVisible ? <EyeOff /> : <Eye />}
+                        </Button>
+                      </div>
                       <p className="text-xs text-gray-500 flex items-center gap-1">
                         <Info className="w-3 h-3" />
                         Must contain uppercase, lowercase, and number

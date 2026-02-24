@@ -98,7 +98,7 @@ export default function VerifyPage() {
       // Ensure we don't get redirected to /dashboard due to a previously persisted session.
       clearAuthSession();
       router.push('/login');
-    } catch (_err) {
+    } catch {
       // Error handled by store
     }
   };
@@ -113,7 +113,7 @@ export default function VerifyPage() {
       });
       setResendMessage('OTP sent successfully! Check your email.');
       setCountdown(60); // 60 second cooldown
-    } catch (_err) {
+    } catch {
       setResendMessage('Failed to resend OTP. Please try again.');
     } finally {
       setResendLoading(false);
