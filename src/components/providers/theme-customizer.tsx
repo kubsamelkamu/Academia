@@ -55,6 +55,18 @@ export function ThemeCustomizer() {
     // (The sidebar uses its own token set: --sidebar-primary, --sidebar-ring, ...)
     root.style.setProperty("--sidebar-primary", `oklch(${vars.primary})`)
     root.style.setProperty("--sidebar-ring", `oklch(${vars.ring})`)
+
+    return () => {
+      // Remove customizations when the dashboard shell unmounts.
+      // This prevents dashboard theme settings from affecting marketing/public pages.
+      root.style.removeProperty("--radius")
+      root.style.removeProperty("font-size")
+      root.style.removeProperty("--font-sans")
+      root.style.removeProperty("--primary")
+      root.style.removeProperty("--ring")
+      root.style.removeProperty("--sidebar-primary")
+      root.style.removeProperty("--sidebar-ring")
+    }
   }, [color, radiusRem, font, scaling, mode])
 
   return null

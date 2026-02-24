@@ -55,19 +55,36 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // Handle token refresh or redirect to login
-      const authStore = useAuthStore.getState()
-      authStore.logout()
-      window.location.href = "/login"
-    }
-
     // Handle backend error envelope
     if (error.response?.data && !error.response.data.success) {
       const message = Array.isArray(error.response.data.message)
         ? error.response.data.message.join(", ")
         : error.response.data.message
       error.message = message || "Request failed"
+    }
+
+    if (error.response?.status === 401) {
+      const requestUrl: string = String(error.config?.url ?? "")
+      const isAuthEndpoint =
+        requestUrl.includes("/auth/login") ||
+        requestUrl.includes("/auth/register") ||
+        requestUrl.includes("/auth/email-verification")
+
+      // For invalid credentials on auth endpoints, let the caller handle the error
+      // (e.g., show an inline message on the login page) instead of hard redirect.
+      if (!isAuthEndpoint) {
+        const authStore = useAuthStore.getState()
+        authStore.logout()
+
+        if (typeof window !== "undefined") {
+          const path = window.location.pathname
+          const isOnAuthPage = path.startsWith("/login") || path.startsWith("/register")
+
+          if (!isOnAuthPage) {
+            window.location.href = "/login"
+          }
+        }
+      }
     }
 
     return Promise.reject(error)

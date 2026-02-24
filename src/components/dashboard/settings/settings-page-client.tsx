@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   DashboardKpiGrid,
   DashboardPageHeader,
@@ -8,16 +8,12 @@ import {
 } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { themes, type ThemeFont } from "@/lib/themes"
-import { useThemeStore } from "@/store/theme-store"
-import { useTheme } from "next-themes"
 import { Bell, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
-import * as React from "react"
 import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
 import { ProfileSettings } from "@/components/dashboard/settings/profile-settings"
+import { AppearanceWizard } from "@/components/dashboard/settings/appearance-wizard"
 
 interface PolicyToggle {
   id: string
@@ -94,15 +90,6 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
   const [policies, setPolicies] = useState<PolicyToggle[]>(initialPolicies)
   const [rules, setRules] = useState<NotificationRule[]>(initialRules)
 
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => {
-    const id = window.setTimeout(() => setMounted(true), 0)
-    return () => window.clearTimeout(id)
-  }, [])
-
-  const { theme, setTheme } = useTheme()
-  const { color, radiusRem, font, scaling, setColor, setFont, setRadiusRem, setScaling, reset } = useThemeStore()
-
   const enabledPolicies = useMemo(() => policies.filter((item) => item.enabled).length, [policies])
   const enabledRules = useMemo(() => rules.filter((item) => item.enabled).length, [rules])
 
@@ -159,101 +146,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
             title="Appearance"
             description="Customize theme mode, brand color, radius, font, and scaling."
           >
-            {!mounted ? (
-              <p className="text-sm text-muted-foreground">Loading appearance preferences…</p>
-            ) : (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Mode</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(["light", "dark", "system"] as const).map((mode) => (
-                      <Button
-                        key={mode}
-                        size="sm"
-                        variant={theme === mode ? "default" : "outline"}
-                        type="button"
-                        onClick={() => setTheme(mode)}
-                      >
-                        {mode}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Color</p>
-                  <div className="flex flex-wrap gap-2">
-                    {themes.map((t) => (
-                      <Button
-                        key={t.name}
-                        size="sm"
-                        variant={color === t.name ? "default" : "outline"}
-                        type="button"
-                        onClick={() => setColor(t.name)}
-                      >
-                        {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Font</p>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      ["inter", "Inter"],
-                      ["manrope", "Manrope"],
-                      ["playfair", "Playfair"],
-                      ["system", "System"],
-                    ] as Array<[ThemeFont, string]>).map(([value, label]) => (
-                      <Button
-                        key={value}
-                        size="sm"
-                        variant={font === value ? "default" : "outline"}
-                        type="button"
-                        onClick={() => setFont(value)}
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Radius (rem)</p>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step={0.125}
-                    min={0.25}
-                    max={1.25}
-                    value={radiusRem}
-                    onChange={(e) => setRadiusRem(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground">Default is 0.625</p>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Scaling</p>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step={0.05}
-                    min={0.75}
-                    max={1.25}
-                    value={scaling}
-                    onChange={(e) => setScaling(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground">1.00 = default text size</p>
-                </div>
-
-                <div className="flex items-end">
-                  <Button type="button" variant="outline" onClick={() => reset()}>
-                    Reset appearance
-                  </Button>
-                </div>
-              </div>
-            )}
+            <AppearanceWizard />
           </DashboardSectionCard>
         </TabsContent>
 

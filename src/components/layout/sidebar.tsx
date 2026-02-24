@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navigationConfig, type UserRole, type NavItem } from "@/config/navigation"
-import { LogOut, ChevronDown, Settings, GraduationCap, Bell } from "lucide-react"
+import { LogOut, ChevronDown, Settings, Bell } from "lucide-react"
 import { motion } from "framer-motion"
 import { useAuthStore } from "@/store/auth-store"
 
@@ -89,7 +90,14 @@ export function Sidebar({ user }: SidebarProps) {
             whileHover={{ rotate: 10, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400, damping: 10 }}
           >
-            <GraduationCap className="h-6 w-6 text-sidebar-primary transition-colors" />
+            <Image
+              src="/favicon.png"
+              alt="Academia"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+              priority
+            />
           </motion.div>
           <span className="text-xl text-sidebar-primary">
             Academia

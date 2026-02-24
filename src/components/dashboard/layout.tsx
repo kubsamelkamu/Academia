@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
 import { DashboardHeader } from "@/components/layout/dashboard-header"
+import { ThemeCustomizer } from "@/components/providers/theme-customizer"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
@@ -54,6 +55,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <ThemeCustomizer />
       <aside className="hidden lg:block">
         <Sidebar user={shellUser} />
       </aside>
