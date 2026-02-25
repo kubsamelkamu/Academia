@@ -29,7 +29,7 @@ Before you begin, ensure you have the following installed:
 1. **Fork the repository** on GitHub
 2. **Clone your fork**:
    ```bash
-   git clone https://github.com/yourusername/academia.git
+   git clone https://github.com/kubsamelkamu/academia.git
    cd academia
    ```
 3. **Install dependencies**:
@@ -108,9 +108,9 @@ We welcome various types of contributions:
 
 ### Finding Issues to Work On
 
-- Check our [GitHub Issues](https://github.com/yourusername/academia/issues) for open tasks
+- Check our [GitHub Issues](https://github.com/kubsamelkamu/academia/issues) for open tasks
 - Look for issues labeled `good first issue` or `help wanted`
-- Join our [GitHub Discussions](https://github.com/yourusername/academia/discussions) for ideas
+- Join our [GitHub Discussions](https://github.com/kubsamelkamu/academia/discussions) for ideas
 
 ## 🔄 Development Workflow
 

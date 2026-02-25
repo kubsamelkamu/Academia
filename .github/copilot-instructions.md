@@ -1,212 +1,74 @@
-# GitHub Copilot Instructions - Academia Platform
+# GitHub Copilot Instructions - Academia
 
-## 🎓 Welcome to Academia - Academic Project Management System
+Academia is a multi-tenant academic project management platform built with Next.js App Router.
 
-**Academia**   is a comprehensive academic project management platform designed to streamline collaboration between students, advisors, coordinators, and department heads in managing academic projects, theses, and defense processes.
+## Stack (source of truth: package.json)
 
-## 🏗️ Architecture Overview
+- Next.js 16 + React 19 + TypeScript (strict)
+- Tailwind CSS v4 + shadcn/ui (Radix primitives)
+- Client API: axios instance in `src/lib/api/client.ts`
+- State: Zustand (UI/auth) + TanStack Query v5 (server state)
 
-### Tech Stack
-- **Frontend**: Next.js 16 + TypeScript + Tailwind CSS + shadcn/ui
-- **State**: Zustand (UI) + TanStack Query (server state)
-- **Backend**: Next.js API routes with multi-tenant middleware
-- **Styling**: Tailwind CSS with custom design system
-
-### Key Features
-- Multi-tenant architecture (subdomain-based)
-- 5 user roles: Department Head, Coordinator, Advisor, Student, Committee Member
-- Project lifecycle management
-- Defense scheduling system
-- Real-time notifications
-- Role-based dashboards
-
-## 📁 File Structure Guide
+## Repo map (high level)
 
 ```
 src/
-├── app/                    # Next.js App Router pages
-│   ├── (marketing)/       # Public landing page
-│   ├── dashboard/         # Protected dashboard routes
-│   ├── api/               # Backend API routes
-│   └── layout.tsx         # Root layout with providers
-├── components/
-│   ├── ui/               # shadcn/ui components (don't modify)
-│   ├── layout/           # Sidebar, header, mobile nav
-│   └── dashboard/        # Dashboard-specific components
-├── config/navigation.ts   # Role-based menu configuration
-├── lib/
-│   ├── utils.ts          # General utilities (cn, etc.)
-│   └── api/              # API client setup
-├── store/                # Zustand stores
-└── types/                # TypeScript definitions
+  app/                 # App Router routes/layouts
+  components/
+    ui/                # shadcn/ui primitives (do not edit unless required)
+    layout/            # Header/sidebar/footer
+    dashboard/         # Role dashboards and widgets
+  config/navigation.ts # Role-based navigation config
+  lib/                 # Utils, API client, themes, validations
+  store/               # Zustand stores
+  types/               # Shared TypeScript types
+  validations/         # zod schemas
 ```
 
-## 👥 User Roles & Navigation
+## Non-negotiables
 
-### Role-Based Access
-1. **Department Head**: Full system overview, manages coordinators
-2. **Coordinator**: Project management, advisor assignment, defense scheduling
-3. **Advisor**: Student guidance, project reviews, defense participation
-4. **Student**: Project submission, progress tracking, defense preparation
-5. **Committee Member**: Defense evaluation, expert feedback
+- Prefer Server Components by default; add `"use client"` only when interactivity is required.
+- Do not restyle by adding new hex colors or custom fonts; use Tailwind tokens and existing theme variables.
+- Avoid editing `src/components/ui/*` directly; prefer composition/wrappers in feature components.
+- Keep changes minimal and consistent with existing patterns (imports use `@/*` alias).
 
-### Navigation Config
-- Located in `src/config/navigation.ts`
-- Role-based menu items with icons and permissions
-- Supports nested navigation items
+## Multi-tenant & auth
 
-## 🔧 Development Patterns
+- Tenant context is derived from the request host in `src/middleware.ts` and forwarded as `x-tenant-id` for internal requests.
+- Calls to the upstream backend should use the shared axios client (`src/lib/api/client.ts`), which injects:
+  - `X-Tenant-Domain` (from `useAuthStore`, `tenantDomain`)
+  - `Authorization: Bearer <token>` when available
+- Never hardcode tenant IDs/domains in components or API handlers.
 
-### Component Creation
-```typescript
-// ✅ Good: Server component by default
-export default function ProjectsPage() {
-  return <div>Projects</div>
-}
+## Roles & navigation
 
-// ✅ Good: Client component only when needed
-'use client'
-export function ProjectForm() {
-  const [title, setTitle] = useState('')
-  // Interactive logic here
-}
-```
+- Roles are defined in `src/config/navigation.ts`:
+  - `department_head`, `coordinator`, `advisor`, `student`, `department_committee`
+- When adding a dashboard route, update navigation config and ensure RBAC matches the route structure under `src/app/dashboard/*`.
 
-### State Management
-```typescript
-// UI State (Zustand)
-import { useSidebarStore } from '@/store/sidebar-store'
+## Data fetching rules
 
-// Server State (TanStack Query)
-import { useQuery } from '@tanstack/react-query'
-```
+- In Client Components: use TanStack Query (`useQuery`, `useMutation`) for server state.
+- Use the shared axios client for app backend calls so tenant/auth headers are consistent.
+- In Server Components / route handlers: use `fetch()` (and pass through needed headers) when appropriate.
 
-### API Patterns
-```typescript
-// API routes in src/app/api/
-export async function GET(request: Request) {
-  // Server-side logic
-  return Response.json({ data })
-}
+## API routes (App Router)
 
-// Client-side API calls
-import { api } from '@/lib/api/client'
-```
+- Place route handlers under `src/app/api/**/route.ts`.
+- Return `NextResponse.json(...)` for JSON and avoid caching sensitive data (`cache: "no-store"` when needed).
 
-## 🎨 UI/UX Guidelines
+## TypeScript & validation
 
-### Design System
-- **Colors**: Use Tailwind CSS variables and shadcn/ui theme
-- **Typography**: Inter font family, responsive text sizes
-- **Spacing**: Consistent padding/margins using Tailwind scale
-- **Components**: Prefer shadcn/ui components over custom implementations
+- Avoid `any`; define or reuse types from `src/types/*`.
+- Reuse zod schemas from `src/validations/*` when validating forms or API payloads.
 
-### Responsive Design
-- Mobile-first approach
-- Breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
-- Sidebar collapses to mobile sheet on small screens
+## Commands
 
-## 🔒 Security & Multi-Tenant
+- Dev: `npm run dev`
+- Lint: `npm run lint`
+- Build: `npm run build`
 
-### Authentication
-- Session-based auth with secure cookies
-- Role-based access control (RBAC)
-- Route protection middleware
+## When unsure
 
-### Multi-Tenant Architecture
-- Subdomain-based tenant isolation (e.g., `university.academia.com`)
-- Middleware sets `x-tenant-id` header
-- Database queries filtered by tenant
-- Shared codebase, isolated data
-
-## 📝 Code Quality Standards
-
-### TypeScript
-- Strict mode enabled
-- Proper typing for all props, state, and API responses
-- Avoid `any` type - use proper interfaces
-
-### ESLint Rules
-- React best practices
-- Accessibility requirements
-- Consistent code formatting
-- No unused imports/variables
-
-### Git Workflow
-- Feature branches from `main`
-- Conventional commit messages
-- Pull request reviews required
-- CI/CD checks must pass
-
-## 🚀 Deployment & DevOps
-
-### Build Process
-- `npm run build` - Production build with static generation
-- `npm run lint` - Code quality checks
-- `npm run dev` - Development server
-
-### Environment Setup
-- `.env.local` for local development
-- Environment variables for different stages
-- Database connections and API keys
-
-## 🧪 Testing Approach
-
-### Current State
-- No tests implemented yet
-- Plan for: Component tests, API tests, E2E tests
-
-### Future Testing
-- Jest + React Testing Library for components
-- API route testing
-- E2E with Playwright (planned)
-
-## 🔄 Common Workflows
-
-### Adding New Features
-1. Check user role requirements
-2. Add navigation items to config
-3. Create API routes if needed
-4. Build UI components
-5. Add proper TypeScript types
-6. Test across different screen sizes
-
-### Database Changes
-1. Update API route handlers
-2. Modify data fetching logic
-3. Update TypeScript interfaces
-4. Test with different user roles
-
-### UI Component Creation
-1. Check if shadcn/ui component exists
-2. Use consistent styling patterns
-3. Ensure accessibility compliance
-4. Add proper TypeScript props
-5. Test responsive behavior
-
-## ⚠️ Important Reminders
-
-- **Always consider multi-tenant context** - data isolation is critical
-- **Role-based permissions** - different users see different data/actions
-- **Mobile responsiveness** - test on small screens
-- **Type safety** - avoid `any` types, use proper interfaces
-- **Accessibility** - ARIA labels, keyboard navigation, screen reader support
-- **Performance** - optimize images, lazy loading, efficient re-renders
-
-## 📞 Support & Resources
-
-- **Documentation**: This file and inline code comments
-- **Issues**: Create GitHub issues for bugs/features
-- **Code Reviews**: Required for all PRs
-- **Architecture**: Refer to established patterns in existing code
-
----
-
-**Remember**: You are building **Academia** - a professional academic management platform. Always prioritize:
-- **Educational institution security** and data privacy
-- **Multi-tenant architecture** for different universities
-- **Role-based access control** for 5 distinct user types
-- **Academic integrity** and compliance standards
-- **Scalable architecture** for growing institutions
-
-**Academia** serves universities worldwide - build it right! 🎓
+- Follow existing patterns in nearby files (dashboard pages/components are the best references).
+- Prefer the simplest implementation that satisfies the requirement.
