@@ -63,20 +63,18 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Streamline your university&apos;s academic project workflow from proposal to defense. 
-              Collaborate seamlessly, track progress, and manage student projects effortlessly with AI-powered insights.
+              Collaborate seamlessly, track progress, and manage student projects effortlessly with clear milestones and real-time visibility.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button size="lg" className="px-8 py-4 text-lg bg-blue-400 hover:bg-blue-500 shadow-xl hover:shadow-2xl transition-all duration-300 group" asChild>
-                  <Link href="/register/department">
-                    Start Free Trial <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  <Link href="/register">
+                    Start Free <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
               </motion.div>
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              ✨ Free for small departments • No credit card required • 14-day trial
-            </p>
+  
             <motion.div
               className="mt-12 flex items-center justify-center gap-8 text-sm text-muted-foreground"
               initial={{ opacity: 0 }}
