@@ -350,7 +350,7 @@ export default function ContactPage() {
     },
   })
 
-  const { submitContactForm, isSubmitting, isSuccess, error, resetForm } = useContactSubmission()
+  const { submitContactForm, isSubmitting, isSuccess, error, resetForm, isRateLimited } = useContactSubmission()
 
   // Auto-hide success message after 5 seconds.
   // This only resets the mutation/store state (no form.reset here), so it won't cause render loops.
@@ -663,7 +663,7 @@ export default function ContactPage() {
                             type="submit"
                             size="lg"
                             className="w-full group relative overflow-hidden"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isRateLimited}
                           >
                             <motion.div
                               className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600"

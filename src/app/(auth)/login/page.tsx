@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +25,7 @@ import {
 import { useAuthStore } from '@/store/auth-store';
 import { loginSchema, LoginFormData } from '@/validations/auth';
 import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from '@/lib/auth/dashboard-role-paths';
+import { DEFAULT_RATE_LIMIT_RETRY_AFTER_MS, getErrorMessage, isRateLimitMessage } from '@/lib/api/errors';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -47,6 +48,27 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading, error, clearError, tenantDomain, user } = useAuthStore();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isRateLimited) return;
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
+    }
+    cooldownTimerRef.current = setTimeout(() => {
+      setIsRateLimited(false);
+      cooldownTimerRef.current = null;
+    }, DEFAULT_RATE_LIMIT_RETRY_AFTER_MS);
+
+    return () => {
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current);
+        cooldownTimerRef.current = null;
+      }
+    };
+  }, [isRateLimited]);
 
   const {
     register,
@@ -56,7 +78,6 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  // Helper function to handle role-based redirection
   const redirectToDashboard = useCallback((userRoles?: string[]) => {
     const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
     if (primaryRole) {
@@ -67,7 +88,6 @@ export default function LoginPage() {
   }, [router]);
 
   useEffect(() => {
-    // Redirect if already logged in
     if (user) {
       redirectToDashboard(user.roles);
       return;
@@ -81,7 +101,11 @@ export default function LoginPage() {
 
       const state = useAuthStore.getState();
       redirectToDashboard(state.user?.roles);
-    } catch {
+    } catch (e: unknown) {
+      const message = getErrorMessage(e, '');
+      if (isRateLimitMessage(message)) {
+        setIsRateLimited(true);
+      }
       // Error handled by store
     }
   };
@@ -94,7 +118,6 @@ export default function LoginPage() {
         initial="hidden"
         animate="visible"
       >
-        {/* Hero Section */}
         <motion.div
           className="text-center mb-8"
           variants={itemVariants}
@@ -115,7 +138,6 @@ export default function LoginPage() {
         </motion.div>
 
         <div className="grid lg:grid-cols-2 gap-8 items-start">
-          {/* Features Section */}
           <motion.div
             className="space-y-6"
             variants={itemVariants}
@@ -160,7 +182,6 @@ export default function LoginPage() {
             </motion.div>
           </motion.div>
 
-          {/* Login Form */}
           <motion.div variants={itemVariants}>
             <Card className="backdrop-blur-sm bg-white/80 border-white/20 shadow-xl">
               <CardHeader className="space-y-1 pb-4">
@@ -256,7 +277,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
-                      disabled={isLoading}
+                      disabled={isLoading || isRateLimited}
                     >
                       {isLoading ? (
                         <motion.div
@@ -280,27 +301,6 @@ export default function LoginPage() {
                   </motion.div>
                 </form>
 
-                <motion.div
-                  className="mt-6 pt-6 border-t text-center"
-                  variants={itemVariants}
-                >
-                  <p className="text-sm text-gray-600 mb-2">
-                    Don&apos;t have an account?
-                  </p>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      onClick={() => router.push('/register')}
-                      variant="outline"
-                      className="border-purple-200 hover:bg-purple-50 text-purple-600"
-                    >
-                      <Users className="w-4 h-4 mr-2" />
-                      Register your institution
-                    </Button>
-                  </motion.div>
-                </motion.div>
               </CardContent>
             </Card>
           </motion.div>

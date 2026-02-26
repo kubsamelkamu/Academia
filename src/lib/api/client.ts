@@ -1,5 +1,6 @@
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from "axios"
 import { useAuthStore } from "@/store/auth-store"
+import { isRateLimitMessage } from "@/lib/api/errors"
 
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
@@ -61,6 +62,12 @@ apiClient.interceptors.response.use(
         ? error.response.data.message.join(", ")
         : error.response.data.message
       error.message = message || "Request failed"
+    }
+
+    // Normalize throttling errors to a clear message.
+    const status = Number(error.response?.status)
+    if (status === 429 || isRateLimitMessage(error.message)) {
+      error.message = "Too many requests. Try again later."
     }
 
     if (error.response?.status === 401) {
