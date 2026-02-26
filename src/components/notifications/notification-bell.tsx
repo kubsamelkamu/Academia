@@ -1,7 +1,7 @@
 "use client"
 
-import useSWR from "swr"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -13,21 +13,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  getNotificationSummary,
-  getUnreadCount,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from "@/lib/api/notifications"
 import { useAuthStore } from "@/store/auth-store"
-import type { Notification, NotificationSeverity, NotificationSummaryResponse } from "@/types/notifications"
+import type { Notification, NotificationSeverity } from "@/types/notifications"
 import { NotificationItem } from "@/components/notifications/notification-item"
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotificationsSummary,
+  useNotificationsUnreadCount,
+} from "@/lib/hooks/use-notifications"
 
 interface NotificationBellProps {
   initialCount?: number
 }
 
 const severityOrder: NotificationSeverity[] = ["HIGH", "MEDIUM", "LOW", "INFO"]
+
+function resolveInternalHref(notification: Notification): string | null {
+  const metadata = notification.metadata
+  if (!metadata || typeof metadata !== "object") return null
+
+  const record = metadata as Record<string, unknown>
+  const candidate = record.href ?? record.path ?? record.url
+  if (typeof candidate !== "string") return null
+  if (!candidate.startsWith("/")) return null
+  return candidate
+}
 
 function groupBySeverity(items: Notification[]): Array<{ severity: NotificationSeverity; items: Notification[] }> {
   const map = new Map<NotificationSeverity, Notification[]>()
@@ -46,44 +57,32 @@ function groupBySeverity(items: Notification[]): Array<{ severity: NotificationS
   return result
 }
 
-async function fetchUnreadCount(): Promise<number> {
-  const data = await getUnreadCount()
-  return data.count
-}
-
-async function fetchSummary(): Promise<NotificationSummaryResponse> {
-  return getNotificationSummary()
-}
-
 export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
+  const router = useRouter()
   const accessToken = useAuthStore((s) => s.accessToken)
   const isAuthenticated = Boolean(accessToken)
 
-  const {
-    data: unreadCount,
-    isLoading: unreadLoading,
-    mutate: mutateUnread,
-  } = useSWR(isAuthenticated ? "notifications.unreadCount" : null, fetchUnreadCount, {
-    refreshInterval: 30000,
-    revalidateOnFocus: true,
+  const unread = useNotificationsUnreadCount({
+    enabled: isAuthenticated,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   })
 
-  const {
-    data: summary,
-    isLoading: summaryLoading,
-    mutate: mutateSummary,
-  } = useSWR(isAuthenticated ? "notifications.summary" : null, fetchSummary, {
-    refreshInterval: 60000,
-    revalidateOnFocus: true,
+  const summary = useNotificationsSummary({
+    enabled: isAuthenticated,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   })
 
-  const badgeCount = unreadCount ?? summary?.unread ?? initialCount
+  const markOne = useMarkNotificationRead()
+  const markAll = useMarkAllNotificationsRead()
+
+  const badgeCount = unread.data?.count ?? summary.data?.unread ?? initialCount
 
   const handleMarkAllRead = async () => {
     try {
-      await markAllNotificationsRead()
+      await markAll.mutateAsync()
       toast.success("All notifications marked as read")
-      await Promise.all([mutateUnread(), mutateSummary()])
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to mark all as read")
     }
@@ -91,18 +90,32 @@ export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
 
   const handleMarkRead = async (id: string) => {
     try {
-      await markNotificationRead(id)
-      await Promise.all([mutateUnread(), mutateSummary()])
+      await markOne.mutateAsync(id)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to mark notification as read")
     }
   }
 
-  const recent: Notification[] = summary?.recent ?? []
+  const handleOpenNotification = async (notification: Notification) => {
+    if (notification.status === "UNREAD") {
+      await handleMarkRead(notification.id)
+    }
+
+    const href = resolveInternalHref(notification) ?? "/dashboard/notifications"
+    router.push(href)
+  }
+
+  const recent: Notification[] = summary.data?.recent ?? []
   const grouped = groupBySeverity(recent)
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (!open || !isAuthenticated) return
+        // Force an immediate refresh so the dropdown list matches the badge.
+        void Promise.all([unread.refetch(), summary.refetch()])
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -131,7 +144,7 @@ export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
             variant="ghost"
             size="sm"
             onClick={handleMarkAllRead}
-            disabled={badgeCount === 0 || unreadLoading || summaryLoading}
+            disabled={badgeCount === 0 || unread.isFetching || summary.isFetching || markAll.isPending}
           >
             Mark all read
           </Button>
@@ -139,7 +152,7 @@ export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
         <DropdownMenuSeparator />
 
         <div className="max-h-[420px] overflow-auto p-2" role="list">
-          {summaryLoading ? (
+          {summary.isLoading || summary.isFetching ? (
             <div className="p-4 text-sm text-muted-foreground">Loading notifications…</div>
           ) : grouped.length ? (
             <div className="grid gap-3">
@@ -153,6 +166,7 @@ export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
                       key={n.id}
                       notification={n}
                       onMarkRead={handleMarkRead}
+                      onClick={handleOpenNotification}
                       compact
                     />
                   ))}

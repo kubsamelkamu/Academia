@@ -28,6 +28,14 @@ export interface AuthUser {
   roles: string[];
   tenantId: string;
 
+  tenantVerification?: null | {
+    status: "PENDING" | "APPROVED" | "REJECTED" | null;
+    isPending: boolean;
+    lastSubmittedAt: string | null;
+    lastReviewedAt: string | null;
+    lastReviewReason: string | null;
+  };
+
   lastLoginAt?: string | null;
   twoFactorEnabled?: boolean;
   twoFactorVerifiedAt?: string | null;

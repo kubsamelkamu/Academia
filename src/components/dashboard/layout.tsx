@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useRef } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
 import { DashboardHeader } from "@/components/layout/dashboard-header"
@@ -16,9 +16,13 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
+
+  const primaryRole = useMemo(() => getPrimaryRoleFromBackendRoles(user?.roles), [user?.roles])
+  const shouldFetchMeRef = useRef(false)
 
   const { data: unreadCount } = useNotificationsUnreadCount()
 
@@ -28,8 +32,46 @@ export default function DashboardLayout({
     }
   }, [accessToken, isLoading, router])
 
+  useEffect(() => {
+    if (!accessToken || !user) {
+      return
+    }
+
+    // If we have an authenticated user but haven't loaded /auth/me data that includes
+    // tenant verification status yet, fetch it once (important on older persisted sessions).
+    if (primaryRole === "department_head" && user.tenantVerification === undefined && !shouldFetchMeRef.current) {
+      shouldFetchMeRef.current = true
+      void useAuthStore.getState().fetchMe().catch(() => {
+        // ignore; axios interceptor handles 401
+      })
+    }
+  }, [accessToken, primaryRole, user])
+
+  useEffect(() => {
+    if (!accessToken || !user) {
+      return
+    }
+
+    if (primaryRole !== "department_head") {
+      return
+    }
+
+    // Unknown state (not fetched yet) -> don't redirect.
+    if (user.tenantVerification === undefined) {
+      return
+    }
+
+    const status = user.tenantVerification?.status ?? null
+    const requiresUpload = status === null || status === "REJECTED"
+    const isOnVerificationPage = pathname === "/dashboard/verify-institution"
+
+    if (requiresUpload && !isOnVerificationPage) {
+      router.replace("/dashboard/verify-institution")
+    }
+  }, [accessToken, pathname, primaryRole, router, user])
+
   const shellUser = useMemo(() => {
-    const role = getPrimaryRoleFromBackendRoles(user?.roles) ?? "student"
+    const role = primaryRole ?? "student"
     const name = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || "User"
 
     return {
@@ -39,7 +81,7 @@ export default function DashboardLayout({
       role,
       avatar: user?.avatarUrl ?? undefined,
     }
-  }, [user])
+  }, [primaryRole, user])
 
   if (!accessToken) {
     return null

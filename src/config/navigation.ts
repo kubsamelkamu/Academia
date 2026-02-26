@@ -51,6 +51,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
+      title: "Verification",
+      href: "/dashboard/verify-institution",
+      icon: CheckSquare,
+    },
+    {
       title: "Settings",
       href: "/dashboard/settings",
       icon: Settings,

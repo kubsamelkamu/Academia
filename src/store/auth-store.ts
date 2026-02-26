@@ -180,13 +180,19 @@ export const useAuthStore = create<AuthState>()(
         try {
           const me = await getAuthMe();
 
+          const isDepartmentHead = getPrimaryRoleFromBackendRoles(me.roles) === "department_head"
+          const normalizedMe: AuthUser = {
+            ...(me as AuthUser),
+            tenantVerification: isDepartmentHead ? (me as AuthUser).tenantVerification ?? null : (me as AuthUser).tenantVerification,
+          }
+
           set({
-            user: me as AuthUser,
-            tenantDomain: me.tenantDomain ?? get().tenantDomain,
+            user: normalizedMe,
+            tenantDomain: normalizedMe.tenantDomain ?? get().tenantDomain,
             isLoading: false,
           });
 
-          setRoleCookieFromBackendRoles(me.roles);
+          setRoleCookieFromBackendRoles(normalizedMe.roles);
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to load profile';

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 export interface NotificationItemProps {
   notification: Notification
   onMarkRead?: (id: string) => void | Promise<void>
+  onClick?: (notification: Notification) => void | Promise<void>
   compact?: boolean
 }
 
@@ -59,19 +60,52 @@ function formatRelativeTime(iso: string): string {
   return rtf.format(diffYear, "year")
 }
 
-export function NotificationItem({ notification, onMarkRead, compact = false }: NotificationItemProps) {
+export function NotificationItem({ notification, onMarkRead, onClick, compact = false }: NotificationItemProps) {
   const time = formatRelativeTime(notification.createdAt)
   const isUnread = notification.status === "UNREAD"
+  const isInteractive = Boolean(onClick) || (isUnread && Boolean(onMarkRead))
+
+  const handleActivate = async () => {
+    if (onClick) {
+      await onClick(notification)
+      return
+    }
+
+    if (isUnread && onMarkRead) {
+      await onMarkRead(notification.id)
+    }
+  }
 
   return (
     <div
       className={cn(
         "flex items-start gap-3 rounded-lg border p-3",
         compact ? "p-2" : "",
-        isUnread ? "bg-muted/50" : ""
+        isUnread ? "bg-muted/50" : "",
+        isInteractive
+          ? "cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-hidden focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          : ""
       )}
-      role="listitem"
+      role={isInteractive ? "button" : "listitem"}
       aria-label={`${notification.title}${isUnread ? ", unread" : ""}`}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={
+        isInteractive
+          ? () => {
+              void handleActivate()
+            }
+          : undefined
+      }
+      onKeyDown={
+        isInteractive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                void handleActivate()
+              }
+            }
+          : undefined
+      }
     >
       <div
         className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", severityDotClass(notification.severity))}
@@ -108,7 +142,11 @@ export function NotificationItem({ notification, onMarkRead, compact = false }: 
           variant="ghost"
           size="sm"
           className="shrink-0"
-          onClick={() => onMarkRead(notification.id)}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            void onMarkRead(notification.id)
+          }}
         >
           Mark read
         </Button>

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import {
   DashboardKpiGrid,
@@ -9,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAuthStore } from "@/store/auth-store"
 import { CalendarDays, CheckCircle2, ListChecks, Settings2 } from "lucide-react"
 
 type PhaseStatus = "Planned" | "Active" | "Completed"
@@ -82,12 +84,33 @@ export function DepartmentHeadSettingsPageContent({ embedded = false }: { embedd
   const [configs, setConfigs] = useState<DepartmentConfig[]>(initialConfigs)
   const [calendarPublished, setCalendarPublished] = useState(false)
 
+  const user = useAuthStore((s) => s.user)
+
   const [newPhaseName, setNewPhaseName] = useState("")
   const [newPhaseStart, setNewPhaseStart] = useState("")
   const [newPhaseEnd, setNewPhaseEnd] = useState("")
 
   const activePhases = useMemo(() => phases.filter((item) => item.status === "Active").length, [phases])
   const completedPhases = useMemo(() => phases.filter((item) => item.status === "Completed").length, [phases])
+
+  const verificationStatus = user?.tenantVerification?.status ?? null
+  const verificationLabel =
+    verificationStatus === "PENDING"
+      ? "Pending"
+      : verificationStatus === "APPROVED"
+      ? "Approved"
+      : verificationStatus === "REJECTED"
+      ? "Rejected"
+      : "Not submitted"
+
+  const verificationBadgeVariant =
+    verificationStatus === "APPROVED"
+      ? "default"
+      : verificationStatus === "PENDING"
+      ? "secondary"
+      : verificationStatus === "REJECTED"
+      ? "destructive"
+      : "outline"
 
   const addPhase = () => {
     if (newPhaseName.trim().length < 3 || newPhaseStart.length === 0 || newPhaseEnd.length === 0) {
@@ -165,6 +188,38 @@ export function DepartmentHeadSettingsPageContent({ embedded = false }: { embedd
           },
         ]}
       />
+
+      <DashboardSectionCard
+        title="Institution Verification"
+        description="Submit a document for admin review. This doesn’t block dashboard access."
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Status</span>
+              <Badge
+                variant={verificationBadgeVariant}
+                className={
+                  verificationStatus === "APPROVED"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90"
+                    : undefined
+                }
+              >
+                {verificationLabel}
+              </Badge>
+            </div>
+            {verificationStatus === "REJECTED" && user?.tenantVerification?.lastReviewReason ? (
+              <p className="text-xs text-muted-foreground">
+                Reason: {user.tenantVerification.lastReviewReason}
+              </p>
+            ) : null}
+          </div>
+
+          <Button asChild variant="outline">
+            <Link href="/dashboard/verify-institution">View / Submit</Link>
+          </Button>
+        </div>
+      </DashboardSectionCard>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <DashboardSectionCard
