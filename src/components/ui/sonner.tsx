@@ -10,7 +10,14 @@ export function Toaster() {
     <Sonner
       theme={theme as "light" | "dark" | "system"}
       closeButton
-      richColors
+      toastOptions={{
+        classNames: {
+          toast: "bg-background text-foreground border border-border",
+          description: "text-muted-foreground",
+          actionButton: "bg-primary text-primary-foreground",
+          cancelButton: "bg-muted text-muted-foreground",
+        },
+      }}
     />
   )
 }

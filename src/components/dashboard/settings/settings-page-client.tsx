@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
 import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
+import { UniversitySettingsForm } from "@/components/dashboard/department-head/university-settings"
 import { ProfileSettings } from "@/components/dashboard/settings/profile-settings"
 import { AppearanceWizard } from "@/components/dashboard/settings/appearance-wizard"
 
@@ -31,6 +32,7 @@ interface NotificationRule {
 }
 
 const initialPolicies: PolicyToggle[] = [
+  
   {
     id: "policy-1",
     name: "Strict defense panel validation",
@@ -95,6 +97,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
 
   const showGovernance = role === "department_head" || role === "coordinator"
   const showDepartment = role === "department_head"
+  const showUniversity = role === "department_head"
   const showProfile = true
 
   const defaultTab = "appearance"
@@ -138,6 +141,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           {showGovernance ? <TabsTrigger value="governance">Governance</TabsTrigger> : null}
           {showDepartment ? <TabsTrigger value="department">Department</TabsTrigger> : null}
+          {showUniversity ? <TabsTrigger value="university">University</TabsTrigger> : null}
           {showProfile ? <TabsTrigger value="profile">Profile</TabsTrigger> : null}
         </TabsList>
 
@@ -229,6 +233,17 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
         {showDepartment ? (
           <TabsContent value="department">
             <DepartmentHeadSettingsPageContent embedded />
+          </TabsContent>
+        ) : null}
+
+        {showUniversity ? (
+          <TabsContent value="university">
+            <DashboardSectionCard
+              title="University Configuration"
+              description="Update university address and contact details."
+            >
+              <UniversitySettingsForm />
+            </DashboardSectionCard>
           </TabsContent>
         ) : null}
 

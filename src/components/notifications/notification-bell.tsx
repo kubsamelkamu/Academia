@@ -97,10 +97,6 @@ export function NotificationBell({ initialCount = 0 }: NotificationBellProps) {
   }
 
   const handleOpenNotification = async (notification: Notification) => {
-    if (notification.status === "UNREAD") {
-      await handleMarkRead(notification.id)
-    }
-
     const href = resolveInternalHref(notification) ?? "/dashboard/notifications"
     router.push(href)
   }
