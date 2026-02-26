@@ -7,17 +7,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { navigationConfig, type UserRole, type NavItem } from "@/config/navigation"
-import { LogOut, ChevronDown, Settings, Bell } from "lucide-react"
+import { LogOut, Bell } from "lucide-react"
 import { motion } from "framer-motion"
 import { useAuthStore } from "@/store/auth-store"
 
@@ -51,26 +42,6 @@ export function Sidebar({ user }: SidebarProps) {
     }
     return filtered
   }, [navItems])
-
-  const getRoleLabel = (role: UserRole): string => {
-    const labels: Record<UserRole, string> = {
-      department_head: "Department Head",
-      coordinator: "Coordinator",
-      advisor: "Advisor",
-      student: "Student",
-      department_committee: "Committee Member",
-    }
-    return labels[role]
-  }
-
-  const getInitials = (name: string): string => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
 
   return (
     <motion.div
@@ -173,62 +144,17 @@ export function Sidebar({ user }: SidebarProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="ghost"
-                className="h-auto w-full justify-start gap-3 rounded-lg border border-sidebar-border px-3 py-2 bg-sidebar/60 backdrop-blur-sm hover:bg-sidebar-accent transition-all duration-300"
-              >
-                <Avatar className="h-8 w-8 ring-2 ring-sidebar-ring/20">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-1 flex-col items-start text-sm">
-                  <span className="font-medium text-sidebar-foreground">{user.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {getRoleLabel(user.role)}
-                  </span>
-                </div>
-                <motion.div
-                  animate={{ rotate: 0 }}
-                  whileHover={{ rotate: 180 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </motion.div>
-              </Button>
-            </motion.div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-popover/95 backdrop-blur-sm border-border">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/settings" className="cursor-pointer transition-colors hover:bg-accent">
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 transition-colors"
-              onSelect={(event) => {
-                event.preventDefault()
-                handleLogout()
-              }}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto w-full justify-start gap-3 rounded-lg border border-sidebar-border px-3 py-2 bg-sidebar/60 backdrop-blur-sm hover:bg-sidebar-accent transition-all duration-300"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </motion.div>
       </motion.div>
     </motion.div>
   )
