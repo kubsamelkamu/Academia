@@ -118,8 +118,21 @@ export function AppearanceWizard() {
   const mounted = useMounted()
   const [stepIndex, setStepIndex] = React.useState(0)
 
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const { color, radiusRem, font, scaling, setColor, setFont, setRadiusRem, setScaling, reset } = useThemeStore()
+  const { theme, resolvedTheme } = useTheme()
+  const {
+    mode: dashboardMode,
+    setMode,
+    color,
+    radiusRem,
+    font,
+    scaling,
+    setColor,
+    setFont,
+    setRadiusRem,
+    setScaling,
+    reset,
+  } =
+    useThemeStore()
 
   const activeStep = steps[stepIndex]
 
@@ -156,16 +169,16 @@ export function AppearanceWizard() {
                   <Button
                     key={mode}
                     size="sm"
-                    variant={theme === mode ? "default" : "outline"}
+                    variant={dashboardMode === mode ? "default" : "outline"}
                     type="button"
-                    onClick={() => setTheme(mode)}
+                    onClick={() => setMode(mode)}
                   >
                     {mode}
                   </Button>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                System will follow your OS setting. Your selection applies across the app.
+                System will follow your OS setting. Your selection applies to the dashboard only.
               </p>
             </div>
           ) : null}

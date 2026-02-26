@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes"
 import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store/auth-store"
 import { Toaster } from "@/components/ui/sonner"
+import { ThemeRouteSync } from "@/components/providers/theme-route-sync"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -26,8 +27,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem
+      disableTransitionOnChange
+      storageKey="academia-theme-mode"
+    >
       <QueryClientProvider client={queryClient}>
+        <ThemeRouteSync />
         {children}
         <Toaster />
         <ReactQueryDevtools initialIsOpen={false} />
