@@ -6,7 +6,11 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query"
-import { getUniversityConfig, updateUniversityConfig } from "@/lib/api/university"
+import {
+  getUniversityConfig,
+  updateUniversityConfig,
+  uploadUniversityLogo,
+} from "@/lib/api/university"
 import type { TenantCurrent, UpdateTenantAddressDto } from "@/types/university"
 
 export function universityKeys() {
@@ -39,6 +43,21 @@ export function useUpdateUniversityConfig() {
       // Backend may emit an in-app notification on first address set.
       // Refresh notification queries so the bell updates immediately.
       void queryClient.invalidateQueries({ queryKey: ["notifications"] })
+    },
+  })
+}
+
+export function useUploadUniversityLogo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (file: File) => uploadUniversityLogo(file),
+    onSuccess: async (data) => {
+      queryClient.setQueryData(universityKeys().config, data)
+      // Ensure we are fully in sync (and allow backend-side transforms).
+      await queryClient.invalidateQueries({ queryKey: universityKeys().config })
+      // Backend may emit an in-app notification when the logo is updated.
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] })
     },
   })
 }

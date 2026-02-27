@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  User,
   Users,
   FolderKanban,
   UserCheck,
@@ -56,6 +57,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: CheckSquare,
     },
     {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
+    },
+    {
       title: "Settings",
       href: "/dashboard/settings",
       icon: Settings,
@@ -98,6 +104,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
+    },
+    {
       title: "Settings",
       href: "/dashboard/settings",
       icon: Settings,
@@ -133,6 +144,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Messages",
       href: "/dashboard/advisor/messages",
       icon: FileText,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
     },
   ],
   student: [
@@ -171,6 +187,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       href: "/dashboard/student/messages",
       icon: FileText,
     },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
+    },
   ],
   department_committee: [
     {
@@ -197,6 +218,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Reports",
       href: "/dashboard/department-committee/reports",
       icon: FileText,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
     },
   ],
 }
