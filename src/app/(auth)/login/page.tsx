@@ -19,7 +19,6 @@ import {
   EyeOff,
   ArrowRight,
   CheckCircle2,
-  Users,
   BarChart3
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
@@ -103,6 +102,10 @@ export default function LoginPage() {
       redirectToDashboard(state.user?.roles);
     } catch (e: unknown) {
       const message = getErrorMessage(e, '');
+      if (message === 'Tenant account is not active') {
+        router.push('/account-suspended');
+        return;
+      }
       if (isRateLimitMessage(message)) {
         setIsRateLimited(true);
       }

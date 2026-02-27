@@ -9,6 +9,7 @@ import { ThemeCustomizer } from "@/components/providers/theme-customizer"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
+import { TenantEnforcementNotice } from "@/components/notifications/tenant-enforcement-notice"
 
 export default function DashboardLayout({
   children,
@@ -24,7 +25,12 @@ export default function DashboardLayout({
   const primaryRole = useMemo(() => getPrimaryRoleFromBackendRoles(user?.roles), [user?.roles])
   const shouldFetchMeRef = useRef(false)
 
-  const { data: unreadCount } = useNotificationsUnreadCount()
+  const { data: unreadCount } = useNotificationsUnreadCount({
+    enabled: Boolean(accessToken),
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    refetchInterval: 60_000,
+  })
 
   useEffect(() => {
     if (!accessToken && !isLoading) {
@@ -37,6 +43,16 @@ export default function DashboardLayout({
       return
     }
 
+    const tenantStatus = user.tenant?.status
+    if (tenantStatus && tenantStatus !== "ACTIVE") {
+      router.replace("/account-suspended")
+      // Avoid leaving a stale authenticated shell around.
+      setTimeout(() => {
+        useAuthStore.getState().clearAuthSession()
+      }, 0)
+      return
+    }
+
     // If we have an authenticated user but haven't loaded /auth/me data that includes
     // tenant verification status yet, fetch it once (important on older persisted sessions).
     if (primaryRole === "department_head" && user.tenantVerification === undefined && !shouldFetchMeRef.current) {
@@ -45,7 +61,7 @@ export default function DashboardLayout({
         // ignore; axios interceptor handles 401
       })
     }
-  }, [accessToken, primaryRole, user])
+  }, [accessToken, primaryRole, router, user])
 
   useEffect(() => {
     if (!accessToken || !user) {
@@ -106,6 +122,7 @@ export default function DashboardLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
         <main className="flex-1 overflow-y-auto bg-muted/10 p-6">
+          <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
           {children}
         </main>
       </div>
