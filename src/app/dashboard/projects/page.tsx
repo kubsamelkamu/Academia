@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import {
   DashboardKpiGrid,
   DashboardPageHeader,
@@ -8,7 +9,14 @@ import {
 } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, FolderKanban, GitBranch, TrendingUp } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { AlertTriangle, FolderKanban, GitBranch, Loader2, TrendingUp } from "lucide-react"
+import { getErrorMessage } from "@/lib/api/errors"
+import {
+  useAddProjectStudentMember,
+  useProjectMembers,
+  useRemoveProjectStudentMember,
+} from "@/lib/hooks/use-project-members"
 
 type ProjectStage = "All" | "Proposal" | "Execution" | "Review" | "Defense"
 
@@ -71,6 +79,14 @@ const delayedProjects = [
 export default function ProjectsOverviewPage() {
   const [activeStage, setActiveStage] = useState<ProjectStage>("All")
 
+  const [selectedProjectId, setSelectedProjectId] = useState("")
+  const [newMemberUserId, setNewMemberUserId] = useState("")
+
+  const projectId = selectedProjectId.trim().length > 0 ? selectedProjectId.trim() : null
+  const membersQuery = useProjectMembers(projectId)
+  const addMemberMutation = useAddProjectStudentMember(projectId)
+  const removeMemberMutation = useRemoveProjectStudentMember(projectId)
+
   const filteredProjects = useMemo(
     () =>
       projectRecords.filter((project) => {
@@ -78,6 +94,42 @@ export default function ProjectsOverviewPage() {
       }),
     [activeStage]
   )
+
+  const handleAddMember = async () => {
+    if (!projectId) {
+      toast.error("Enter a project ID first")
+      return
+    }
+
+    const userId = newMemberUserId.trim()
+    if (!userId) {
+      toast.error("Enter a student user ID")
+      return
+    }
+
+    try {
+      await addMemberMutation.mutateAsync({ userId })
+      toast.success("Student added to project.")
+      setNewMemberUserId("")
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to add student"))
+    }
+  }
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!projectId) return
+    try {
+      await removeMemberMutation.mutateAsync({ userId })
+      toast.success("Student removed from project.")
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to remove student"))
+    }
+  }
+
+  const handleSelectMockProject = (id: string) => {
+    setSelectedProjectId(id)
+    setNewMemberUserId("")
+  }
 
   return (
     <div className="space-y-6">
@@ -179,6 +231,119 @@ export default function ProjectsOverviewPage() {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      </DashboardSectionCard>
+
+      <DashboardSectionCard
+        title="Project Members"
+        description="Look up a project by ID, then add or remove student members."
+      >
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Quick pick (mock projects):
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {projectRecords.map((project) => (
+              <Button
+                key={project.id}
+                type="button"
+                size="sm"
+                variant={selectedProjectId.trim() === project.id ? "secondary" : "outline"}
+                onClick={() => handleSelectMockProject(project.id)}
+              >
+                {project.title}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <Input
+            placeholder="Project ID"
+            value={selectedProjectId}
+            onChange={(event) => setSelectedProjectId(event.target.value)}
+          />
+
+          <Input
+            placeholder="Student User ID"
+            value={newMemberUserId}
+            onChange={(event) => setNewMemberUserId(event.target.value)}
+            disabled={!projectId}
+          />
+
+          <Button
+            type="button"
+            onClick={handleAddMember}
+            disabled={!projectId || addMemberMutation.isPending}
+          >
+            {addMemberMutation.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Adding
+              </span>
+            ) : (
+              "Add Student"
+            )}
+          </Button>
+        </div>
+
+        <div className="mt-4">
+          {!projectId ? (
+            <p className="text-sm text-muted-foreground">Enter a project ID to load members.</p>
+          ) : membersQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading members
+            </div>
+          ) : membersQuery.isError ? (
+            <div className="space-y-3">
+              <p className="text-sm text-destructive">{membersQuery.error.message}</p>
+              <Button type="button" variant="outline" onClick={() => membersQuery.refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : !membersQuery.data ? (
+            <p className="text-sm text-muted-foreground">No member data loaded yet.</p>
+          ) : membersQuery.data.members.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No members found for this project.</p>
+          ) : (
+            <div className="space-y-2">
+              {membersQuery.data.members.map((member) => {
+                const fullName = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ")
+                const canRemove = member.role === "STUDENT"
+
+                return (
+                  <div
+                    key={`${member.userId}-${member.role}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium">
+                          {fullName.length > 0 ? fullName : member.user.email}
+                        </p>
+                        <Badge variant={member.role === "STUDENT" ? "secondary" : "outline"}>
+                          {member.role}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{member.user.email}</p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRemoveMember(member.userId)}
+                      disabled={!canRemove || removeMemberMutation.isPending}
+                      title={canRemove ? "Remove student" : "Only STUDENT members can be removed here"}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </DashboardSectionCard>

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
 import { TenantEnforcementNotice } from "@/components/notifications/tenant-enforcement-notice"
+import { NotificationsRealtime } from "@/components/notifications/notifications-realtime"
 
 export default function DashboardLayout({
   children,
@@ -113,6 +114,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <NotificationsRealtime />
       <ThemeCustomizer />
       <aside className="hidden lg:block">
         <Sidebar user={shellUser} />

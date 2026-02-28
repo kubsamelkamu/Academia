@@ -14,6 +14,7 @@ import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
 import { UniversitySettingsForm } from "@/components/dashboard/department-head/university-settings"
 import { AppearanceWizard } from "@/components/dashboard/settings/appearance-wizard"
+import { DepartmentGroupSizeSettings } from "@/components/dashboard/settings/department-group-size-settings"
 
 interface PolicyToggle {
   id: string
@@ -161,6 +162,14 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
                 { title: "Preference Profiles", value: "2", note: "Saved department presets", icon: SlidersHorizontal },
               ]}
             />
+
+            <DashboardSectionCard
+              className="mt-4"
+              title="Project Group Size"
+              description="Set allowed student group size range for department projects."
+            >
+              <DepartmentGroupSizeSettings />
+            </DashboardSectionCard>
 
             <div className="mt-4 grid gap-4 xl:grid-cols-3">
               <DashboardSectionCard
