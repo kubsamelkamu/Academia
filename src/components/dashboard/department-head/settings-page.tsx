@@ -7,6 +7,8 @@ import {
   DashboardPageHeader,
   DashboardSectionCard,
 } from "@/components/dashboard/page-primitives"
+import { DocumentTemplatesSection } from "@/components/dashboard/department-head/document-templates-section"
+import { MilestoneTemplatesSection } from "@/components/dashboard/department-head/milestone-templates-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -220,6 +222,10 @@ export function DepartmentHeadSettingsPageContent({ embedded = false }: { embedd
           </Button>
         </div>
       </DashboardSectionCard>
+
+      <MilestoneTemplatesSection />
+
+      <DocumentTemplatesSection />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <DashboardSectionCard
