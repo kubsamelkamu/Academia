@@ -19,13 +19,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
 import { useCreateDocumentTemplate } from "@/lib/hooks/use-document-templates"
+import { formatBytesAsMb, validateDocumentTemplateFiles } from "@/lib/file-utils"
 import { useAuthStore } from "@/store/auth-store"
 import type { DocumentTemplateType } from "@/types/document-templates"
-
-const allowedMimeTypes = new Set<string>([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-])
 
 const typeOptions: Array<{ label: string; value: DocumentTemplateType }> = [
   { label: "SRS", value: "SRS" },
@@ -33,18 +29,6 @@ const typeOptions: Array<{ label: string; value: DocumentTemplateType }> = [
   { label: "REPORT", value: "REPORT" },
   { label: "OTHER", value: "OTHER" },
 ]
-
-function isAllowedFile(file: File): boolean {
-  if (allowedMimeTypes.has(file.type)) return true
-  const name = file.name.toLowerCase()
-  return name.endsWith(".pdf") || name.endsWith(".docx")
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—"
-  const mb = bytes / (1024 * 1024)
-  return `${mb.toFixed(2)} MB`
-}
 
 export function CreateDocumentTemplateDialog({
   onCreated,
@@ -86,24 +70,9 @@ export function CreateDocumentTemplateDialog({
       return "Title must be at least 3 characters."
     }
 
-    if (!input.files.length) {
-      return "Please select at least one file (PDF or DOCX)."
-    }
-
-    if (input.files.length > 10) {
-      return "You can upload up to 10 files per template."
-    }
-
-    for (const file of input.files) {
-      if (!isAllowedFile(file)) {
-        return `Unsupported file type: ${file.name}`
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        return `File too large (max 10MB): ${file.name}`
-      }
-    }
-
-    return null
+    return validateDocumentTemplateFiles(input.files, {
+      tooManyFilesError: "You can upload up to 10 files per template.",
+    })
   }
 
   const onPickFiles = (fileList: FileList | null) => {
@@ -217,7 +186,7 @@ export function CreateDocumentTemplateDialog({
                   <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                      <p className="text-xs text-muted-foreground">{formatBytesAsMb(file.size)}</p>
                     </div>
                     <Button
                       type="button"

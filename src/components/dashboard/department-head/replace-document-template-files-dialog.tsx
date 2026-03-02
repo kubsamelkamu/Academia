@@ -19,23 +19,7 @@ import { Label } from "@/components/ui/label"
 
 import { useAuthStore } from "@/store/auth-store"
 import { useReplaceDocumentTemplateFiles } from "@/lib/hooks/use-document-templates"
-
-const allowedMimeTypes = new Set<string>([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-])
-
-function isAllowedFile(file: File): boolean {
-  if (allowedMimeTypes.has(file.type)) return true
-  const name = file.name.toLowerCase()
-  return name.endsWith(".pdf") || name.endsWith(".docx")
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—"
-  const mb = bytes / (1024 * 1024)
-  return `${mb.toFixed(2)} MB`
-}
+import { formatBytesAsMb, validateDocumentTemplateFiles } from "@/lib/file-utils"
 
 export function ReplaceDocumentTemplateFilesDialog({
   templateId,
@@ -59,24 +43,9 @@ export function ReplaceDocumentTemplateFilesDialog({
   }
 
   const validate = (): string | null => {
-    if (!files.length) {
-      return "Please select at least one file (PDF or DOCX)."
-    }
-
-    if (files.length > 10) {
-      return "You can upload up to 10 files per request."
-    }
-
-    for (const file of files) {
-      if (!isAllowedFile(file)) {
-        return `Unsupported file type: ${file.name}`
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        return `File too large (max 10MB): ${file.name}`
-      }
-    }
-
-    return null
+    return validateDocumentTemplateFiles(files, {
+      tooManyFilesError: "You can upload up to 10 files per request.",
+    })
   }
 
   const onPickFiles = (fileList: FileList | null) => {
@@ -160,7 +129,7 @@ export function ReplaceDocumentTemplateFilesDialog({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                    <p className="text-xs text-muted-foreground">{formatBytesAsMb(file.size)}</p>
                   </div>
                   <Button
                     type="button"
