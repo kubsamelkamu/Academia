@@ -7,7 +7,8 @@ export interface UpdateProfileNameDto {
 }
 
 export interface ChangePasswordDto {
-  currentPassword: string
+  oldPassword?: string
+  currentPassword?: string
   newPassword: string
 }
 
@@ -60,5 +61,13 @@ export async function deleteProfileAvatar(): Promise<Partial<AuthUser>> {
 }
 
 export async function changeProfilePassword(dto: ChangePasswordDto): Promise<void> {
-  await apiClient.post("/profile/change-password", dto)
+  const oldPassword = dto.oldPassword ?? dto.currentPassword
+  if (!oldPassword) {
+    throw new Error("Current password is required")
+  }
+
+  await apiClient.post("/auth/change-password", {
+    oldPassword,
+    newPassword: dto.newPassword,
+  })
 }

@@ -8,6 +8,7 @@ export interface AuthUser {
 
   status?: string;
   emailVerified?: boolean;
+  mustChangePassword?: boolean;
 
   tenantDomain?: string;
   tenant?: {

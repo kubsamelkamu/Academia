@@ -44,6 +44,11 @@ export default function DashboardLayout({
       return
     }
 
+    if (user.mustChangePassword && pathname !== "/change-password") {
+      router.replace("/change-password")
+      return
+    }
+
     const tenantStatus = user.tenant?.status
     if (tenantStatus && tenantStatus !== "ACTIVE") {
       router.replace("/account-suspended")
@@ -62,7 +67,7 @@ export default function DashboardLayout({
         // ignore; axios interceptor handles 401
       })
     }
-  }, [accessToken, primaryRole, router, user])
+  }, [accessToken, pathname, primaryRole, router, user])
 
   useEffect(() => {
     if (!accessToken || !user) {
