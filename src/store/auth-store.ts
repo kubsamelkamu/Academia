@@ -291,7 +291,11 @@ export const useAuthStore = create<AuthState>()(
         set({ profileIsLoading: true, profileError: undefined })
         try {
           await changeProfilePassword(dto)
-          set({ profileIsLoading: false })
+          const currentUser = get().user
+          set({
+            user: currentUser ? { ...currentUser, mustChangePassword: false } : currentUser,
+            profileIsLoading: false,
+          })
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to change password';
