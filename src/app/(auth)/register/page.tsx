@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Loader2,
-  Building2,
   GraduationCap,
   Mail,
   Lock,
@@ -26,19 +26,6 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { DEPARTMENT_NAME_OPTIONS, registerInstitutionSchema, RegisterInstitutionFormData } from '@/validations/auth';
-
-const UNIVERSITY_SUGGESTIONS = [
-  'Addis Ababa University',
-  'Adama Science and Technology University',
-  'Jimma University',
-  'Bahir Dar University',
-  'University of Gondar',
-  'Hawassa University',
-  'Mekelle University',
-  'Haramaya University',
-  'Arba Minch University',
-  'Wollo University',
-] as const;
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -63,19 +50,27 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
+  const DEFAULT_UNIVERSITY_NAME = 'Haramaya University';
+
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterInstitutionFormData>({
     resolver: zodResolver(registerInstitutionSchema),
+    defaultValues: {
+      universityName: DEFAULT_UNIVERSITY_NAME,
+    },
   });
 
   const onSubmit = async (data: RegisterInstitutionFormData) => {
     try {
       clearError();
-      await registerInstitution(data);
-      setSuccessMessage(`Institution registered successfully! Check ${data.email} for verification code.`);
+      await registerInstitution({
+        ...data,
+        universityName: DEFAULT_UNIVERSITY_NAME,
+      });
+      setSuccessMessage(`Registration submitted! Check ${data.email} for the verification code.`);
       // Navigate to verification page after a short delay
       setTimeout(() => {
         router.push('/register/verify');
@@ -162,54 +157,38 @@ export default function RegisterPage() {
           <motion.div variants={itemVariants}>
             <Card className="backdrop-blur-sm bg-white/80 border-white/20 shadow-xl">
               <CardHeader className="space-y-1 pb-4">
+                <div className="flex justify-center">
+                  <motion.div
+                    className="relative h-24 w-24 overflow-hidden rounded-2xl border bg-white/60"
+                    whileHover={{ scale: 1.03, rotate: 2 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <Image
+                      src="/haramaya.png"
+                      alt="Haramaya University"
+                      fill
+                      sizes="96px"
+                      className="object-contain p-3"
+                      priority
+                    />
+                  </motion.div>
+                </div>
                 <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-                  <Building2 className="w-6 h-6 text-blue-500" />
-                  Register Institution
+                  <GraduationCap className="w-6 h-6 text-purple-500" />
+                  Register Your Department
                 </CardTitle>
                 <CardDescription className="text-center">
-                  Create your academic institution and department head account
+                  Set up your department and create the Department Head account (Haramaya University deployment)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  {/* Institution Details */}
-                  <motion.div
-                    className="space-y-4"
-                    variants={itemVariants}
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <Building2 className="w-4 h-4 text-blue-500" />
-                      <h4 className="font-medium text-gray-900">Institution Details</h4>
-                    </div>
-
-                    <motion.div className="space-y-2" variants={itemVariants}>
-                      <Label htmlFor="universityName" className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        University Name
-                      </Label>
-                      <Input
-                        id="universityName"
-                        list="university-suggestions"
-                        {...register('universityName')}
-                        placeholder="Addis Ababa University"
-                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500/20"
-                      />
-                      <datalist id="university-suggestions">
-                        {UNIVERSITY_SUGGESTIONS.map((name) => (
-                          <option key={name} value={name} />
-                        ))}
-                      </datalist>
-                      {errors.universityName && (
-                        <motion.p
-                          className="text-sm text-red-600 flex items-center gap-1"
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                        >
-                          {errors.universityName.message}
-                        </motion.p>
-                      )}
-                    </motion.div>
-                  </motion.div>
+                  {/* Hidden: institution is fixed for this deployment */}
+                  <input
+                    type="hidden"
+                    value={DEFAULT_UNIVERSITY_NAME}
+                    {...register('universityName')}
+                  />
 
                   {/* Department Details */}
                   <motion.div
@@ -445,14 +424,14 @@ export default function RegisterPage() {
                           animate={{ opacity: 1 }}
                         >
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Creating Institution...
+                          Creating Department...
                         </motion.div>
                       ) : (
                         <motion.div
                           className="flex items-center gap-2"
                           whileHover={{ x: 2 }}
                         >
-                          Register Institution
+                          Register Department
                           <ArrowRight className="w-4 h-4" />
                         </motion.div>
                       )}
