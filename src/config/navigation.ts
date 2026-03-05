@@ -37,11 +37,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: Users,
     },
     {
-      title: "Coordinators",
-      href: "/dashboard/department-head/coordinators",
-      icon: UserCheck,
-    },
-    {
       title: "Faculty",
       href: "/dashboard/department-head/faculty",
       icon: Users,

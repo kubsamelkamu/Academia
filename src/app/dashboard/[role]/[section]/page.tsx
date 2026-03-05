@@ -9,7 +9,10 @@ import { CommitteeAssignedProjectsPage } from "@/components/dashboard/committee/
 import { CommitteeDefenseSchedulePage } from "@/components/dashboard/committee/defense-schedule-page"
 import { CommitteeEvaluationsPage } from "@/components/dashboard/committee/evaluations-page"
 import { CommitteeReportsPage } from "@/components/dashboard/committee/reports-page"
+import { DepartmentHeadFacultyPage } from "@/components/dashboard/department-head/faculty-page"
 import { DepartmentHeadInvitationsPage } from "@/components/dashboard/department-head/invitations-page"
+import DepartmentHeadProjectsPage from "@/components/dashboard/department-head/ProjectsOverview"
+import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Reports"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import { StudentDefensePage } from "@/components/dashboard/student/defense-page"
 import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
@@ -18,10 +21,8 @@ import { StudentSubmissionsPage } from "@/components/dashboard/student/submissio
 import { StudentTeamPage } from "@/components/dashboard/student/team-page"
 import { StudentTimelinePage } from "@/components/dashboard/student/timeline-page"
 import AdvisorsPage from "@/app/dashboard/advisors/page"
-import CoordinatorsPage from "@/app/dashboard/coordinators/page"
 import DefensesPage from "@/app/dashboard/defenses/page"
 import EvaluationsPage from "@/app/dashboard/evaluations/page"
-import FacultyPage from "@/app/dashboard/faculty/page"
 import ProjectsOverviewPage from "@/app/dashboard/projects/page"
 import ReportsPage from "@/app/dashboard/reports/page"
 import SettingsPage from "@/app/dashboard/settings/page"
@@ -41,10 +42,9 @@ type SectionComponent = () => ReactElement | Promise<ReactElement>
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
     invitations: DepartmentHeadInvitationsPage,
-    coordinators: CoordinatorsPage,
-    faculty: FacultyPage,
-    projects: ProjectsOverviewPage,
-    reports: ReportsPage,
+    faculty: DepartmentHeadFacultyPage,
+    projects: DepartmentHeadProjectsPage,
+    reports: DepartmentHeadReportsPage,
     settings: DepartmentHeadSettingsPage,
   },
   coordinator: {
@@ -79,10 +79,6 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
   },
 }
 
-const sectionAliasToCanonical: Record<string, string> = {
-  coordinator: "coordinators",
-}
-
 function getCanonicalSectionForRole(role: UserRole, section: string): string {
   if (role === "student" && section === "defenses") {
     return "defense"
@@ -96,11 +92,11 @@ function getCanonicalSectionForRole(role: UserRole, section: string): string {
     return "defense"
   }
 
-  return sectionAliasToCanonical[section] ?? section
+  return section
 }
 
 const allowedSectionsByRole: Record<UserRole, string[]> = {
-  department_head: ["invitations", "coordinators", "faculty", "projects", "reports", "settings"],
+  department_head: ["invitations", "faculty", "projects", "reports", "settings"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
   advisor: ["my-projects", "students", "evaluations", "schedule", "messages"],
   student: ["my-project", "team", "submissions", "defense", "timeline", "messages"],

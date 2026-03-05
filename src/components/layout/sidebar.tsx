@@ -114,8 +114,8 @@ export function Sidebar({ user }: SidebarProps) {
                     className={cn(
                       "relative flex h-7 w-7 items-center justify-center rounded-md transition-all duration-300",
                       isActive
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                        : "bg-sidebar-accent/60 text-sidebar-accent-foreground group-hover:bg-sidebar-primary/10 group-hover:text-sidebar-primary"
+                        ? "bg-sidebar-primary/20 text-sidebar-foreground shadow-sm"
+                        : "bg-sidebar-accent/60 text-sidebar-accent-foreground group-hover:bg-sidebar-primary/10 group-hover:text-sidebar-accent-foreground"
                     )}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
