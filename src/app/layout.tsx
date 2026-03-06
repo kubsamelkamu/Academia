@@ -1,13 +1,14 @@
 
 import type { Metadata } from "next"
-import { Inter, Manrope, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
 import { Favicon } from "@/components/Favicon"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" })
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
+const fallbackFontVariables = {
+  "--font-inter": "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  "--font-manrope": "Manrope, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  "--font-playfair": "'Playfair Display', Georgia, Cambria, 'Times New Roman', Times, serif",
+} as React.CSSProperties
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://academia.et"),
@@ -73,7 +74,7 @@ export default function RootLayout({
         <meta name="twitter:description" content="Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities." />
         <meta name="twitter:image" content="/favicon.png" />
       </head>
-      <body className={`${inter.variable} ${manrope.variable} ${playfair.variable}`}>
+      <body style={fallbackFontVariables}>
         <Favicon />
         <Providers>{children}</Providers>
       </body>
