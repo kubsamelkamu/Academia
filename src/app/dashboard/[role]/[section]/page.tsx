@@ -9,7 +9,6 @@ import { CommitteeAssignedProjectsPage } from "@/components/dashboard/committee/
 import { CommitteeDefenseSchedulePage } from "@/components/dashboard/committee/defense-schedule-page"
 import { CommitteeEvaluationsPage } from "@/components/dashboard/committee/evaluations-page"
 import { CommitteeReportsPage } from "@/components/dashboard/committee/reports-page"
-import { DepartmentHeadFacultyPage } from "@/components/dashboard/department-head/faculty-page"
 import { DepartmentHeadInvitationsPage } from "@/components/dashboard/department-head/invitations-page"
 import DepartmentHeadProjectsPage from "@/components/dashboard/department-head/ProjectsOverview"
 import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Reports"
@@ -42,7 +41,9 @@ type SectionComponent = () => ReactElement | Promise<ReactElement>
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
     invitations: DepartmentHeadInvitationsPage,
-    faculty: DepartmentHeadFacultyPage,
+    faculty: async () => {
+      redirect("/dashboard/faculty")
+    },
     projects: DepartmentHeadProjectsPage,
     reports: DepartmentHeadReportsPage,
     settings: DepartmentHeadSettingsPage,
