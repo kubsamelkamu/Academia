@@ -11,6 +11,7 @@ import {
   GraduationCap,
   CheckSquare,
   Clock,
+  Bell,
   type LucideIcon,
 } from "lucide-react"
 
@@ -158,14 +159,19 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
+      title: "Team",
+      href: "/dashboard/student/team",
+      icon: Users,
+    },
+    {
       title: "My Project",
       href: "/dashboard/student/my-project",
       icon: FolderKanban,
     },
     {
-      title: "Team",
-      href: "/dashboard/student/team",
-      icon: Users,
+      title: "Milestones",
+      href: "/dashboard/student/milestones",
+      icon: Calendar,
     },
     {
       title: "Submissions",
@@ -173,19 +179,24 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
-      title: "Defense",
-      href: "/dashboard/student/defense",
-      icon: Calendar,
-    },
-    {
       title: "Timeline",
       href: "/dashboard/student/timeline",
       icon: Clock,
     },
     {
+      title: "Defense",
+      href: "/dashboard/student/defense",
+      icon: Calendar,
+    },
+    {
       title: "Messages",
       href: "/dashboard/student/messages",
       icon: FileText,
+    },
+    {
+      title: "Notifications",
+      href: "/dashboard/notifications",
+      icon: Bell,
     },
     {
       title: "Profile",

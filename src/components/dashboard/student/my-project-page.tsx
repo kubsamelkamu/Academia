@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import {
   Calendar,
   Users,
@@ -192,6 +191,22 @@ const initialProjectData: ProjectData = getInitialProjectData()
 // ----------------------------------------------------------------------
 // Main Component
 // ----------------------------------------------------------------------
+
+function MyProjectHeader() {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          My Project
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          View and manage your project details, milestones, and submissions
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function StudentMyProjectPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
@@ -202,10 +217,7 @@ export function StudentMyProjectPage() {
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {
     return (
       <div className="space-y-6 w-full">
-        <DashboardPageHeader
-          title="My Project"
-          description="View and manage your project details, milestones, and submissions"
-        />
+        <MyProjectHeader />
         <Card>
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">No project data available.</p>
@@ -301,10 +313,7 @@ export function StudentMyProjectPage() {
 
   return (
     <div className="space-y-6 w-full">
-      <DashboardPageHeader
-        title="My Project"
-        description="View and manage your project details, milestones, and submissions"
-      />
+      <MyProjectHeader />
 
       {/* Project Overview Card */}
       <Card>

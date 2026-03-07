@@ -32,11 +32,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
 
 export function StudentTeamPage() {
-  const [activeTab, setActiveTab] = useState('overview')
   const [groupSubmitted, setGroupSubmitted] = useState(false)
-  const [groupApproved, setGroupApproved] = useState(false)
+  const [groupApproved] = useState(false)
 
   // Mock data - would come from API in production
   const currentUser = {
@@ -44,7 +44,15 @@ export function StudentTeamPage() {
     id: 'STU001',
     role: 'Group Manager',
     department: 'Computer Science',
-    email: 'john.doe@university.edu'
+    email: 'john.doe@university.edu',
+    managerApprovalStatus: 'approved' as 'approved' | 'pending' | 'rejected' | 'not_requested',
+  }
+
+  const isApprovedGroupManager = currentUser.managerApprovalStatus === 'approved'
+
+  // Students who are not approved as group managers should see the normal student team page.
+  if (!isApprovedGroupManager) {
+    return <StudentTeamMemberPage />
   }
 
   const groupMembers = [
@@ -147,7 +155,7 @@ export function StudentTeamPage() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6" onValueChange={setActiveTab}>
+      <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
