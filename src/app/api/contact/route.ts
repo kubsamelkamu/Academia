@@ -2,11 +2,29 @@ import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return null
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const upstreamBase = process.env.NEXT_PUBLIC_API_BASE_URL
 
-    const upstream = await fetch('https://api.academia.et/api/v1/contact', {
+    if (!upstreamBase) {
+      return NextResponse.json(
+        { message: 'Contact service is not configured. Set NEXT_PUBLIC_API_BASE_URL.' },
+        { status: 500 }
+      )
+    }
+
+    const upstreamUrl = `${upstreamBase.replace(/\/$/, '')}/contact`
+
+    const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: {
         accept: 'application/json',
@@ -17,14 +35,26 @@ export async function POST(req: Request) {
     })
 
     const text = await upstream.text()
+    const contentType = upstream.headers.get('content-type') ?? ''
+    const parsed = tryParseJson(text)
 
-    return new NextResponse(text, {
-      status: upstream.status,
-      headers: {
-        'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
-        'Cache-Control': 'no-store',
-      },
-    })
+    if (contentType.includes('application/json') && parsed !== null) {
+      return NextResponse.json(parsed, {
+        status: upstream.status,
+        headers: { 'Cache-Control': 'no-store' },
+      })
+    }
+
+    if (!upstream.ok) {
+      const fallbackMessage =
+        upstream.status === 503
+          ? 'Service is temporarily unavailable. Please try again later.'
+          : 'Failed to submit contact form'
+
+      return NextResponse.json({ message: fallbackMessage }, { status: upstream.status })
+    }
+
+    return NextResponse.json({ message: 'Contact form submitted successfully' }, { status: upstream.status })
   } catch {
     return NextResponse.json({ message: 'Failed to submit contact form' }, { status: 500 })
   }
