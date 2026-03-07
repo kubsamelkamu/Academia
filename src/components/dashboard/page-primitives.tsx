@@ -24,10 +24,10 @@ export function DashboardPageHeader({
   actions,
 }: DashboardPageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between text-foreground">
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-inherit">{title}</h1>
           {badge ? <Badge variant="secondary">{badge}</Badge> : null}
         </div>
         <p className="text-muted-foreground">{description}</p>

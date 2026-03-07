@@ -1,11 +1,10 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { toast } from "sonner"
 import {
   BarChart3,
@@ -54,6 +53,17 @@ interface StudentDashboardData {
     name: string
     members: TeamMember[]
   }
+}
+
+function useLiveTime(intervalMs = 1000): Date {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), intervalMs)
+    return () => window.clearInterval(id)
+  }, [intervalMs])
+
+  return now
 }
 
 function formatDate(dateString: string): string {
@@ -167,6 +177,20 @@ interface StudentDashboardProps {
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const data = useMemo(() => buildMockDashboardData(), [])
 
+  const welcomeTitle =
+    userName && userName.trim().length > 0 ? `Welcome, ${userName.trim()}` : "Welcome"
+
+  const now = useLiveTime(1000)
+  const timeString = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(now),
+    [now]
+  )
+
   const completedMilestones = data.project.milestones.filter(
     (m) => m.status === "approved" || m.status === "submitted"
   ).length
@@ -193,10 +217,21 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
   return (
     <div className="space-y-6">
-      <DashboardPageHeader
-        title="Student Dashboard"
-        description="Track your project progress, team activity, and evaluation status in one place."
-      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            {welcomeTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Track your project progress, team activity, and evaluation status in one place.
+          </p>
+        </div>
+        <div className="mt-1 sm:mt-0 flex items-center text-sm text-muted-foreground">
+          <span className="tabular-nums font-medium" aria-live="polite">
+            {timeString}
+          </span>
+        </div>
+      </div>
 
       {/* KPI Row */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
