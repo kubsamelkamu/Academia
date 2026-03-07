@@ -14,12 +14,14 @@ import { DepartmentHeadInvitationsPage } from "@/components/dashboard/department
 import DepartmentHeadProjectsPage from "@/components/dashboard/department-head/ProjectsOverview"
 import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Reports"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
-import { StudentDefensePage } from "@/components/dashboard/student/defense-page"
+import StudentDefensePage from "@/components/dashboard/student/defense-page"
 import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
+import { StudentMilestonesPage } from "@/components/dashboard/student/milestones-page"
 import { StudentMyProjectPage } from "@/components/dashboard/student/my-project-page"
 import { StudentSubmissionsPage } from "@/components/dashboard/student/submissions-page"
 import { StudentTeamPage } from "@/components/dashboard/student/team-page"
 import { StudentTimelinePage } from "@/components/dashboard/student/timeline-page"
+import { StudentUploadDocumentsPage } from "@/components/dashboard/student/upload-documents-page"
 import AdvisorsPage from "@/app/dashboard/advisors/page"
 import DefensesPage from "@/app/dashboard/defenses/page"
 import EvaluationsPage from "@/app/dashboard/evaluations/page"
@@ -67,6 +69,8 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     "my-project": StudentMyProjectPage,
     team: StudentTeamPage,
     submissions: StudentSubmissionsPage,
+    milestones: StudentMilestonesPage,
+    "upload-documents": StudentUploadDocumentsPage,
     defense: StudentDefensePage,
     timeline: StudentTimelinePage,
     messages: StudentMessagesPage,
@@ -99,7 +103,7 @@ const allowedSectionsByRole: Record<UserRole, string[]> = {
   department_head: ["invitations", "faculty", "projects", "reports", "settings"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
   advisor: ["my-projects", "students", "evaluations", "schedule", "messages"],
-  student: ["my-project", "team", "submissions", "defense", "timeline", "messages"],
+  student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],
   department_committee: ["assigned-projects", "evaluations", "defense-schedule", "reports"],
 }
 
