@@ -16,6 +16,7 @@ import {
   changeProfilePassword,
   deleteProfileAvatar,
   getProfile,
+  getStudentProfile,
   updateProfileName,
   uploadProfileAvatar,
   updateStudentProfile,
@@ -50,6 +51,7 @@ interface AuthState {
   login: (dto: LoginDto) => Promise<void>;
   fetchMe: () => Promise<void>;
   fetchProfile: () => Promise<void>;
+  fetchStudentProfile: () => Promise<void>;
   updateProfileName: (dto: UpdateProfileNameDto) => Promise<void>;
   uploadProfileAvatar: (file: File) => Promise<void>;
   deleteProfileAvatar: () => Promise<void>;
@@ -226,6 +228,38 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      fetchStudentProfile: async (): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const profile = await getStudentProfile()
+          const currentUser = get().user
+
+          // Normalize field naming differences.
+          const normalized = {
+            ...profile,
+            techStack:
+              (profile as { techStack?: string[]; technologies?: string[] }).techStack ??
+              (profile as { techStack?: string[]; technologies?: string[] }).technologies,
+            technologies:
+              (profile as { techStack?: string[]; technologies?: string[] }).technologies ??
+              (profile as { techStack?: string[]; technologies?: string[] }).techStack,
+          }
+
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(normalized as AuthUser),
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to load student profile';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
       updateProfileName: async (dto: UpdateProfileNameDto): Promise<void> => {
         set({ profileIsLoading: true, profileError: undefined })
         try {
@@ -299,6 +333,13 @@ export const useAuthStore = create<AuthState>()(
             user: {
               ...(currentUser ?? ({} as AuthUser)),
               ...(updated as AuthUser),
+              // Keep both fields populated for UI compatibility.
+              techStack:
+                (updated as AuthUser).techStack ?? (updated as AuthUser).technologies ??
+                dto.techStack ?? dto.technologies,
+              technologies:
+                (updated as AuthUser).technologies ?? (updated as AuthUser).techStack ??
+                dto.technologies ?? dto.techStack,
             },
             profileIsLoading: false,
           })
@@ -306,8 +347,14 @@ export const useAuthStore = create<AuthState>()(
           const status = (error as { response?: { status?: number } })?.response?.status
           const currentUser = get().user
           if ((status === 404 || status === 501) && currentUser) {
+            const mergedTechStack = dto.techStack ?? dto.technologies
             set({
-              user: { ...currentUser, ...dto },
+              user: {
+                ...currentUser,
+                ...dto,
+                techStack: mergedTechStack ?? currentUser.techStack ?? currentUser.technologies,
+                technologies: (dto.technologies ?? dto.techStack) ?? currentUser.technologies ?? currentUser.techStack,
+              },
               profileIsLoading: false,
             })
             return

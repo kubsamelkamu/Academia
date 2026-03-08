@@ -41,14 +41,15 @@ export interface AuthUser {
   twoFactorEnabled?: boolean;
   twoFactorVerifiedAt?: string | null;
 
-  /** Student / group manager profile (optional) */
   bio?: string | null;
   githubUrl?: string | null;
   linkedinUrl?: string | null;
+  portfolioUrl?: string | null;
+
+  techStack?: string[];
   technologies?: string[];
 }
 
-// GET /api/v1/auth/me response payload (after envelope unwrapping)
 export type AuthMeUser = AuthUser;
 
 export interface RegisterInstitutionDto {
