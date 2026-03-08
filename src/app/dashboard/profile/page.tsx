@@ -34,6 +34,7 @@ export default function ProfilePage() {
       <DashboardSectionCard
         title="Profile"
         description="Update your profile, password, and account security preferences."
+        className="text-inherit"
       >
         <ProfileSettings />
       </DashboardSectionCard>
