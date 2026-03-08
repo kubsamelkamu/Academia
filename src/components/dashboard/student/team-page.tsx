@@ -17,7 +17,8 @@ import {
   Eye,
   Info,
   Send,
-  AlertCircle
+  AlertCircle,
+  PlusCircle
 } from 'lucide-react'
 import {
   Dialog,
@@ -34,9 +35,78 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
 
+type CreateGroupFormData = {
+  name: string
+  objective: string
+  technology: string
+}
+
+function CreateGroupForm({
+  defaultValues,
+  onSubmit,
+  onSuccess,
+}: {
+  defaultValues?: CreateGroupFormData
+  onSubmit: (data: CreateGroupFormData) => void
+  onSuccess?: () => void
+}) {
+  const [name, setName] = useState(defaultValues?.name ?? "")
+  const [objective, setObjective] = useState(defaultValues?.objective ?? "")
+  const [technology, setTechnology] = useState(defaultValues?.technology ?? "")
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim() || !objective.trim() || !technology.trim()) return
+    onSubmit({ name: name.trim(), objective: objective.trim(), technology: technology.trim() })
+    onSuccess?.()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label htmlFor="group-name">Group Name <span className="text-destructive">*</span></Label>
+        <Input
+          id="group-name"
+          placeholder="e.g. Tech Innovators"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="group-objective">Group Objective <span className="text-destructive">*</span></Label>
+        <Textarea
+          id="group-objective"
+          placeholder="Describe the goals and objectives of your group project..."
+          value={objective}
+          onChange={(e) => setObjective(e.target.value)}
+          rows={4}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="group-technology">Technology We Use <span className="text-destructive">*</span></Label>
+        <Input
+          id="group-technology"
+          placeholder="e.g. React, Node.js, PostgreSQL"
+          value={technology}
+          onChange={(e) => setTechnology(e.target.value)}
+          required
+        />
+      </div>
+      <Button type="submit" className="w-full">
+        <PlusCircle className="h-4 w-4 mr-2" />
+        Create Group
+      </Button>
+    </form>
+  )
+}
+
 export function StudentTeamPage() {
   const [groupSubmitted, setGroupSubmitted] = useState(false)
   const [groupApproved] = useState(false)
+  const [groupInfo, setGroupInfo] = useState<CreateGroupFormData | null>(null)
+  const [createGroupOpen, setCreateGroupOpen] = useState(false)
 
   // Mock data - would come from API in production
   const currentUser = {
@@ -364,7 +434,31 @@ export function StudentTeamPage() {
                 </CardDescription>
               </div>
               {canEditGroup && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" size="sm">
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create Group
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create Group</DialogTitle>
+                        <DialogDescription>
+                          Set up your project group with required details
+                        </DialogDescription>
+                      </DialogHeader>
+                      <CreateGroupForm
+                        key={createGroupOpen ? "open" : "closed"}
+                        defaultValues={groupInfo ?? undefined}
+                        onSubmit={(data) => {
+                          setGroupInfo(data)
+                        }}
+                        onSuccess={() => setCreateGroupOpen(false)}
+                      />
+                    </DialogContent>
+                  </Dialog>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -399,6 +493,16 @@ export function StudentTeamPage() {
               )}
             </CardHeader>
             <CardContent>
+              {groupInfo && (
+                <div className="mb-6 p-4 rounded-lg border bg-muted/30 space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Group Details</p>
+                  <p className="font-semibold">{groupInfo.name}</p>
+                  <p className="text-sm text-muted-foreground">{groupInfo.objective}</p>
+                  <p className="text-xs">
+                    <span className="font-medium">Technology:</span> {groupInfo.technology}
+                  </p>
+                </div>
+              )}
               <div className="space-y-4">
                 {groupMembers.map((member) => (
                   <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">

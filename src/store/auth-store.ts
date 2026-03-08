@@ -18,8 +18,10 @@ import {
   getProfile,
   updateProfileName,
   uploadProfileAvatar,
+  updateStudentProfile,
   type ChangePasswordDto,
   type UpdateProfileNameDto,
+  type UpdateStudentProfileDto,
 } from '@/lib/api/profile';
 
 interface AuthState {
@@ -51,6 +53,7 @@ interface AuthState {
   updateProfileName: (dto: UpdateProfileNameDto) => Promise<void>;
   uploadProfileAvatar: (file: File) => Promise<void>;
   deleteProfileAvatar: () => Promise<void>;
+  updateStudentProfile: (dto: UpdateStudentProfileDto) => Promise<void>;
   changePassword: (dto: ChangePasswordDto) => Promise<void>;
   bootstrap: () => Promise<void>;
   clearAuthSession: () => void;
@@ -282,6 +285,35 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to delete avatar';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
+      updateStudentProfile: async (dto: UpdateStudentProfileDto): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const updated = await updateStudentProfile(dto)
+          const currentUser = get().user
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(updated as AuthUser),
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response?.status
+          const currentUser = get().user
+          if ((status === 404 || status === 501) && currentUser) {
+            set({
+              user: { ...currentUser, ...dto },
+              profileIsLoading: false,
+            })
+            return
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to save student profile';
           set({ profileError: message, profileIsLoading: false })
           throw new Error(message)
         }

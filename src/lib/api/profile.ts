@@ -12,6 +12,13 @@ export interface ChangePasswordDto {
   newPassword: string
 }
 
+export interface UpdateStudentProfileDto {
+  bio?: string | null
+  githubUrl?: string | null
+  linkedinUrl?: string | null
+  technologies?: string[]
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -70,4 +77,11 @@ export async function changeProfilePassword(dto: ChangePasswordDto): Promise<voi
     oldPassword,
     newPassword: dto.newPassword,
   })
+}
+
+export async function updateStudentProfile(
+  dto: UpdateStudentProfileDto
+): Promise<Partial<AuthUser>> {
+  const response = await apiClient.put<unknown>("/profile/student", dto)
+  return normalizeProfilePayload(response.data)
 }

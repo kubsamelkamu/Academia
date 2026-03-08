@@ -147,6 +147,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
           <DashboardSectionCard
             title="Appearance"
             description="Customize theme mode, brand color, radius, font, and scaling."
+            className="text-inherit"
           >
             <AppearanceWizard />
           </DashboardSectionCard>

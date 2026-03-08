@@ -40,6 +40,12 @@ export interface AuthUser {
   lastLoginAt?: string | null;
   twoFactorEnabled?: boolean;
   twoFactorVerifiedAt?: string | null;
+
+  /** Student / group manager profile (optional) */
+  bio?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  technologies?: string[];
 }
 
 // GET /api/v1/auth/me response payload (after envelope unwrapping)
