@@ -25,6 +25,10 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { useDocumentTemplate, useDocumentTemplatesList } from "@/lib/hooks/use-document-templates"
+import { useAuthStore } from "@/store/auth-store"
+import type { DocumentTemplateType } from "@/types/document-templates"
+
 type SubmissionStatus = "approved" | "reviewed" | "pending"
 
 interface FeedbackComment {
@@ -107,11 +111,12 @@ const submissions: StudentSubmission[] = [
   },
 ]
 
-const templatePdfs = [
-  { id: "sdd", name: "Software Design Document Template.pdf", size: "1.3 MB" },
-  { id: "srs", name: "Software Requirements Specification Template.pdf", size: "1.1 MB" },
-  { id: "project-plan", name: "Project Plan and Timeline Template.pdf", size: "980 KB" },
-  { id: "test-plan", name: "Test Plan and Strategy Template.pdf", size: "1.0 MB" },
+const templateTypes: Array<{ label: string; value: DocumentTemplateType | null }> = [
+  { label: "All", value: null },
+  { label: "SRS", value: "SRS" },
+  { label: "SDD", value: "SDD" },
+  { label: "REPORT", value: "REPORT" },
+  { label: "OTHER", value: "OTHER" },
 ]
 
 function statusBadge(status: SubmissionStatus) {
@@ -139,12 +144,50 @@ function statusBadge(status: SubmissionStatus) {
   )
 }
 
+
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return "-"
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "-"
+  return date.toLocaleDateString()
+}
+
+function formatFileSize(sizeBytes: number | null | undefined) {
+  if (typeof sizeBytes !== "number" || Number.isNaN(sizeBytes) || sizeBytes <= 0) return "-"
+
+  const units = ["B", "KB", "MB", "GB"]
+  let value = sizeBytes
+  let unitIndex = 0
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+
+  const digits = value >= 10 || unitIndex === 0 ? 0 : 1
+  return `${value.toFixed(digits)} ${units[unitIndex]}`
+}
+
 export function StudentSubmissionsPage() {
   const router = useRouter()
+  const departmentId = useAuthStore((s) => s.user?.departmentId)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [templateSearch, setTemplateSearch] = useState("")
+  const [templateTypeFilter, setTemplateTypeFilter] = useState<DocumentTemplateType | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<StudentSubmission | null>(null)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [reply, setReply] = useState("")
+  const templatesQuery = useDocumentTemplatesList(departmentId, {
+    page: 1,
+    limit: 10,
+    isActive: true,
+    search: templateSearch.trim() || undefined,
+    type: templateTypeFilter ?? undefined,
+  })
+  const templateDetailQuery = useDocumentTemplate(departmentId, selectedTemplateId, {
+    enabled: Boolean(selectedTemplateId),
+  })
 
   const filtered = useMemo(() => {
     return submissions.filter((doc) => {
@@ -309,26 +352,125 @@ export function StudentSubmissionsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Templates & Guidelines</CardTitle>
-              <CardDescription>PDF templates</CardDescription>
+              <CardDescription>Download active document templates from your department.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {templatePdfs.map((item) => (
-                <div key={item.id} className="rounded-lg border p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{item.size}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => toast.success(`Downloading ${item.name}`)}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download PDF
+              <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search templates by title..."
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {templateTypes.map((typeOption) => (
+                    <Button
+                      key={typeOption.label}
+                      type="button"
+                      size="sm"
+                      variant={templateTypeFilter === typeOption.value ? "secondary" : "outline"}
+                      onClick={() => setTemplateTypeFilter(typeOption.value)}
+                    >
+                      {typeOption.label}
+                    </Button>
+                  ))}
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setTemplateSearch("")
+                      setTemplateTypeFilter(null)
+                    }}
+                    disabled={!templateSearch.trim() && templateTypeFilter === null}
+                  >
+                    Reset
                   </Button>
                 </div>
-              ))}
+              </div>
+
+              {!departmentId ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  Your account is not linked to a department yet, so templates are not available.
+                </div>
+              ) : templatesQuery.isLoading ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  Loading department templates...
+                </div>
+              ) : templatesQuery.isError ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-destructive">
+                  {templatesQuery.error.message}
+                </div>
+              ) : !templatesQuery.data?.templates.length ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  No templates match your current filters.
+                </div>
+              ) : (
+                templatesQuery.data.templates.map((template) => {
+                  const firstFile = template.files[0]
+
+                  return (
+                    <div key={template.templateId} className="rounded-lg border p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{template.title}</p>
+                            <Badge variant="outline">{template.type}</Badge>
+                          </div>
+                          {template.description ? (
+                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                          ) : null}
+                          <p className="text-xs text-muted-foreground">
+                            {template.files.length} file{template.files.length === 1 ? "" : "s"} • Updated {formatDate(template.updatedAt)}
+                          </p>
+                          {firstFile ? (
+                            <p className="text-xs text-muted-foreground">
+                              Primary file: {firstFile.fileName} • {formatFileSize(firstFile.sizeBytes)}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No file is attached yet.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedTemplateId(template.templateId)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          View details
+                        </Button>
+                        {firstFile?.url ? (
+                          <Button asChild variant="outline" size="sm">
+                            <a href={firstFile.url} target="_blank" rel="noreferrer">
+                              <Eye className="h-4 w-4 mr-2" />
+                              Open
+                            </a>
+                          </Button>
+                        ) : null}
+                        {firstFile?.url ? (
+                          <Button asChild variant="outline" size="sm">
+                            <a href={firstFile.url} download>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </a>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -389,6 +531,90 @@ export function StudentSubmissionsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedTemplateId} onOpenChange={(open) => !open && setSelectedTemplateId(null)}>
+        <DialogContent className="sm:max-w-[720px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Template Details
+            </DialogTitle>
+            <DialogDescription>
+              Review the selected department template and open or download any attached file.
+            </DialogDescription>
+          </DialogHeader>
+
+          {templateDetailQuery.isLoading ? (
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              Loading template details...
+            </div>
+          ) : templateDetailQuery.isError ? (
+            <div className="rounded-lg border border-dashed p-4 text-sm text-destructive">
+              {templateDetailQuery.error.message}
+            </div>
+          ) : templateDetailQuery.data ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-semibold">{templateDetailQuery.data.title}</h3>
+                  <Badge variant="outline">{templateDetailQuery.data.type}</Badge>
+                  <Badge variant={templateDetailQuery.data.isActive ? "secondary" : "outline"}>
+                    {templateDetailQuery.data.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+
+                {templateDetailQuery.data.description ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{templateDetailQuery.data.description}</p>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">No description was provided for this template.</p>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <span>Created {formatDate(templateDetailQuery.data.createdAt)}</span>
+                  <span>Updated {formatDate(templateDetailQuery.data.updatedAt)}</span>
+                  <span>{templateDetailQuery.data.files.length} attached file{templateDetailQuery.data.files.length === 1 ? "" : "s"}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {templateDetailQuery.data.files.length ? (
+                  templateDetailQuery.data.files.map((file) => (
+                    <div key={file.fileId} className="rounded-lg border p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0 space-y-1">
+                        <p className="font-medium break-all">{file.fileName}</p>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>{formatFileSize(file.sizeBytes)}</span>
+                          <span>{file.mimeType}</span>
+                          <span>Added {formatDate(file.createdAt)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <a href={file.url} target="_blank" rel="noreferrer">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Open
+                          </a>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                          <a href={file.url} download>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    No files are attached to this template yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
