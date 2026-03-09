@@ -10,8 +10,10 @@ import {
   ClipboardList,
   GraduationCap,
   CheckSquare,
+  ClipboardCheck,
   Clock,
   Bell,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react"
 
@@ -39,8 +41,13 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
     },
     {
       title: "Faculty",
-      href: "/dashboard/faculty",
-      icon: Users,
+      href: "/dashboard/department-head/faculty",
+      icon: UserCheck,
+    },
+    {
+      title: "Grade Approval",
+      href: "/dashboard/department-head/grades",
+      icon: ClipboardCheck,
     },
     {
       title: "Projects Overview",
@@ -53,9 +60,19 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
+      title: "Announcements",
+      href: "/dashboard/department-head/announcements",
+      icon: Megaphone,
+    },
+    {
       title: "Verification",
       href: "/dashboard/verify-institution",
       icon: CheckSquare,
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/department-head/messages",
+      icon: FileText,
     },
     {
       title: "Profile",

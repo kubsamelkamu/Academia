@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { type UserRole } from "@/config/navigation"
 import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard"
 import { StudentDashboard } from "@/components/dashboard/roles/student-dashboard"
+import { DepartmentHeadDashboard } from "@/components/dashboard/roles/department-head-dashboard"
 import { useAuthStore } from "@/store/auth-store"
 import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 
@@ -59,27 +60,11 @@ function StudentDashboardWelcome(props: { userName?: string }) {
 }
 
 function DepartmentHeadDashboardWelcome(props: { userName?: string }) {
-  const [today] = useState(() => new Date())
-  const formattedDate = new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(today)
-
-  const name = props.userName?.trim()
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-6">
-        <p className="text-sm text-muted-foreground">{formattedDate}</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          Welcome{name ? `, ${name}` : ""}
-        </h1>
-        <p className="mt-2 text-muted-foreground">Department Head</p>
-      </div>
-    </div>
-  )
+  // For department heads, show the full analytics dashboard experience.
+  // We ignore the userName for now because the dedicated dashboard
+  // already includes its own contextual header and copy.
+  void props
+  return <DepartmentHeadDashboard />
 }
 
 interface DashboardPageProps {
