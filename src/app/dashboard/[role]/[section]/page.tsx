@@ -9,9 +9,13 @@ import { CommitteeAssignedProjectsPage } from "@/components/dashboard/committee/
 import { CommitteeDefenseSchedulePage } from "@/components/dashboard/committee/defense-schedule-page"
 import { CommitteeEvaluationsPage } from "@/components/dashboard/committee/evaluations-page"
 import { CommitteeReportsPage } from "@/components/dashboard/committee/reports-page"
+import { DepartmentHeadFacultyPage } from "@/components/dashboard/department-head/faculty-page"
+import { DepartmentHeadGradesPage } from "@/components/dashboard/department-head/grades-page"
 import { DepartmentHeadInvitationsPage } from "@/components/dashboard/department-head/invitations-page"
 import DepartmentHeadProjectsPage from "@/components/dashboard/department-head/ProjectsOverview"
 import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Reports"
+import { DepartmentHeadAnnouncementsPage } from "@/components/dashboard/department-head/announcements-page"
+import { DepartmentHeadMessagesPage } from "@/components/dashboard/department-head/messages-page"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import StudentDefensePage from "@/components/dashboard/student/defense-page"
 import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
@@ -29,7 +33,7 @@ import ReportsPage from "@/app/dashboard/reports/page"
 import SettingsPage from "@/app/dashboard/settings/page"
 import StudentsPage from "@/app/dashboard/students/page"
 import { notFound, redirect } from "next/navigation"
-import { type ReactElement } from "react"
+import { type ReactElement, type ComponentType } from "react"
 
 interface RoleSectionDashboardPageProps {
   params: Promise<{
@@ -38,16 +42,17 @@ interface RoleSectionDashboardPageProps {
   }>
 }
 
-type SectionComponent = () => ReactElement | Promise<ReactElement>
+type SectionComponent = ComponentType
 
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
     invitations: DepartmentHeadInvitationsPage,
-    faculty: async () => {
-      redirect("/dashboard/faculty")
-    },
+    faculty: DepartmentHeadFacultyPage,
+    grades: DepartmentHeadGradesPage,
     projects: DepartmentHeadProjectsPage,
     reports: DepartmentHeadReportsPage,
+    announcements: DepartmentHeadAnnouncementsPage,
+    messages: DepartmentHeadMessagesPage,
     settings: DepartmentHeadSettingsPage,
   },
   coordinator: {
@@ -101,7 +106,7 @@ function getCanonicalSectionForRole(role: UserRole, section: string): string {
 }
 
 const allowedSectionsByRole: Record<UserRole, string[]> = {
-  department_head: ["invitations", "faculty", "projects", "reports", "settings"],
+  department_head: ["invitations", "faculty", "grades", "projects", "reports", "announcements", "messages", "settings"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
   advisor: ["my-projects", "students", "evaluations", "schedule", "messages"],
   student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],

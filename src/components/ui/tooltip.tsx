@@ -18,10 +18,15 @@ export function Tooltip({ children, ...props }: TooltipProps) {
   )
 }
 
-export type TooltipTriggerProps = React.ComponentProps<"button">
+export type TooltipTriggerProps = React.ComponentProps<"button"> & { asChild?: boolean }
 
 export const TooltipTrigger = React.forwardRef<HTMLButtonElement, TooltipTriggerProps>(
-  function TooltipTrigger({ children, ...props }, ref) {
+  function TooltipTrigger({ asChild, children, ...props }, ref) {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<{ ref?: React.Ref<unknown> }>, {
+        ...props,
+      })
+    }
     return (
       <button type="button" ref={ref} {...props}>
         {children}

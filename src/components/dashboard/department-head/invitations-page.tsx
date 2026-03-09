@@ -4,13 +4,29 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
-import { Download } from "lucide-react"
+import { 
+  Download, 
+  Mail, 
+  Users, 
+  UserPlus, 
+  RefreshCw, 
+  Eye, 
+  Send, 
+  XCircle, 
+  RotateCcw,
+  Upload,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  FileSpreadsheet
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,6 +36,8 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { DashboardEmptyState, DashboardPageHeader, DashboardSectionCard } from "@/components/dashboard/page-primitives"
 import {
   useBulkInviteJob,
@@ -126,10 +144,27 @@ function uniqueInvitesByEmail(invites: BulkInviteStudentItemDto[]): BulkInviteSt
   return next
 }
 
-function getStatusBadgeVariant(status: InvitationStatus): "secondary" | "outline" | "destructive" {
-  if (status === "PENDING") return "secondary"
-  if (status === "REVOKED") return "destructive"
-  return "outline"
+function getStatusBadgeVariant(status: InvitationStatus): "default" | "secondary" | "destructive" | "outline" {
+  const variants: Record<InvitationStatus, "default" | "secondary" | "destructive" | "outline"> = {
+    PENDING: "secondary",
+    ACCEPTED: "default",
+    EXPIRED: "outline",
+    REVOKED: "destructive",
+  }
+  return variants[status]
+}
+
+function getStatusIcon(status: InvitationStatus) {
+  switch (status) {
+    case "PENDING":
+      return <Mail className="h-3 w-3" />
+    case "ACCEPTED":
+      return <CheckCircle2 className="h-3 w-3" />
+    case "EXPIRED":
+      return <AlertCircle className="h-3 w-3" />
+    case "REVOKED":
+      return <XCircle className="h-3 w-3" />
+  }
 }
 
 function isPending(invite: TenantInvitation): boolean {
@@ -138,46 +173,53 @@ function isPending(invite: TenantInvitation): boolean {
 
 function InvitationEmailPreview({ preview }: { preview: PreviewInvitationEmailResult }) {
   return (
-    <div className="space-y-3">
-      <div className="space-y-1 text-sm">
-        <p className="font-medium">Subject: {preview.subject}</p>
-        <p className="text-xs text-muted-foreground">Expires: {formatIsoToLocal(preview.expiresAt)}</p>
-      </div>
-
-      <div className="grid gap-1 text-xs">
-        <a
-          className="text-primary underline underline-offset-4"
-          href={preview.acceptUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Accept URL
-        </a>
-        <a
-          className="text-primary underline underline-offset-4"
-          href={preview.loginUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Login URL
-        </a>
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-muted/50 p-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Subject: {preview.subject}</p>
+            <Badge variant="outline">Expires: {formatIsoToLocal(preview.expiresAt)}</Badge>
+          </div>
+          <div className="flex gap-4">
+            <a
+              className="text-sm text-primary hover:underline"
+              href={preview.acceptUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Accept invitation →
+            </a>
+            <a
+              className="text-sm text-primary hover:underline"
+              href={preview.loginUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Login →
+            </a>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="html">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full max-w-[200px] grid-cols-2">
           <TabsTrigger value="html">HTML</TabsTrigger>
           <TabsTrigger value="text">Text</TabsTrigger>
         </TabsList>
         <TabsContent value="html">
-          <iframe
-            title="Invitation email preview"
-            sandbox="allow-popups allow-top-navigation-by-user-activation"
-            srcDoc={preview.htmlContent}
-            className="h-[60vh] min-h-[320px] w-full rounded-md border bg-background"
-          />
+          <div className="rounded-lg border bg-background">
+            <iframe
+              title="Invitation email preview"
+              sandbox="allow-popups allow-top-navigation-by-user-activation"
+              srcDoc={preview.htmlContent}
+              className="h-[60vh] min-h-[400px] w-full rounded-lg"
+            />
+          </div>
         </TabsContent>
         <TabsContent value="text">
-          <Textarea readOnly value={preview.textContent} rows={10} />
+          <div className="rounded-lg border bg-muted/50 p-4">
+            <pre className="whitespace-pre-wrap text-sm">{preview.textContent}</pre>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -204,7 +246,6 @@ export function DepartmentHeadInvitationsPage() {
   const [previewModalData, setPreviewModalData] = useState<PreviewInvitationEmailResult | null>(null)
 
   const isAllStatuses = statusFilter === "ALL"
-
   const pageSize = 10
 
   const listParams = useMemo(() => {
@@ -616,6 +657,11 @@ export function DepartmentHeadInvitationsPage() {
     }
   }
 
+  const isLoading = invitationsQuery.isLoading || 
+    createInvitationMutation.isPending || 
+    bulkSyncMutation.isPending || 
+    bulkAsyncMutation.isPending ||
+    importIsSending
 
   return (
     <div className="space-y-6">
@@ -628,145 +674,174 @@ export function DepartmentHeadInvitationsPage() {
             onClick={() => invitationsQuery.refetch()}
             disabled={invitationsQuery.isFetching}
           >
+            <RefreshCw className={`mr-2 h-4 w-4 ${invitationsQuery.isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DashboardSectionCard
-          title="Invite one user"
-          description="Send an invitation email to a single user."
-        >
-          <form
-            className="space-y-4"
-            onSubmit={createInvitationForm.handleSubmit(onCreateInvitation)}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="invite-email">Email</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                placeholder="user@university.edu"
-                {...createInvitationForm.register("email")}
-              />
-              {createInvitationForm.formState.errors.email ? (
-                <p className="text-sm text-destructive">{createInvitationForm.formState.errors.email.message}</p>
-              ) : null}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="invite-firstName">First name</Label>
-                <Input
-                  id="invite-firstName"
-                  placeholder="First name"
-                  {...createInvitationForm.register("firstName")}
-                />
-                {createInvitationForm.formState.errors.firstName ? (
-                  <p className="text-sm text-destructive">
-                    {createInvitationForm.formState.errors.firstName.message}
-                  </p>
-                ) : null}
+        {/* Single Invite Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <UserPlus className="h-5 w-5 text-primary" />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="invite-lastName">Last name</Label>
-                <Input
-                  id="invite-lastName"
-                  placeholder="Last name"
-                  {...createInvitationForm.register("lastName")}
-                />
-                {createInvitationForm.formState.errors.lastName ? (
-                  <p className="text-sm text-destructive">
-                    {createInvitationForm.formState.errors.lastName.message}
-                  </p>
-                ) : null}
+              <div>
+                <CardTitle>Invite one user</CardTitle>
+                <CardDescription>Send an invitation email to a single user.</CardDescription>
               </div>
             </div>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={createInvitationForm.handleSubmit(onCreateInvitation)}>
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">Email</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="user@university.edu"
+                  {...createInvitationForm.register("email")}
+                />
+                {createInvitationForm.formState.errors.email && (
+                  <p className="text-sm text-destructive">{createInvitationForm.formState.errors.email.message}</p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Tabs
-                value={selectedRoleName}
-                onValueChange={(value) => {
-                  createInvitationForm.setValue("roleName", value as CreateInvitationFormData["roleName"], {
-                    shouldValidate: true,
-                  })
-                }}
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="Student">Student</TabsTrigger>
-                  <TabsTrigger value="Advisor">Advisor</TabsTrigger>
-                  <TabsTrigger value="Coordinator">Coordinator</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {createInvitationForm.formState.errors.roleName ? (
-                <p className="text-sm text-destructive">{createInvitationForm.formState.errors.roleName.message}</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="invite-subject">Subject (optional)</Label>
-              <Input
-                id="invite-subject"
-                placeholder="Optional custom subject"
-                {...createInvitationForm.register("subject")}
-              />
-              {createInvitationForm.formState.errors.subject ? (
-                <p className="text-sm text-destructive">{createInvitationForm.formState.errors.subject.message}</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="invite-message">Message (optional)</Label>
-              <Textarea
-                id="invite-message"
-                rows={4}
-                placeholder="Optional custom message (plain text)"
-                {...createInvitationForm.register("message")}
-              />
-              {createInvitationForm.formState.errors.message ? (
-                <p className="text-sm text-destructive">{createInvitationForm.formState.errors.message.message}</p>
-              ) : null}
-            </div>
-
-            <Button type="submit" disabled={createInvitationMutation.isPending}>
-              {createInvitationMutation.isPending ? "Sending..." : "Send invitation"}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onPreviewSingle}
-              disabled={previewSingleMutation.isPending}
-            >
-              {previewSingleMutation.isPending ? "Generating..." : "Preview email"}
-            </Button>
-          </form>
-        </DashboardSectionCard>
-
-        <DashboardSectionCard
-          title="Bulk invite students"
-          description="Add up to 50 students (email + first name + last name)."
-        >
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium">Excel template</p>
-                    <Badge variant="secondary">.xlsx</Badge>
-                    <Badge variant="outline">50 rows</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Download, fill up to 50 rows, then upload to import.
-                  </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-firstName">First name</Label>
+                  <Input
+                    id="invite-firstName"
+                    placeholder="First name"
+                    {...createInvitationForm.register("firstName")}
+                  />
+                  {createInvitationForm.formState.errors.firstName && (
+                    <p className="text-sm text-destructive">
+                      {createInvitationForm.formState.errors.firstName.message}
+                    </p>
+                  )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="invite-lastName">Last name</Label>
+                  <Input
+                    id="invite-lastName"
+                    placeholder="Last name"
+                    {...createInvitationForm.register("lastName")}
+                  />
+                  {createInvitationForm.formState.errors.lastName && (
+                    <p className="text-sm text-destructive">
+                      {createInvitationForm.formState.errors.lastName.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Tabs
+                  value={selectedRoleName}
+                  onValueChange={(value) => {
+                    createInvitationForm.setValue("roleName", value as CreateInvitationFormData["roleName"], {
+                      shouldValidate: true,
+                    })
+                  }}
+                >
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="Student">Student</TabsTrigger>
+                    <TabsTrigger value="Advisor">Advisor</TabsTrigger>
+                    <TabsTrigger value="Coordinator">Coordinator</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {createInvitationForm.formState.errors.roleName && (
+                  <p className="text-sm text-destructive">{createInvitationForm.formState.errors.roleName.message}</p>
+                )}
+              </div>
+
+              <div className="border-t border-border my-4" />
+
+              <div className="space-y-2">
+                <Label htmlFor="invite-subject">Subject (optional)</Label>
+                <Input
+                  id="invite-subject"
+                  placeholder="Optional custom subject"
+                  {...createInvitationForm.register("subject")}
+                />
+                {createInvitationForm.formState.errors.subject && (
+                  <p className="text-sm text-destructive">{createInvitationForm.formState.errors.subject.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invite-message">Message (optional)</Label>
+                <Textarea
+                  id="invite-message"
+                  rows={4}
+                  placeholder="Optional custom message (plain text)"
+                  {...createInvitationForm.register("message")}
+                />
+                {createInvitationForm.formState.errors.message && (
+                  <p className="text-sm text-destructive">{createInvitationForm.formState.errors.message.message}</p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="submit" disabled={createInvitationMutation.isPending} className="flex-1">
+                  {createInvitationMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send invitation
+                    </>
+                  )}
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={onPreviewSingle}
+                  disabled={previewSingleMutation.isPending}
+                >
+                  {previewSingleMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Bulk Invite Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Bulk invite students</CardTitle>
+                <CardDescription>Add up to 50 students (email + first name + last name).</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Template Download */}
+            <Alert>
+              <FileSpreadsheet className="h-4 w-4" />
+              <AlertTitle>Excel template</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>Download and fill up to 50 rows, then upload to import.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={async () => {
                     try {
                       await downloadBulkInviteTemplateXlsx()
@@ -777,13 +852,14 @@ export function DepartmentHeadInvitationsPage() {
                   }}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Download template
+                  Download
                 </Button>
-              </CardContent>
-            </Card>
+              </AlertDescription>
+            </Alert>
 
+            {/* Bulk Invite Table */}
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center justify-between">
                 <Label>Students</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addBulkRow}>
                   Add row
@@ -791,66 +867,75 @@ export function DepartmentHeadInvitationsPage() {
               </div>
 
               <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[44%]">Email</TableHead>
-                      <TableHead className="w-[24%]">First name</TableHead>
-                      <TableHead className="w-[24%]">Last name</TableHead>
-                      <TableHead className="w-[8%]" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bulkInvites.map((row, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Input
-                            type="email"
-                            value={row.email}
-                            onChange={(e) => updateBulkRow(index, { email: e.target.value })}
-                            placeholder="student@university.edu"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={row.firstName}
-                            onChange={(e) => updateBulkRow(index, { firstName: e.target.value })}
-                            placeholder="First"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={row.lastName}
-                            onChange={(e) => updateBulkRow(index, { lastName: e.target.value })}
-                            placeholder="Last"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeBulkRow(index)}
-                            disabled={bulkInvites.length <= 1}
-                          >
-                            Remove
-                          </Button>
-                        </TableCell>
+                <ScrollArea className="h-[300px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead className="w-[44%]">Email</TableHead>
+                        <TableHead className="w-[24%]">First name</TableHead>
+                        <TableHead className="w-[24%]">Last name</TableHead>
+                        <TableHead className="w-[8%]" />
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {bulkInvites.map((row, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Input
+                              type="email"
+                              value={row.email}
+                              onChange={(e) => updateBulkRow(index, { email: e.target.value })}
+                              placeholder="student@university.edu"
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={row.firstName}
+                              onChange={(e) => updateBulkRow(index, { firstName: e.target.value })}
+                              placeholder="First"
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={row.lastName}
+                              onChange={(e) => updateBulkRow(index, { lastName: e.target.value })}
+                              placeholder="Last"
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeBulkRow(index)}
+                              disabled={bulkInvites.length <= 1}
+                              className="h-8 px-2"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
               </div>
 
-              <p className="text-xs text-muted-foreground">Rows: {bulkInvites.length} / 50</p>
+              <p className="text-xs text-muted-foreground">
+                Rows: {bulkInvites.length} / 50
+              </p>
             </div>
 
-            <div className="space-y-2 rounded-md border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Import Section */}
+            <div className="space-y-2 rounded-lg border bg-muted/50 p-4">
+              <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Import from Excel</p>
-                {importFileName ? (
-                  <p className="text-xs text-muted-foreground">{importFileName}</p>
-                ) : null}
+                {importFileName && (
+                  <Badge variant="outline">{importFileName}</Badge>
+                )}
               </div>
 
               <Input
@@ -859,40 +944,65 @@ export function DepartmentHeadInvitationsPage() {
                 onChange={(e) => onImportFileChange(e.target.files?.[0] ?? null)}
               />
 
-              <div className="text-xs text-muted-foreground">
-                Valid: {importValidInvites.length} · Invalid: {importInvalidRows.length}
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-green-600">Valid: {importValidInvites.length}</span>
+                {importInvalidRows.length > 0 && (
+                  <span className="text-destructive">Invalid: {importInvalidRows.length}</span>
+                )}
               </div>
 
-              {importInvalidRows.length ? (
-                <div className="text-xs text-muted-foreground">
-                  <p className="font-medium">First invalid rows:</p>
-                  <ul className="list-disc pl-5">
-                    {importInvalidRows.slice(0, 5).map((row) => (
-                      <li key={`${row.rowNumber}-${row.reason}`}>Row {row.rowNumber}: {row.reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+              {importInvalidRows.length > 0 && (
+                <Alert variant="destructive" className="py-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Invalid rows found</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-4 text-xs">
+                      {importInvalidRows.slice(0, 3).map((row) => (
+                        <li key={`${row.rowNumber}-${row.reason}`}>
+                          Row {row.rowNumber}: {row.reason}
+                        </li>
+                      ))}
+                      {importInvalidRows.length > 3 && (
+                        <li>...and {importInvalidRows.length - 3} more</li>
+                      )}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={loadImportedIntoTable}
                   disabled={!importValidInvites.length}
                 >
+                  <Upload className="mr-2 h-4 w-4" />
                   Load into table
                 </Button>
                 <Button
                   type="button"
+                  size="sm"
                   onClick={sendImportedInBatchesSync}
-                  disabled={!importValidInvites.length || importIsSending || bulkSyncMutation.isPending}
+                  disabled={!importValidInvites.length || importIsSending}
                 >
-                  {importIsSending ? "Sending imported..." : "Send imported (batched)"}
+                  {importIsSending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send imported
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
 
+            {/* Custom Message */}
             <div className="space-y-2">
               <Label htmlFor="bulk-subject">Subject (optional)</Label>
               <Input
@@ -910,10 +1020,11 @@ export function DepartmentHeadInvitationsPage() {
                 value={bulkMessage}
                 onChange={(e) => setBulkMessage(e.target.value)}
                 placeholder="Optional custom message (applies to all)"
-                rows={4}
+                rows={3}
               />
             </div>
 
+            {/* Preview Options */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="bulk-preview-first-name">Preview first name (optional)</Label>
@@ -936,19 +1047,35 @@ export function DepartmentHeadInvitationsPage() {
               </div>
             </div>
 
+            {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={onBulkInviteSync}
                 disabled={bulkSyncMutation.isPending}
+                className="flex-1"
               >
-                {bulkSyncMutation.isPending ? "Processing..." : "Send now"}
+                {bulkSyncMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send now
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
                 onClick={onBulkInviteAsync}
                 disabled={bulkAsyncMutation.isPending}
               >
-                {bulkAsyncMutation.isPending ? "Enqueuing..." : "Enqueue job"}
+                {bulkAsyncMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Enqueue job"
+                )}
               </Button>
               <Button
                 type="button"
@@ -956,44 +1083,72 @@ export function DepartmentHeadInvitationsPage() {
                 onClick={onPreviewBulk}
                 disabled={previewBulkMutation.isPending}
               >
-                {previewBulkMutation.isPending ? "Generating..." : "Preview email"}
+                {previewBulkMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </Button>
             </div>
 
-            {bulkJobId ? (
-              <div className="rounded-md border p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium">Async job</p>
-                  <Badge variant="outline">{bulkJobQuery.data?.state ?? "..."}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">Job ID: {bulkJobId}</p>
-                {bulkJobQuery.data?.state === "failed" ? (
-                  <p className="mt-2 text-sm text-destructive">Job failed. Please retry.</p>
-                ) : null}
-              </div>
-            ) : null}
+            {/* Job Status */}
+            {bulkJobId && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertTitle>Async job in progress</AlertTitle>
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <span>Job ID: {bulkJobId}</span>
+                    <Badge variant="outline">{bulkJobQuery.data?.state ?? "processing"}</Badge>
+                  </div>
+                  {bulkJobQuery.data?.state === "failed" && (
+                    <p className="mt-2 text-sm text-destructive">
+                      Job failed. Please try again.
+                    </p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
 
-            {bulkResultToShow ? (
+            {/* Bulk Result */}
+            {bulkResultToShow && (
               <Card>
-                <CardContent className="space-y-2 p-4 text-sm">
-                  <p className="font-medium">Bulk result</p>
-                  <div className="grid gap-1 text-muted-foreground">
-                    <p>Requested: {bulkResultToShow.requested}</p>
-                    <p>Unique: {bulkResultToShow.unique}</p>
-                    <p>Created: {bulkResultToShow.created}</p>
-                    <p>Skipped existing: {bulkResultToShow.skippedExisting}</p>
-                    {bulkResultToShow.duplicates.length ? (
-                      <p>Duplicates: {bulkResultToShow.duplicates.length}</p>
-                    ) : null}
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    <p className="font-medium">Bulk invite results</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Requested</p>
+                        <p className="font-medium">{bulkResultToShow.requested}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Unique</p>
+                        <p className="font-medium">{bulkResultToShow.unique}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Created</p>
+                        <p className="font-medium text-green-600">{bulkResultToShow.created}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Skipped</p>
+                        <p className="font-medium text-yellow-600">{bulkResultToShow.skippedExisting}</p>
+                      </div>
+                      {bulkResultToShow.duplicates.length > 0 && (
+                        <div className="col-span-2 space-y-1">
+                          <p className="text-muted-foreground">Duplicates</p>
+                          <p className="font-medium text-destructive">{bulkResultToShow.duplicates.length}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            ) : null}
-          </div>
-        </DashboardSectionCard>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-
+      {/* Preview Modal */}
       <Dialog
         open={previewModalOpen}
         onOpenChange={(open) => {
@@ -1001,32 +1156,51 @@ export function DepartmentHeadInvitationsPage() {
           if (!open) setPreviewModalData(null)
         }}
       >
-        <DialogContent className="sm:max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Email preview</DialogTitle>
+            <DialogDescription>
+              Preview how the invitation email will appear to recipients.
+            </DialogDescription>
           </DialogHeader>
 
           {previewModalData ? (
             <InvitationEmailPreview preview={previewModalData} />
           ) : (
-            <p className="text-sm text-muted-foreground">No preview loaded.</p>
+            <div className="flex h-[200px] items-center justify-center">
+              <p className="text-sm text-muted-foreground">No preview loaded.</p>
+            </div>
           )}
 
-          <DialogFooter showCloseButton />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewModalOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <DashboardSectionCard
-        title="Invitations list"
-        description="Resend pending invitations or revoke them."
-      >
-        <div className="mb-4">
+      {/* Invitations List */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Mail className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Invitations list</CardTitle>
+              <CardDescription>Resend pending invitations or revoke them.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
           <Tabs
             value={statusFilter}
             onValueChange={(value) => {
               setStatusFilter(value as StatusFilter)
               setPage(1)
             }}
+            className="mb-4"
           >
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="ALL">All</TabsTrigger>
@@ -1036,100 +1210,114 @@ export function DepartmentHeadInvitationsPage() {
               <TabsTrigger value="REVOKED">Revoked</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
 
-        {invitationsQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading invitations...</p>
-        ) : invitationsQuery.isError ? (
-          <p className="text-sm text-destructive">{invitationsQuery.error.message}</p>
-        ) : totalInvitations === 0 ? (
-          <DashboardEmptyState
-            title="No invitations"
-            description="Send an invitation to see it appear here."
-          />
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Last sent</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedInvitations.map((invite) => (
-                  <TableRow key={invite.id}>
-                    <TableCell>
-                      {invite.firstName || invite.lastName
-                        ? `${invite.firstName ?? ""} ${invite.lastName ?? ""}`.trim()
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="font-medium">{invite.email}</TableCell>
-                    <TableCell>{invite.roleName}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(invite.status)}>{invite.status}</Badge>
-                    </TableCell>
-                    <TableCell>{formatIsoToLocal(invite.expiresAt)}</TableCell>
-                    <TableCell>{formatIsoToLocal(invite.lastSentAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onResend(invite.id)}
-                          disabled={!isPending(invite) || resendMutation.isPending}
-                        >
-                          Resend
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => onRevoke(invite.id)}
-                          disabled={!isPending(invite) || revokeMutation.isPending}
-                        >
-                          Revoke
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            <div className="flex flex-col gap-2 border-t p-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                Showing {pageStartIndex + 1}-{pageEndIndexExclusive} of {totalInvitations}
-              </p>
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={effectivePage <= 1}
-                >
-                  Prev
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Page {effectivePage} / {totalPages}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={effectivePage >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
+          {invitationsQuery.isLoading ? (
+            <div className="flex h-[200px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          </div>
-        )}
-      </DashboardSectionCard>
+          ) : invitationsQuery.isError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error loading invitations</AlertTitle>
+              <AlertDescription>{invitationsQuery.error.message}</AlertDescription>
+            </Alert>
+          ) : totalInvitations === 0 ? (
+            <DashboardEmptyState
+              title="No invitations"
+              description="Send an invitation to see it appear here."
+            />
+          ) : (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Last sent</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedInvitations.map((invite) => (
+                      <TableRow key={invite.id}>
+                        <TableCell>
+                          {invite.firstName || invite.lastName
+                            ? `${invite.firstName ?? ""} ${invite.lastName ?? ""}`.trim()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="font-medium">{invite.email}</TableCell>
+                        <TableCell>{invite.roleName}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(invite.status)} className="gap-1">
+                            {getStatusIcon(invite.status)}
+                            {invite.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatIsoToLocal(invite.expiresAt)}</TableCell>
+                        <TableCell>{formatIsoToLocal(invite.lastSentAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onResend(invite.id)}
+                              disabled={!isPending(invite) || resendMutation.isPending}
+                            >
+                              <RotateCcw className="mr-2 h-3 w-3" />
+                              Resend
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => onRevoke(invite.id)}
+                              disabled={!isPending(invite) || revokeMutation.isPending}
+                            >
+                              <XCircle className="mr-2 h-3 w-3" />
+                              Revoke
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Showing {pageStartIndex + 1}-{pageEndIndexExclusive} of {totalInvitations}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={effectivePage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {effectivePage} of {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={effectivePage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
