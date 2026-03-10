@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   Users, 
+  User,
   UserPlus, 
   UserCheck, 
   UserMinus, 
@@ -16,8 +17,12 @@ import {
   XCircle,
   Eye,
   Info,
+  Loader2,
   Send,
   AlertCircle,
+  Github,
+  Linkedin,
+  Globe,
   PlusCircle
 } from 'lucide-react'
 import {
@@ -33,7 +38,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
+import { useAuthStore } from "@/store/auth-store"
+import { useQuery } from "@tanstack/react-query"
+import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
 
 type CreateGroupFormData = {
   name: string
@@ -107,6 +116,20 @@ export function StudentTeamPage() {
   const [groupApproved] = useState(false)
   const [groupInfo, setGroupInfo] = useState<CreateGroupFormData | null>(null)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("overview")
+
+  const [studentProfilesPage, setStudentProfilesPage] = useState(1)
+  const studentProfilesLimit = 10
+
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState<StudentProfileListItem | null>(null)
+  const [studentProfileDetailsOpen, setStudentProfileDetailsOpen] = useState(false)
+
+  const hasFetchedStudentProfileRef = useRef(false)
+
+  const user = useAuthStore((s) => s.user)
+  const profileIsLoading = useAuthStore((s) => s.profileIsLoading)
+  const profileError = useAuthStore((s) => s.profileError)
+  const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
 
   // Mock data - would come from API in production
   const currentUser = {
@@ -115,15 +138,11 @@ export function StudentTeamPage() {
     role: 'Group Manager',
     department: 'Computer Science',
     email: 'john.doe@university.edu',
-    managerApprovalStatus: 'approved' as 'approved' | 'pending' | 'rejected' | 'not_requested',
+    managerApprovalStatus: 'pending' as 'approved' | 'pending' | 'rejected' | 'not_requested',
   }
 
   const isApprovedGroupManager = currentUser.managerApprovalStatus === 'approved'
-
-  // Students who are not approved as group managers should see the normal student team page.
-  if (!isApprovedGroupManager) {
-    return <StudentTeamMemberPage />
-  }
+  const departmentName = user?.departmentName ?? user?.department?.name ?? currentUser.department
 
   const groupMembers = [
     { id: 1, name: 'John Doe', role: 'Group Manager', status: 'approved', email: 'john@university.edu', joinDate: '2024-01-15' },
@@ -133,15 +152,64 @@ export function StudentTeamPage() {
   ]
 
   const pendingRequests = [
-    { id: 5, name: 'Alex Brown', department: 'Computer Science', requestedAt: '2024-01-18' },
-    { id: 6, name: 'Emily Davis', department: 'Computer Science', requestedAt: '2024-01-18' },
+    { id: 5, name: 'Alex Brown', department: departmentName, requestedAt: '2024-01-18' },
+    { id: 6, name: 'Emily Davis', department: departmentName, requestedAt: '2024-01-18' },
   ]
 
   const availableStudents = [
-    { id: 7, name: 'Chris Lee', department: 'Computer Science', email: 'chris@university.edu' },
-    { id: 8, name: 'Pat Taylor', department: 'Computer Science', email: 'pat@university.edu' },
-    { id: 9, name: 'Jordan Wong', department: 'Computer Science', email: 'jordan@university.edu' },
+    { id: 7, name: 'Chris Lee', department: departmentName, email: 'chris@university.edu' },
+    { id: 8, name: 'Pat Taylor', department: departmentName, email: 'pat@university.edu' },
+    { id: 9, name: 'Jordan Wong', department: departmentName, email: 'jordan@university.edu' },
   ]
+
+  const firstName = user?.firstName?.trim()
+  const lastName = user?.lastName?.trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(" ")
+  const profileName = fullName || user?.email || currentUser.name
+
+  const profileEmail = user?.email ?? currentUser.email
+  const profileDepartment = user?.departmentName ?? user?.department?.name ?? currentUser.department
+  const profileTechStack = user?.techStack ?? user?.technologies ?? []
+
+  const safeExternalUrl = (value?: string | null): string | null => {
+    if (!value) return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    try {
+      const url = new URL(trimmed)
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null
+      return url.toString()
+    } catch {
+      return null
+    }
+  }
+
+  const githubUrl = safeExternalUrl(user?.githubUrl)
+  const linkedinUrl = safeExternalUrl(user?.linkedinUrl)
+  const portfolioUrl = safeExternalUrl(user?.portfolioUrl)
+
+  useEffect(() => {
+    if (!isApprovedGroupManager) return
+    if (activeTab !== "student") return
+    if (hasFetchedStudentProfileRef.current) return
+
+    hasFetchedStudentProfileRef.current = true
+    fetchStudentProfile().catch(() => {
+      // Error is already handled in store state.
+    })
+  }, [activeTab, fetchStudentProfile, isApprovedGroupManager])
+
+  const studentProfilesQuery = useQuery({
+    queryKey: ["student-profiles", studentProfilesPage, studentProfilesLimit],
+    queryFn: () => getStudentProfiles({ page: studentProfilesPage, limit: studentProfilesLimit }),
+    enabled: isApprovedGroupManager && activeTab === "student",
+    staleTime: 60_000,
+  })
+
+  const openStudentDetails = (item: StudentProfileListItem) => {
+    setSelectedStudentProfile(item)
+    setStudentProfileDetailsOpen(true)
+  }
 
   const getStatusBadge = (status: string) => {
     switch(status) {
@@ -166,6 +234,11 @@ export function StudentTeamPage() {
   const minGroupSize = 3
   const maxGroupSize = 7
   const groupProgress = (groupSize / maxGroupSize) * 100
+
+  // Students who are not approved as group managers should see the normal student team page.
+  if (!isApprovedGroupManager) {
+    return <StudentTeamMemberPage />
+  }
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -195,7 +268,7 @@ export function StudentTeamPage() {
                   <Badge variant="outline" className="text-xs">
                     {currentUser.role}
                   </Badge>
-                  <span>{currentUser.department}</span>
+                  <span>{departmentName}</span>
                 </div>
               </div>
             </div>
@@ -225,8 +298,8 @@ export function StudentTeamPage() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-auto lg:inline-flex">
+      <Tabs value={activeTab} className="space-y-6" onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -247,6 +320,10 @@ export function StudentTeamPage() {
           <TabsTrigger value="available" className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
             <span className="hidden sm:inline">Available</span>
+          </TabsTrigger>
+          <TabsTrigger value="student" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">Student</span>
           </TabsTrigger>
         </TabsList>
 
@@ -644,7 +721,381 @@ export function StudentTeamPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Student Tab */}
+        <TabsContent value="student" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>My Profile</CardTitle>
+                <CardDescription>
+                  View your student profile details used across teams and requests.
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={profileIsLoading}
+                onClick={() => fetchStudentProfile().catch(() => {})}
+              >
+                {profileIsLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Refreshing
+                  </>
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              {profileError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Could not load profile</AlertTitle>
+                  <AlertDescription>{profileError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-14 w-14">
+                    <AvatarImage src={user?.avatarUrl ?? undefined} />
+                    <AvatarFallback>{getInitials(profileName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold truncate">{profileName}</p>
+                    <p className="text-sm text-muted-foreground truncate">{profileEmail}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">Student</Badge>
+                      {profileDepartment && <Badge variant="secondary">{profileDepartment}</Badge>}
+                    </div>
+                  </div>
+                </div>
+
+                {profileIsLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading profile…
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Tech stack</h3>
+                {profileTechStack.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {profileTechStack.slice(0, 12).map((tech) => (
+                      <Badge key={tech} variant="secondary">
+                        {tech}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No tech stack added yet.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Bio</h3>
+                {user?.bio?.trim() ? (
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{user.bio.trim()}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No bio added yet.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Links</h3>
+                {githubUrl || linkedinUrl || portfolioUrl ? (
+                  <div className="flex flex-wrap gap-2">
+                    {githubUrl && (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={githubUrl} target="_blank" rel="noreferrer">
+                          <Github className="h-4 w-4 mr-2" />
+                          GitHub
+                        </a>
+                      </Button>
+                    )}
+                    {linkedinUrl && (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={linkedinUrl} target="_blank" rel="noreferrer">
+                          <Linkedin className="h-4 w-4 mr-2" />
+                          LinkedIn
+                        </a>
+                      </Button>
+                    )}
+                    {portfolioUrl && (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={portfolioUrl} target="_blank" rel="noreferrer">
+                          <Globe className="h-4 w-4 mr-2" />
+                          Portfolio
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No links added yet.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>Student Profiles</CardTitle>
+                <CardDescription>Browse student profiles (paginated).</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={studentProfilesQuery.isFetching}
+                onClick={() => studentProfilesQuery.refetch()}
+              >
+                {studentProfilesQuery.isFetching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Refreshing
+                  </>
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {studentProfilesQuery.isError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Could not load students</AlertTitle>
+                  <AlertDescription>
+                    {studentProfilesQuery.error instanceof Error
+                      ? studentProfilesQuery.error.message
+                      : "Failed to load student profiles."}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {studentProfilesQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading students…
+                </div>
+              ) : (
+                <>
+                  <ScrollArea className="h-[320px]">
+                    <div className="space-y-3 pr-3">
+                      {(studentProfilesQuery.data?.items ?? []).length > 0 ? (
+                        (studentProfilesQuery.data?.items ?? []).map((item) => {
+                          const fullName = [item.user.firstName, item.user.lastName].filter(Boolean).join(" ")
+                          const displayName = fullName || item.user.email || "Student"
+                          const techStack = item.profile.techStack ?? []
+
+                          return (
+                            <div key={item.user.id ?? displayName} className="rounded-lg border p-3">
+                              <div className="flex items-start gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={item.user.avatarUrl ?? undefined} />
+                                  <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold truncate">{displayName}</p>
+                                      {item.user.email && (
+                                        <p className="text-xs text-muted-foreground truncate">{item.user.email}</p>
+                                      )}
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={() => openStudentDetails(item)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View details
+                                    </Button>
+                                  </div>
+
+                                  {item.profile.bio && (
+                                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                      {item.profile.bio}
+                                    </p>
+                                  )}
+
+                                  {techStack.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      {techStack.slice(0, 8).map((tech) => (
+                                        <Badge key={tech} variant="secondary">
+                                          {tech}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="text-center py-10">
+                          <Users className="h-10 w-10 mx-auto text-muted-foreground/50" />
+                          <p className="mt-2 text-sm text-muted-foreground">No student profiles found.</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={studentProfilesPage <= 1 || studentProfilesQuery.isFetching}
+                      onClick={() => setStudentProfilesPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+
+                    <div className="text-sm text-muted-foreground">
+                      Page <span className="font-medium text-foreground">{studentProfilesPage}</span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        studentProfilesQuery.isFetching ||
+                        (studentProfilesQuery.data?.items?.length ?? 0) < studentProfilesLimit
+                      }
+                      onClick={() => setStudentProfilesPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Student Profile Details Dialog */}
+      <Dialog
+        open={studentProfileDetailsOpen}
+        onOpenChange={(open) => {
+          setStudentProfileDetailsOpen(open)
+          if (!open) setSelectedStudentProfile(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Student Profile</DialogTitle>
+            <DialogDescription>Profile details and tech stack.</DialogDescription>
+          </DialogHeader>
+
+          {selectedStudentProfile ? (
+            <div className="space-y-5">
+              <div className="flex items-start gap-4">
+                <Avatar className="h-14 w-14">
+                  <AvatarImage src={selectedStudentProfile.user.avatarUrl ?? undefined} />
+                  <AvatarFallback>
+                    {getInitials(
+                      [selectedStudentProfile.user.firstName, selectedStudentProfile.user.lastName]
+                        .filter(Boolean)
+                        .join(" ") ||
+                        selectedStudentProfile.user.email ||
+                        "Student"
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-semibold truncate">
+                    {[selectedStudentProfile.user.firstName, selectedStudentProfile.user.lastName]
+                      .filter(Boolean)
+                      .join(" ") ||
+                      "Student"}
+                  </p>
+                  {selectedStudentProfile.user.email && (
+                    <p className="text-sm text-muted-foreground truncate">{selectedStudentProfile.user.email}</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Student</Badge>
+                    {selectedStudentProfile.profile.updatedAt && (
+                      <Badge variant="secondary">
+                        Updated {new Date(selectedStudentProfile.profile.updatedAt).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Bio</p>
+                {selectedStudentProfile.profile.bio ? (
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{selectedStudentProfile.profile.bio}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No bio provided.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Tech stack</p>
+                {selectedStudentProfile.profile.techStack.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedStudentProfile.profile.techStack.map((tech) => (
+                      <Badge key={tech} variant="secondary">
+                        {tech}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No tech stack provided.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Links</p>
+                {(() => {
+                  const gh = safeExternalUrl(selectedStudentProfile.profile.githubUrl)
+                  const li = safeExternalUrl(selectedStudentProfile.profile.linkedinUrl)
+                  const pf = safeExternalUrl(selectedStudentProfile.profile.portfolioUrl)
+
+                  if (!gh && !li && !pf) {
+                    return <p className="text-sm text-muted-foreground">No links provided.</p>
+                  }
+
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {gh && (
+                        <Button asChild variant="outline" size="sm">
+                          <a href={gh} target="_blank" rel="noreferrer">
+                            <Github className="h-4 w-4 mr-2" />
+                            GitHub
+                          </a>
+                        </Button>
+                      )}
+                      {li && (
+                        <Button asChild variant="outline" size="sm">
+                          <a href={li} target="_blank" rel="noreferrer">
+                            <Linkedin className="h-4 w-4 mr-2" />
+                            LinkedIn
+                          </a>
+                        </Button>
+                      )}
+                      {pf && (
+                        <Button asChild variant="outline" size="sm">
+                          <a href={pf} target="_blank" rel="noreferrer">
+                            <Globe className="h-4 w-4 mr-2" />
+                            Portfolio
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* Help Section */}
       <Card className="mt-6 bg-muted/50">

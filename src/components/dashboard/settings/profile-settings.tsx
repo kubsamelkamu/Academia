@@ -112,6 +112,7 @@ export function ProfileSettings() {
   const profileIsLoading = useAuthStore((s) => s.profileIsLoading)
   const profileError = useAuthStore((s) => s.profileError)
   const fetchProfile = useAuthStore((s) => s.fetchProfile)
+  const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
   const updateProfileName = useAuthStore((s) => s.updateProfileName)
   const uploadProfileAvatar = useAuthStore((s) => s.uploadProfileAvatar)
   const deleteProfileAvatar = useAuthStore((s) => s.deleteProfileAvatar)
@@ -155,10 +156,13 @@ export function ProfileSettings() {
 
   React.useEffect(() => {
     // Best-effort refresh (keeps profile up to date when this page is opened).
-    fetchProfile().catch(() => {
+    const primaryRole = getPrimaryRoleFromBackendRoles(user?.roles)
+
+    const refresh = primaryRole === "student" ? fetchStudentProfile : fetchProfile
+    refresh().catch(() => {
       // store already captures profileError
     })
-  }, [fetchProfile])
+  }, [fetchProfile, fetchStudentProfile, user?.roles])
 
   React.useEffect(() => {
     accountForm.reset({

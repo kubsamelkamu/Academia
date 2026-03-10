@@ -35,6 +35,25 @@ export type StudentPublicProfile = {
   }
 }
 
+export type StudentProfileListItem = {
+  user: Partial<AuthUser>
+  profile: {
+    bio: string | null
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+    updatedAt?: string | null
+  }
+}
+
+export type StudentProfilesPage = {
+  items: StudentProfileListItem[]
+  page?: number
+  limit?: number
+  total?: number
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -81,6 +100,42 @@ function normalizeStudentProfilePayload(payload: unknown): Partial<AuthUser> {
   }
 }
 
+function normalizeStudentProfileListItem(payload: unknown): StudentProfileListItem {
+  if (!isRecord(payload)) {
+    return {
+      user: {},
+      profile: {
+        bio: null,
+        githubUrl: null,
+        linkedinUrl: null,
+        portfolioUrl: null,
+        techStack: [],
+        updatedAt: null,
+      },
+    }
+  }
+
+  const user = ("user" in payload && isRecord(payload.user) ? payload.user : {}) as Partial<AuthUser>
+  const profileRaw = ("profile" in payload && isRecord(payload.profile) ? payload.profile : {}) as Record<string, unknown>
+
+  const asNullableString = (value: unknown): string | null => (typeof value === "string" ? value : null)
+  const techStack = Array.isArray(profileRaw.techStack)
+    ? (profileRaw.techStack as unknown[]).filter((v): v is string => typeof v === "string")
+    : []
+
+  return {
+    user,
+    profile: {
+      bio: asNullableString(profileRaw.bio),
+      githubUrl: asNullableString(profileRaw.githubUrl),
+      linkedinUrl: asNullableString(profileRaw.linkedinUrl),
+      portfolioUrl: asNullableString(profileRaw.portfolioUrl),
+      techStack,
+      updatedAt: asNullableString(profileRaw.updatedAt),
+    },
+  }
+}
+
 export async function getProfile(): Promise<Partial<AuthUser>> {
   const response = await apiClient.get<unknown>("/profile")
   return normalizeProfilePayload(response.data)
@@ -110,8 +165,41 @@ export async function deleteProfileAvatar(): Promise<Partial<AuthUser>> {
 }
 
 export async function getStudentProfile(): Promise<Partial<AuthUser>> {
-  const response = await apiClient.get<unknown>("/profile/student")
+  const response = await apiClient.get<unknown>("/profile/student/me")
   return normalizeStudentProfilePayload(response.data)
+}
+
+export async function getStudentProfiles(params: {
+  page?: number
+  limit?: number
+} = {}): Promise<StudentProfilesPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 10
+
+  const response = await apiClient.get<unknown>("/profile/student", {
+    params: {
+      page,
+      limit,
+    },
+  })
+
+  const payload = response.data
+  if (!isRecord(payload)) {
+    throw new Error("Invalid student profiles response")
+  }
+
+  const rawItems = ("items" in payload && Array.isArray(payload.items) ? payload.items : []) as unknown[]
+  const items = rawItems.map(normalizeStudentProfileListItem)
+
+  const asOptionalNumber = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined
+
+  return {
+    items,
+    page: asOptionalNumber(payload.page) ?? page,
+    limit: asOptionalNumber(payload.limit) ?? limit,
+    total: asOptionalNumber(payload.total),
+  }
 }
 
 export async function changeProfilePassword(dto: ChangePasswordDto): Promise<void> {
@@ -139,7 +227,7 @@ export async function updateStudentProfile(
     techStack,
   }
 
-  const response = await apiClient.patch<unknown>("/profile/student", payload)
+  const response = await apiClient.patch<unknown>("/profile/student/me", payload)
   return normalizeStudentProfilePayload(response.data)
 }
 
