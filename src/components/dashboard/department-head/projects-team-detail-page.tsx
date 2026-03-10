@@ -30,9 +30,9 @@ export function ProjectsTeamDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10 sticky top-0 z-10 backdrop-blur-sm">
+    <div className="min-h-screen bg-background overflow-y-auto">
+      {/* Header - matching system background, removed sticky positioning */}
+      <div className="border-b bg-background">
         <div className="px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -62,81 +62,78 @@ export function ProjectsTeamDetailPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="h-[calc(100vh-73px)] overflow-y-auto">
-        <div className="px-8 py-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FolderOpen className="h-5 w-5 text-primary" />
-                Team Overview
-              </CardTitle>
-              <CardDescription>
-                Manager: <span className="font-medium text-foreground">{team.managerName}</span> • Advisor:{" "}
-                <span className="font-medium text-foreground">{team.advisorName}</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  Last activity: {new Date(team.lastActivity).toLocaleDateString()}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
-                  {team.members.length} members
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Content - removed fixed height */}
+      <div className="px-8 py-6 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-primary" />
+              Team Overview
+            </CardTitle>
+            <CardDescription>
+              Manager: <span className="font-medium text-foreground">{team.managerName}</span> • Advisor:{" "}
+              <span className="font-medium text-foreground">{team.advisorName}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                Last activity: {new Date(team.lastActivity).toLocaleDateString()}
+              </span>
+              <span className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                {team.members.length} members
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Members
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {team.members.map((member) => (
-                  <div key={member} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium text-primary">
-                          {member
-                            .split(" ")
-                            .filter(Boolean)
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium">{member}</span>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Members
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {team.members.map((member) => (
+                <div key={member} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-medium text-primary">
+                        {member
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </span>
                     </div>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="whitespace-nowrap"
-                    >
-                      <Link
-                        href={`/dashboard/department-head/projects/teams/${team.id}/members/${encodeURIComponent(
-                          member,
-                        )}`}
-                      >
-                        View
-                      </Link>
-                    </Button>
+                    <span className="text-sm font-medium">{member}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    <Link
+                      href={`/dashboard/department-head/projects/teams/${team.id}/members/${encodeURIComponent(
+                        member,
+                      )}`}
+                    >
+                      View
+                    </Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
-

@@ -30,6 +30,38 @@ export interface Grade {
 
 export type InternshipGrade = Grade
 
+export interface GroupManagerApplication {
+  id: string
+  studentId: string
+  studentName: string
+  email: string
+  currentRole: UserRoleMock
+  requestedRole: "group_manager"
+  motivation: string
+  requestedAt: string
+  status: "pending" | "approved" | "rejected"
+  proposedGroupName?: string
+}
+
+export interface StudentGroupMember {
+  id: string
+  name: string
+  email: string
+  role: UserRoleMock
+  isManager?: boolean
+}
+
+export interface StudentGroup {
+  id: string
+  name: string
+  projectTitle: string
+  managerId: string
+  managerName: string
+  managerEmail: string
+  members: StudentGroupMember[]
+  status: "active" | "completed" | "on_hold"
+}
+
 export interface ProjectSummary {
   id: string
   title: string
@@ -178,3 +210,88 @@ export const mockInternshipGrades: InternshipGrade[] = mockGrades.filter(
   (g) => g.type === "internship",
 )
 
+export const mockGroupManagerApplications: GroupManagerApplication[] = [
+  {
+    id: "ga1",
+    studentId: "u7",
+    studentName: "Alex Johnson",
+    email: "ajohnson@stanford.edu",
+    currentRole: "student",
+    requestedRole: "group_manager",
+    motivation:
+      "I have previous experience leading software projects and would like to coordinate our team deliverables.",
+    requestedAt: "2024-01-15",
+    status: "pending",
+    proposedGroupName: "AI Research Group",
+  },
+  {
+    id: "ga2",
+    studentId: "u10",
+    studentName: "Samuel Lee",
+    email: "slee@stanford.edu",
+    currentRole: "student",
+    requestedRole: "group_manager",
+    motivation:
+      "I want to take responsibility for organizing meetings and ensuring our milestones are met on time.",
+    requestedAt: "2024-01-18",
+    status: "pending",
+    proposedGroupName: "Blockchain Innovators",
+  },
+]
+
+export const mockStudentGroups: StudentGroup[] = [
+  {
+    id: "g1",
+    name: "AI‑Driven Academic Assistant",
+    projectTitle: "AI‑Driven Academic Assistant",
+    managerId: "u8",
+    managerName: "Maria Garcia",
+    managerEmail: "mgarcia@stanford.edu",
+    status: "active",
+    members: [
+      {
+        id: "u8",
+        name: "Maria Garcia",
+        email: "mgarcia@stanford.edu",
+        role: "group_manager",
+        isManager: true,
+      },
+      {
+        id: "s1",
+        name: "Alex Johnson",
+        email: "ajohnson@stanford.edu",
+        role: "student",
+      },
+      {
+        id: "s2",
+        name: "David Kim",
+        email: "dkim@stanford.edu",
+        role: "student",
+      },
+    ],
+  },
+  {
+    id: "g2",
+    name: "Blockchain Voting",
+    projectTitle: "Blockchain‑Based Voting System",
+    managerId: "u11",
+    managerName: "Alice Brown",
+    managerEmail: "abrown@stanford.edu",
+    status: "active",
+    members: [
+      {
+        id: "u11",
+        name: "Alice Brown",
+        email: "abrown@stanford.edu",
+        role: "group_manager",
+        isManager: true,
+      },
+      {
+        id: "s3",
+        name: "Charlie Davis",
+        email: "cdavis@stanford.edu",
+        role: "student",
+      },
+    ],
+  },
+]

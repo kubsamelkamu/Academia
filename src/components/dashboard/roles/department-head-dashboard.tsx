@@ -216,7 +216,7 @@ export function DepartmentHeadDashboard() {
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users">Department Users</TabsTrigger>
-          <TabsTrigger value="grades">Grade Approval</TabsTrigger>
+          <TabsTrigger value="grades">Review & Approval</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
