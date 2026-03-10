@@ -28,8 +28,8 @@ export function ProjectsTeamsPage() {
 
   return (
     <div className="min-h-screen bg-background overflow-y-auto">
-      {/* Header - removed sticky positioning */}
-      <div className="border-b bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5">
+      {/* Header - matching system background */}
+      <div className="border-b bg-background">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

@@ -618,9 +618,9 @@ export default function ProjectsOverview() {
 
   const renderPastProjectDetails = (project: PastProject) => {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header - removed sticky positioning */}
-        <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10">
+      <div className="min-h-screen bg-background overflow-y-auto">
+        {/* Header - matching system background, removed sticky positioning */}
+        <div className="border-b bg-background">
           <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4 min-w-0">
@@ -654,7 +654,7 @@ export default function ProjectsOverview() {
           </div>
         </div>
 
-        {/* Scrollable Content - removed fixed height */}
+        {/* Content - natural scrolling */}
         <div className="px-8 py-6 space-y-6">
           {/* Project Overview Grid */}
           <div className="grid gap-6 lg:grid-cols-3">
@@ -853,9 +853,9 @@ export default function ProjectsOverview() {
 
   const renderActiveProjectDetails = (project: Project) => {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header - removed sticky positioning */}
-        <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10">
+      <div className="min-h-screen bg-background overflow-y-auto">
+        {/* Header - matching system background, removed sticky positioning */}
+        <div className="border-b bg-background">
           <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4 min-w-0">
@@ -883,7 +883,7 @@ export default function ProjectsOverview() {
           </div>
         </div>
 
-        {/* Scrollable Content - removed fixed height */}
+        {/* Content - natural scrolling */}
         <div className="px-8 py-6 space-y-6">
           {/* Project Overview Grid */}
           <div className="grid gap-6 lg:grid-cols-3">
@@ -1052,7 +1052,7 @@ export default function ProjectsOverview() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in px-6 max-w-[1920px] mx-auto overflow-y-auto">
+    <div className="space-y-6 animate-fade-in px-6 max-w-[1920px] mx-auto">
       <DashboardPageHeader
         title="Projects Overview"
         description="Monitor and manage all department projects, both active and completed"

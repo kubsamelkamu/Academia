@@ -16,7 +16,7 @@ export default function DashboardOverview() {
       {stats.map((stat) => (
         <Card key={stat.label}>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">{stat.label}</CardTitle>
+            <CardTitle className="text-lg font-semibold">kk</CardTitle>
           </CardHeader>
           <CardContent>
             <span className="text-3xl font-bold">{stat.value}</span>

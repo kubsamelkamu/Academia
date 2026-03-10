@@ -45,7 +45,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: UserCheck,
     },
     {
-      title: "Grade Approval",
+      title: "Review & Approval",
       href: "/dashboard/department-head/grades",
       icon: ClipboardCheck,
     },
