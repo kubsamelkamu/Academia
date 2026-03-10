@@ -2,6 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import StatCard from "@/components/shared/StatCard"
 import DataTable, { type Column } from "@/components/shared/DataTable"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -13,7 +14,6 @@ import {
   FolderOpen,
   ClipboardCheck,
   UserCheck,
-  GraduationCap,
   Download,
   RefreshCw,
 } from "lucide-react"
@@ -24,9 +24,21 @@ import {
   type User,
   type Grade,
 } from "@/data/mockData"
+import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
 
 export function DepartmentHeadDashboard() {
+  const authUser = useAuthStore((s) => s.user)
+
+  const departmentName =
+    authUser?.departmentName ?? authUser?.department?.name ?? "Software Engineering"
+
+  const departmentTitle = departmentName.toLowerCase().includes("department")
+    ? departmentName
+    : `${departmentName} Department`
+
+  const universityName = authUser?.tenant?.name ?? "Haramaya University"
+
   const departmentUsers = mockUsers.filter((u) => u.departmentId === "dept1")
   const students = departmentUsers.filter(
     (u) => u.role === "student" || u.role === "group_manager",
@@ -173,13 +185,20 @@ export function DepartmentHeadDashboard() {
             Department overview
           </p>
           <h2 className="text-xl font-semibold tracking-tight">
-            Computer Science Department
+            {departmentTitle}
           </h2>
           <p className="text-sm text-primary-foreground/80">
-            Academic year 2024–2025 • Stanford University
+            Academic year 2024–2025 • {universityName}
           </p>
         </div>
-        <GraduationCap className="absolute right-6 top-1/2 h-20 w-20 -translate-y-1/2 text-primary-foreground/20" />
+        <Image
+          src="/favicon.png"
+          alt="Graduation cap"
+          width={80}
+          height={80}
+          className="absolute right-6 top-1/2 h-20 w-20 -translate-y-1/2 object-contain opacity-20 mix-blend-multiply dark:mix-blend-screen pointer-events-none select-none"
+          priority={false}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

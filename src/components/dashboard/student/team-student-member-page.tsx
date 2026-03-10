@@ -431,7 +431,6 @@ export function StudentTeamMemberPage() {
         </CardContent>
       </Card>
 
-      {/* Main Content Tabs */}
       <Tabs value={activeTab} className="space-y-6" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="browse-groups" className="flex items-center gap-2">
