@@ -43,6 +43,7 @@ import { StudentTeamMemberPage } from "@/components/dashboard/student/team-stude
 import { useAuthStore } from "@/store/auth-store"
 import { useQuery } from "@tanstack/react-query"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
+import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
 
 type CreateGroupFormData = {
   name: string
@@ -127,25 +128,34 @@ export function StudentTeamPage() {
   const hasFetchedStudentProfileRef = useRef(false)
 
   const user = useAuthStore((s) => s.user)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const profileIsLoading = useAuthStore((s) => s.profileIsLoading)
   const profileError = useAuthStore((s) => s.profileError)
   const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
 
-  // Mock data - would come from API in production
-  const currentUser = {
-    name: 'John Doe',
-    id: 'STU001',
-    role: 'Group Manager',
-    department: 'Computer Science',
-    email: 'john.doe@university.edu',
-    managerApprovalStatus: 'pending' as 'approved' | 'pending' | 'rejected' | 'not_requested',
-  }
+  const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
 
-  const isApprovedGroupManager = currentUser.managerApprovalStatus === 'approved'
-  const departmentName = user?.departmentName ?? user?.department?.name ?? currentUser.department
+  const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
+  const departmentName = user?.departmentName ?? user?.department?.name ?? ""
+
+  const firstName = user?.firstName?.trim()
+  const lastName = user?.lastName?.trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(" ")
+  const profileName = fullName || user?.email || "Student"
+
+  const profileEmail = user?.email ?? ""
+  const profileDepartment = user?.departmentName ?? user?.department?.name ?? ""
+  const profileTechStack = user?.techStack ?? user?.technologies ?? []
 
   const groupMembers = [
-    { id: 1, name: 'John Doe', role: 'Group Manager', status: 'approved', email: 'john@university.edu', joinDate: '2024-01-15' },
+    {
+      id: 1,
+      name: profileName,
+      role: 'Group Leader',
+      status: 'approved',
+      email: profileEmail,
+      joinDate: '2024-01-15',
+    },
     { id: 2, name: 'Jane Smith', role: 'Member', status: 'approved', email: 'jane@university.edu', joinDate: '2024-01-16' },
     { id: 3, name: 'Mike Johnson', role: 'Member', status: 'pending', email: 'mike@university.edu', joinDate: '2024-01-17' },
     { id: 4, name: 'Sarah Wilson', role: 'Member', status: 'approved', email: 'sarah@university.edu', joinDate: '2024-01-15' },
@@ -161,15 +171,6 @@ export function StudentTeamPage() {
     { id: 8, name: 'Pat Taylor', department: departmentName, email: 'pat@university.edu' },
     { id: 9, name: 'Jordan Wong', department: departmentName, email: 'jordan@university.edu' },
   ]
-
-  const firstName = user?.firstName?.trim()
-  const lastName = user?.lastName?.trim()
-  const fullName = [firstName, lastName].filter(Boolean).join(" ")
-  const profileName = fullName || user?.email || currentUser.name
-
-  const profileEmail = user?.email ?? currentUser.email
-  const profileDepartment = user?.departmentName ?? user?.department?.name ?? currentUser.department
-  const profileTechStack = user?.techStack ?? user?.technologies ?? []
 
   const safeExternalUrl = (value?: string | null): string | null => {
     if (!value) return null
@@ -228,7 +229,7 @@ export function StudentTeamPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
-  const isGroupManager = currentUser.role === 'Group Manager'
+  const isGroupManager = isApprovedGroupManager
   const canEditGroup = !groupApproved && !groupSubmitted && isGroupManager
   const groupSize = groupMembers.length
   const minGroupSize = 3
@@ -258,17 +259,19 @@ export function StudentTeamPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 border-2 border-primary">
+                <AvatarImage src={user?.avatarUrl ?? undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {getInitials(currentUser.name)}
+                  {getInitials(profileName)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{currentUser.name}</p>
+                <p className="text-sm font-medium truncate">{profileName}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline" className="text-xs">
-                    {currentUser.role}
+                    Group Leader
                   </Badge>
-                  <span>{departmentName}</span>
+                  <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Approved</Badge>
+                  <span>{profileDepartment || departmentName || "No department"}</span>
                 </div>
               </div>
             </div>

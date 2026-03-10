@@ -44,6 +44,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuthStore } from "@/store/auth-store"
 import { useQuery } from "@tanstack/react-query"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
+import { toast } from "sonner"
+import { useCreateGroupLeaderRequest, useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
 
 type PresenceStatus = "online" | "away" | "offline"
 type RequestStatus = "pending" | "approved" | "rejected"
@@ -122,10 +124,14 @@ export function StudentTeamMemberPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hasFetchedStudentProfileRef = useRef(false)
 
+  const createGroupLeaderRequestMutation = useCreateGroupLeaderRequest()
+
   const user = useAuthStore((s) => s.user)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const profileIsLoading = useAuthStore((s) => s.profileIsLoading)
   const profileError = useAuthStore((s) => s.profileError)
   const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
+  const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
   const studentProfilesLimit = 10
@@ -312,14 +318,34 @@ export function StudentTeamMemberPage() {
     },
   ]
 
-  const managerRequests: ManagerRequest[] = [
-    {
-      id: 1,
-      status: "pending",
-      requestedAt: "2024-01-10",
-      reason: "I have 2 years of project management experience and want to lead a team",
-    },
-  ]
+  const managerRequests: ManagerRequest[] = (() => {
+    const status = groupLeaderMeQuery.data?.status
+    if (!status) return []
+
+    const normalizedStatus: RequestStatus =
+      String(status).toUpperCase() === "APPROVED"
+        ? "approved"
+        : String(status).toUpperCase() === "REJECTED"
+          ? "rejected"
+          : "pending"
+
+    const createdAt = "createdAt" in (groupLeaderMeQuery.data ?? {})
+      ? (groupLeaderMeQuery.data as { createdAt: string }).createdAt
+      : new Date().toISOString()
+
+    const message = "message" in (groupLeaderMeQuery.data ?? {})
+      ? (groupLeaderMeQuery.data as { message: string | null }).message
+      : null
+
+    return [
+      {
+        id: 1,
+        status: normalizedStatus,
+        requestedAt: createdAt,
+        reason: message ?? "Applied to become a group leader",
+      },
+    ]
+  })()
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase()
 
@@ -360,13 +386,41 @@ export function StudentTeamMemberPage() {
   }
 
   const handleManagerRequest = () => {
-    setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setShowManagerRequestDialog(false)
-      setManagerRequestReason("")
-      alert("Manager request submitted successfully!")
-    }, 1500)
+    const reason = managerRequestReason.trim()
+    if (!reason || createGroupLeaderRequestMutation.isPending) return
+
+    if (groupLeaderMeQuery.data?.status) {
+      toast.message("You already have an application on file.")
+      return
+    }
+
+    createGroupLeaderRequestMutation
+      .mutateAsync({ reason })
+      .then(() => {
+        setShowManagerRequestDialog(false)
+        setManagerRequestReason("")
+        toast.success("Group leader request submitted")
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Request failed"
+        // Common backend errors to present clearly.
+        if (message.toLowerCase().includes("already") && message.toLowerCase().includes("appl")) {
+          toast.message("You have already applied to become a group leader.")
+          return
+        }
+
+        if (message.toLowerCase().includes("not assigned") && message.toLowerCase().includes("department")) {
+          toast.error("You must be assigned to a department before applying.")
+          return
+        }
+
+        if (message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("forbidden")) {
+          toast.error("You are not authorized to apply. Please login again.")
+          return
+        }
+
+        toast.error(message)
+      })
   }
 
   const handleSubmitJoinRequest = () => {
@@ -527,8 +581,7 @@ export function StudentTeamMemberPage() {
                         </div>
                       </ScrollArea>
                     </div>
-
-                    {/* Action Buttons - Only Details and Request to Join */}
+                    
                     <div className="flex gap-2 pt-2">
                       {group.currentSize < group.maxSize ? (
                         <Button className="flex-1" onClick={() => handleJoinRequest(group)}>
@@ -557,7 +610,6 @@ export function StudentTeamMemberPage() {
           </div>
         </TabsContent>
 
-        {/* My Requests Tab */}
         <TabsContent value="my-requests" className="space-y-6">
           <Card>
             <CardHeader>
@@ -632,7 +684,6 @@ export function StudentTeamMemberPage() {
           </Card>
         </TabsContent>
 
-        {/* Become Manager Tab */}
         <TabsContent value="become-manager" className="space-y-6">
           <Card>
             <CardHeader>
@@ -645,24 +696,9 @@ export function StudentTeamMemberPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Requirements */}
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Manager Requirements</AlertTitle>
-                <AlertDescription>
-                  <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                    <li>Minimum 3.5 GPA</li>
-                    <li>Previous project experience</li>
-                    <li>Good academic standing</li>
-                    <li>Leadership potential</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-
-              {/* Request Form */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="manager-request-reason">Why do you want to become a group manager?</Label>
+                  <Label htmlFor="manager-request-reason">Why do you want to become a group Leader?</Label>
                   <Textarea
                     id="manager-request-reason"
                     placeholder="Describe your motivation, experience, and qualifications..."
@@ -675,10 +711,10 @@ export function StudentTeamMemberPage() {
                 <Button
                   className="w-full"
                   size="lg"
-                  disabled={!managerRequestReason.trim() || isSubmitting}
+                  disabled={!managerRequestReason.trim() || Boolean(groupLeaderMeQuery.data?.status) || createGroupLeaderRequestMutation.isPending}
                   onClick={() => setShowManagerRequestDialog(true)}
                 >
-                  {isSubmitting ? (
+                  {createGroupLeaderRequestMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Submitting...
@@ -690,6 +726,20 @@ export function StudentTeamMemberPage() {
                     </>
                   )}
                 </Button>
+
+                <p className="text-xs text-muted-foreground">
+                  {groupLeaderMeQuery.isLoading
+                    ? "Checking your application status…"
+                    : !groupLeaderMeQuery.data?.status
+                      ? "You haven’t applied to become a group leader yet."
+                      : String(groupLeaderMeQuery.data.status).toUpperCase() === "PENDING"
+                        ? "Your application is pending review."
+                        : String(groupLeaderMeQuery.data.status).toUpperCase() === "APPROVED"
+                          ? "You’re approved as a group leader."
+                          : String(groupLeaderMeQuery.data.status).toUpperCase() === "REJECTED"
+                            ? "Your application was rejected. You can review the reason below."
+                            : `Application status: ${String(groupLeaderMeQuery.data.status)}`}
+                </p>
               </div>
 
               {/* Horizontal Rule */}
@@ -707,6 +757,15 @@ export function StudentTeamMemberPage() {
                         <p className="text-xs text-muted-foreground mt-1">
                           Submitted: {new Date(request.requestedAt).toLocaleDateString()}
                         </p>
+                        {request.status === "rejected" && "rejectionReason" in (groupLeaderMeQuery.data ?? {}) && (groupLeaderMeQuery.data as { rejectionReason: string | null }).rejectionReason ? (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Rejection reason</AlertTitle>
+                            <AlertDescription>
+                              {(groupLeaderMeQuery.data as { rejectionReason: string | null }).rejectionReason}
+                            </AlertDescription>
+                          </Alert>
+                        ) : null}
                       </div>
                       <Badge
                         className={
@@ -1171,11 +1230,15 @@ export function StudentTeamMemberPage() {
             </Alert>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowManagerRequestDialog(false)} disabled={isSubmitting}>
+            <Button
+              variant="outline"
+              onClick={() => setShowManagerRequestDialog(false)}
+              disabled={createGroupLeaderRequestMutation.isPending}
+            >
               Go Back
             </Button>
-            <Button onClick={handleManagerRequest} disabled={isSubmitting}>
-              {isSubmitting ? (
+            <Button onClick={handleManagerRequest} disabled={createGroupLeaderRequestMutation.isPending}>
+              {createGroupLeaderRequestMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Submitting...
