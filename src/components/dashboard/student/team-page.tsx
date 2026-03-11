@@ -41,9 +41,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
 import { useAuthStore } from "@/store/auth-store"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { isAxiosError } from "axios"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import { projectGroupKeys, useCreateProjectGroup, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/errors"
+import {
+  createProjectGroupSchema,
+  parseTechnologiesInput,
+} from "@/validations/project-groups"
 
 type CreateGroupFormData = {
   name: string
@@ -57,18 +65,31 @@ function CreateGroupForm({
   onSuccess,
 }: {
   defaultValues?: CreateGroupFormData
-  onSubmit: (data: CreateGroupFormData) => void
+  onSubmit: (data: CreateGroupFormData) => Promise<boolean>
   onSuccess?: () => void
 }) {
   const [name, setName] = useState(defaultValues?.name ?? "")
   const [objective, setObjective] = useState(defaultValues?.objective ?? "")
   const [technology, setTechnology] = useState(defaultValues?.technology ?? "")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
     if (!name.trim() || !objective.trim() || !technology.trim()) return
-    onSubmit({ name: name.trim(), objective: objective.trim(), technology: technology.trim() })
-    onSuccess?.()
+    setIsSubmitting(true)
+    try {
+      const didComplete = await onSubmit({
+        name: name.trim(),
+        objective: objective.trim(),
+        technology: technology.trim(),
+      })
+      if (didComplete) {
+        onSuccess?.()
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -80,6 +101,7 @@ function CreateGroupForm({
           placeholder="e.g. Tech Innovators"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          disabled={isSubmitting}
           required
         />
       </div>
@@ -91,6 +113,7 @@ function CreateGroupForm({
           value={objective}
           onChange={(e) => setObjective(e.target.value)}
           rows={4}
+          disabled={isSubmitting}
           required
         />
       </div>
@@ -101,12 +124,22 @@ function CreateGroupForm({
           placeholder="e.g. React, Node.js, PostgreSQL"
           value={technology}
           onChange={(e) => setTechnology(e.target.value)}
+          disabled={isSubmitting}
           required
         />
       </div>
-      <Button type="submit" className="w-full">
-        <PlusCircle className="h-4 w-4 mr-2" />
-        Create Group
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          <>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create Group
+          </>
+        )}
       </Button>
     </form>
   )
@@ -116,8 +149,13 @@ export function StudentTeamPage() {
   const [groupSubmitted, setGroupSubmitted] = useState(false)
   const [groupApproved] = useState(false)
   const [groupInfo, setGroupInfo] = useState<CreateGroupFormData | null>(null)
+  const [groupExists, setGroupExists] = useState(false)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
+  const [createGroupDismissed, setCreateGroupDismissed] = useState(false)
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+  const createProjectGroupMutation = useCreateProjectGroup()
+  const queryClient = useQueryClient()
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
   const studentProfilesLimit = 10
@@ -147,19 +185,61 @@ export function StudentTeamPage() {
   const profileDepartment = user?.departmentName ?? user?.department?.name ?? ""
   const profileTechStack = user?.techStack ?? user?.technologies ?? []
 
-  const groupMembers = [
-    {
-      id: 1,
-      name: profileName,
-      role: 'Group Leader',
-      status: 'approved',
-      email: profileEmail,
-      joinDate: '2024-01-15',
-    },
-    { id: 2, name: 'Jane Smith', role: 'Member', status: 'approved', email: 'jane@university.edu', joinDate: '2024-01-16' },
-    { id: 3, name: 'Mike Johnson', role: 'Member', status: 'pending', email: 'mike@university.edu', joinDate: '2024-01-17' },
-    { id: 4, name: 'Sarah Wilson', role: 'Member', status: 'approved', email: 'sarah@university.edu', joinDate: '2024-01-15' },
-  ]
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken) && isApprovedGroupManager)
+
+  const myGroup = myProjectGroupQuery.data ?? null
+  const myGroupErrorStatus =
+    myProjectGroupQuery.isError && isAxiosError(myProjectGroupQuery.error)
+      ? Number(myProjectGroupQuery.error.response?.status)
+      : undefined
+  const myGroupErrorMessage = myProjectGroupQuery.isError
+    ? String(myProjectGroupQuery.error?.message ?? "")
+    : ""
+  const myGroupNotFound =
+    myProjectGroupQuery.isError &&
+    (myGroupErrorStatus === 400 || myGroupErrorMessage.toLowerCase().includes("group not found"))
+  const myGroupForbidden = myProjectGroupQuery.isError && myGroupErrorStatus === 403
+
+  const derivedGroupExists = Boolean(myGroup) || (!myGroupNotFound && groupExists)
+  const derivedActiveTab = myGroupNotFound ? "my-group" : activeTab
+  const shouldAutoOpenCreateGroup = myGroupNotFound && !createGroupDismissed
+
+  const handleTechnologyClick = async (tech: string) => {
+    const value = tech.trim()
+    if (!value) return
+
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`Copied: ${value}`)
+    } catch {
+      toast.message(value)
+    }
+  }
+
+  const groupMembers =
+    myGroup
+      ? [
+          {
+            id: myGroup.leader.id,
+            name:
+              [myGroup.leader.firstName, myGroup.leader.lastName].filter(Boolean).join(" ") ||
+              myGroup.leader.email,
+            role: "Group Manager",
+            status: "approved",
+            email: myGroup.leader.email,
+            joinDate: myGroup.createdAt,
+          },
+          ...myGroup.members.map((member) => ({
+            id: member.id,
+            name:
+              [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") || member.user.email,
+            role: "Member",
+            status: "approved",
+            email: member.user.email,
+            joinDate: member.joinedAt,
+          })),
+        ]
+      : []
 
   const pendingRequests = [
     { id: 5, name: 'Alex Brown', department: departmentName, requestedAt: '2024-01-18' },
@@ -301,7 +381,7 @@ export function StudentTeamPage() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} className="space-y-6" onValueChange={setActiveTab}>
+      <Tabs value={derivedActiveTab} className="space-y-6" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
@@ -511,34 +591,149 @@ export function StudentTeamPage() {
                 <CardTitle>My Group Members</CardTitle>
                 <CardDescription>
                   {groupSize} of {maxGroupSize} members • Minimum {minGroupSize} required
+                  {myGroup ? ` • Pending invites: ${myGroup.pendingInvitationsCount}` : ""}
                 </CardDescription>
               </div>
               {canEditGroup && (
                 <div className="flex gap-2 flex-wrap">
-                  <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="default" size="sm">
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create Group
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create Group</DialogTitle>
-                        <DialogDescription>
-                          Set up your project group with required details
-                        </DialogDescription>
-                      </DialogHeader>
-                      <CreateGroupForm
-                        key={createGroupOpen ? "open" : "closed"}
-                        defaultValues={groupInfo ?? undefined}
-                        onSubmit={(data) => {
-                          setGroupInfo(data)
-                        }}
-                        onSuccess={() => setCreateGroupOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
+                  {myGroup && (
+                    <Dialog open={groupDetailsOpen} onOpenChange={setGroupDetailsOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Mode
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Group Details</DialogTitle>
+                          <DialogDescription>
+                            View your group information. Click a technology to copy it.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-1">
+                            <p className="text-xl font-semibold">{myGroup.name}</p>
+                            <p className="text-sm text-muted-foreground whitespace-pre-line">{myGroup.objectives}</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Technology</p>
+                            {myGroup.technologies.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {myGroup.technologies.map((tech) => (
+                                  <button
+                                    key={tech}
+                                    type="button"
+                                    onClick={() => handleTechnologyClick(tech)}
+                                    className="focus:outline-none"
+                                  >
+                                    <Badge variant="secondary" className="cursor-pointer">
+                                      {tech}
+                                    </Badge>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No technologies listed.</p>
+                            )}
+                          </div>
+
+                          <div className="text-sm">
+                            <span className="font-medium">Pending invites:</span> {myGroup.pendingInvitationsCount}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {!derivedGroupExists && (
+                    <Dialog
+                      open={createGroupOpen || shouldAutoOpenCreateGroup}
+                      onOpenChange={(open) => {
+                        setCreateGroupOpen(open)
+                        if (open) {
+                          setCreateGroupDismissed(false)
+                        } else {
+                          setCreateGroupDismissed(true)
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm">
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Create Group
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Group</DialogTitle>
+                          <DialogDescription>
+                            Set up your project group with required details
+                          </DialogDescription>
+                        </DialogHeader>
+                        <CreateGroupForm
+                          key={createGroupOpen ? "open" : "closed"}
+                          defaultValues={groupInfo ?? undefined}
+                          onSubmit={async (data) => {
+                            if (createProjectGroupMutation.isPending) return false
+
+                            const technologies = parseTechnologiesInput(data.technology)
+                            const dto = {
+                              name: data.name,
+                              objectives: data.objective,
+                              technologies,
+                            }
+
+                            const parsed = createProjectGroupSchema.safeParse(dto)
+                            if (!parsed.success) {
+                              const message = parsed.error.issues[0]?.message ?? "Invalid group details"
+                              toast.error(message)
+                              return false
+                            }
+
+                            try {
+                              const created = await createProjectGroupMutation.mutateAsync(parsed.data)
+
+                              setGroupInfo({
+                                name: created.name,
+                                objective: created.objectives,
+                                technology: created.technologies.join(", "),
+                              })
+                              setGroupExists(true)
+
+                              toast.success("Group created")
+                              queryClient.invalidateQueries({ queryKey: projectGroupKeys().me() }).catch(() => {})
+                              setActiveTab("my-group")
+                              return true
+                            } catch (error) {
+                              const message = getErrorMessage(error, "Failed to create group")
+                              const normalized = message.toLowerCase()
+
+                              if (normalized.includes("already") && normalized.includes("created") && normalized.includes("group")) {
+                                toast.message("You already have a group.")
+                                setGroupExists(true)
+                                queryClient.invalidateQueries({ queryKey: projectGroupKeys().me() }).catch(() => {})
+                                setActiveTab("my-group")
+                                setCreateGroupOpen(false)
+                                return true
+                              }
+
+                              if (normalized.includes("only") && normalized.includes("approved") && normalized.includes("group")) {
+                                toast.error("Only approved group leaders can perform this action")
+                                setCreateGroupOpen(false)
+                                return true
+                              }
+
+                              toast.error(message)
+                              return false
+                            }
+                          }}
+                          onSuccess={() => setCreateGroupOpen(false)}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  )}
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -573,7 +768,53 @@ export function StudentTeamPage() {
               )}
             </CardHeader>
             <CardContent>
-              {groupInfo && (
+              {myProjectGroupQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading group…
+                </div>
+              ) : myGroupForbidden ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Access denied</AlertTitle>
+                  <AlertDescription>Only approved group leaders can perform this action.</AlertDescription>
+                </Alert>
+              ) : myGroup ? (
+                <>
+                  <div className="space-y-4">
+                    {groupMembers.map((member) => (
+                      <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar>
+                            <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{member.name}</p>
+                              {member.role === 'Group Manager' && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                  Manager
+                                </Badge>
+                              )}
+                              {getStatusBadge(member.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Joined: {new Date(member.joinDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        {canEditGroup && member.role !== 'Group Manager' && (
+                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <UserMinus className="h-4 w-4 mr-2" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : groupInfo ? (
                 <div className="mb-6 p-4 rounded-lg border bg-muted/30 space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Group Details</p>
                   <p className="font-semibold">{groupInfo.name}</p>
@@ -582,41 +823,14 @@ export function StudentTeamPage() {
                     <span className="font-medium">Technology:</span> {groupInfo.technology}
                   </p>
                 </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No group found yet. Create one to get started.</p>
+                </div>
               )}
-              <div className="space-y-4">
-                {groupMembers.map((member) => (
-                  <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar>
-                        <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{member.name}</p>
-                          {member.role === 'Group Manager' && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              Manager
-                            </Badge>
-                          )}
-                          {getStatusBadge(member.status)}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Joined: {new Date(member.joinDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    {canEditGroup && member.role !== 'Group Manager' && (
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                        <UserMinus className="h-4 w-4 mr-2" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
             </CardContent>
-            {canEditGroup && (
+            {canEditGroup && myGroup && (
               <CardContent className="border-t pt-6">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                   <div>
