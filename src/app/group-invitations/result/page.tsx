@@ -3,7 +3,7 @@ import { CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 type InvitationResultStatus = "accepted" | "rejected" | "error"
 
