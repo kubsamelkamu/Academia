@@ -11,7 +11,6 @@ import {
   User,
   UserPlus, 
   UserCheck, 
-  UserMinus, 
   Clock, 
   CheckCircle2, 
   XCircle,
@@ -44,11 +43,18 @@ import { useAuthStore } from "@/store/auth-store"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { isAxiosError } from "axios"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
+import { getStudentPublicProfile, type StudentPublicProfile } from "@/lib/api/profile"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
-import { projectGroupKeys, useCreateProjectGroup, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import {
+  projectGroupKeys,
+  useAvailableStudents,
+  useCreateProjectGroup,
+  useMyProjectGroup,
+} from "@/lib/hooks/use-project-groups"
 import { useDepartmentGroupSizeSettings } from "@/lib/hooks/use-department-group-size-settings"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/errors"
+import type { AvailableStudentListItem } from "@/types/project-groups"
 import {
   createProjectGroupSchema,
   parseTechnologiesInput,
@@ -154,12 +160,31 @@ export function StudentTeamPage() {
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
   const [createGroupDismissed, setCreateGroupDismissed] = useState(false)
   const [groupDetailsOpen, setGroupDetailsOpen] = useState(false)
+  const [memberDetailsOpen, setMemberDetailsOpen] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<null | {
+    id: string
+    userId?: string
+    name: string
+    role: string
+    status: string
+    email: string
+    joinDate: string
+    avatarUrl?: string | null
+  }>(null)
   const [activeTab, setActiveTab] = useState("overview")
   const createProjectGroupMutation = useCreateProjectGroup()
   const queryClient = useQueryClient()
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
   const studentProfilesLimit = 10
+
+  const [availableStudentsPage, setAvailableStudentsPage] = useState(1)
+  const availableStudentsLimit = 20
+  const [availableStudentsSearchInput, setAvailableStudentsSearchInput] = useState("")
+  const [availableStudentsSearch, setAvailableStudentsSearch] = useState<string | undefined>(undefined)
+
+  const [availableStudentDetailsOpen, setAvailableStudentDetailsOpen] = useState(false)
+  const [selectedAvailableStudent, setSelectedAvailableStudent] = useState<AvailableStudentListItem | null>(null)
 
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<StudentProfileListItem | null>(null)
   const [studentProfileDetailsOpen, setStudentProfileDetailsOpen] = useState(false)
@@ -217,27 +242,53 @@ export function StudentTeamPage() {
     }
   }
 
+  const openMemberDetails = (member: {
+    id: string
+    userId?: string
+    name: string
+    role: string
+    status: string
+    email: string
+    joinDate: string
+    avatarUrl?: string | null
+  }) => {
+    setSelectedMember(member)
+    setMemberDetailsOpen(true)
+  }
+
+  const selectedMemberProfileQuery = useQuery<StudentPublicProfile, Error>({
+    queryKey: ["student-public-profile", selectedMember?.userId],
+    queryFn: () => getStudentPublicProfile(String(selectedMember?.userId ?? "")),
+    enabled: memberDetailsOpen && Boolean(selectedMember?.userId),
+    staleTime: 60_000,
+    retry: false,
+  })
+
   const groupMembers =
     myGroup
       ? [
           {
             id: myGroup.leader.id,
+            userId: myGroup.leader.id,
             name:
               [myGroup.leader.firstName, myGroup.leader.lastName].filter(Boolean).join(" ") ||
               myGroup.leader.email,
-            role: "Group Manager",
+            role: "Leader",
             status: "approved",
             email: myGroup.leader.email,
             joinDate: myGroup.createdAt,
+            avatarUrl: myGroup.leader.avatarUrl,
           },
           ...myGroup.members.map((member) => ({
             id: member.id,
+            userId: member.user.id,
             name:
               [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") || member.user.email,
             role: "Member",
             status: "approved",
             email: member.user.email,
             joinDate: member.joinedAt,
+            avatarUrl: member.user.avatarUrl,
           })),
         ]
       : []
@@ -245,12 +296,6 @@ export function StudentTeamPage() {
   const pendingRequests = [
     { id: 5, name: 'Alex Brown', department: departmentName, requestedAt: '2024-01-18' },
     { id: 6, name: 'Emily Davis', department: departmentName, requestedAt: '2024-01-18' },
-  ]
-
-  const availableStudents = [
-    { id: 7, name: 'Chris Lee', department: departmentName, email: 'chris@university.edu' },
-    { id: 8, name: 'Pat Taylor', department: departmentName, email: 'pat@university.edu' },
-    { id: 9, name: 'Jordan Wong', department: departmentName, email: 'jordan@university.edu' },
   ]
 
   const safeExternalUrl = (value?: string | null): string | null => {
@@ -293,6 +338,11 @@ export function StudentTeamPage() {
     setStudentProfileDetailsOpen(true)
   }
 
+  const openAvailableStudentDetails = (item: AvailableStudentListItem) => {
+    setSelectedAvailableStudent(item)
+    setAvailableStudentDetailsOpen(true)
+  }
+
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'approved':
@@ -316,6 +366,23 @@ export function StudentTeamPage() {
     retry: false,
   })
 
+  useEffect(() => {
+    const value = availableStudentsSearchInput.trim()
+    const handle = window.setTimeout(() => {
+      setAvailableStudentsPage(1)
+      setAvailableStudentsSearch(value ? value : undefined)
+    }, 400)
+
+    return () => window.clearTimeout(handle)
+  }, [availableStudentsSearchInput])
+
+  const availableStudentsQuery = useAvailableStudents({
+    enabled: Boolean(accessToken) && isApprovedGroupManager && Boolean(myGroup),
+    page: availableStudentsPage,
+    limit: availableStudentsLimit,
+    search: availableStudentsSearch,
+  })
+
   const isGroupManager = isApprovedGroupManager
   const canEditGroup = !groupApproved && !groupSubmitted && isGroupManager
   const groupSize = groupMembers.length
@@ -324,6 +391,8 @@ export function StudentTeamPage() {
   const minGroupSize = groupSizeSettingsQuery.data?.minGroupSize ?? fallbackMinGroupSize
   const maxGroupSize = groupSizeSettingsQuery.data?.maxGroupSize ?? fallbackMaxGroupSize
   const groupProgress = maxGroupSize > 0 ? (groupSize / maxGroupSize) * 100 : 0
+
+  const availableStudentsCount = availableStudentsQuery.data?.pagination.total ?? availableStudentsQuery.data?.items.length ?? 0
 
   // Students who are not approved as group managers should see the normal student team page.
   if (!isApprovedGroupManager) {
@@ -579,7 +648,7 @@ export function StudentTeamPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{availableStudents.length}</div>
+                <div className="text-2xl font-bold">{availableStudentsCount}</div>
                 <p className="text-xs text-muted-foreground">Available Students</p>
               </CardContent>
             </Card>
@@ -795,15 +864,19 @@ export function StudentTeamPage() {
                       <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
                         <div className="flex items-start gap-3">
                           <Avatar>
+                            <AvatarImage src={member.avatarUrl ?? undefined} />
                             <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                           </Avatar>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium">{member.name}</p>
-                              {member.role === 'Group Manager' && (
+                              {member.role === 'Leader' && (
                                 <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                                  Manager
+                                  Leader
                                 </Badge>
+                              )}
+                              {member.userId && user?.id && member.userId === user.id && (
+                                <Badge variant="outline">You</Badge>
                               )}
                               {getStatusBadge(member.status)}
                             </div>
@@ -813,12 +886,16 @@ export function StudentTeamPage() {
                             </p>
                           </div>
                         </div>
-                        {canEditGroup && member.role !== 'Group Manager' && (
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                            <UserMinus className="h-4 w-4 mr-2" />
-                            Remove
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMemberDetails(member)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
                           </Button>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -859,6 +936,140 @@ export function StudentTeamPage() {
               </CardContent>
             )}
           </Card>
+
+          <Dialog open={memberDetailsOpen} onOpenChange={setMemberDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Member Details</DialogTitle>
+                <DialogDescription>Profile details for this group member.</DialogDescription>
+              </DialogHeader>
+
+              {selectedMember && (
+                <div className="space-y-4 py-2">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={selectedMember.avatarUrl ?? undefined} />
+                      <AvatarFallback>{getInitials(selectedMember.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-base font-semibold truncate">{selectedMember.name}</p>
+                        {selectedMember.role === "Leader" && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            Leader
+                          </Badge>
+                        )}
+                        {selectedMember.userId && user?.id && selectedMember.userId === user.id && (
+                          <Badge variant="outline">You</Badge>
+                        )}
+                        {getStatusBadge(selectedMember.status)}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">{selectedMember.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-sm">
+                    <span className="font-medium">Joined:</span>{" "}
+                    {new Date(selectedMember.joinDate).toLocaleString()}
+                  </div>
+
+                  {selectedMemberProfileQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading profile…
+                    </div>
+                  ) : selectedMemberProfileQuery.isError ? (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Could not load profile</AlertTitle>
+                      <AlertDescription>
+                        {selectedMemberProfileQuery.error instanceof Error
+                          ? selectedMemberProfileQuery.error.message
+                          : "Failed to load member profile."}
+                      </AlertDescription>
+                    </Alert>
+                  ) : selectedMemberProfileQuery.data ? (
+                    <>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Bio</p>
+                        {selectedMemberProfileQuery.data.profile.bio ? (
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMemberProfileQuery.data.profile.bio}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No bio provided.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Tech stack</p>
+                        {selectedMemberProfileQuery.data.profile.techStack.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {selectedMemberProfileQuery.data.profile.techStack.map((tech) => (
+                              <button
+                                key={tech}
+                                type="button"
+                                onClick={() => handleTechnologyClick(tech)}
+                                className="focus:outline-none"
+                              >
+                                <Badge variant="secondary" className="cursor-pointer">
+                                  {tech}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No tech stack listed.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Links</p>
+                        {(() => {
+                          const gh = safeExternalUrl(selectedMemberProfileQuery.data.profile.githubUrl)
+                          const li = safeExternalUrl(selectedMemberProfileQuery.data.profile.linkedinUrl)
+                          const pf = safeExternalUrl(selectedMemberProfileQuery.data.profile.portfolioUrl)
+
+                          if (!gh && !li && !pf) {
+                            return <p className="text-sm text-muted-foreground">No links added.</p>
+                          }
+
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {gh && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={gh} target="_blank" rel="noreferrer">
+                                    <Github className="h-4 w-4 mr-2" />
+                                    GitHub
+                                  </a>
+                                </Button>
+                              )}
+                              {li && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={li} target="_blank" rel="noreferrer">
+                                    <Linkedin className="h-4 w-4 mr-2" />
+                                    LinkedIn
+                                  </a>
+                                </Button>
+                              )}
+                              {pf && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={pf} target="_blank" rel="noreferrer">
+                                    <Globe className="h-4 w-4 mr-2" />
+                                    Portfolio
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Requests Tab */}
@@ -922,30 +1133,229 @@ export function StudentTeamPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {availableStudents.map((student) => (
-                  <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar>
-                        <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">{student.department}</p>
-                        <p className="text-xs text-muted-foreground">{student.email}</p>
-                      </div>
-                    </div>
-                    {isGroupManager && canEditGroup && (
-                      <Button size="sm" className="self-end sm:self-center">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invite
-                      </Button>
-                    )}
+              {!myGroup ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">Create a group first to invite members.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="available-students-search">Search students</Label>
+                    <Input
+                      id="available-students-search"
+                      placeholder="Search by first name or last name..."
+                      value={availableStudentsSearchInput}
+                      onChange={(e) => setAvailableStudentsSearchInput(e.target.value)}
+                    />
                   </div>
-                ))}
-              </div>
+
+                  {availableStudentsQuery.isError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Could not load available students</AlertTitle>
+                      <AlertDescription>
+                        {availableStudentsQuery.error instanceof Error
+                          ? availableStudentsQuery.error.message
+                          : "Failed to load available students."}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {availableStudentsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading students…
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        {(availableStudentsQuery.data?.items ?? []).length > 0 ? (
+                          (availableStudentsQuery.data?.items ?? []).map((item) => {
+                            const first = item.user.firstName?.trim() ?? ""
+                            const last = item.user.lastName?.trim() ?? ""
+                            const displayName = [first, last].filter(Boolean).join(" ")
+                            const name = displayName || item.user.email || "Student"
+                            const email = item.user.email
+
+                            return (
+                              <div
+                                key={item.user.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <Avatar>
+                                    <AvatarImage src={item.user.avatarUrl ?? undefined} />
+                                    <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{name}</p>
+                                    {departmentName && (
+                                      <p className="text-sm text-muted-foreground">{departmentName}</p>
+                                    )}
+                                    {email && <p className="text-xs text-muted-foreground">{email}</p>}
+                                  </div>
+                                </div>
+
+                                {isGroupManager && canEditGroup && (
+                                  <div className="flex items-center gap-2 self-end sm:self-center">
+                                    <Button variant="outline" size="sm" onClick={() => openAvailableStudentDetails(item)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </Button>
+                                    <Button size="sm" disabled>
+                                      <UserPlus className="h-4 w-4 mr-2" />
+                                      Invite
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className="text-center py-8">
+                            <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                            <p className="mt-2 text-sm text-muted-foreground">No available students found.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={availableStudentsPage <= 1 || availableStudentsQuery.isFetching}
+                          onClick={() => setAvailableStudentsPage((p) => Math.max(1, p - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Page {availableStudentsQuery.data?.pagination.page ?? availableStudentsPage} of {availableStudentsQuery.data?.pagination.pages ?? 1}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            availableStudentsQuery.isFetching ||
+                            (availableStudentsQuery.data?.pagination.pages
+                              ? availableStudentsPage >= availableStudentsQuery.data.pagination.pages
+                              : (availableStudentsQuery.data?.items ?? []).length < availableStudentsLimit)
+                          }
+                          onClick={() => setAvailableStudentsPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          <Dialog open={availableStudentDetailsOpen} onOpenChange={setAvailableStudentDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Student Details</DialogTitle>
+                <DialogDescription>Profile details for this student.</DialogDescription>
+              </DialogHeader>
+
+              {selectedAvailableStudent && (() => {
+                const first = selectedAvailableStudent.user.firstName?.trim() ?? ""
+                const last = selectedAvailableStudent.user.lastName?.trim() ?? ""
+                const displayName = [first, last].filter(Boolean).join(" ")
+                const name = displayName || selectedAvailableStudent.user.email || "Student"
+                const email = selectedAvailableStudent.user.email
+
+                const gh = safeExternalUrl(selectedAvailableStudent.profile.githubUrl)
+                const li = safeExternalUrl(selectedAvailableStudent.profile.linkedinUrl)
+                const pf = safeExternalUrl(selectedAvailableStudent.profile.portfolioUrl)
+
+                return (
+                  <div className="space-y-4 py-2">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={selectedAvailableStudent.user.avatarUrl ?? undefined} />
+                        <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold truncate">{name}</p>
+                        {email && <p className="text-sm text-muted-foreground truncate">{email}</p>}
+                        {departmentName && <p className="text-xs text-muted-foreground">{departmentName}</p>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Bio</p>
+                      {selectedAvailableStudent.profile.bio ? (
+                        <p className="text-sm text-muted-foreground whitespace-pre-line">
+                          {selectedAvailableStudent.profile.bio}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No bio provided.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Tech stack</p>
+                      {selectedAvailableStudent.profile.techStack.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedAvailableStudent.profile.techStack.map((tech) => (
+                            <button
+                              key={tech}
+                              type="button"
+                              onClick={() => handleTechnologyClick(tech)}
+                              className="focus:outline-none"
+                            >
+                              <Badge variant="secondary" className="cursor-pointer">
+                                {tech}
+                              </Badge>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No tech stack listed.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Links</p>
+                      {gh || li || pf ? (
+                        <div className="flex flex-wrap gap-2">
+                          {gh && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={gh} target="_blank" rel="noreferrer">
+                                <Github className="h-4 w-4 mr-2" />
+                                GitHub
+                              </a>
+                            </Button>
+                          )}
+                          {li && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={li} target="_blank" rel="noreferrer">
+                                <Linkedin className="h-4 w-4 mr-2" />
+                                LinkedIn
+                              </a>
+                            </Button>
+                          )}
+                          {pf && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={pf} target="_blank" rel="noreferrer">
+                                <Globe className="h-4 w-4 mr-2" />
+                                Portfolio
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No links added.</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Student Tab */}

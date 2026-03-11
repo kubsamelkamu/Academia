@@ -52,3 +52,37 @@ export interface ProjectGroupMe {
   members: ProjectGroupMember[]
   pendingInvitationsCount: number
 }
+
+export type AvailableStudentProfile = {
+  bio: string | null
+  githubUrl: string | null
+  linkedinUrl: string | null
+  portfolioUrl: string | null
+  techStack: string[]
+}
+
+export type AvailableStudentUser = {
+  id: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  departmentId: string | null
+}
+
+export type AvailableStudentListItem = {
+  user: AvailableStudentUser
+  profile: AvailableStudentProfile
+}
+
+export type AvailableStudentsPagination = {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export type AvailableStudentsPage = {
+  items: AvailableStudentListItem[]
+  pagination: AvailableStudentsPagination
+}
