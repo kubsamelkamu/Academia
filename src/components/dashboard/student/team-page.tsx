@@ -11,7 +11,6 @@ import {
   User,
   UserPlus, 
   UserCheck, 
-  UserMinus, 
   Clock, 
   CheckCircle2, 
   XCircle,
@@ -41,9 +40,26 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
 import { useAuthStore } from "@/store/auth-store"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { isAxiosError } from "axios"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
+import { getStudentPublicProfile, type StudentPublicProfile } from "@/lib/api/profile"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import {
+  projectGroupKeys,
+  useAvailableStudents,
+  useCreateProjectGroupInvitation,
+  useCreateProjectGroup,
+  useMyProjectGroup,
+} from "@/lib/hooks/use-project-groups"
+import { useDepartmentGroupSizeSettings } from "@/lib/hooks/use-department-group-size-settings"
+import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/errors"
+import type { AvailableStudentListItem } from "@/types/project-groups"
+import {
+  createProjectGroupSchema,
+  parseTechnologiesInput,
+} from "@/validations/project-groups"
 
 type CreateGroupFormData = {
   name: string
@@ -57,18 +73,31 @@ function CreateGroupForm({
   onSuccess,
 }: {
   defaultValues?: CreateGroupFormData
-  onSubmit: (data: CreateGroupFormData) => void
+  onSubmit: (data: CreateGroupFormData) => Promise<boolean>
   onSuccess?: () => void
 }) {
   const [name, setName] = useState(defaultValues?.name ?? "")
   const [objective, setObjective] = useState(defaultValues?.objective ?? "")
   const [technology, setTechnology] = useState(defaultValues?.technology ?? "")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
     if (!name.trim() || !objective.trim() || !technology.trim()) return
-    onSubmit({ name: name.trim(), objective: objective.trim(), technology: technology.trim() })
-    onSuccess?.()
+    setIsSubmitting(true)
+    try {
+      const didComplete = await onSubmit({
+        name: name.trim(),
+        objective: objective.trim(),
+        technology: technology.trim(),
+      })
+      if (didComplete) {
+        onSuccess?.()
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -80,6 +109,7 @@ function CreateGroupForm({
           placeholder="e.g. Tech Innovators"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          disabled={isSubmitting}
           required
         />
       </div>
@@ -91,6 +121,7 @@ function CreateGroupForm({
           value={objective}
           onChange={(e) => setObjective(e.target.value)}
           rows={4}
+          disabled={isSubmitting}
           required
         />
       </div>
@@ -101,12 +132,22 @@ function CreateGroupForm({
           placeholder="e.g. React, Node.js, PostgreSQL"
           value={technology}
           onChange={(e) => setTechnology(e.target.value)}
+          disabled={isSubmitting}
           required
         />
       </div>
-      <Button type="submit" className="w-full">
-        <PlusCircle className="h-4 w-4 mr-2" />
-        Create Group
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          <>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create Group
+          </>
+        )}
       </Button>
     </form>
   )
@@ -116,11 +157,37 @@ export function StudentTeamPage() {
   const [groupSubmitted, setGroupSubmitted] = useState(false)
   const [groupApproved] = useState(false)
   const [groupInfo, setGroupInfo] = useState<CreateGroupFormData | null>(null)
+  const [groupExists, setGroupExists] = useState(false)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
+  const [createGroupDismissed, setCreateGroupDismissed] = useState(false)
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false)
+  const [memberDetailsOpen, setMemberDetailsOpen] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<null | {
+    id: string
+    userId?: string
+    name: string
+    role: string
+    status: string
+    email: string
+    joinDate: string
+    avatarUrl?: string | null
+  }>(null)
   const [activeTab, setActiveTab] = useState("overview")
+  const createProjectGroupMutation = useCreateProjectGroup()
+  const createInvitationMutation = useCreateProjectGroupInvitation()
+  const queryClient = useQueryClient()
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
   const studentProfilesLimit = 10
+
+  const [availableStudentsPage, setAvailableStudentsPage] = useState(1)
+  const availableStudentsLimit = 20
+  const [availableStudentsSearchInput, setAvailableStudentsSearchInput] = useState("")
+  const [availableStudentsSearch, setAvailableStudentsSearch] = useState<string | undefined>(undefined)
+
+  const [availableStudentDetailsOpen, setAvailableStudentDetailsOpen] = useState(false)
+  const [selectedAvailableStudent, setSelectedAvailableStudent] = useState<AvailableStudentListItem | null>(null)
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null)
 
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<StudentProfileListItem | null>(null)
   const [studentProfileDetailsOpen, setStudentProfileDetailsOpen] = useState(false)
@@ -147,29 +214,91 @@ export function StudentTeamPage() {
   const profileDepartment = user?.departmentName ?? user?.department?.name ?? ""
   const profileTechStack = user?.techStack ?? user?.technologies ?? []
 
-  const groupMembers = [
-    {
-      id: 1,
-      name: profileName,
-      role: 'Group Leader',
-      status: 'approved',
-      email: profileEmail,
-      joinDate: '2024-01-15',
-    },
-    { id: 2, name: 'Jane Smith', role: 'Member', status: 'approved', email: 'jane@university.edu', joinDate: '2024-01-16' },
-    { id: 3, name: 'Mike Johnson', role: 'Member', status: 'pending', email: 'mike@university.edu', joinDate: '2024-01-17' },
-    { id: 4, name: 'Sarah Wilson', role: 'Member', status: 'approved', email: 'sarah@university.edu', joinDate: '2024-01-15' },
-  ]
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken) && isApprovedGroupManager)
+
+  const myGroup = myProjectGroupQuery.data ?? null
+  const myGroupErrorStatus =
+    myProjectGroupQuery.isError && isAxiosError(myProjectGroupQuery.error)
+      ? Number(myProjectGroupQuery.error.response?.status)
+      : undefined
+  const myGroupErrorMessage = myProjectGroupQuery.isError
+    ? String(myProjectGroupQuery.error?.message ?? "")
+    : ""
+  const myGroupNotFound =
+    myProjectGroupQuery.isError &&
+    (myGroupErrorStatus === 400 || myGroupErrorMessage.toLowerCase().includes("group not found"))
+  const myGroupForbidden = myProjectGroupQuery.isError && myGroupErrorStatus === 403
+
+  const derivedGroupExists = Boolean(myGroup) || (!myGroupNotFound && groupExists)
+  const derivedActiveTab = myGroupNotFound ? "my-group" : activeTab
+  const shouldAutoOpenCreateGroup = myGroupNotFound && !createGroupDismissed
+
+  const handleTechnologyClick = async (tech: string) => {
+    const value = tech.trim()
+    if (!value) return
+
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`Copied: ${value}`)
+    } catch {
+      toast.message(value)
+    }
+  }
+
+  const openMemberDetails = (member: {
+    id: string
+    userId?: string
+    name: string
+    role: string
+    status: string
+    email: string
+    joinDate: string
+    avatarUrl?: string | null
+  }) => {
+    setSelectedMember(member)
+    setMemberDetailsOpen(true)
+  }
+
+  const selectedMemberProfileQuery = useQuery<StudentPublicProfile, Error>({
+    queryKey: ["student-public-profile", selectedMember?.userId],
+    queryFn: () => getStudentPublicProfile(String(selectedMember?.userId ?? "")),
+    enabled: memberDetailsOpen && Boolean(selectedMember?.userId),
+    staleTime: 60_000,
+    retry: false,
+  })
+
+  const groupMembers =
+    myGroup
+      ? [
+          {
+            id: myGroup.leader.id,
+            userId: myGroup.leader.id,
+            name:
+              [myGroup.leader.firstName, myGroup.leader.lastName].filter(Boolean).join(" ") ||
+              myGroup.leader.email,
+            role: "Leader",
+            status: "approved",
+            email: myGroup.leader.email,
+            joinDate: myGroup.createdAt,
+            avatarUrl: myGroup.leader.avatarUrl,
+          },
+          ...myGroup.members.map((member) => ({
+            id: member.id,
+            userId: member.user.id,
+            name:
+              [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") || member.user.email,
+            role: "Member",
+            status: "approved",
+            email: member.user.email,
+            joinDate: member.joinedAt,
+            avatarUrl: member.user.avatarUrl,
+          })),
+        ]
+      : []
 
   const pendingRequests = [
     { id: 5, name: 'Alex Brown', department: departmentName, requestedAt: '2024-01-18' },
     { id: 6, name: 'Emily Davis', department: departmentName, requestedAt: '2024-01-18' },
-  ]
-
-  const availableStudents = [
-    { id: 7, name: 'Chris Lee', department: departmentName, email: 'chris@university.edu' },
-    { id: 8, name: 'Pat Taylor', department: departmentName, email: 'pat@university.edu' },
-    { id: 9, name: 'Jordan Wong', department: departmentName, email: 'jordan@university.edu' },
   ]
 
   const safeExternalUrl = (value?: string | null): string | null => {
@@ -212,6 +341,11 @@ export function StudentTeamPage() {
     setStudentProfileDetailsOpen(true)
   }
 
+  const openAvailableStudentDetails = (item: AvailableStudentListItem) => {
+    setSelectedAvailableStudent(item)
+    setAvailableStudentDetailsOpen(true)
+  }
+
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'approved':
@@ -229,12 +363,45 @@ export function StudentTeamPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
+  const groupSizeSettingsQuery = useDepartmentGroupSizeSettings({
+    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    staleTime: 60_000,
+    retry: false,
+  })
+
+  useEffect(() => {
+    const value = availableStudentsSearchInput.trim()
+    const handle = window.setTimeout(() => {
+      setAvailableStudentsPage(1)
+      setAvailableStudentsSearch(value ? value : undefined)
+    }, 400)
+
+    return () => window.clearTimeout(handle)
+  }, [availableStudentsSearchInput])
+
+  const availableStudentsQuery = useAvailableStudents({
+    enabled:
+      Boolean(accessToken) &&
+      isApprovedGroupManager &&
+      Boolean(myGroup) &&
+      derivedActiveTab === "available",
+    page: availableStudentsPage,
+    limit: availableStudentsLimit,
+    search: availableStudentsSearch,
+  })
+
   const isGroupManager = isApprovedGroupManager
   const canEditGroup = !groupApproved && !groupSubmitted && isGroupManager
   const groupSize = groupMembers.length
-  const minGroupSize = 3
-  const maxGroupSize = 7
-  const groupProgress = (groupSize / maxGroupSize) * 100
+  const fallbackMinGroupSize = 3
+  const fallbackMaxGroupSize = 7
+  const minGroupSize = groupSizeSettingsQuery.data?.minGroupSize ?? fallbackMinGroupSize
+  const maxGroupSize = groupSizeSettingsQuery.data?.maxGroupSize ?? fallbackMaxGroupSize
+  const groupProgress = maxGroupSize > 0 ? (groupSize / maxGroupSize) * 100 : 0
+
+  const canInviteMoreMembers = groupSize < maxGroupSize
+
+  const availableStudentsCount = availableStudentsQuery.data?.pagination.total ?? availableStudentsQuery.data?.items.length ?? 0
 
   // Students who are not approved as group managers should see the normal student team page.
   if (!isApprovedGroupManager) {
@@ -301,7 +468,7 @@ export function StudentTeamPage() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} className="space-y-6" onValueChange={setActiveTab}>
+      <Tabs value={derivedActiveTab} className="space-y-6" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
@@ -353,7 +520,7 @@ export function StudentTeamPage() {
                     <h3 className="font-semibold">Step 1: Create Group</h3>
                   </div>
                   <p className="text-sm text-muted-foreground pl-10">
-                    Group Manager creates a group within the department (3-7 members required)
+                    Group Manager creates a group within the department ({minGroupSize}-{maxGroupSize} members required)
                   </p>
                 </div>
 
@@ -490,7 +657,7 @@ export function StudentTeamPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{availableStudents.length}</div>
+                <div className="text-2xl font-bold">{availableStudentsCount}</div>
                 <p className="text-xs text-muted-foreground">Available Students</p>
               </CardContent>
             </Card>
@@ -511,69 +678,208 @@ export function StudentTeamPage() {
                 <CardTitle>My Group Members</CardTitle>
                 <CardDescription>
                   {groupSize} of {maxGroupSize} members • Minimum {minGroupSize} required
+                  {myGroup ? ` • Pending invites: ${myGroup.pendingInvitationsCount}` : ""}
                 </CardDescription>
               </div>
               {canEditGroup && (
                 <div className="flex gap-2 flex-wrap">
-                  <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="default" size="sm">
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create Group
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create Group</DialogTitle>
-                        <DialogDescription>
-                          Set up your project group with required details
-                        </DialogDescription>
-                      </DialogHeader>
-                      <CreateGroupForm
-                        key={createGroupOpen ? "open" : "closed"}
-                        defaultValues={groupInfo ?? undefined}
-                        onSubmit={(data) => {
-                          setGroupInfo(data)
-                        }}
-                        onSuccess={() => setCreateGroupOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invite Members
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Invite Students</DialogTitle>
-                        <DialogDescription>
-                          Search and invite students to join your group
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Search Students</Label>
-                          <Input placeholder="Search by name or email..." />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Invitation Message (Optional)</Label>
-                          <Textarea placeholder="Add a personal message to your invitation..." />
-                        </div>
-                        <Button className="w-full">
-                          <Send className="h-4 w-4 mr-2" />
-                          Send Invitations
+                  {myGroup && (
+                    <Dialog open={groupDetailsOpen} onOpenChange={setGroupDetailsOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Mode
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Group Details</DialogTitle>
+                          <DialogDescription>
+                            View your group information. Click a technology to copy it.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-1">
+                            <p className="text-xl font-semibold">{myGroup.name}</p>
+                            <p className="text-sm text-muted-foreground whitespace-pre-line">{myGroup.objectives}</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Technology</p>
+                            {myGroup.technologies.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {myGroup.technologies.map((tech) => (
+                                  <button
+                                    key={tech}
+                                    type="button"
+                                    onClick={() => handleTechnologyClick(tech)}
+                                    className="focus:outline-none"
+                                  >
+                                    <Badge variant="secondary" className="cursor-pointer">
+                                      {tech}
+                                    </Badge>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No technologies listed.</p>
+                            )}
+                          </div>
+
+                          <div className="text-sm">
+                            <span className="font-medium">Pending invites:</span> {myGroup.pendingInvitationsCount}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {!derivedGroupExists && (
+                    <Dialog
+                      open={createGroupOpen || shouldAutoOpenCreateGroup}
+                      onOpenChange={(open) => {
+                        setCreateGroupOpen(open)
+                        if (open) {
+                          setCreateGroupDismissed(false)
+                        } else {
+                          setCreateGroupDismissed(true)
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm">
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Create Group
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Group</DialogTitle>
+                          <DialogDescription>
+                            Set up your project group with required details
+                          </DialogDescription>
+                        </DialogHeader>
+                        <CreateGroupForm
+                          key={createGroupOpen ? "open" : "closed"}
+                          defaultValues={groupInfo ?? undefined}
+                          onSubmit={async (data) => {
+                            if (createProjectGroupMutation.isPending) return false
+
+                            const technologies = parseTechnologiesInput(data.technology)
+                            const dto = {
+                              name: data.name,
+                              objectives: data.objective,
+                              technologies,
+                            }
+
+                            const parsed = createProjectGroupSchema.safeParse(dto)
+                            if (!parsed.success) {
+                              const message = parsed.error.issues[0]?.message ?? "Invalid group details"
+                              toast.error(message)
+                              return false
+                            }
+
+                            try {
+                              const created = await createProjectGroupMutation.mutateAsync(parsed.data)
+
+                              setGroupInfo({
+                                name: created.name,
+                                objective: created.objectives,
+                                technology: created.technologies.join(", "),
+                              })
+                              setGroupExists(true)
+
+                              toast.success("Group created")
+                              queryClient.invalidateQueries({ queryKey: projectGroupKeys().me() }).catch(() => {})
+                              setActiveTab("my-group")
+                              return true
+                            } catch (error) {
+                              const message = getErrorMessage(error, "Failed to create group")
+                              const normalized = message.toLowerCase()
+
+                              if (normalized.includes("already") && normalized.includes("created") && normalized.includes("group")) {
+                                toast.message("You already have a group.")
+                                setGroupExists(true)
+                                queryClient.invalidateQueries({ queryKey: projectGroupKeys().me() }).catch(() => {})
+                                setActiveTab("my-group")
+                                setCreateGroupOpen(false)
+                                return true
+                              }
+
+                              if (normalized.includes("only") && normalized.includes("approved") && normalized.includes("group")) {
+                                toast.error("Only approved group leaders can perform this action")
+                                setCreateGroupOpen(false)
+                                return true
+                              }
+
+                              toast.error(message)
+                              return false
+                            }
+                          }}
+                          onSuccess={() => setCreateGroupOpen(false)}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               )}
             </CardHeader>
             <CardContent>
-              {groupInfo && (
+              {myProjectGroupQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading group…
+                </div>
+              ) : myGroupForbidden ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Access denied</AlertTitle>
+                  <AlertDescription>Only approved group leaders can perform this action.</AlertDescription>
+                </Alert>
+              ) : myGroup ? (
+                <>
+                  <div className="space-y-4">
+                    {groupMembers.map((member) => (
+                      <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar>
+                            <AvatarImage src={member.avatarUrl ?? undefined} />
+                            <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{member.name}</p>
+                              {member.role === 'Leader' && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                  Leader
+                                </Badge>
+                              )}
+                              {member.userId && user?.id && member.userId === user.id && (
+                                <Badge variant="outline">You</Badge>
+                              )}
+                              {getStatusBadge(member.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Joined: {new Date(member.joinDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMemberDetails(member)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : groupInfo ? (
                 <div className="mb-6 p-4 rounded-lg border bg-muted/30 space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Group Details</p>
                   <p className="font-semibold">{groupInfo.name}</p>
@@ -582,41 +888,14 @@ export function StudentTeamPage() {
                     <span className="font-medium">Technology:</span> {groupInfo.technology}
                   </p>
                 </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No group found yet. Create one to get started.</p>
+                </div>
               )}
-              <div className="space-y-4">
-                {groupMembers.map((member) => (
-                  <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar>
-                        <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{member.name}</p>
-                          {member.role === 'Group Manager' && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              Manager
-                            </Badge>
-                          )}
-                          {getStatusBadge(member.status)}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Joined: {new Date(member.joinDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    {canEditGroup && member.role !== 'Group Manager' && (
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                        <UserMinus className="h-4 w-4 mr-2" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
             </CardContent>
-            {canEditGroup && (
+            {canEditGroup && myGroup && (
               <CardContent className="border-t pt-6">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                   <div>
@@ -636,6 +915,140 @@ export function StudentTeamPage() {
               </CardContent>
             )}
           </Card>
+
+          <Dialog open={memberDetailsOpen} onOpenChange={setMemberDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Member Details</DialogTitle>
+                <DialogDescription>Profile details for this group member.</DialogDescription>
+              </DialogHeader>
+
+              {selectedMember && (
+                <div className="space-y-4 py-2">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={selectedMember.avatarUrl ?? undefined} />
+                      <AvatarFallback>{getInitials(selectedMember.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-base font-semibold truncate">{selectedMember.name}</p>
+                        {selectedMember.role === "Leader" && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            Leader
+                          </Badge>
+                        )}
+                        {selectedMember.userId && user?.id && selectedMember.userId === user.id && (
+                          <Badge variant="outline">You</Badge>
+                        )}
+                        {getStatusBadge(selectedMember.status)}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">{selectedMember.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-sm">
+                    <span className="font-medium">Joined:</span>{" "}
+                    {new Date(selectedMember.joinDate).toLocaleString()}
+                  </div>
+
+                  {selectedMemberProfileQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading profile…
+                    </div>
+                  ) : selectedMemberProfileQuery.isError ? (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Could not load profile</AlertTitle>
+                      <AlertDescription>
+                        {selectedMemberProfileQuery.error instanceof Error
+                          ? selectedMemberProfileQuery.error.message
+                          : "Failed to load member profile."}
+                      </AlertDescription>
+                    </Alert>
+                  ) : selectedMemberProfileQuery.data ? (
+                    <>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Bio</p>
+                        {selectedMemberProfileQuery.data.profile.bio ? (
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {selectedMemberProfileQuery.data.profile.bio}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No bio provided.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Tech stack</p>
+                        {selectedMemberProfileQuery.data.profile.techStack.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {selectedMemberProfileQuery.data.profile.techStack.map((tech) => (
+                              <button
+                                key={tech}
+                                type="button"
+                                onClick={() => handleTechnologyClick(tech)}
+                                className="focus:outline-none"
+                              >
+                                <Badge variant="secondary" className="cursor-pointer">
+                                  {tech}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No tech stack listed.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Links</p>
+                        {(() => {
+                          const gh = safeExternalUrl(selectedMemberProfileQuery.data.profile.githubUrl)
+                          const li = safeExternalUrl(selectedMemberProfileQuery.data.profile.linkedinUrl)
+                          const pf = safeExternalUrl(selectedMemberProfileQuery.data.profile.portfolioUrl)
+
+                          if (!gh && !li && !pf) {
+                            return <p className="text-sm text-muted-foreground">No links added.</p>
+                          }
+
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {gh && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={gh} target="_blank" rel="noreferrer">
+                                    <Github className="h-4 w-4 mr-2" />
+                                    GitHub
+                                  </a>
+                                </Button>
+                              )}
+                              {li && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={li} target="_blank" rel="noreferrer">
+                                    <Linkedin className="h-4 w-4 mr-2" />
+                                    LinkedIn
+                                  </a>
+                                </Button>
+                              )}
+                              {pf && (
+                                <Button asChild variant="outline" size="sm">
+                                  <a href={pf} target="_blank" rel="noreferrer">
+                                    <Globe className="h-4 w-4 mr-2" />
+                                    Portfolio
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Requests Tab */}
@@ -699,30 +1112,274 @@ export function StudentTeamPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {availableStudents.map((student) => (
-                  <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar>
-                        <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">{student.department}</p>
-                        <p className="text-xs text-muted-foreground">{student.email}</p>
-                      </div>
-                    </div>
-                    {isGroupManager && canEditGroup && (
-                      <Button size="sm" className="self-end sm:self-center">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invite
-                      </Button>
-                    )}
+              {!myGroup ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">Create a group first to invite members.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="available-students-search">Search students</Label>
+                    <Input
+                      id="available-students-search"
+                      placeholder="Search by first name or last name..."
+                      value={availableStudentsSearchInput}
+                      onChange={(e) => setAvailableStudentsSearchInput(e.target.value)}
+                    />
                   </div>
-                ))}
-              </div>
+
+                  {availableStudentsQuery.isError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Could not load available students</AlertTitle>
+                      <AlertDescription>
+                        {availableStudentsQuery.error instanceof Error
+                          ? availableStudentsQuery.error.message
+                          : "Failed to load available students."}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {availableStudentsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading students…
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        {(availableStudentsQuery.data?.items ?? []).length > 0 ? (
+                          (availableStudentsQuery.data?.items ?? []).map((item) => {
+                            const first = item.user.firstName?.trim() ?? ""
+                            const last = item.user.lastName?.trim() ?? ""
+                            const displayName = [first, last].filter(Boolean).join(" ")
+                            const name = displayName || item.user.email || "Student"
+                            const email = item.user.email
+
+                            return (
+                              <div
+                                key={item.user.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <Avatar>
+                                    <AvatarImage src={item.user.avatarUrl ?? undefined} />
+                                    <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{name}</p>
+                                    {departmentName && (
+                                      <p className="text-sm text-muted-foreground">{departmentName}</p>
+                                    )}
+                                    {email && <p className="text-xs text-muted-foreground">{email}</p>}
+                                  </div>
+                                </div>
+
+                                {isGroupManager && (
+                                  <div className="flex items-center gap-2 self-end sm:self-center">
+                                    <Button variant="outline" size="sm" onClick={() => openAvailableStudentDetails(item)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </Button>
+
+                                    {canEditGroup && (
+                                      <Button
+                                        size="sm"
+                                        disabled={
+                                          !canInviteMoreMembers ||
+                                          (createInvitationMutation.isPending && invitingUserId === item.user.id)
+                                        }
+                                        onClick={async () => {
+                                          if (!item.user.id) return
+                                          if (!canInviteMoreMembers) {
+                                            toast.error("Group has reached the maximum size")
+                                            return
+                                          }
+
+                                          setInvitingUserId(item.user.id)
+                                          try {
+                                            const result = await createInvitationMutation.mutateAsync({
+                                              invitedUserId: item.user.id,
+                                            })
+
+                                            if (result.message) {
+                                              toast.message(result.message)
+                                            } else {
+                                              toast.success("Invitation sent")
+                                            }
+
+                                            queryClient.invalidateQueries({ queryKey: projectGroupKeys().root }).catch(() => {})
+                                          } catch (error) {
+                                            const message = getErrorMessage(error, "Failed to send invitation")
+                                            toast.error(message)
+                                          } finally {
+                                            setInvitingUserId(null)
+                                          }
+                                        }}
+                                      >
+                                        {createInvitationMutation.isPending && invitingUserId === item.user.id ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Inviting…
+                                          </>
+                                        ) : (
+                                          <>
+                                            <UserPlus className="h-4 w-4 mr-2" />
+                                            Invite
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className="text-center py-8">
+                            <Users className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                            <p className="mt-2 text-sm text-muted-foreground">No available students found.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={availableStudentsPage <= 1 || availableStudentsQuery.isFetching}
+                          onClick={() => setAvailableStudentsPage((p) => Math.max(1, p - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Page {availableStudentsQuery.data?.pagination.page ?? availableStudentsPage} of {availableStudentsQuery.data?.pagination.pages ?? 1}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            availableStudentsQuery.isFetching ||
+                            (availableStudentsQuery.data?.pagination.pages
+                              ? availableStudentsPage >= availableStudentsQuery.data.pagination.pages
+                              : (availableStudentsQuery.data?.items ?? []).length < availableStudentsLimit)
+                          }
+                          onClick={() => setAvailableStudentsPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          <Dialog open={availableStudentDetailsOpen} onOpenChange={setAvailableStudentDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Student Details</DialogTitle>
+                <DialogDescription>Profile details for this student.</DialogDescription>
+              </DialogHeader>
+
+              {selectedAvailableStudent && (() => {
+                const first = selectedAvailableStudent.user.firstName?.trim() ?? ""
+                const last = selectedAvailableStudent.user.lastName?.trim() ?? ""
+                const displayName = [first, last].filter(Boolean).join(" ")
+                const name = displayName || selectedAvailableStudent.user.email || "Student"
+                const email = selectedAvailableStudent.user.email
+
+                const gh = safeExternalUrl(selectedAvailableStudent.profile.githubUrl)
+                const li = safeExternalUrl(selectedAvailableStudent.profile.linkedinUrl)
+                const pf = safeExternalUrl(selectedAvailableStudent.profile.portfolioUrl)
+
+                return (
+                  <div className="space-y-4 py-2">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={selectedAvailableStudent.user.avatarUrl ?? undefined} />
+                        <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold truncate">{name}</p>
+                        {email && <p className="text-sm text-muted-foreground truncate">{email}</p>}
+                        {departmentName && <p className="text-xs text-muted-foreground">{departmentName}</p>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Bio</p>
+                      {selectedAvailableStudent.profile.bio ? (
+                        <p className="text-sm text-muted-foreground whitespace-pre-line">
+                          {selectedAvailableStudent.profile.bio}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No bio provided.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Tech stack</p>
+                      {selectedAvailableStudent.profile.techStack.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedAvailableStudent.profile.techStack.map((tech) => (
+                            <button
+                              key={tech}
+                              type="button"
+                              onClick={() => handleTechnologyClick(tech)}
+                              className="focus:outline-none"
+                            >
+                              <Badge variant="secondary" className="cursor-pointer">
+                                {tech}
+                              </Badge>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No tech stack listed.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Links</p>
+                      {gh || li || pf ? (
+                        <div className="flex flex-wrap gap-2">
+                          {gh && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={gh} target="_blank" rel="noreferrer">
+                                <Github className="h-4 w-4 mr-2" />
+                                GitHub
+                              </a>
+                            </Button>
+                          )}
+                          {li && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={li} target="_blank" rel="noreferrer">
+                                <Linkedin className="h-4 w-4 mr-2" />
+                                LinkedIn
+                              </a>
+                            </Button>
+                          )}
+                          {pf && (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={pf} target="_blank" rel="noreferrer">
+                                <Globe className="h-4 w-4 mr-2" />
+                                Portfolio
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No links added.</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Student Tab */}

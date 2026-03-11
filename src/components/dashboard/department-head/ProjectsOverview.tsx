@@ -16,9 +16,6 @@ import {
   Users,
   FolderOpen,
   ClipboardCheck,
-  BarChart3,
-  Bell,
-  Settings,
   Eye,
   Download,
   Calendar,
@@ -27,7 +24,6 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  AlertCircle,
   FileText,
   Code,
   Archive,
@@ -37,14 +33,12 @@ import {
   BookOpen,
   UserCheck,
   DollarSign,
-  Target,
   PieChart,
   Activity,
   ChevronRight,
   ExternalLink,
   ArrowLeft,
   Info,
-  Building,
 } from "lucide-react"
 
 // Helper Components for better reusability and styling
@@ -441,7 +435,6 @@ export default function ProjectsOverview() {
   const totalProjects = allProjects.length;
   const activeCount = mockActiveProjects.length;
   const completedCount = mockPastProjects.length;
-  const onHoldCount = mockActiveProjects.filter(p => p.status === 'on-hold').length;
   const avgProgress = Math.round(mockActiveProjects.reduce((acc, p) => acc + p.progress, 0) / mockActiveProjects.length);
   const totalBudget = allProjects.reduce((acc, p) => acc + (p.budget || 0), 0);
 

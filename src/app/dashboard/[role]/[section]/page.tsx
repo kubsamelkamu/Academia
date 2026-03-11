@@ -33,7 +33,7 @@ import ReportsPage from "@/app/dashboard/reports/page"
 import SettingsPage from "@/app/dashboard/settings/page"
 import StudentsPage from "@/app/dashboard/students/page"
 import { notFound, redirect } from "next/navigation"
-import { type ReactElement, type ComponentType } from "react"
+import { type ComponentType } from "react"
 
 interface RoleSectionDashboardPageProps {
   params: Promise<{

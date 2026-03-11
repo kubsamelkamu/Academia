@@ -9,7 +9,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import {
   Tooltip,
@@ -31,8 +30,6 @@ import {
   ArrowLeft,
   Mail,
   HelpCircle,
-  Download,
-  Eye,
   Lock,
   Info,
   CheckCheck,
