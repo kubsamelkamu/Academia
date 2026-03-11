@@ -46,6 +46,7 @@ import { isAxiosError } from "axios"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
 import { projectGroupKeys, useCreateProjectGroup, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useDepartmentGroupSizeSettings } from "@/lib/hooks/use-department-group-size-settings"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/errors"
 import {
@@ -309,12 +310,20 @@ export function StudentTeamPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
+  const groupSizeSettingsQuery = useDepartmentGroupSizeSettings({
+    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    staleTime: 60_000,
+    retry: false,
+  })
+
   const isGroupManager = isApprovedGroupManager
   const canEditGroup = !groupApproved && !groupSubmitted && isGroupManager
   const groupSize = groupMembers.length
-  const minGroupSize = 3
-  const maxGroupSize = 7
-  const groupProgress = (groupSize / maxGroupSize) * 100
+  const fallbackMinGroupSize = 3
+  const fallbackMaxGroupSize = 7
+  const minGroupSize = groupSizeSettingsQuery.data?.minGroupSize ?? fallbackMinGroupSize
+  const maxGroupSize = groupSizeSettingsQuery.data?.maxGroupSize ?? fallbackMaxGroupSize
+  const groupProgress = maxGroupSize > 0 ? (groupSize / maxGroupSize) * 100 : 0
 
   // Students who are not approved as group managers should see the normal student team page.
   if (!isApprovedGroupManager) {
@@ -433,7 +442,7 @@ export function StudentTeamPage() {
                     <h3 className="font-semibold">Step 1: Create Group</h3>
                   </div>
                   <p className="text-sm text-muted-foreground pl-10">
-                    Group Manager creates a group within the department (3-7 members required)
+                    Group Manager creates a group within the department ({minGroupSize}-{maxGroupSize} members required)
                   </p>
                 </div>
 
