@@ -1,9 +1,16 @@
 "use client"
 
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { createProjectGroup, getAvailableStudents, getMyProjectGroup } from "@/lib/api/project-groups"
+import {
+  createProjectGroup,
+  createProjectGroupInvitation,
+  getAvailableStudents,
+  getMyProjectGroup,
+} from "@/lib/api/project-groups"
 import type {
   AvailableStudentsPage,
+  CreateProjectGroupInvitationDto,
+  CreateProjectGroupInvitationResult,
   CreateProjectGroupDto,
   ProjectGroup,
   ProjectGroupMe,
@@ -57,5 +64,11 @@ export function useAvailableStudents(params: {
     enabled: params.enabled,
     staleTime: 30_000,
     retry: false,
+  })
+}
+
+export function useCreateProjectGroupInvitation() {
+  return useMutation<CreateProjectGroupInvitationResult, Error, CreateProjectGroupInvitationDto>({
+    mutationFn: (dto) => createProjectGroupInvitation(dto),
   })
 }

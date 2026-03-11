@@ -3,6 +3,8 @@ import type {
   AvailableStudentListItem,
   AvailableStudentsPage,
   AvailableStudentsPagination,
+  CreateProjectGroupInvitationDto,
+  CreateProjectGroupInvitationResult,
   CreateProjectGroupDto,
   ProjectGroup,
   ProjectGroupMe,
@@ -141,4 +143,11 @@ export async function getAvailableStudents(params: {
     items,
     pagination,
   }
+}
+
+export async function createProjectGroupInvitation(
+  dto: CreateProjectGroupInvitationDto
+): Promise<CreateProjectGroupInvitationResult> {
+  const response = await apiClient.post<CreateProjectGroupInvitationResult>("/project-groups/invitations", dto)
+  return response.data
 }

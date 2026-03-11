@@ -86,3 +86,19 @@ export type AvailableStudentsPage = {
   items: AvailableStudentListItem[]
   pagination: AvailableStudentsPagination
 }
+
+export type CreateProjectGroupInvitationDto = {
+  invitedUserId: string
+}
+
+export type ProjectGroupInvitation = {
+  id: string
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED" | string
+  expiresAt: string
+}
+
+export type CreateProjectGroupInvitationResult = {
+  invitation: ProjectGroupInvitation
+  /** Some backends return an informational message like "Invitation already sent". */
+  message?: string
+}

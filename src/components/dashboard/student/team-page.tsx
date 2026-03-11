@@ -48,6 +48,7 @@ import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
 import {
   projectGroupKeys,
   useAvailableStudents,
+  useCreateProjectGroupInvitation,
   useCreateProjectGroup,
   useMyProjectGroup,
 } from "@/lib/hooks/use-project-groups"
@@ -173,6 +174,7 @@ export function StudentTeamPage() {
   }>(null)
   const [activeTab, setActiveTab] = useState("overview")
   const createProjectGroupMutation = useCreateProjectGroup()
+  const createInvitationMutation = useCreateProjectGroupInvitation()
   const queryClient = useQueryClient()
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
@@ -185,6 +187,7 @@ export function StudentTeamPage() {
 
   const [availableStudentDetailsOpen, setAvailableStudentDetailsOpen] = useState(false)
   const [selectedAvailableStudent, setSelectedAvailableStudent] = useState<AvailableStudentListItem | null>(null)
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null)
 
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<StudentProfileListItem | null>(null)
   const [studentProfileDetailsOpen, setStudentProfileDetailsOpen] = useState(false)
@@ -377,7 +380,11 @@ export function StudentTeamPage() {
   }, [availableStudentsSearchInput])
 
   const availableStudentsQuery = useAvailableStudents({
-    enabled: Boolean(accessToken) && isApprovedGroupManager && Boolean(myGroup),
+    enabled:
+      Boolean(accessToken) &&
+      isApprovedGroupManager &&
+      Boolean(myGroup) &&
+      derivedActiveTab === "available",
     page: availableStudentsPage,
     limit: availableStudentsLimit,
     search: availableStudentsSearch,
@@ -391,6 +398,8 @@ export function StudentTeamPage() {
   const minGroupSize = groupSizeSettingsQuery.data?.minGroupSize ?? fallbackMinGroupSize
   const maxGroupSize = groupSizeSettingsQuery.data?.maxGroupSize ?? fallbackMaxGroupSize
   const groupProgress = maxGroupSize > 0 ? (groupSize / maxGroupSize) * 100 : 0
+
+  const canInviteMoreMembers = groupSize < maxGroupSize
 
   const availableStudentsCount = availableStudentsQuery.data?.pagination.total ?? availableStudentsQuery.data?.items.length ?? 0
 
@@ -812,36 +821,6 @@ export function StudentTeamPage() {
                       </DialogContent>
                     </Dialog>
                   )}
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invite Members
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Invite Students</DialogTitle>
-                        <DialogDescription>
-                          Search and invite students to join your group
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Search Students</Label>
-                          <Input placeholder="Search by name or email..." />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Invitation Message (Optional)</Label>
-                          <Textarea placeholder="Add a personal message to your invitation..." />
-                        </div>
-                        <Button className="w-full">
-                          <Send className="h-4 w-4 mr-2" />
-                          Send Invitations
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </div>
               )}
             </CardHeader>
@@ -1197,16 +1176,61 @@ export function StudentTeamPage() {
                                   </div>
                                 </div>
 
-                                {isGroupManager && canEditGroup && (
+                                {isGroupManager && (
                                   <div className="flex items-center gap-2 self-end sm:self-center">
                                     <Button variant="outline" size="sm" onClick={() => openAvailableStudentDetails(item)}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       View
                                     </Button>
-                                    <Button size="sm" disabled>
-                                      <UserPlus className="h-4 w-4 mr-2" />
-                                      Invite
-                                    </Button>
+
+                                    {canEditGroup && (
+                                      <Button
+                                        size="sm"
+                                        disabled={
+                                          !canInviteMoreMembers ||
+                                          (createInvitationMutation.isPending && invitingUserId === item.user.id)
+                                        }
+                                        onClick={async () => {
+                                          if (!item.user.id) return
+                                          if (!canInviteMoreMembers) {
+                                            toast.error("Group has reached the maximum size")
+                                            return
+                                          }
+
+                                          setInvitingUserId(item.user.id)
+                                          try {
+                                            const result = await createInvitationMutation.mutateAsync({
+                                              invitedUserId: item.user.id,
+                                            })
+
+                                            if (result.message) {
+                                              toast.message(result.message)
+                                            } else {
+                                              toast.success("Invitation sent")
+                                            }
+
+                                            queryClient.invalidateQueries({ queryKey: projectGroupKeys().root }).catch(() => {})
+                                          } catch (error) {
+                                            const message = getErrorMessage(error, "Failed to send invitation")
+                                            toast.error(message)
+                                          } finally {
+                                            setInvitingUserId(null)
+                                          }
+                                        }}
+                                      >
+                                        {createInvitationMutation.isPending && invitingUserId === item.user.id ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Inviting…
+                                          </>
+                                        ) : (
+                                          <>
+                                            <UserPlus className="h-4 w-4 mr-2" />
+                                            Invite
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
                                   </div>
                                 )}
                               </div>
