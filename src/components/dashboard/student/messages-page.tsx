@@ -103,10 +103,13 @@ export function StudentMessagesPage() {
   const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
   const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
 
+  const [announcementsPage, setAnnouncementsPage] = useState(1)
+  const ANNOUNCEMENTS_PAGE_SIZE = 10
+
   const announcementsQuery = useMyGroupAnnouncements({
     enabled: Boolean(accessToken),
-    page: 1,
-    limit: 20,
+    page: announcementsPage,
+    limit: ANNOUNCEMENTS_PAGE_SIZE,
   })
 
   const createAnnouncementMutation = useCreateMyGroupAnnouncement()
@@ -129,6 +132,10 @@ export function StudentMessagesPage() {
     try {
       await deleteAnnouncementMutation.mutateAsync({ announcementId: parsedId.data })
       toast.success("Announcement deleted")
+
+      if (announcements.length === 1 && announcementsPage > 1) {
+        setAnnouncementsPage((prev) => Math.max(1, prev - 1))
+      }
     } catch {
       toast.error("Failed to delete announcement")
     }
@@ -300,6 +307,8 @@ export function StudentMessagesPage() {
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null)
 
   const announcementItems = announcementsQuery.data?.items
+  const announcementPagination = announcementsQuery.data?.pagination
+  const announcementsTotalPages = announcementPagination?.pages ?? 1
 
   const announcements: Announcement[] = useMemo(() => {
     if (!announcementItems) return []
@@ -1005,7 +1014,7 @@ export function StudentMessagesPage() {
                       </Button>
                     </div>
                   </div>
-                ) : announcements.length === 0 ? (
+                ) : (announcementPagination?.total ?? 0) === 0 ? (
                   <div className="py-10 text-center">
                     <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                       <Bell className="h-5 w-5 text-muted-foreground" />
@@ -1108,6 +1117,32 @@ export function StudentMessagesPage() {
                     </CardContent>
                   </Card>
                   ))
+                )}
+
+                {announcementPagination && announcementPagination.pages > 1 && !announcementsQuery.isLoading && (
+                  <div className="flex items-center justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAnnouncementsPage((prev) => Math.max(1, prev - 1))}
+                      disabled={announcementsPage <= 1}
+                    >
+                      Previous
+                    </Button>
+
+                    <p className="text-sm text-muted-foreground">
+                      Page {announcementsPage} of {announcementsTotalPages}
+                    </p>
+
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setAnnouncementsPage((prev) => Math.min(announcementsTotalPages, prev + 1))
+                      }
+                      disabled={announcementsPage >= announcementsTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardContent>
