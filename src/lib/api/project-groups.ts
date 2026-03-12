@@ -3,11 +3,24 @@ import type {
   AvailableStudentListItem,
   AvailableStudentsPage,
   AvailableStudentsPagination,
+  BrowseProjectGroupsPage,
+  CancelProjectGroupJoinRequestResult,
+  ApproveMyGroupJoinRequestResult,
+  RejectMyGroupJoinRequestDto,
+  RejectMyGroupJoinRequestResult,
+  CreateProjectGroupJoinRequestDto,
+  CreateProjectGroupJoinRequestResult,
   CreateProjectGroupInvitationDto,
   CreateProjectGroupInvitationResult,
   CreateProjectGroupDto,
+  MyProjectGroupJoinRequestStatus,
+  MyProjectGroupJoinRequestsPage,
   ProjectGroup,
+  ProjectGroupDetails,
+  MyGroupJoinRequestsPage,
   ProjectGroupMe,
+  SubmitMyProjectGroupResult,
+  ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -149,5 +162,149 @@ export async function createProjectGroupInvitation(
   dto: CreateProjectGroupInvitationDto
 ): Promise<CreateProjectGroupInvitationResult> {
   const response = await apiClient.post<CreateProjectGroupInvitationResult>("/project-groups/invitations", dto)
+  return response.data
+}
+
+export async function browseProjectGroups(params: {
+  page?: number
+  limit?: number
+  search?: string
+} = {}): Promise<BrowseProjectGroupsPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const search = params.search?.trim() ? params.search.trim() : undefined
+
+  const response = await apiClient.get<BrowseProjectGroupsPage>("/project-groups/browse", {
+    params: {
+      page,
+      limit,
+      ...(search ? { search } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function getProjectGroupDetails(groupId: string): Promise<ProjectGroupDetails> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const response = await apiClient.get<ProjectGroupDetails>(`/project-groups/${encodeURIComponent(trimmed)}`)
+  return response.data
+}
+
+export async function createProjectGroupJoinRequest(
+  groupId: string,
+  dto: CreateProjectGroupJoinRequestDto = {}
+): Promise<CreateProjectGroupJoinRequestResult> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const message = dto.message?.trim()
+
+  const response = await apiClient.post<CreateProjectGroupJoinRequestResult>(
+    `/project-groups/${encodeURIComponent(trimmed)}/join-requests`,
+    message ? { message } : {}
+  )
+
+  return response.data
+}
+
+export async function getMyProjectGroupJoinRequests(params: {
+  page?: number
+  limit?: number
+  status?: MyProjectGroupJoinRequestStatus | string
+} = {}): Promise<MyProjectGroupJoinRequestsPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const status = params.status?.trim() ? params.status.trim() : undefined
+
+  const response = await apiClient.get<MyProjectGroupJoinRequestsPage>("/project-groups/join-requests/me", {
+    params: {
+      page,
+      limit,
+      ...(status ? { status } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function getMyGroupJoinRequests(params: {
+  page?: number
+  limit?: number
+  status?: MyProjectGroupJoinRequestStatus | string
+} = {}): Promise<MyGroupJoinRequestsPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const status = params.status?.trim() ? params.status.trim() : undefined
+
+  const response = await apiClient.get<MyGroupJoinRequestsPage>("/project-groups/me/join-requests", {
+    params: {
+      page,
+      limit,
+      ...(status ? { status } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function approveMyGroupJoinRequest(requestId: string): Promise<ApproveMyGroupJoinRequestResult> {
+  const trimmed = requestId.trim()
+  if (!trimmed) {
+    throw new Error("requestId is required")
+  }
+
+  const response = await apiClient.post<ApproveMyGroupJoinRequestResult>(
+    `/project-groups/me/join-requests/${encodeURIComponent(trimmed)}/approve`
+  )
+
+  return response.data
+}
+
+export async function rejectMyGroupJoinRequest(
+  requestId: string,
+  dto: RejectMyGroupJoinRequestDto = {}
+): Promise<RejectMyGroupJoinRequestResult> {
+  const trimmed = requestId.trim()
+  if (!trimmed) {
+    throw new Error("requestId is required")
+  }
+
+  const reason = dto.reason?.trim()
+
+  const response = await apiClient.post<RejectMyGroupJoinRequestResult>(
+    `/project-groups/me/join-requests/${encodeURIComponent(trimmed)}/reject`,
+    reason ? { reason } : {}
+  )
+
+  return response.data
+}
+
+export async function submitMyProjectGroup(): Promise<SubmitMyProjectGroupResult> {
+  const response = await apiClient.post<SubmitMyProjectGroupResult>("/project-groups/me/submit")
+  return response.data
+}
+
+export async function reopenMyProjectGroup(): Promise<ReopenMyProjectGroupResult> {
+  const response = await apiClient.post<ReopenMyProjectGroupResult>("/project-groups/me/reopen")
+  return response.data
+}
+
+export async function cancelProjectGroupJoinRequest(requestId: string): Promise<CancelProjectGroupJoinRequestResult> {
+  const trimmed = requestId.trim()
+  if (!trimmed) {
+    throw new Error("requestId is required")
+  }
+
+  const response = await apiClient.delete<CancelProjectGroupJoinRequestResult>(
+    `/project-groups/join-requests/${encodeURIComponent(trimmed)}`
+  )
+
   return response.data
 }

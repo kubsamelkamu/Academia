@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
+import { useAuthStore } from "@/store/auth-store"
+import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import {
   BarChart3,
   Calendar,
@@ -49,10 +52,6 @@ interface StudentProjectOverview {
 interface StudentDashboardData {
   project: StudentProjectOverview
   grade: GradeSummary | null
-  team: {
-    name: string
-    members: TeamMember[]
-  }
 }
 
 function useLiveTime(intervalMs = 1000): Date {
@@ -141,32 +140,6 @@ function buildMockDashboardData(): StudentDashboardData {
       grade: "A-",
       status: "provisional",
     },
-    team: {
-      name: "Team Quantum",
-      members: [
-        {
-          id: "s1",
-          name: "You",
-          email: "you@student.university.edu",
-          isManager: true,
-        },
-        {
-          id: "s2",
-          name: "Sara Ibrahim",
-          email: "sara.ibrahim@student.university.edu",
-        },
-        {
-          id: "s3",
-          name: "Mohamed Adel",
-          email: "mohamed.adel@student.university.edu",
-        },
-        {
-          id: "s4",
-          name: "Nadia Hassan",
-          email: "nadia.hassan@student.university.edu",
-        },
-      ],
-    },
   }
 }
 
@@ -176,6 +149,31 @@ interface StudentDashboardProps {
 
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const data = useMemo(() => buildMockDashboardData(), [])
+
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+
+  const myUserId = user?.id ? String(user.id) : null
+  const myGroup = myProjectGroupQuery.data ?? null
+  const myTeamMembers: TeamMember[] = myGroup
+    ? [
+        {
+          id: myGroup.leader.id,
+          name:
+            `${myGroup.leader.firstName ?? ""} ${myGroup.leader.lastName ?? ""}`.trim() ||
+            myGroup.leader.email,
+          email: myGroup.leader.email,
+          isManager: true,
+        },
+        ...(myGroup.members ?? []).map((member) => ({
+          id: member.user.id,
+          name:
+            `${member.user.firstName ?? ""} ${member.user.lastName ?? ""}`.trim() || member.user.email,
+          email: member.user.email,
+        })),
+      ]
+    : []
 
   const welcomeTitle =
     userName && userName.trim().length > 0 ? `Welcome, ${userName.trim()}` : "Welcome"
@@ -392,44 +390,69 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       {/* Team & Grades */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Team */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              <span>My Team</span>
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="h-3 w-3" />
-                {data.team.members.length} members
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.team.members.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    {member.name.charAt(0)}
+        <Link
+          href="/dashboard/student/team"
+          className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label="Open Team page"
+        >
+          <Card className="cursor-pointer transition-colors hover:bg-muted/30 hover:border-muted-foreground/20 hover:opacity-95">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="group-hover:underline underline-offset-4">My Team</span>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Users className="h-3 w-3" />
+                  {myProjectGroupQuery.isLoading ? "…" : `${myTeamMembers.length} members`}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {myProjectGroupQuery.isLoading ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Loading your team…</p>
+              ) : myProjectGroupQuery.isError ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Unable to load your team right now.
+                </p>
+              ) : myGroup ? (
+                myTeamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                        {(member.name || member.email || "?").charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium leading-tight truncate">
+                            {member.name}
+                          </p>
+                          {myUserId && member.id === myUserId ? (
+                            <Badge variant="outline" className="text-[11px]">
+                              You
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {member.email}
+                        </p>
+                      </div>
+                    </div>
+                    {member.isManager && (
+                      <Badge variant="secondary" className="text-[11px]">
+                        Group Manager
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium leading-tight">
-                      {member.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {member.email}
-                    </p>
-                  </div>
-                </div>
-                {member.isManager && (
-                  <Badge variant="secondary" className="text-[11px]">
-                    Group Manager
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+                ))
+              ) : (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  You are not in a project group yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Grades */}
         <Card>

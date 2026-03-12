@@ -22,6 +22,7 @@ import {
   Loader2,
   Target,
   Lightbulb,
+  Send,
   Github,
   Linkedin,
   Twitter,
@@ -41,17 +42,32 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useAuthStore } from "@/store/auth-store"
 import { useQuery } from "@tanstack/react-query"
 import { getStudentProfiles, type StudentProfileListItem } from "@/lib/api/profile"
 import { toast } from "sonner"
 import { useCreateGroupLeaderRequest, useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import {
+  useBrowseProjectGroups,
+  useCancelProjectGroupJoinRequest,
+  useCreateProjectGroupJoinRequest,
+  useMyProjectGroup,
+  useMyProjectGroupJoinRequests,
+  useProjectGroupDetails,
+} from "@/lib/hooks/use-project-groups"
 
 type PresenceStatus = "online" | "away" | "offline"
-type RequestStatus = "pending" | "approved" | "rejected"
+type RequestStatus = "pending" | "approved" | "rejected" | "revoked" | "cancelled"
+type JoinRequestStatusFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "REVOKED" | "CANCELLED"
 
 interface GroupMember {
-  id: number
+  id: string
   name: string
   email: string
   role: string
@@ -61,7 +77,7 @@ interface GroupMember {
 }
 
 interface GroupManager {
-  id: number
+  id: string
   name: string
   email: string
   avatar: string
@@ -77,12 +93,13 @@ interface GroupManager {
 }
 
 interface AvailableGroup {
-  id: number
+  id: string
   name: string
   manager: GroupManager
   members: GroupMember[]
   currentSize: number
   maxSize: number
+  isJoinable?: boolean
   department: string
   objectives?: string[]
   technologies?: string[]
@@ -94,7 +111,7 @@ interface AvailableGroup {
 }
 
 interface JoinRequest {
-  id: number
+  id: string
   groupName: string
   managerName: string
   status: RequestStatus
@@ -115,16 +132,29 @@ interface ManagerRequest {
 export function StudentTeamMemberPage() {
   const [activeTab, setActiveTab] = useState("browse-groups")
   const [selectedGroup, setSelectedGroup] = useState<AvailableGroup | null>(null)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [showRequestDialog, setShowRequestDialog] = useState(false)
   const [showManagerRequestDialog, setShowManagerRequestDialog] = useState(false)
   const [showGroupDetailsDialog, setShowGroupDetailsDialog] = useState(false)
+  const [cancelJoinRequestDialogOpen, setCancelJoinRequestDialogOpen] = useState(false)
+  const [cancelJoinRequestTarget, setCancelJoinRequestTarget] = useState<{ id: string; groupName: string } | null>(null)
   const [requestReason, setRequestReason] = useState("")
   const [managerRequestReason, setManagerRequestReason] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const hasFetchedStudentProfileRef = useRef(false)
+  const hasShownJoinRequestsErrorRef = useRef(false)
+
+  const [browseGroupsPage, setBrowseGroupsPage] = useState(1)
+  const browseGroupsLimit = 20
+
+  const [myJoinRequestsPage, setMyJoinRequestsPage] = useState(1)
+  const [myJoinRequestsLimit, setMyJoinRequestsLimit] = useState(20)
+  const [myJoinRequestsStatus, setMyJoinRequestsStatus] = useState<JoinRequestStatusFilter>("ALL")
 
   const createGroupLeaderRequestMutation = useCreateGroupLeaderRequest()
+  const createJoinRequestMutation = useCreateProjectGroupJoinRequest()
+  const cancelJoinRequestMutation = useCancelProjectGroupJoinRequest()
 
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -132,6 +162,36 @@ export function StudentTeamMemberPage() {
   const profileError = useAuthStore((s) => s.profileError)
   const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
   const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
+
+  const myProjectGroupQuery = useMyProjectGroup(activeTab === "my-group" && Boolean(accessToken))
+  const myGroup = myProjectGroupQuery.data ?? null
+  const myGroupErrorMessage = myProjectGroupQuery.isError
+    ? String(myProjectGroupQuery.error?.message ?? "")
+    : ""
+  const myGroupNotFound =
+    myProjectGroupQuery.isError && myGroupErrorMessage.toLowerCase().includes("group not found")
+
+  const groupStatus = String(myGroup?.status ?? "")
+  const groupRejected = groupStatus === "REJECTED"
+  const groupSubmitted = groupStatus === "SUBMITTED"
+  const groupApproved = groupStatus === "APPROVED"
+  const myUserId = user?.id ? String(user.id) : null
+
+  const myJoinRequestsApiStatus = myJoinRequestsStatus === "ALL" ? undefined : myJoinRequestsStatus
+
+  const myJoinRequestsQuery = useMyProjectGroupJoinRequests({
+    enabled: activeTab === "my-requests" && Boolean(accessToken),
+    page: myJoinRequestsPage,
+    limit: myJoinRequestsLimit,
+    status: myJoinRequestsApiStatus,
+  })
+
+  const pendingJoinRequestsCountQuery = useMyProjectGroupJoinRequests({
+    enabled: Boolean(accessToken),
+    page: 1,
+    limit: 1,
+    status: "PENDING",
+  })
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
   const studentProfilesLimit = 10
@@ -197,126 +257,153 @@ export function StudentTeamMemberPage() {
     })
   }, [activeTab, fetchStudentProfile])
 
-  // Mock data - would come from API in production
-  const availableGroups: AvailableGroup[] = [
-    {
-      id: 1,
-      name: "AI Research Group",
+  useEffect(() => {
+    if (activeTab !== "browse-groups") return
+
+    const handle = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+      setBrowseGroupsPage((p) => (p === 1 ? p : 1))
+    }, 300)
+
+    return () => {
+      window.clearTimeout(handle)
+    }
+  }, [activeTab, searchQuery])
+
+  useEffect(() => {
+    if (activeTab !== "my-requests") return
+    if (!myJoinRequestsQuery.isError) return
+    if (hasShownJoinRequestsErrorRef.current) return
+
+    hasShownJoinRequestsErrorRef.current = true
+    const message = myJoinRequestsQuery.error?.message ?? "Failed to load join requests"
+    const normalized = message.toLowerCase()
+
+    if (normalized.includes("invalid status")) {
+      toast.error("Invalid status filter")
+      return
+    }
+
+    if (normalized.includes("not assigned") && normalized.includes("department")) {
+      toast.error("You are not assigned to a department.")
+      return
+    }
+
+    toast.error(message)
+  }, [activeTab, myJoinRequestsQuery.isError, myJoinRequestsQuery.error])
+
+  const clampMyJoinRequestsPage = (value: number) => {
+    const normalized = Number.isFinite(value) ? Math.trunc(value) : 1
+    const minClamped = Math.max(1, normalized)
+
+    const maxPages = myJoinRequestsQuery.data?.pagination?.pages
+    if (typeof maxPages === "number" && Number.isFinite(maxPages) && maxPages > 0) {
+      return Math.min(minClamped, maxPages)
+    }
+
+    return minClamped
+  }
+
+  const commitMyJoinRequestsPageFromInput = (rawValue: string) => {
+    const parsed = Number(rawValue)
+    if (!Number.isFinite(parsed)) return
+    setMyJoinRequestsPage(clampMyJoinRequestsPage(parsed))
+  }
+
+  const myJoinRequestsStatusLabel = (status: JoinRequestStatusFilter) => {
+    if (status === "ALL") return "All"
+    const normalized = status.toLowerCase()
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  }
+
+  const selectMyJoinRequestsStatus = (next: JoinRequestStatusFilter) => {
+    setMyJoinRequestsStatus(next)
+    setMyJoinRequestsPage(1)
+    hasShownJoinRequestsErrorRef.current = false
+  }
+
+  const selectMyJoinRequestsLimit = (next: number) => {
+    setMyJoinRequestsLimit(next)
+    setMyJoinRequestsPage(1)
+    hasShownJoinRequestsErrorRef.current = false
+  }
+
+  const browseGroupsQuery = useBrowseProjectGroups({
+    enabled: activeTab === "browse-groups" && Boolean(accessToken),
+    page: browseGroupsPage,
+    limit: browseGroupsLimit,
+    search: debouncedSearchQuery,
+  })
+
+  const clampBrowseGroupsPage = (value: number) => {
+    const normalized = Number.isFinite(value) ? Math.trunc(value) : 1
+    const minClamped = Math.max(1, normalized)
+
+    const maxPages = browseGroupsQuery.data?.pagination?.pages
+    if (typeof maxPages === "number" && Number.isFinite(maxPages) && maxPages > 0) {
+      return Math.min(minClamped, maxPages)
+    }
+
+    return minClamped
+  }
+
+  const commitBrowseGroupsPageFromInput = (rawValue: string) => {
+    const parsed = Number(rawValue)
+    if (!Number.isFinite(parsed)) return
+    setBrowseGroupsPage(clampBrowseGroupsPage(parsed))
+  }
+
+  const availableGroups: AvailableGroup[] = (browseGroupsQuery.data?.items ?? []).map((item) => {
+    const leaderName = `${item.leader?.firstName ?? ""} ${item.leader?.lastName ?? ""}`.trim()
+
+    return {
+      id: item.id,
+      name: item.name,
       manager: {
-        id: 101,
-        name: "Dr. Sarah Chen",
-        email: "sarah.chen@university.edu",
-        avatar: "/avatars/sarah.jpg",
-        status: "online",
-        bio: "Associate Professor of Computer Science with 10+ years experience in AI ethics and machine learning.",
-        expertise: ["AI Ethics", "Machine Learning", "Healthcare Informatics"],
-        socialLinks: {
-          github: "https://github.com/sarachen",
-          linkedin: "https://linkedin.com/in/sarachen",
-          twitter: "https://twitter.com/sarachen",
-          website: "https://sarachen.research.edu"
-        }
-      },
-      members: [
-        { id: 201, name: "John Smith", email: "john.smith@university.edu", role: "Frontend Developer", skills: ["Python", "Machine Learning"], joinedAt: "2024-01-15" },
-        { id: 202, name: "Emily Brown", email: "emily.brown@university.edu", role: "Backend Developer", skills: ["Ethics", "Philosophy"], joinedAt: "2024-01-16" },
-        { id: 203, name: "Michael Lee", email: "michael.lee@university.edu", role: "Frontend Developer", skills: ["React", "Python"], joinedAt: "2024-01-17" },
-      ],
-      currentSize: 4,
-      maxSize: 7,
-      department: "Computer Science",
-      objectives: [
-        "Develop ethical guidelines for AI in clinical settings",
-        "Create fairness metrics for medical AI systems",
-        "Publish research papers in top AI ethics journals"
-      ],
-      technologies: ["Python", "TensorFlow", "PyTorch", "React"],
-      meetings: [
-        { day: "Monday", time: "2:00 PM - 4:00 PM", location: "Room 301" },
-        { day: "Wednesday", time: "10:00 AM - 12:00 PM", location: "Virtual (Zoom)" }
-      ]
-    },
-    {
-      id: 2,
-      name: "Web Development Team",
-      manager: {
-        id: 102,
-        name: "Prof. James Wilson",
-        email: "j.wilson@university.edu",
-        avatar: "/avatars/james.jpg",
-        status: "away",
-        bio: "Professor of Software Engineering with focus on web technologies.",
-        expertise: ["React", "Node.js", "TypeScript"],
-      },
-      members: [
-        { id: 204, name: "David Kim", email: "david.kim@university.edu", role: "Frontend Developer", skills: ["React", "CSS"], joinedAt: "2024-01-12" },
-        { id: 205, name: "Lisa Wang", email: "lisa.wang@university.edu", role: "Backend Developer", skills: ["Node.js", "Python"], joinedAt: "2024-01-14" },
-      ],
-      currentSize: 3,
-      maxSize: 7,
-      department: "Computer Science",
-      objectives: [
-        "Build a modern e-learning platform",
-        "Implement real-time collaboration features",
-        "Ensure accessibility compliance"
-      ],
-      technologies: ["React", "Node.js", "TypeScript", "MongoDB"],
-      meetings: [
-        { day: "Tuesday", time: "3:00 PM - 5:00 PM", location: "Online" }
-      ]
-    },
-    {
-      id: 3,
-      name: "Mobile App Innovation",
-      manager: {
-        id: 103,
-        name: "Dr. Robert Taylor",
-        email: "r.taylor@university.edu",
-        avatar: "/avatars/robert.jpg",
+        id: item.leader?.id ?? "",
+        name: leaderName || "Group Leader",
+        email: "",
+        avatar: item.leader?.avatarUrl ?? "",
         status: "offline",
       },
-      members: [
-        { id: 206, name: "Amanda Garcia", email: "amanda@university.edu", role: "Mobile Developer", joinedAt: "2024-01-08" },
-        { id: 207, name: "Kevin Park", email: "kevin@university.edu", role: "UI/UX Designer", joinedAt: "2024-01-09" },
-        { id: 208, name: "Rachel Green", email: "rachel@university.edu", role: "Developer", joinedAt: "2024-01-10" },
-        { id: 209, name: "Tom Harris", email: "tom@university.edu", role: "Developer", joinedAt: "2024-01-11" },
-        { id: 210, name: "Nina Patel", email: "nina@university.edu", role: "Developer", joinedAt: "2024-01-12" },
-      ],
-      currentSize: 6,
-      maxSize: 7,
-      department: "Computer Science",
-      objectives: [
-        "Develop AR-based campus navigation",
-        "Integrate with university map services",
-        "Create intuitive user interface"
-      ],
-      technologies: ["React Native", "AR Kit", "Node.js", "PostgreSQL"],
-      meetings: [
-        { day: "Thursday", time: "4:00 PM - 6:00 PM", location: "Lab 205" }
-      ]
-    },
-  ]
+      members: [],
+      currentSize: item.memberCount,
+      maxSize: item.maxGroupSize,
+      isJoinable: item.isJoinable,
+      department: profileDepartment,
+      objectives: item.objectives ? [item.objectives] : [],
+      technologies: Array.isArray(item.technologies) ? item.technologies : [],
+      meetings: [],
+    }
+  })
 
-  const myRequests: JoinRequest[] = [
-    {
-      id: 1,
-      groupName: "AI Research Group",
-      managerName: "Dr. Sarah Chen",
-      status: "pending",
-      requestedAt: "2024-01-15T10:30:00",
-      reason: "Interested in AI ethics research, have completed relevant courses",
-    },
-    {
-      id: 2,
-      groupName: "Web Development Team",
-      managerName: "Prof. James Wilson",
-      status: "rejected",
-      requestedAt: "2024-01-14T14:20:00",
-      respondedAt: "2024-01-15T09:15:00",
-      reason: "Looking to gain experience in full-stack development",
-      rejectionReason: "Group currently looking for backend specialists, your profile shows more frontend experience",
-    },
-  ]
+  const myRequests: JoinRequest[] = (myJoinRequestsQuery.data?.items ?? []).map((item) => {
+    const rawStatus = String(item.status ?? "").toUpperCase()
+
+    const normalizedStatus: RequestStatus =
+      rawStatus === "APPROVED"
+        ? "approved"
+        : rawStatus === "REJECTED"
+          ? "rejected"
+          : rawStatus === "REVOKED"
+            ? "revoked"
+            : rawStatus === "CANCELLED"
+              ? "cancelled"
+              : "pending"
+
+    const leaderName = `${item.group?.leader?.firstName ?? ""} ${item.group?.leader?.lastName ?? ""}`.trim()
+
+    return {
+      id: item.id,
+      groupName: item.group?.name ?? "",
+      managerName: leaderName || "Group Leader",
+      status: normalizedStatus,
+      requestedAt: item.createdAt,
+      respondedAt: item.decidedAt ?? undefined,
+      reason: item.message ?? "",
+      rejectionReason: item.rejectionReason ?? undefined,
+    }
+  })
 
   const managerRequests: ManagerRequest[] = (() => {
     const status = groupLeaderMeQuery.data?.status
@@ -376,14 +463,67 @@ export function StudentTeamMemberPage() {
   })
 
   const handleJoinRequest = (group: AvailableGroup) => {
+    if (group.currentSize >= group.maxSize) {
+      toast.message("This group is full.")
+      return
+    }
+
+    if (group.isJoinable === false) {
+      toast.message("This group is not accepting join requests.")
+      return
+    }
+
     setSelectedGroup(group)
     setShowRequestDialog(true)
   }
 
   const handleViewDetails = (group: AvailableGroup) => {
     setSelectedGroup(group)
+    setSelectedGroupId(group.id)
     setShowGroupDetailsDialog(true)
   }
+
+  const groupDetailsQuery = useProjectGroupDetails({
+    enabled: showGroupDetailsDialog && activeTab === "browse-groups" && Boolean(accessToken),
+    groupId: selectedGroupId,
+  })
+
+  const effectiveSelectedGroup: AvailableGroup | null = (() => {
+    if (!groupDetailsQuery.data) return selectedGroup
+
+    const details = groupDetailsQuery.data
+    const leaderName = `${details.leader?.firstName ?? ""} ${details.leader?.lastName ?? ""}`.trim()
+
+    return {
+      id: details.id,
+      name: details.name,
+      manager: {
+        id: details.leader?.id ?? "",
+        name: leaderName || "Group Leader",
+        email: details.leader?.email ?? "",
+        avatar: details.leader?.avatarUrl ?? "",
+        status: "offline",
+      },
+      members: (details.members ?? []).map((member) => {
+        const fullName = `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim()
+        return {
+          id: member.id,
+          name: fullName || member.email || "Member",
+          email: member.email,
+          role: "Member",
+          avatar: member.avatarUrl ?? undefined,
+          joinedAt: member.joinedAt,
+        }
+      }),
+      currentSize: details.memberCount,
+      maxSize: details.maxGroupSize,
+      isJoinable: details.isJoinable,
+      department: profileDepartment,
+      objectives: details.objectives ? [details.objectives] : [],
+      technologies: Array.isArray(details.technologies) ? details.technologies : [],
+      meetings: [],
+    }
+  })()
 
   const handleManagerRequest = () => {
     const reason = managerRequestReason.trim()
@@ -424,13 +564,128 @@ export function StudentTeamMemberPage() {
   }
 
   const handleSubmitJoinRequest = () => {
-    setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setShowRequestDialog(false)
-      setRequestReason("")
-      alert("Join request sent successfully!")
-    }, 1500)
+    const groupId = selectedGroup?.id
+    if (!groupId) {
+      toast.error("Select a group first.")
+      return
+    }
+
+    if (createJoinRequestMutation.isPending) return
+
+    const message = requestReason.trim()
+    if (!message) {
+      toast.message("Please enter a message.")
+      return
+    }
+    if (message.length > 1000) {
+      toast.error("Message must be 1000 characters or less.")
+      return
+    }
+
+    createJoinRequestMutation
+      .mutateAsync({
+        groupId,
+        dto: { message },
+      })
+      .then((result) => {
+        setShowRequestDialog(false)
+        setRequestReason("")
+
+        if (result.message) {
+          toast.message(result.message)
+        } else {
+          toast.success("Join request sent")
+        }
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Request failed"
+        const normalized = message.toLowerCase()
+
+        if (normalized.includes("already joined") && normalized.includes("group")) {
+          toast.message("You already belong to a project group.")
+          return
+        }
+
+        if (normalized.includes("already") && normalized.includes("group leader")) {
+          toast.message("Group leaders cannot send join requests.")
+          return
+        }
+
+        if (normalized.includes("group not found")) {
+          toast.error("Group not found.")
+          return
+        }
+
+        if (normalized.includes("not accepting") || (normalized.includes("group") && normalized.includes("draft"))) {
+          toast.message("This group is not accepting join requests.")
+          return
+        }
+
+        if (normalized.includes("group is full") || normalized.includes("full")) {
+          toast.message("This group is full.")
+          return
+        }
+
+        if (normalized.includes("unauthorized") || normalized.includes("forbidden")) {
+          toast.error("You are not authorized to send join requests. Please login again.")
+          return
+        }
+
+        toast.error(message)
+      })
+  }
+
+  const handleCancelJoinRequest = (requestId: string, groupName: string) => {
+    if (!requestId.trim()) return
+    if (cancelJoinRequestMutation.isPending) return
+
+    setCancelJoinRequestTarget({ id: requestId, groupName })
+    setCancelJoinRequestDialogOpen(true)
+  }
+
+  const confirmCancelJoinRequest = () => {
+    const requestId = cancelJoinRequestTarget?.id
+    if (!requestId) return
+    if (cancelJoinRequestMutation.isPending) return
+
+    cancelJoinRequestMutation
+      .mutateAsync({ requestId })
+      .then(() => {
+        setCancelJoinRequestDialogOpen(false)
+        setCancelJoinRequestTarget(null)
+        toast.success("Join request cancelled")
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Request failed"
+        const normalized = message.toLowerCase()
+
+        if (normalized.includes("not found")) {
+          toast.error("Join request not found")
+          return
+        }
+
+        if (normalized.includes("approved")) {
+          toast.message("This join request is already approved.")
+          return
+        }
+
+        if (normalized.includes("rejected")) {
+          toast.message("This join request is already rejected.")
+          return
+        }
+
+        if (normalized.includes("revoked")) {
+          toast.message("This join request is already revoked.")
+          return
+        }
+
+        if (normalized.includes("cancelled") || normalized.includes("canceled")) {
+          toast.message("This join request is already cancelled.")
+          return
+        }
+
+        toast.error(message)
+      })
   }
 
   return (
@@ -485,8 +740,24 @@ export function StudentTeamMemberPage() {
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} className="space-y-6" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-auto lg:inline-flex">
+      <Tabs
+        value={activeTab}
+        className="space-y-6"
+        onValueChange={(value) => {
+          setActiveTab(value)
+          if (value === "browse-groups") {
+            setBrowseGroupsPage(1)
+          }
+          if (value === "my-requests") {
+            setMyJoinRequestsPage(1)
+          }
+        }}
+      >
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
+          <TabsTrigger value="my-group" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">My Group</span>
+          </TabsTrigger>
           <TabsTrigger value="browse-groups" className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             <span className="hidden sm:inline">Browse Groups</span>
@@ -494,9 +765,9 @@ export function StudentTeamMemberPage() {
           <TabsTrigger value="my-requests" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">My Requests</span>
-            {myRequests.filter((r) => r.status === "pending").length > 0 && (
+            {(pendingJoinRequestsCountQuery.data?.pagination?.total ?? 0) > 0 && (
               <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0">
-                {myRequests.filter((r) => r.status === "pending").length}
+                {pendingJoinRequestsCountQuery.data?.pagination?.total ?? 0}
               </Badge>
             )}
           </TabsTrigger>
@@ -509,6 +780,167 @@ export function StudentTeamMemberPage() {
             <span className="hidden sm:inline">Student</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="my-group" className="space-y-6">
+          {myProjectGroupQuery.isLoading ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading your group…
+                </div>
+              </CardContent>
+            </Card>
+          ) : myProjectGroupQuery.isError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Unable to load your group</AlertTitle>
+              <AlertDescription>
+                {myGroupNotFound
+                  ? "You are not in a project group yet."
+                  : myGroupErrorMessage || "Request failed"}
+              </AlertDescription>
+            </Alert>
+          ) : myGroup ? (
+            <>
+              {groupApproved ? (
+                <Alert className="bg-green-50 border-green-200">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-800">Group Approved</AlertTitle>
+                  <AlertDescription className="text-green-700">
+                    Your group is officially registered.
+                  </AlertDescription>
+                </Alert>
+              ) : groupSubmitted ? (
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                  <AlertTitle className="text-yellow-800">Submitted for Review</AlertTitle>
+                  <AlertDescription className="text-yellow-700">
+                    Your group is pending review.
+                  </AlertDescription>
+                </Alert>
+              ) : groupRejected ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Rejected</AlertTitle>
+                  <AlertDescription>
+                    {myGroup.rejectionReason
+                      ? `Reason: ${myGroup.rejectionReason}`
+                      : "Your group was rejected."}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-xl">{myGroup.name}</CardTitle>
+                      <CardDescription>
+                        You are a group member.
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline">{String(myGroup.status ?? "DRAFT")}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Objectives</p>
+                    <p className="text-sm text-muted-foreground">{myGroup.objectives}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Technologies</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(myGroup.technologies ?? []).map((tech) => (
+                        <Badge key={tech} variant="secondary">
+                          {tech}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Members</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pending invitations: {myGroup.pendingInvitationsCount}
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src={myGroup.leader.avatarUrl ?? undefined} />
+                            <AvatarFallback>
+                              {getInitials(
+                                `${myGroup.leader.firstName ?? ""} ${myGroup.leader.lastName ?? ""}`.trim() ||
+                                  myGroup.leader.email
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">
+                                {`${myGroup.leader.firstName ?? ""} ${myGroup.leader.lastName ?? ""}`.trim() ||
+                                  myGroup.leader.email}
+                              </p>
+                              {myUserId && myGroup.leader.id === myUserId ? (
+                                <Badge variant="outline">You</Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{myGroup.leader.email}</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">Leader</Badge>
+                      </div>
+
+                      {(myGroup.members ?? []).map((member) => {
+                        const name =
+                          `${member.user.firstName ?? ""} ${member.user.lastName ?? ""}`.trim() || member.user.email
+
+                        return (
+                          <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-9 w-9">
+                                <AvatarImage src={member.user.avatarUrl ?? undefined} />
+                                <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium truncate">{name}</p>
+                                  {myUserId && member.user.id === myUserId ? (
+                                    <Badge variant="outline">You</Badge>
+                                  ) : null}
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">{member.user.email}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline">Member</Badge>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {myGroup.reviewedBy ? (
+                    <div className="text-xs text-muted-foreground">
+                      Reviewed by: {myGroup.reviewedBy.firstName} {myGroup.reviewedBy.lastName}
+                      {myGroup.reviewedAt ? ` • ${new Date(myGroup.reviewedAt).toLocaleString()}` : ""}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground">You are not in a project group yet.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         {/* Browse Groups Tab */}
         <TabsContent value="browse-groups" className="space-y-6">
@@ -584,7 +1016,7 @@ export function StudentTeamMemberPage() {
                     
                     <div className="flex gap-2 pt-2">
                       {group.currentSize < group.maxSize ? (
-                        <Button className="flex-1" onClick={() => handleJoinRequest(group)}>
+                        <Button className="flex-1" disabled={group.isJoinable === false} onClick={() => handleJoinRequest(group)}>
                           <UserPlus className="h-4 w-4 mr-2" />
                           Request to Join
                         </Button>
@@ -608,6 +1040,80 @@ export function StudentTeamMemberPage() {
               </div>
             )}
           </div>
+
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={browseGroupsPage <= 1 || browseGroupsQuery.isFetching}
+              onClick={() => setBrowseGroupsPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+
+            <div className="text-sm text-muted-foreground">
+              <span className="hidden sm:inline">
+                Showing{" "}
+                <span className="font-medium text-foreground">{browseGroupsQuery.data?.items?.length ?? 0}</span>
+                {browseGroupsQuery.data?.pagination?.total != null
+                  ? (
+                      <>
+                        {" "}
+                        of <span className="font-medium text-foreground">{browseGroupsQuery.data.pagination.total}</span>
+                      </>
+                    )
+                  : null}
+                {" "}
+                groups
+                <span className="mx-2">•</span>
+              </span>
+              Page <span className="font-medium text-foreground">{browseGroupsPage}</span>
+              {browseGroupsQuery.data?.pagination?.pages
+                ? (
+                    <>
+                      {" "}
+                      of <span className="font-medium text-foreground">{browseGroupsQuery.data.pagination.pages}</span>
+                    </>
+                  )
+                : null}
+            </div>
+
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Go to</span>
+              <Input
+                key={browseGroupsPage}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={browseGroupsQuery.data?.pagination?.pages}
+                defaultValue={browseGroupsPage}
+                className="h-8 w-20"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return
+                  commitBrowseGroupsPageFromInput(e.currentTarget.value)
+                }}
+                onBlur={(e) => {
+                  commitBrowseGroupsPageFromInput(e.currentTarget.value)
+                }}
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={(() => {
+                if (browseGroupsQuery.isFetching) return true
+                const pages = browseGroupsQuery.data?.pagination?.pages
+                if (typeof pages === "number" && Number.isFinite(pages)) {
+                  return browseGroupsPage >= pages
+                }
+                return (browseGroupsQuery.data?.items?.length ?? 0) < browseGroupsLimit
+              })()}
+              onClick={() => setBrowseGroupsPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="my-requests" className="space-y-6">
@@ -617,68 +1123,195 @@ export function StudentTeamMemberPage() {
               <CardDescription>Track the status of your group join requests</CardDescription>
             </CardHeader>
             <CardContent>
-              {myRequests.length > 0 ? (
-                <div className="space-y-4">
-                  {myRequests.map((request) => (
-                    <Card key={request.id}>
-                      <CardContent className="p-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={`p-2 rounded-full ${
-                                request.status === "pending"
-                                  ? "bg-yellow-100"
-                                  : request.status === "approved"
-                                    ? "bg-green-100"
-                                    : "bg-red-100"
-                              }`}
-                            >
-                              {request.status === "pending" && <Clock className="h-5 w-5 text-yellow-600" />}
-                              {request.status === "approved" && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                              {request.status === "rejected" && <XCircle className="h-5 w-5 text-red-600" />}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{request.groupName}</h4>
-                              <p className="text-sm text-muted-foreground">Manager: {request.managerName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Requested: {new Date(request.requestedAt).toLocaleDateString()}
-                              </p>
-                              <p className="text-sm mt-2 p-2 bg-muted rounded">
-                                <span className="font-medium">Your reason:</span> {request.reason}
-                              </p>
-                              {request.rejectionReason && (
-                                <Alert variant="destructive" className="mt-2">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <AlertTitle>Rejection Reason</AlertTitle>
-                                  <AlertDescription>{request.rejectionReason}</AlertDescription>
-                                </Alert>
-                              )}
-                            </div>
-                          </div>
-                          <Badge
-                            className={
-                              request.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : request.status === "approved"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {myJoinRequestsQuery.isLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="mt-2">Loading requests…</span>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <Clock className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No join requests yet</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setActiveTab("browse-groups")}>
-                    Browse Groups
-                  </Button>
-                </div>
+                <>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Status: {myJoinRequestsStatusLabel(myJoinRequestsStatus)}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("ALL")}>All</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("PENDING")}>Pending</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("APPROVED")}>Approved</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("REJECTED")}>Rejected</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("REVOKED")}>Revoked</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsStatus("CANCELLED")}>Cancelled</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Limit: {myJoinRequestsLimit}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsLimit(5)}>5</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsLimit(10)}>10</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyJoinRequestsLimit(20)}>20</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={myJoinRequestsPage <= 1 || myJoinRequestsQuery.isFetching}
+                        onClick={() => setMyJoinRequestsPage((p) => Math.max(1, p - 1))}
+                      >
+                        Previous
+                      </Button>
+
+                      <div className="text-sm text-muted-foreground">
+                        <span className="hidden sm:inline">
+                          Page <span className="font-medium text-foreground">{myJoinRequestsPage}</span> of{" "}
+                          <span className="font-medium text-foreground">{myJoinRequestsQuery.data?.pagination?.pages ?? 1}</span>
+                          {myJoinRequestsQuery.data?.pagination?.total != null ? (
+                            <>
+                              {" "}• <span className="font-medium text-foreground">{myJoinRequestsQuery.data.pagination.total}</span> total
+                            </>
+                          ) : null}
+                        </span>
+                      </div>
+
+                      <div className="hidden md:flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Go to</span>
+                        <Input
+                          key={myJoinRequestsPage}
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={myJoinRequestsQuery.data?.pagination?.pages}
+                          defaultValue={myJoinRequestsPage}
+                          className="h-8 w-20"
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return
+                            commitMyJoinRequestsPageFromInput(e.currentTarget.value)
+                          }}
+                          onBlur={(e) => {
+                            commitMyJoinRequestsPageFromInput(e.currentTarget.value)
+                          }}
+                        />
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={(() => {
+                          if (myJoinRequestsQuery.isFetching) return true
+                          const pages = myJoinRequestsQuery.data?.pagination?.pages
+                          if (typeof pages === "number" && Number.isFinite(pages)) {
+                            return myJoinRequestsPage >= pages
+                          }
+                          return (myJoinRequestsQuery.data?.items?.length ?? 0) < myJoinRequestsLimit
+                        })()}
+                        onClick={() => setMyJoinRequestsPage((p) => p + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+
+                  {myRequests.length > 0 ? (
+                    <div className="space-y-4">
+                      {myRequests.map((request) => (
+                        <Card key={request.id}>
+                          <CardContent className="p-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`p-2 rounded-full ${
+                                    request.status === "pending"
+                                      ? "bg-yellow-100"
+                                      : request.status === "approved"
+                                        ? "bg-green-100"
+                                        : "bg-red-100"
+                                  }`}
+                                >
+                                  {request.status === "pending" && <Clock className="h-5 w-5 text-yellow-600" />}
+                                  {request.status === "approved" && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                                  {request.status === "rejected" && <XCircle className="h-5 w-5 text-red-600" />}
+                                  {(request.status === "revoked" || request.status === "cancelled") && (
+                                    <XCircle className="h-5 w-5 text-red-600" />
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="font-medium">{request.groupName}</h4>
+                                  <p className="text-sm text-muted-foreground">Manager: {request.managerName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Requested: {new Date(request.requestedAt).toLocaleDateString()}
+                                  </p>
+                                  <p className="text-sm mt-2 p-2 bg-muted rounded">
+                                    <span className="font-medium">Your reason:</span> {request.reason}
+                                  </p>
+                                  {request.rejectionReason && (
+                                    <Alert variant="destructive" className="mt-2">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <AlertTitle>Rejection Reason</AlertTitle>
+                                      <AlertDescription>{request.rejectionReason}</AlertDescription>
+                                    </Alert>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge
+                                className={
+                                  request.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : request.status === "approved"
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-red-100 text-red-800"
+                                }
+                              >
+                                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                              </Badge>
+
+                              {request.status === "pending" ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="md:ml-2"
+                                  disabled={
+                                    cancelJoinRequestMutation.isPending &&
+                                    cancelJoinRequestMutation.variables?.requestId === request.id
+                                  }
+                                  onClick={() => handleCancelJoinRequest(request.id, request.groupName)}
+                                >
+                                  {cancelJoinRequestMutation.isPending &&
+                                  cancelJoinRequestMutation.variables?.requestId === request.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Cancelling...
+                                    </>
+                                  ) : (
+                                    "Cancel"
+                                  )}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Clock className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                      <p className="mt-2 text-sm text-muted-foreground">No join requests yet</p>
+                      <Button variant="outline" className="mt-4" onClick={() => setActiveTab("browse-groups")}>
+                        Browse Groups
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -1192,11 +1825,11 @@ export function StudentTeamMemberPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRequestDialog(false)} disabled={isSubmitting}>
+            <Button variant="outline" onClick={() => setShowRequestDialog(false)} disabled={createJoinRequestMutation.isPending}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitJoinRequest} disabled={!requestReason.trim() || isSubmitting}>
-              {isSubmitting ? (
+            <Button onClick={handleSubmitJoinRequest} disabled={!requestReason.trim() || createJoinRequestMutation.isPending}>
+              {createJoinRequestMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Sending...
@@ -1206,6 +1839,52 @@ export function StudentTeamMemberPage() {
                   <Send className="h-4 w-4 mr-2" />
                   Send Request
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Join Request Confirmation */}
+      <Dialog
+        open={cancelJoinRequestDialogOpen}
+        onOpenChange={(open) => {
+          if (cancelJoinRequestMutation.isPending) return
+          setCancelJoinRequestDialogOpen(open)
+          if (!open) {
+            setCancelJoinRequestTarget(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cancel join request?</DialogTitle>
+            <DialogDescription>
+              {cancelJoinRequestTarget?.groupName
+                ? `This will cancel your pending join request to ${cancelJoinRequestTarget.groupName}.`
+                : "This will cancel your pending join request."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelJoinRequestDialogOpen(false)}
+              disabled={cancelJoinRequestMutation.isPending}
+            >
+              Keep
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmCancelJoinRequest}
+              disabled={cancelJoinRequestMutation.isPending}
+            >
+              {cancelJoinRequestMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Yes, cancel"
               )}
             </Button>
           </DialogFooter>
@@ -1255,35 +1934,43 @@ export function StudentTeamMemberPage() {
       </Dialog>
 
       {/* Group Details Dialog - Simplified without project description and documents */}
-      <Dialog open={showGroupDetailsDialog} onOpenChange={setShowGroupDetailsDialog}>
+      <Dialog
+        open={showGroupDetailsDialog}
+        onOpenChange={(open) => {
+          setShowGroupDetailsDialog(open)
+          if (!open) {
+            setSelectedGroupId(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{selectedGroup?.name}</DialogTitle>
+            <DialogTitle className="text-2xl">{effectiveSelectedGroup?.name}</DialogTitle>
             <DialogDescription>
-              {selectedGroup?.department}
+              {effectiveSelectedGroup?.department}
             </DialogDescription>
           </DialogHeader>
           
-          {selectedGroup && (
+          {effectiveSelectedGroup && (
             <div className="space-y-6 py-4">
               {/* Manager Info */}
               <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
                 <div className="relative">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={selectedGroup.manager.avatar} />
-                    <AvatarFallback>{getInitials(selectedGroup.manager.name)}</AvatarFallback>
+                    <AvatarImage src={effectiveSelectedGroup.manager.avatar} />
+                    <AvatarFallback>{getInitials(effectiveSelectedGroup.manager.name)}</AvatarFallback>
                   </Avatar>
-                  <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ${getStatusColor(selectedGroup.manager.status)} ring-2 ring-white`} />
+                  <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ${getStatusColor(effectiveSelectedGroup.manager.status)} ring-2 ring-white`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold">{selectedGroup.manager.name}</h3>
+                  <h3 className="text-lg font-semibold">{effectiveSelectedGroup.manager.name}</h3>
                   <p className="text-sm text-muted-foreground">Group Manager</p>
-                  <p className="text-sm mt-2">{selectedGroup.manager.bio || "No bio available."}</p>
+                  <p className="text-sm mt-2">{effectiveSelectedGroup.manager.bio || "No bio available."}</p>
                   
                   {/* Expertise Tags */}
-                  {selectedGroup.manager.expertise && (
+                  {effectiveSelectedGroup.manager.expertise && (
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {selectedGroup.manager.expertise.map((item, index) => (
+                      {effectiveSelectedGroup.manager.expertise.map((item, index) => (
                         <Badge key={index} variant="secondary" className="bg-blue-50">
                           {item}
                         </Badge>
@@ -1293,30 +1980,30 @@ export function StudentTeamMemberPage() {
 
                   {/* Social Links */}
                   <div className="flex gap-2 mt-3">
-                    {selectedGroup.manager.socialLinks?.github && (
+                    {effectiveSelectedGroup.manager.socialLinks?.github && (
                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                        <a href={selectedGroup.manager.socialLinks.github} target="_blank" rel="noopener noreferrer">
+                        <a href={effectiveSelectedGroup.manager.socialLinks.github} target="_blank" rel="noopener noreferrer">
                           <Github className="h-4 w-4" />
                         </a>
                       </Button>
                     )}
-                    {selectedGroup.manager.socialLinks?.linkedin && (
+                    {effectiveSelectedGroup.manager.socialLinks?.linkedin && (
                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                        <a href={selectedGroup.manager.socialLinks.linkedin} target="_blank" rel="noopener noreferrer">
+                        <a href={effectiveSelectedGroup.manager.socialLinks.linkedin} target="_blank" rel="noopener noreferrer">
                           <Linkedin className="h-4 w-4" />
                         </a>
                       </Button>
                     )}
-                    {selectedGroup.manager.socialLinks?.twitter && (
+                    {effectiveSelectedGroup.manager.socialLinks?.twitter && (
                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                        <a href={selectedGroup.manager.socialLinks.twitter} target="_blank" rel="noopener noreferrer">
+                        <a href={effectiveSelectedGroup.manager.socialLinks.twitter} target="_blank" rel="noopener noreferrer">
                           <Twitter className="h-4 w-4" />
                         </a>
                       </Button>
                     )}
-                    {selectedGroup.manager.socialLinks?.website && (
+                    {effectiveSelectedGroup.manager.socialLinks?.website && (
                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                        <a href={selectedGroup.manager.socialLinks.website} target="_blank" rel="noopener noreferrer">
+                        <a href={effectiveSelectedGroup.manager.socialLinks.website} target="_blank" rel="noopener noreferrer">
                           <Globe className="h-4 w-4" />
                         </a>
                       </Button>
@@ -1326,14 +2013,14 @@ export function StudentTeamMemberPage() {
               </div>
 
               {/* Objectives */}
-              {selectedGroup.objectives && selectedGroup.objectives.length > 0 && (
+              {effectiveSelectedGroup.objectives && effectiveSelectedGroup.objectives.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2 flex items-center gap-2">
                     <Target className="h-4 w-4 text-primary" />
                     Objectives
                   </h4>
                   <ul className="space-y-2">
-                    {selectedGroup.objectives.map((obj, index) => (
+                    {effectiveSelectedGroup.objectives.map((obj, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
                         <span>{obj}</span>
@@ -1344,14 +2031,14 @@ export function StudentTeamMemberPage() {
               )}
 
               {/* Technologies */}
-              {selectedGroup.technologies && selectedGroup.technologies.length > 0 && (
+              {effectiveSelectedGroup.technologies && effectiveSelectedGroup.technologies.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2 flex items-center gap-2">
                     <Lightbulb className="h-4 w-4 text-primary" />
                     Technologies
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {selectedGroup.technologies.map((tech, index) => (
+                    {effectiveSelectedGroup.technologies.map((tech, index) => (
                       <Badge key={index} variant="secondary">{tech}</Badge>
                     ))}
                   </div>
@@ -1362,10 +2049,10 @@ export function StudentTeamMemberPage() {
               <div>
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  Team Members ({selectedGroup.currentSize}/{selectedGroup.maxSize})
+                  Team Members ({effectiveSelectedGroup.currentSize}/{effectiveSelectedGroup.maxSize})
                 </h4>
                 <div className="space-y-2">
-                  {selectedGroup.members.map((member) => (
+                  {effectiveSelectedGroup.members.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
@@ -1399,11 +2086,11 @@ export function StudentTeamMemberPage() {
             <Button variant="outline" onClick={() => setShowGroupDetailsDialog(false)}>
               Close
             </Button>
-            {selectedGroup && selectedGroup.currentSize < selectedGroup.maxSize && (
+            {effectiveSelectedGroup && effectiveSelectedGroup.currentSize < effectiveSelectedGroup.maxSize && (
               <Button onClick={() => {
                 setShowGroupDetailsDialog(false)
-                handleJoinRequest(selectedGroup)
-              }}>
+                handleJoinRequest(effectiveSelectedGroup)
+              }} disabled={effectiveSelectedGroup.isJoinable === false}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Request to Join
               </Button>
@@ -1429,6 +2116,3 @@ export function StudentTeamMemberPage() {
     </div>
   )
 }
-
-// Add missing Send import
-import { Send } from "lucide-react"

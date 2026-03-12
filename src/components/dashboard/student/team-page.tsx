@@ -29,6 +29,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
@@ -38,6 +39,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { StudentTeamMemberPage } from "@/components/dashboard/student/team-student-member-page"
 import { useAuthStore } from "@/store/auth-store"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -50,12 +57,17 @@ import {
   useAvailableStudents,
   useCreateProjectGroupInvitation,
   useCreateProjectGroup,
+  useApproveMyGroupJoinRequest,
+  useRejectMyGroupJoinRequest,
+  useSubmitMyProjectGroup,
+  useReopenMyProjectGroup,
+  useMyGroupJoinRequests,
   useMyProjectGroup,
 } from "@/lib/hooks/use-project-groups"
 import { useDepartmentGroupSizeSettings } from "@/lib/hooks/use-department-group-size-settings"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/errors"
-import type { AvailableStudentListItem } from "@/types/project-groups"
+import type { AvailableStudentListItem, MyProjectGroupJoinRequestStatus } from "@/types/project-groups"
 import {
   createProjectGroupSchema,
   parseTechnologiesInput,
@@ -154,8 +166,6 @@ function CreateGroupForm({
 }
 
 export function StudentTeamPage() {
-  const [groupSubmitted, setGroupSubmitted] = useState(false)
-  const [groupApproved] = useState(false)
   const [groupInfo, setGroupInfo] = useState<CreateGroupFormData | null>(null)
   const [groupExists, setGroupExists] = useState(false)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
@@ -173,8 +183,19 @@ export function StudentTeamPage() {
     avatarUrl?: string | null
   }>(null)
   const [activeTab, setActiveTab] = useState("overview")
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false)
+  const [approveConfirmRequestId, setApproveConfirmRequestId] = useState<string | null>(null)
+  const [approveConfirmStudentName, setApproveConfirmStudentName] = useState<string | null>(null)
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false)
+  const [rejectConfirmRequestId, setRejectConfirmRequestId] = useState<string | null>(null)
+  const [rejectConfirmStudentName, setRejectConfirmStudentName] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
   const createProjectGroupMutation = useCreateProjectGroup()
   const createInvitationMutation = useCreateProjectGroupInvitation()
+  const approveJoinRequestMutation = useApproveMyGroupJoinRequest()
+  const rejectJoinRequestMutation = useRejectMyGroupJoinRequest()
+  const submitMyProjectGroupMutation = useSubmitMyProjectGroup()
+  const reopenMyProjectGroupMutation = useReopenMyProjectGroup()
   const queryClient = useQueryClient()
 
   const [studentProfilesPage, setStudentProfilesPage] = useState(1)
@@ -184,6 +205,12 @@ export function StudentTeamPage() {
   const availableStudentsLimit = 20
   const [availableStudentsSearchInput, setAvailableStudentsSearchInput] = useState("")
   const [availableStudentsSearch, setAvailableStudentsSearch] = useState<string | undefined>(undefined)
+
+  const [myGroupJoinRequestsPage, setMyGroupJoinRequestsPage] = useState(1)
+  const [myGroupJoinRequestsLimit, setMyGroupJoinRequestsLimit] = useState(10)
+  const [myGroupJoinRequestsStatus, setMyGroupJoinRequestsStatus] = useState<
+    "ALL" | MyProjectGroupJoinRequestStatus
+  >("PENDING")
 
   const [availableStudentDetailsOpen, setAvailableStudentDetailsOpen] = useState(false)
   const [selectedAvailableStudent, setSelectedAvailableStudent] = useState<AvailableStudentListItem | null>(null)
@@ -216,7 +243,29 @@ export function StudentTeamPage() {
 
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken) && isApprovedGroupManager)
 
+  const myGroupJoinRequestsStatusParam =
+    myGroupJoinRequestsStatus === "ALL" ? undefined : myGroupJoinRequestsStatus
+
+  const myGroupJoinRequestsQuery = useMyGroupJoinRequests({
+    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    page: myGroupJoinRequestsPage,
+    limit: myGroupJoinRequestsLimit,
+    status: myGroupJoinRequestsStatusParam,
+  })
+
+  const pendingJoinRequestsCountQuery = useMyGroupJoinRequests({
+    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    page: 1,
+    limit: 1,
+    status: "PENDING",
+  })
+
   const myGroup = myProjectGroupQuery.data ?? null
+  const groupStatus = myGroup?.status ?? undefined
+  const groupApproved = groupStatus === "APPROVED"
+  const groupSubmitted = groupStatus === "SUBMITTED"
+  const groupRejected = groupStatus === "REJECTED"
+  const groupIsDraft = (groupStatus ?? "DRAFT") === "DRAFT"
   const myGroupErrorStatus =
     myProjectGroupQuery.isError && isAxiosError(myProjectGroupQuery.error)
       ? Number(myProjectGroupQuery.error.response?.status)
@@ -296,10 +345,174 @@ export function StudentTeamPage() {
         ]
       : []
 
-  const pendingRequests = [
-    { id: 5, name: 'Alex Brown', department: departmentName, requestedAt: '2024-01-18' },
-    { id: 6, name: 'Emily Davis', department: departmentName, requestedAt: '2024-01-18' },
-  ]
+  const pendingJoinRequestsCount =
+    pendingJoinRequestsCountQuery.data?.pagination?.total ??
+    pendingJoinRequestsCountQuery.data?.items?.length ??
+    0
+
+  const myGroupJoinRequestsItems = myGroupJoinRequestsQuery.data?.items ?? []
+
+  const myGroupJoinRequestsStatusLabel = (value: "ALL" | MyProjectGroupJoinRequestStatus) => {
+    switch (value) {
+      case "ALL":
+        return "All"
+      case "PENDING":
+        return "Pending"
+      case "APPROVED":
+        return "Approved"
+      case "REJECTED":
+        return "Rejected"
+      case "REVOKED":
+        return "Revoked"
+      case "CANCELLED":
+        return "Cancelled"
+      default:
+        return value
+    }
+  }
+
+  const getJoinRequestStatusBadge = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending</Badge>
+      case "APPROVED":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Approved</Badge>
+      case "REJECTED":
+        return <Badge variant="destructive">Rejected</Badge>
+      case "REVOKED":
+        return <Badge variant="outline">Revoked</Badge>
+      case "CANCELLED":
+        return <Badge variant="outline">Cancelled</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const selectMyGroupJoinRequestsStatus = (next: "ALL" | MyProjectGroupJoinRequestStatus) => {
+    setMyGroupJoinRequestsStatus(next)
+    setMyGroupJoinRequestsPage(1)
+  }
+
+  const selectMyGroupJoinRequestsLimit = (next: number) => {
+    setMyGroupJoinRequestsLimit(next)
+    setMyGroupJoinRequestsPage(1)
+  }
+
+  const approveJoinRequest = async (requestId: string): Promise<boolean> => {
+    if (approveJoinRequestMutation.isPending) return false
+
+    try {
+      const result = await approveJoinRequestMutation.mutateAsync({ requestId })
+      if (result.memberAdded) {
+        toast.success("Student added to your group")
+      } else {
+        toast.message("Join request was already approved")
+      }
+
+      return true
+    } catch (error) {
+      const message = getErrorMessage(error, "Failed to approve join request")
+      const normalized = message.toLowerCase()
+
+      if (normalized.includes("not found")) {
+        toast.error("Join request not found")
+        return false
+      }
+
+      if (
+        normalized.includes("rejected") ||
+        normalized.includes("revoked") ||
+        normalized.includes("cancelled")
+      ) {
+        toast.error(message)
+        return false
+      }
+
+      if (normalized.includes("not accepting") && normalized.includes("join")) {
+        toast.error("Group is not accepting join requests")
+        return false
+      }
+
+      if (normalized.includes("already") && normalized.includes("joined") && normalized.includes("group")) {
+        toast.error("Student has already joined a group")
+        return false
+      }
+
+      if (normalized.includes("already") && normalized.includes("group leader")) {
+        toast.error("Student is already a group leader")
+        return false
+      }
+
+      if (normalized.includes("group") && normalized.includes("full")) {
+        toast.error("Group is full")
+        return false
+      }
+
+      if (normalized.includes("only") && normalized.includes("approved") && normalized.includes("group")) {
+        toast.error("Only approved group leaders can perform this action")
+        return false
+      }
+
+      toast.error(message)
+
+      return false
+    }
+  }
+
+  const rejectJoinRequest = async (requestId: string, reason?: string): Promise<boolean> => {
+    if (rejectJoinRequestMutation.isPending) return false
+
+    const trimmedReason = reason?.trim()
+    if (trimmedReason && trimmedReason.length > 500) {
+      toast.error("Reason must be 500 characters or less")
+      return false
+    }
+
+    try {
+      const result = await rejectJoinRequestMutation.mutateAsync({
+        requestId,
+        dto: trimmedReason ? { reason: trimmedReason } : {},
+      })
+
+      if (result.request?.status === "REJECTED") {
+        toast.success("Join request rejected")
+      } else {
+        toast.message("Request updated")
+      }
+
+      return true
+    } catch (error) {
+      const message = getErrorMessage(error, "Failed to reject join request")
+      const normalized = message.toLowerCase()
+
+      if (normalized.includes("not found")) {
+        toast.error("Join request not found")
+        return false
+      }
+
+      if (
+        normalized.includes("approved") ||
+        normalized.includes("revoked") ||
+        normalized.includes("cancelled")
+      ) {
+        toast.error(message)
+        return false
+      }
+
+      if (normalized.includes("only") && normalized.includes("pending")) {
+        toast.error(message)
+        return false
+      }
+
+      if (normalized.includes("only") && normalized.includes("approved") && normalized.includes("group")) {
+        toast.error("Only approved group leaders can perform this action")
+        return false
+      }
+
+      toast.error(message)
+      return false
+    }
+  }
 
   const safeExternalUrl = (value?: string | null): string | null => {
     if (!value) return null
@@ -391,13 +604,20 @@ export function StudentTeamPage() {
   })
 
   const isGroupManager = isApprovedGroupManager
-  const canEditGroup = !groupApproved && !groupSubmitted && isGroupManager
+  const canEditGroup = isGroupManager && groupIsDraft
   const groupSize = groupMembers.length
   const fallbackMinGroupSize = 3
-  const fallbackMaxGroupSize = 7
+  const fallbackMaxGroupSize = 5
   const minGroupSize = groupSizeSettingsQuery.data?.minGroupSize ?? fallbackMinGroupSize
   const maxGroupSize = groupSizeSettingsQuery.data?.maxGroupSize ?? fallbackMaxGroupSize
   const groupProgress = maxGroupSize > 0 ? (groupSize / maxGroupSize) * 100 : 0
+
+  const canSubmitGroup =
+    Boolean(myGroup) &&
+    canEditGroup &&
+    groupIsDraft &&
+    groupSize >= minGroupSize &&
+    groupSize <= maxGroupSize
 
   const canInviteMoreMembers = groupSize < maxGroupSize
 
@@ -467,6 +687,44 @@ export function StudentTeamPage() {
         </Alert>
       )}
 
+      {groupRejected && (
+        <Alert className="mb-6" variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Group Rejected</AlertTitle>
+          <AlertDescription>
+            <div className="space-y-3">
+              <p>
+                Your group was rejected. Reopen it to return to draft and make changes before submitting again.
+              </p>
+              <div>
+                <Button
+                  variant="outline"
+                  disabled={reopenMyProjectGroupMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await reopenMyProjectGroupMutation.mutateAsync()
+                      toast.success("Group reopened")
+                    } catch (error) {
+                      const message = getErrorMessage(error, "Failed to reopen group")
+                      toast.error(message)
+                    }
+                  }}
+                >
+                  {reopenMyProjectGroupMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Reopening…
+                    </>
+                  ) : (
+                    "Reopen Group"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Main Content Tabs */}
       <Tabs value={derivedActiveTab} className="space-y-6" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
@@ -481,9 +739,9 @@ export function StudentTeamPage() {
           <TabsTrigger value="requests" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Requests</span>
-            {pendingRequests.length > 0 && (
+            {pendingJoinRequestsCount > 0 && (
               <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0">
-                {pendingRequests.length}
+                {pendingJoinRequestsCount}
               </Badge>
             )}
           </TabsTrigger>
@@ -651,7 +909,7 @@ export function StudentTeamPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{pendingRequests.length}</div>
+                <div className="text-2xl font-bold">{pendingJoinRequestsCount}</div>
                 <p className="text-xs text-muted-foreground">Pending Requests</p>
               </CardContent>
             </Card>
@@ -901,14 +1159,30 @@ export function StudentTeamPage() {
                   <div>
                     <p className="text-sm font-medium">Group Status</p>
                     <p className="text-xs text-muted-foreground">
-                      {groupSize >= minGroupSize ? '✓ Ready for submission' : `Need ${minGroupSize - groupSize} more members`}
+                      {groupSize < minGroupSize
+                        ? `Need ${minGroupSize - groupSize} more members`
+                        : groupSize > maxGroupSize
+                          ? `Too many members (max ${maxGroupSize})`
+                          : "✓ Ready for submission"}
                     </p>
                   </div>
                   <Button 
-                    disabled={groupSize < minGroupSize || groupSize > maxGroupSize}
-                    onClick={() => setGroupSubmitted(true)}
+                    disabled={!canSubmitGroup || submitMyProjectGroupMutation.isPending}
+                    onClick={async () => {
+                      try {
+                        await submitMyProjectGroupMutation.mutateAsync()
+                        toast.success("Group submitted for review")
+                      } catch (error) {
+                        const message = getErrorMessage(error, "Failed to submit group")
+                        toast.error(message)
+                      }
+                    }}
                   >
-                    <Send className="h-4 w-4 mr-2" />
+                    {submitMyProjectGroupMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
                     Submit for Approval
                   </Button>
                 </div>
@@ -1055,48 +1329,310 @@ export function StudentTeamPage() {
         <TabsContent value="requests" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pending Join Requests</CardTitle>
+              <CardTitle>
+                {myGroupJoinRequestsStatus === "PENDING" ? "Pending Join Requests" : "Join Requests"}
+              </CardTitle>
               <CardDescription>
                 Students requesting to join your group
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {pendingRequests.length > 0 ? (
-                <div className="space-y-4">
-                  {pendingRequests.map((request) => (
-                    <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                      <div className="flex items-start gap-3">
-                        <Avatar>
-                          <AvatarFallback>{getInitials(request.name)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{request.name}</p>
-                          <p className="text-sm text-muted-foreground">{request.department}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Requested: {new Date(request.requestedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      {isGroupManager && !groupApproved && (
-                        <div className="flex gap-2 self-end sm:self-center">
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                            <UserCheck className="h-4 w-4 mr-2" />
-                            Approve
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-red-600">
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Reject
-                          </Button>
-                        </div>
+              <Dialog
+                open={approveConfirmOpen}
+                onOpenChange={(open) => {
+                  setApproveConfirmOpen(open)
+                  if (!open) {
+                    setApproveConfirmRequestId(null)
+                    setApproveConfirmStudentName(null)
+                  }
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Approve join request?</DialogTitle>
+                    <DialogDescription>
+                      {approveConfirmStudentName ? (
+                        <>
+                          This will add <span className="font-medium text-foreground">{approveConfirmStudentName}</span> to your group.
+                          The student will be removed from any other pending join requests and invitations.
+                        </>
+                      ) : (
+                        "This will add the student to your group and revoke their other pending requests/invitations."
                       )}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={approveJoinRequestMutation.isPending}
+                      onClick={() => setApproveConfirmOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={approveJoinRequestMutation.isPending || !approveConfirmRequestId}
+                      onClick={async () => {
+                        if (!approveConfirmRequestId) return
+                        const didApprove = await approveJoinRequest(approveConfirmRequestId)
+                        if (didApprove) {
+                          setApproveConfirmOpen(false)
+                        }
+                      }}
+                    >
+                      {approveJoinRequestMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Approving…
+                        </>
+                      ) : (
+                        "Approve"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog
+                open={rejectConfirmOpen}
+                onOpenChange={(open) => {
+                  setRejectConfirmOpen(open)
+                  if (!open) {
+                    setRejectConfirmRequestId(null)
+                    setRejectConfirmStudentName(null)
+                    setRejectReason("")
+                  }
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Reject join request?</DialogTitle>
+                    <DialogDescription>
+                      {rejectConfirmStudentName ? (
+                        <>
+                          You’re about to reject <span className="font-medium text-foreground">{rejectConfirmStudentName}</span>.
+                          You may optionally provide a reason.
+                        </>
+                      ) : (
+                        "You may optionally provide a rejection reason."
+                      )}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reject-reason">Reason (optional)</Label>
+                    <Textarea
+                      id="reject-reason"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      rows={4}
+                      maxLength={500}
+                      placeholder="e.g. Group is currently full for our tech stack needs"
+                      disabled={rejectJoinRequestMutation.isPending}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      {rejectReason.length}/500
                     </div>
-                  ))}
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={rejectJoinRequestMutation.isPending}
+                      onClick={() => setRejectConfirmOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="text-red-600"
+                      disabled={rejectJoinRequestMutation.isPending || !rejectConfirmRequestId}
+                      onClick={async () => {
+                        if (!rejectConfirmRequestId) return
+                        const didReject = await rejectJoinRequest(rejectConfirmRequestId, rejectReason)
+                        if (didReject) {
+                          setRejectConfirmOpen(false)
+                        }
+                      }}
+                    >
+                      {rejectJoinRequestMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Rejecting…
+                        </>
+                      ) : (
+                        "Reject"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {myGroupJoinRequestsQuery.isLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="mt-2">Loading requests…</span>
                 </div>
+              ) : myGroupJoinRequestsQuery.isError ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Failed to load join requests</AlertTitle>
+                  <AlertDescription>{getErrorMessage(myGroupJoinRequestsQuery.error, "Please try again")}</AlertDescription>
+                </Alert>
               ) : (
-                <div className="text-center py-8">
-                  <UserCheck className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No pending requests</p>
-                </div>
+                <>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Status: {myGroupJoinRequestsStatusLabel(myGroupJoinRequestsStatus)}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("ALL")}>All</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("PENDING")}>Pending</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("APPROVED")}>Approved</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("REJECTED")}>Rejected</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("REVOKED")}>Revoked</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsStatus("CANCELLED")}>Cancelled</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Limit: {myGroupJoinRequestsLimit}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsLimit(5)}>5</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsLimit(10)}>10</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => selectMyGroupJoinRequestsLimit(20)}>20</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={myGroupJoinRequestsPage <= 1 || myGroupJoinRequestsQuery.isFetching}
+                        onClick={() => setMyGroupJoinRequestsPage((p) => Math.max(1, p - 1))}
+                      >
+                        Previous
+                      </Button>
+
+                      <div className="text-sm text-muted-foreground">
+                        <span className="hidden sm:inline">
+                          Page <span className="font-medium text-foreground">{myGroupJoinRequestsPage}</span> of{" "}
+                          <span className="font-medium text-foreground">{myGroupJoinRequestsQuery.data?.pagination?.pages ?? 1}</span>
+                        </span>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={(() => {
+                          if (myGroupJoinRequestsQuery.isFetching) return true
+                          const pages = myGroupJoinRequestsQuery.data?.pagination?.pages
+                          if (typeof pages === "number" && Number.isFinite(pages)) {
+                            return myGroupJoinRequestsPage >= pages
+                          }
+                          return (myGroupJoinRequestsQuery.data?.items?.length ?? 0) < myGroupJoinRequestsLimit
+                        })()}
+                        onClick={() => setMyGroupJoinRequestsPage((p) => p + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+
+                  {myGroupJoinRequestsItems.length > 0 ? (
+                    <div className="space-y-4">
+                      {myGroupJoinRequestsItems.map((request) => {
+                        const studentName =
+                          [request.student?.firstName, request.student?.lastName].filter(Boolean).join(" ") ||
+                          request.student?.email ||
+                          "Student"
+                        const studentDepartment = request.student?.departmentName || departmentName || "Unknown department"
+
+                        return (
+                          <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                            <div className="flex items-start gap-3">
+                              <Avatar>
+                                <AvatarImage src={request.student?.avatarUrl ?? undefined} />
+                                <AvatarFallback>{getInitials(studentName)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-medium">{studentName}</p>
+                                  {getJoinRequestStatusBadge(String(request.status ?? ""))}
+                                </div>
+                                <p className="text-sm text-muted-foreground">{studentDepartment}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Requested: {new Date(request.createdAt).toLocaleDateString()}
+                                </p>
+                                {request.status === "REJECTED" && request.rejectionReason ? (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Reason: {request.rejectionReason}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                            {canEditGroup && request.status === "PENDING" && (
+                              <div className="flex gap-2 self-end sm:self-center">
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  disabled={approveJoinRequestMutation.isPending}
+                                  onClick={() => {
+                                    setApproveConfirmRequestId(request.id)
+                                    setApproveConfirmStudentName(studentName)
+                                    setApproveConfirmOpen(true)
+                                  }}
+                                >
+                                  {approveJoinRequestMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                  )}
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600"
+                                  disabled={rejectJoinRequestMutation.isPending}
+                                  onClick={() => {
+                                    setRejectConfirmRequestId(request.id)
+                                    setRejectConfirmStudentName(studentName)
+                                    setRejectReason("")
+                                    setRejectConfirmOpen(true)
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <UserCheck className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {myGroupJoinRequestsStatus === "PENDING" ? "No pending requests" : "No requests found"}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
