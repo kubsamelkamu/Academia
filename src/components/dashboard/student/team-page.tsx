@@ -247,14 +247,14 @@ export function StudentTeamPage() {
     myGroupJoinRequestsStatus === "ALL" ? undefined : myGroupJoinRequestsStatus
 
   const myGroupJoinRequestsQuery = useMyGroupJoinRequests({
-    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    enabled: Boolean(accessToken) && isApprovedGroupManager && Boolean(myProjectGroupQuery.data),
     page: myGroupJoinRequestsPage,
     limit: myGroupJoinRequestsLimit,
     status: myGroupJoinRequestsStatusParam,
   })
 
   const pendingJoinRequestsCountQuery = useMyGroupJoinRequests({
-    enabled: Boolean(accessToken) && isApprovedGroupManager,
+    enabled: Boolean(accessToken) && isApprovedGroupManager && Boolean(myProjectGroupQuery.data),
     page: 1,
     limit: 1,
     status: "PENDING",
@@ -279,7 +279,12 @@ export function StudentTeamPage() {
   const myGroupForbidden = myProjectGroupQuery.isError && myGroupErrorStatus === 403
 
   const derivedGroupExists = Boolean(myGroup) || (!myGroupNotFound && groupExists)
-  const derivedActiveTab = myGroupNotFound ? "my-group" : activeTab
+  const derivedActiveTab = (() => {
+    if (!myGroup && (activeTab === "requests" || activeTab === "available")) {
+      return "my-group"
+    }
+    return activeTab
+  })()
   const shouldAutoOpenCreateGroup = myGroupNotFound && !createGroupDismissed
 
   const handleTechnologyClick = async (tech: string) => {
@@ -736,7 +741,7 @@ export function StudentTeamPage() {
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">My Group</span>
           </TabsTrigger>
-          <TabsTrigger value="requests" className="flex items-center gap-2">
+          <TabsTrigger value="requests" className="flex items-center gap-2" disabled={!myGroup}>
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Requests</span>
             {pendingJoinRequestsCount > 0 && (
@@ -745,7 +750,7 @@ export function StudentTeamPage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="available" className="flex items-center gap-2">
+          <TabsTrigger value="available" className="flex items-center gap-2" disabled={!myGroup}>
             <UserPlus className="h-4 w-4" />
             <span className="hidden sm:inline">Available</span>
           </TabsTrigger>
