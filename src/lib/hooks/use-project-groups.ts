@@ -12,6 +12,8 @@ import {
   submitMyProjectGroup,
   reopenMyProjectGroup,
   listMyGroupAnnouncements,
+  createMyGroupAnnouncement,
+  getMyGroupAnnouncementById,
   getAvailableStudents,
   getMyProjectGroupJoinRequests,
   getMyGroupJoinRequests,
@@ -39,7 +41,7 @@ import type {
   ProjectGroupDetails,
   ProjectGroupMe,
 } from "@/types/project-groups"
-import type { ListAnnouncementsData } from "@/types/announcements"
+import type { AnnouncementDetails, CreateMyGroupAnnouncementDto, ListAnnouncementsData } from "@/types/announcements"
 
 
 export function projectGroupKeys() {
@@ -57,6 +59,8 @@ export function projectGroupKeys() {
       [...projectGroupKeys().root, "join-requests", "my-group", params] as const,
     announcementsMyGroup: (params: { page: number; limit: number }) =>
       [...projectGroupKeys().root, "announcements", "my-group", params] as const,
+    announcementMyGroup: (announcementId: string) =>
+      [...projectGroupKeys().root, "announcements", "my-group", announcementId] as const,
   }
 }
 
@@ -283,5 +287,36 @@ export function useMyGroupAnnouncements(params: {
     enabled: params.enabled,
     staleTime: 30_000,
     retry: false,
+  })
+}
+
+export function useMyGroupAnnouncementById(params: {
+  enabled: boolean
+  announcementId: string | null
+}) {
+  const announcementId = params.announcementId?.trim() ? params.announcementId.trim() : null
+
+  return useQuery<AnnouncementDetails, Error>({
+    queryKey: projectGroupKeys().announcementMyGroup(announcementId ?? ""),
+    queryFn: () => {
+      if (!announcementId) throw new Error("announcementId is required")
+      return getMyGroupAnnouncementById(announcementId)
+    },
+    enabled: params.enabled && Boolean(announcementId),
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useCreateMyGroupAnnouncement() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (dto: CreateMyGroupAnnouncementDto) => createMyGroupAnnouncement(dto),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: projectGroupKeys().root,
+      })
+    },
   })
 }

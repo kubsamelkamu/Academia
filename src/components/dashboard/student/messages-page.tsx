@@ -43,7 +43,8 @@ import {
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
-import { useMyGroupAnnouncements } from "@/lib/hooks/use-project-groups"
+import { useCreateMyGroupAnnouncement, useMyGroupAnnouncements } from "@/lib/hooks/use-project-groups"
+import { createMyGroupAnnouncementSchema } from "@/validations/announcements"
 
 type MessageStatus = 'sent' | 'delivered' | 'read'
 type UserStatus = 'online' | 'away' | 'offline'
@@ -117,7 +118,6 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
 
 export function StudentMessagesPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const user = useAuthStore((s) => s.user)
   const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
   const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
 
@@ -126,6 +126,8 @@ export function StudentMessagesPage() {
     page: 1,
     limit: 20,
   })
+
+  const createAnnouncementMutation = useCreateMyGroupAnnouncement()
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messageInput, setMessageInput] = useState('')
@@ -286,7 +288,6 @@ export function StudentMessagesPage() {
     ]
   }
 
-  const [localAnnouncements, setLocalAnnouncements] = useState<Announcement[]>([])
   const [createAnnouncementOpen, setCreateAnnouncementOpen] = useState(false)
   const [announcementTitle, setAnnouncementTitle] = useState("")
   const [announcementContent, setAnnouncementContent] = useState("")
@@ -313,8 +314,8 @@ export function StudentMessagesPage() {
         })
       : null
 
-    return [...localAnnouncements, ...(mapped ?? INITIAL_ANNOUNCEMENTS)]
-  }, [announcementItems, localAnnouncements])
+    return mapped ?? INITIAL_ANNOUNCEMENTS
+  }, [announcementItems])
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
@@ -385,30 +386,38 @@ export function StudentMessagesPage() {
     alert(`${type === 'audio' ? 'Audio' : 'Video'} call initiated with ${selectedConversation?.name}`)
   }
 
-  const handleCreateAnnouncement = () => {
-    if (!announcementTitle.trim() || !announcementContent.trim()) {
-      toast.error("Title and content are required")
+  const handleCreateAnnouncement = async () => {
+    const priorityApi =
+      announcementPriority === "high" ? "HIGH" : announcementPriority === "low" ? "LOW" : "MEDIUM"
+
+    const parsed = createMyGroupAnnouncementSchema.safeParse({
+      title: announcementTitle,
+      priority: priorityApi,
+      message: announcementContent,
+    })
+
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "Invalid announcement"
+      toast.error(message)
       return
     }
 
-    const newAnnouncement: Announcement = {
-      id: `a-${Date.now()}`,
-      title: announcementTitle.trim(),
-      content: announcementContent.trim(),
-      date: new Date().toISOString().split("T")[0],
-      author:
-        [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-        user?.email ||
-        "You",
-      priority: announcementPriority,
-    }
+    try {
+      await createAnnouncementMutation.mutateAsync({
+        title: parsed.data.title,
+        priority: parsed.data.priority,
+        message: parsed.data.message,
+      })
 
-    setLocalAnnouncements((prev) => [newAnnouncement, ...prev])
-    setAnnouncementTitle("")
-    setAnnouncementContent("")
-    setAnnouncementPriority("medium")
-    setCreateAnnouncementOpen(false)
-    toast.success("Announcement posted")
+      setAnnouncementTitle("")
+      setAnnouncementContent("")
+      setAnnouncementPriority("medium")
+      setCreateAnnouncementOpen(false)
+      toast.success("Announcement posted")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to post announcement"
+      toast.error(message)
+    }
   }
 
   return (

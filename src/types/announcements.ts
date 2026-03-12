@@ -1,5 +1,14 @@
 export type AnnouncementPriority = "HIGH" | "MEDIUM" | "LOW"
 export type AttachmentType = "NONE" | "FILE" | "LINK"
+export type AttachmentResourceType = "image" | "raw"
+
+export type CreateMyGroupAnnouncementDto = {
+  title: string
+  priority: AnnouncementPriority
+  message: string
+  attachment?: File
+  attachmentUrl?: string
+}
 
 export type AnnouncementItem = {
   id: string
@@ -23,6 +32,15 @@ export type AnnouncementItem = {
     lastName: string | null
     avatarUrl: string | null
   }
+}
+
+export type AnnouncementDetails = AnnouncementItem & {
+  tenantId: string
+  departmentId: string
+  createdByUserId: string
+
+  attachmentPublicId: string | null
+  attachmentResourceType: AttachmentResourceType | null
 }
 
 export type ListAnnouncementsData = {

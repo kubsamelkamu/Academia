@@ -22,7 +22,12 @@ import type {
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
-import type { ListAnnouncementsData } from "@/types/announcements"
+import type {
+  AnnouncementDetails,
+  AnnouncementItem,
+  CreateMyGroupAnnouncementDto,
+  ListAnnouncementsData,
+} from "@/types/announcements"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -310,6 +315,59 @@ export async function listMyGroupAnnouncements(params: {
       limit,
     },
   })
+
+  return response.data
+}
+
+export async function createMyGroupAnnouncement(dto: CreateMyGroupAnnouncementDto): Promise<AnnouncementItem> {
+  const title = dto.title.trim()
+  const message = dto.message.trim()
+  const attachmentUrl = dto.attachmentUrl?.trim() ? dto.attachmentUrl.trim() : undefined
+
+  if (!title) {
+    throw new Error("title is required")
+  }
+  if (!message) {
+    throw new Error("message is required")
+  }
+
+  if (dto.attachment && attachmentUrl) {
+    throw new Error("Provide either attachment or attachmentUrl, not both")
+  }
+
+  const formData = new FormData()
+  formData.append("title", title)
+  formData.append("priority", dto.priority)
+  formData.append("message", message)
+
+  if (dto.attachment) {
+    const maxBytes = 5 * 1024 * 1024
+    if (dto.attachment.size > maxBytes) {
+      throw new Error("Attachment must be 5MB or less")
+    }
+    formData.append("attachment", dto.attachment)
+  } else if (attachmentUrl) {
+    formData.append("attachmentUrl", attachmentUrl)
+  }
+
+  const response = await apiClient.post<AnnouncementItem>("/project-groups/me/announcements", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+
+  return response.data
+}
+
+export async function getMyGroupAnnouncementById(announcementId: string): Promise<AnnouncementDetails> {
+  const trimmed = announcementId.trim()
+  if (!trimmed) {
+    throw new Error("announcementId is required")
+  }
+
+  const response = await apiClient.get<AnnouncementDetails>(
+    `/project-groups/me/announcements/${encodeURIComponent(trimmed)}`
+  )
 
   return response.data
 }
