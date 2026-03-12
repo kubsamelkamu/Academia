@@ -10,6 +10,16 @@ export type CreateMyGroupAnnouncementDto = {
   attachmentUrl?: string
 }
 
+export type UpdateMyGroupAnnouncementDto = {
+  title?: string
+  priority?: AnnouncementPriority
+  message?: string
+
+  attachment?: File
+  attachmentUrl?: string
+  removeAttachment?: boolean
+}
+
 export type AnnouncementItem = {
   id: string
   projectGroupId: string

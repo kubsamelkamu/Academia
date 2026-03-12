@@ -26,6 +26,7 @@ import type {
   AnnouncementDetails,
   AnnouncementItem,
   CreateMyGroupAnnouncementDto,
+  UpdateMyGroupAnnouncementDto,
   ListAnnouncementsData,
 } from "@/types/announcements"
 
@@ -367,6 +368,72 @@ export async function getMyGroupAnnouncementById(announcementId: string): Promis
 
   const response = await apiClient.get<AnnouncementDetails>(
     `/project-groups/me/announcements/${encodeURIComponent(trimmed)}`
+  )
+
+  return response.data
+}
+
+export async function updateMyGroupAnnouncement(
+  announcementId: string,
+  dto: UpdateMyGroupAnnouncementDto
+): Promise<AnnouncementItem> {
+  const trimmedId = announcementId.trim()
+  if (!trimmedId) {
+    throw new Error("announcementId is required")
+  }
+
+  const title = dto.title?.trim()
+  const message = dto.message?.trim()
+  const attachmentUrl = dto.attachmentUrl?.trim() ? dto.attachmentUrl.trim() : undefined
+  const removeAttachment = dto.removeAttachment === true
+
+  const attachmentOps = Number(Boolean(dto.attachment)) + Number(Boolean(attachmentUrl)) + Number(removeAttachment)
+  if (attachmentOps > 1) {
+    throw new Error("Choose only one attachment operation: attachment, attachmentUrl, or removeAttachment")
+  }
+
+  const hasAnyUpdate =
+    typeof title === "string" ||
+    typeof message === "string" ||
+    typeof dto.priority === "string" ||
+    attachmentOps === 1
+
+  if (!hasAnyUpdate) {
+    throw new Error("No updates provided")
+  }
+
+  if (typeof title === "string" && !title) {
+    throw new Error("title cannot be empty")
+  }
+  if (typeof message === "string" && !message) {
+    throw new Error("message cannot be empty")
+  }
+
+  const formData = new FormData()
+  if (typeof title === "string") formData.append("title", title)
+  if (typeof dto.priority === "string") formData.append("priority", dto.priority)
+  if (typeof message === "string") formData.append("message", message)
+
+  if (dto.attachment) {
+    const maxBytes = 5 * 1024 * 1024
+    if (dto.attachment.size > maxBytes) {
+      throw new Error("Attachment must be 5MB or less")
+    }
+    formData.append("attachment", dto.attachment)
+  } else if (attachmentUrl) {
+    formData.append("attachmentUrl", attachmentUrl)
+  } else if (removeAttachment) {
+    formData.append("removeAttachment", "true")
+  }
+
+  const response = await apiClient.patch<AnnouncementItem>(
+    `/project-groups/me/announcements/${encodeURIComponent(trimmedId)}`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
   )
 
   return response.data

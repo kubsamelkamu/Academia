@@ -14,6 +14,7 @@ import {
   listMyGroupAnnouncements,
   createMyGroupAnnouncement,
   getMyGroupAnnouncementById,
+  updateMyGroupAnnouncement,
   getAvailableStudents,
   getMyProjectGroupJoinRequests,
   getMyGroupJoinRequests,
@@ -41,7 +42,12 @@ import type {
   ProjectGroupDetails,
   ProjectGroupMe,
 } from "@/types/project-groups"
-import type { AnnouncementDetails, CreateMyGroupAnnouncementDto, ListAnnouncementsData } from "@/types/announcements"
+import type {
+  AnnouncementDetails,
+  CreateMyGroupAnnouncementDto,
+  ListAnnouncementsData,
+  UpdateMyGroupAnnouncementDto,
+} from "@/types/announcements"
 
 
 export function projectGroupKeys() {
@@ -313,6 +319,20 @@ export function useCreateMyGroupAnnouncement() {
 
   return useMutation({
     mutationFn: (dto: CreateMyGroupAnnouncementDto) => createMyGroupAnnouncement(dto),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: projectGroupKeys().root,
+      })
+    },
+  })
+}
+
+export function useUpdateMyGroupAnnouncement() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { announcementId: string; dto: UpdateMyGroupAnnouncementDto }) =>
+      updateMyGroupAnnouncement(params.announcementId, params.dto),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: projectGroupKeys().root,
