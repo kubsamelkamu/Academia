@@ -62,3 +62,7 @@ export type ListAnnouncementsData = {
     pages: number
   }
 }
+
+export type DeleteAnnouncementResult = {
+  deleted: boolean
+}

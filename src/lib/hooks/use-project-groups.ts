@@ -15,6 +15,7 @@ import {
   createMyGroupAnnouncement,
   getMyGroupAnnouncementById,
   updateMyGroupAnnouncement,
+  deleteMyGroupAnnouncement,
   getAvailableStudents,
   getMyProjectGroupJoinRequests,
   getMyGroupJoinRequests,
@@ -333,6 +334,19 @@ export function useUpdateMyGroupAnnouncement() {
   return useMutation({
     mutationFn: (params: { announcementId: string; dto: UpdateMyGroupAnnouncementDto }) =>
       updateMyGroupAnnouncement(params.announcementId, params.dto),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: projectGroupKeys().root,
+      })
+    },
+  })
+}
+
+export function useDeleteMyGroupAnnouncement() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { announcementId: string }) => deleteMyGroupAnnouncement(params.announcementId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: projectGroupKeys().root,

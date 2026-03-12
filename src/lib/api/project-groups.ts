@@ -24,6 +24,7 @@ import type {
 } from "@/types/project-groups"
 import type {
   AnnouncementDetails,
+  DeleteAnnouncementResult,
   AnnouncementItem,
   CreateMyGroupAnnouncementDto,
   UpdateMyGroupAnnouncementDto,
@@ -434,6 +435,19 @@ export async function updateMyGroupAnnouncement(
         "Content-Type": "multipart/form-data",
       },
     }
+  )
+
+  return response.data
+}
+
+export async function deleteMyGroupAnnouncement(announcementId: string): Promise<DeleteAnnouncementResult> {
+  const trimmedId = announcementId.trim()
+  if (!trimmedId) {
+    throw new Error("announcementId is required")
+  }
+
+  const response = await apiClient.delete<DeleteAnnouncementResult>(
+    `/project-groups/me/announcements/${encodeURIComponent(trimmedId)}`
   )
 
   return response.data
