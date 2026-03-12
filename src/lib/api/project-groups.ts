@@ -22,6 +22,7 @@ import type {
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
+import type { ListAnnouncementsData } from "@/types/announcements"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -293,6 +294,23 @@ export async function submitMyProjectGroup(): Promise<SubmitMyProjectGroupResult
 
 export async function reopenMyProjectGroup(): Promise<ReopenMyProjectGroupResult> {
   const response = await apiClient.post<ReopenMyProjectGroupResult>("/project-groups/me/reopen")
+  return response.data
+}
+
+export async function listMyGroupAnnouncements(params: {
+  page?: number
+  limit?: number
+} = {}): Promise<ListAnnouncementsData> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+
+  const response = await apiClient.get<ListAnnouncementsData>("/project-groups/me/announcements", {
+    params: {
+      page,
+      limit,
+    },
+  })
+
   return response.data
 }
 

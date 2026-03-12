@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
+import { useAuthStore } from "@/store/auth-store"
+import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import { useMyGroupAnnouncements } from "@/lib/hooks/use-project-groups"
 
 type MessageStatus = 'sent' | 'delivered' | 'read'
 type UserStatus = 'online' | 'away' | 'offline'
@@ -85,13 +88,44 @@ interface Announcement {
   priority: 'high' | 'medium' | 'low'
 }
 
+const INITIAL_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'a1',
+    title: 'Team Meeting Schedule',
+    content: 'Weekly sync meeting moved to Fridays at 3pm. Please update your calendars.',
+    date: '2024-07-25',
+    author: 'Dr. Sarah Chen',
+    priority: 'medium'
+  },
+  {
+    id: 'a2',
+    title: 'Milestone Deadline Reminder',
+    content: 'Design phase due in 3 days. All deliverables must be submitted by Friday.',
+    date: '2024-07-24',
+    author: 'Prof. James Wilson',
+    priority: 'high'
+  },
+  {
+    id: 'a3',
+    title: 'New Resource Available',
+    content: 'Research papers on AI ethics have been added to the shared drive.',
+    date: '2024-07-23',
+    author: 'John Smith',
+    priority: 'low'
+  },
+]
+
 export function StudentMessagesPage() {
-  const currentUser = {
-    id: "STU001",
-    name: "You",
-    managerApprovalStatus: "approved" as "approved" | "pending" | "rejected" | "not_requested",
-  }
-  const isApprovedGroupManager = currentUser.managerApprovalStatus === "approved"
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
+  const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
+
+  const announcementsQuery = useMyGroupAnnouncements({
+    enabled: Boolean(accessToken),
+    page: 1,
+    limit: 20,
+  })
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messageInput, setMessageInput] = useState('')
@@ -252,38 +286,35 @@ export function StudentMessagesPage() {
     ]
   }
 
-  const initialAnnouncements: Announcement[] = [
-    {
-      id: 'a1',
-      title: 'Team Meeting Schedule',
-      content: 'Weekly sync meeting moved to Fridays at 3pm. Please update your calendars.',
-      date: '2024-07-25',
-      author: 'Dr. Sarah Chen',
-      priority: 'medium'
-    },
-    {
-      id: 'a2',
-      title: 'Milestone Deadline Reminder',
-      content: 'Design phase due in 3 days. All deliverables must be submitted by Friday.',
-      date: '2024-07-24',
-      author: 'Prof. James Wilson',
-      priority: 'high'
-    },
-    {
-      id: 'a3',
-      title: 'New Resource Available',
-      content: 'Research papers on AI ethics have been added to the shared drive.',
-      date: '2024-07-23',
-      author: 'John Smith',
-      priority: 'low'
-    },
-  ]
-
-  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements)
+  const [localAnnouncements, setLocalAnnouncements] = useState<Announcement[]>([])
   const [createAnnouncementOpen, setCreateAnnouncementOpen] = useState(false)
   const [announcementTitle, setAnnouncementTitle] = useState("")
   const [announcementContent, setAnnouncementContent] = useState("")
   const [announcementPriority, setAnnouncementPriority] = useState<Announcement["priority"]>("medium")
+
+  const announcementItems = announcementsQuery.data?.items
+
+  const announcements: Announcement[] = useMemo(() => {
+    const mapped: Announcement[] | null = announcementItems
+      ? announcementItems.map((item) => {
+          const priority = item.priority === "HIGH" ? "high" : item.priority === "LOW" ? "low" : "medium"
+          const authorName =
+            [item.createdBy?.firstName, item.createdBy?.lastName].filter(Boolean).join(" ") ||
+            "Unknown"
+
+          return {
+            id: item.id,
+            title: item.title,
+            content: item.message,
+            date: item.createdAt,
+            author: authorName,
+            priority,
+          }
+        })
+      : null
+
+    return [...localAnnouncements, ...(mapped ?? INITIAL_ANNOUNCEMENTS)]
+  }, [announcementItems, localAnnouncements])
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
@@ -365,11 +396,14 @@ export function StudentMessagesPage() {
       title: announcementTitle.trim(),
       content: announcementContent.trim(),
       date: new Date().toISOString().split("T")[0],
-      author: currentUser.name,
+      author:
+        [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+        user?.email ||
+        "You",
       priority: announcementPriority,
     }
 
-    setAnnouncements((prev) => [newAnnouncement, ...prev])
+    setLocalAnnouncements((prev) => [newAnnouncement, ...prev])
     setAnnouncementTitle("")
     setAnnouncementContent("")
     setAnnouncementPriority("medium")

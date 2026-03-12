@@ -11,6 +11,7 @@ import {
   rejectMyGroupJoinRequest,
   submitMyProjectGroup,
   reopenMyProjectGroup,
+  listMyGroupAnnouncements,
   getAvailableStudents,
   getMyProjectGroupJoinRequests,
   getMyGroupJoinRequests,
@@ -38,6 +39,7 @@ import type {
   ProjectGroupDetails,
   ProjectGroupMe,
 } from "@/types/project-groups"
+import type { ListAnnouncementsData } from "@/types/announcements"
 
 
 export function projectGroupKeys() {
@@ -53,6 +55,8 @@ export function projectGroupKeys() {
       [...projectGroupKeys().root, "join-requests", "me", params] as const,
     joinRequestsMyGroup: (params: { page: number; limit: number; status?: MyProjectGroupJoinRequestStatus | string }) =>
       [...projectGroupKeys().root, "join-requests", "my-group", params] as const,
+    announcementsMyGroup: (params: { page: number; limit: number }) =>
+      [...projectGroupKeys().root, "announcements", "my-group", params] as const,
   }
 }
 
@@ -258,5 +262,26 @@ export function useReopenMyProjectGroup() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: projectGroupKeys().root })
     },
+  })
+}
+
+export function useMyGroupAnnouncements(params: {
+  enabled: boolean
+  page: number
+  limit: number
+}) {
+  return useQuery<ListAnnouncementsData, Error>({
+    queryKey: projectGroupKeys().announcementsMyGroup({
+      page: params.page,
+      limit: params.limit,
+    }),
+    queryFn: () =>
+      listMyGroupAnnouncements({
+        page: params.page,
+        limit: params.limit,
+      }),
+    enabled: params.enabled,
+    staleTime: 30_000,
+    retry: false,
   })
 }
