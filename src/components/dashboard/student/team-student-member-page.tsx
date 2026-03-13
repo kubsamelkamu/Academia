@@ -20,8 +20,6 @@ import {
   Info,
   FileText,
   Loader2,
-  Target,
-  Lightbulb,
   Send,
   Github,
   Linkedin,
@@ -95,6 +93,7 @@ interface GroupManager {
 interface AvailableGroup {
   id: string
   name: string
+  status?: string
   manager: GroupManager
   members: GroupMember[]
   currentSize: number
@@ -359,6 +358,7 @@ export function StudentTeamMemberPage() {
     return {
       id: item.id,
       name: item.name,
+      status: item.status,
       manager: {
         id: item.leader?.id ?? "",
         name: leaderName || "Group Leader",
@@ -445,15 +445,6 @@ export function StudentTeamMemberPage() {
     }
   }
 
-  const getStatusText = (status: PresenceStatus) => {
-    switch (status) {
-      case "online": return "Online"
-      case "away": return "Away"
-      case "offline": return "Offline"
-      default: return "Offline"
-    }
-  }
-
   const filteredGroups = availableGroups.filter((group) => {
     const q = searchQuery.toLowerCase()
     return (
@@ -497,6 +488,7 @@ export function StudentTeamMemberPage() {
     return {
       id: details.id,
       name: details.name,
+      status: details.status,
       manager: {
         id: details.leader?.id ?? "",
         name: leaderName || "Group Leader",
@@ -966,13 +958,15 @@ export function StudentTeamMemberPage() {
                         <CardTitle className="text-lg">{group.name}</CardTitle>
                         <CardDescription className="mt-1">{group.department}</CardDescription>
                       </div>
-                      <Badge variant={group.currentSize < group.maxSize ? "default" : "secondary"}>
-                        {group.currentSize < group.maxSize ? "Accepting Members" : "Full"}
-                      </Badge>
+                      {group.currentSize >= group.maxSize ? (
+                        <Badge variant="secondary">Full</Badge>
+                      ) : group.isJoinable === true && String(group.status ?? "").toUpperCase() !== "APPROVED" ? (
+                        <Badge variant="default">Accepting Members</Badge>
+                      ) : null}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Group Manager - Simplified */}
+                    {/* Group Leader - Simplified */}
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                       <div className="relative">
                         <Avatar>
@@ -986,7 +980,7 @@ export function StudentTeamMemberPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{group.manager.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          Group Manager • {getStatusText(group.manager.status)}
+                          Group Leader
                         </p>
                       </div>
                     </div>
@@ -1964,8 +1958,10 @@ export function StudentTeamMemberPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold">{effectiveSelectedGroup.manager.name}</h3>
-                  <p className="text-sm text-muted-foreground">Group Manager</p>
-                  <p className="text-sm mt-2">{effectiveSelectedGroup.manager.bio || "No bio available."}</p>
+                  <p className="text-sm text-muted-foreground">Group Leader</p>
+                  {effectiveSelectedGroup.manager.bio ? (
+                    <p className="text-sm mt-2">{effectiveSelectedGroup.manager.bio}</p>
+                  ) : null}
                   
                   {/* Expertise Tags */}
                   {effectiveSelectedGroup.manager.expertise && (
@@ -2012,55 +2008,22 @@ export function StudentTeamMemberPage() {
                 </div>
               </div>
 
-              {/* Objectives */}
-              {effectiveSelectedGroup.objectives && effectiveSelectedGroup.objectives.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    Objectives
-                  </h4>
-                  <ul className="space-y-2">
-                    {effectiveSelectedGroup.objectives.map((obj, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
-                        <span>{obj}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Technologies */}
-              {effectiveSelectedGroup.technologies && effectiveSelectedGroup.technologies.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-primary" />
-                    Technologies
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {effectiveSelectedGroup.technologies.map((tech, index) => (
-                      <Badge key={index} variant="secondary">{tech}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Members List */}
               <div>
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  Team Members ({effectiveSelectedGroup.currentSize}/{effectiveSelectedGroup.maxSize})
+                  Team Members
                 </h4>
                 <div className="space-y-2">
                   {effectiveSelectedGroup.members.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
+                          <AvatarImage src={member.avatar} />
                           <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="text-sm font-medium">{member.name}</p>
-                          <p className="text-xs text-muted-foreground">{member.role}</p>
                           {member.skills && (
                             <div className="flex gap-1 mt-1">
                               {member.skills.slice(0, 2).map((skill, idx) => (

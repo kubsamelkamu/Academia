@@ -566,7 +566,7 @@ export function StudentMessagesPage() {
           Messages
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Chat with your group managers and team members
+          Chat with your group leader and team members
         </p>
       </div>
 
