@@ -100,7 +100,7 @@ export function AdvisorReviewsPage() {
                         Download
                       </Button>
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/dashboard/advisor/students/revision/${row.projectId}`}>Request Revision</Link>
+                        <Link href={`/dashboard/advisor/reviews/${row.projectId}`}>Request Revision</Link>
                       </Button>
                     </div>
                   </TableCell>

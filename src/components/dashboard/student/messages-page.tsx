@@ -89,7 +89,7 @@ export function StudentMessagesPage() {
   const currentUser = {
     id: "STU001",
     name: "You",
-    managerApprovalStatus: "approved" as "approved" | "pending" | "rejected" | "not_requested",
+    managerApprovalStatus: "pending" as "approved" | "pending" | "rejected" | "not_requested",
   }
   const isApprovedGroupManager = currentUser.managerApprovalStatus === "approved"
 

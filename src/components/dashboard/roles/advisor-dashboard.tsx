@@ -225,7 +225,7 @@ export function AdvisorDashboard({ userName }: { userName?: string }) {
                                   <CheckCircle className="mr-1 h-3 w-3" /> Approve
                                 </Button>
                                 <Button asChild variant="ghost" size="sm">
-                                  <Link href={`/dashboard/advisor/students/revision/${project.id}`}>Request Revision</Link>
+                                  <Link href={`/dashboard/advisor/reviews/${project.id}`}>Request Revision</Link>
                                 </Button>
                               </>
                             )}
