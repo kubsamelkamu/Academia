@@ -96,6 +96,10 @@ interface Announcement {
   date: string
   author: string
   priority: 'high' | 'medium' | 'low'
+
+  attachmentType?: "NONE" | "FILE" | "LINK"
+  attachmentUrl?: string | null
+  attachmentFileName?: string | null
 }
 
 export function StudentMessagesPage() {
@@ -304,6 +308,8 @@ export function StudentMessagesPage() {
   const [announcementTitle, setAnnouncementTitle] = useState("")
   const [announcementContent, setAnnouncementContent] = useState("")
   const [announcementPriority, setAnnouncementPriority] = useState<Announcement["priority"]>("medium")
+  const [announcementAttachmentUrl, setAnnouncementAttachmentUrl] = useState("")
+  const [announcementAttachmentFile, setAnnouncementAttachmentFile] = useState<File | null>(null)
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null)
 
   const announcementItems = announcementsQuery.data?.items
@@ -323,6 +329,10 @@ export function StudentMessagesPage() {
           date: item.createdAt,
           author: authorName,
           priority,
+
+          attachmentType: item.attachmentType,
+          attachmentUrl: item.attachmentUrl,
+          attachmentFileName: item.attachmentFileName,
         }
       })
     : []
@@ -334,6 +344,8 @@ export function StudentMessagesPage() {
     setAnnouncementTitle("")
     setAnnouncementContent("")
     setAnnouncementPriority("medium")
+    setAnnouncementAttachmentUrl("")
+    setAnnouncementAttachmentFile(null)
     setCreateAnnouncementOpen(true)
   }
 
@@ -342,6 +354,8 @@ export function StudentMessagesPage() {
     setAnnouncementTitle(announcement.title)
     setAnnouncementContent(announcement.content)
     setAnnouncementPriority(announcement.priority)
+    setAnnouncementAttachmentUrl("")
+    setAnnouncementAttachmentFile(null)
     setCreateAnnouncementOpen(true)
   }
 
@@ -352,6 +366,8 @@ export function StudentMessagesPage() {
       setAnnouncementTitle("")
       setAnnouncementContent("")
       setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
     }
   }
 
@@ -425,6 +441,16 @@ export function StudentMessagesPage() {
   }
 
   const handleCreateAnnouncement = async () => {
+    if (announcementAttachmentFile && announcementAttachmentUrl.trim()) {
+      toast.error("Choose either an attachment file or an attachment URL")
+      return
+    }
+
+    if (announcementAttachmentFile && announcementAttachmentFile.size > 5 * 1024 * 1024) {
+      toast.error("Attachment must be 5MB or less")
+      return
+    }
+
     const priorityApi =
       announcementPriority === "high" ? "HIGH" : announcementPriority === "low" ? "LOW" : "MEDIUM"
 
@@ -432,6 +458,7 @@ export function StudentMessagesPage() {
       title: announcementTitle,
       priority: priorityApi,
       message: announcementContent,
+      attachmentUrl: announcementAttachmentUrl.trim() ? announcementAttachmentUrl : undefined,
     })
 
     if (!parsed.success) {
@@ -445,11 +472,15 @@ export function StudentMessagesPage() {
         title: parsed.data.title,
         priority: parsed.data.priority,
         message: parsed.data.message,
+        attachmentUrl: parsed.data.attachmentUrl,
+        attachment: announcementAttachmentFile ?? undefined,
       })
 
       setAnnouncementTitle("")
       setAnnouncementContent("")
       setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
       setCreateAnnouncementOpen(false)
       toast.success("Announcement posted")
     } catch (error) {
@@ -465,6 +496,16 @@ export function StudentMessagesPage() {
       return
     }
 
+    if (announcementAttachmentFile && announcementAttachmentUrl.trim()) {
+      toast.error("Choose either an attachment file or an attachment URL")
+      return
+    }
+
+    if (announcementAttachmentFile && announcementAttachmentFile.size > 5 * 1024 * 1024) {
+      toast.error("Attachment must be 5MB or less")
+      return
+    }
+
     const priorityApi =
       announcementPriority === "high" ? "HIGH" : announcementPriority === "low" ? "LOW" : "MEDIUM"
 
@@ -472,6 +513,7 @@ export function StudentMessagesPage() {
       title: announcementTitle,
       priority: priorityApi,
       message: announcementContent,
+      attachmentUrl: announcementAttachmentUrl.trim() ? announcementAttachmentUrl : undefined,
     })
 
     if (!parsed.success) {
@@ -487,6 +529,8 @@ export function StudentMessagesPage() {
           title: parsed.data.title,
           priority: parsed.data.priority,
           message: parsed.data.message,
+          attachmentUrl: parsed.data.attachmentUrl,
+          attachment: announcementAttachmentFile ?? undefined,
         },
       })
 
@@ -494,6 +538,8 @@ export function StudentMessagesPage() {
       setAnnouncementTitle("")
       setAnnouncementContent("")
       setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
       setCreateAnnouncementOpen(false)
       toast.success("Announcement updated")
     } catch (error) {
@@ -973,7 +1019,7 @@ export function StudentMessagesPage() {
                     Team Announcements
                   </CardTitle>
                   <CardDescription>
-                    Important updates from your group managers
+                    Important updates from your Group Leader
                   </CardDescription>
                 </div>
 
@@ -984,9 +1030,6 @@ export function StudentMessagesPage() {
                   </Button>
                 )}
               </div>
-              <CardDescription>
-                Important updates from your group managers
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -1058,6 +1101,21 @@ export function StudentMessagesPage() {
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+
+                                {announcement.attachmentUrl && (
+                                  <div className="mt-2">
+                                    <a
+                                      href={announcement.attachmentUrl}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4"
+                                    >
+                                      <Paperclip className="h-3 w-3" />
+                                      Open link
+                                    </a>
+                                  </div>
+                                )}
+
                                 <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                                   <span>Posted by {announcement.author}</span>
                                   <span>•</span>
@@ -1070,10 +1128,6 @@ export function StudentMessagesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="whitespace-nowrap">
-                                New
-                              </Badge>
-
                               {canManageAnnouncements && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -1193,6 +1247,28 @@ export function StudentMessagesPage() {
                 value={announcementContent}
                 onChange={(e) => setAnnouncementContent(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="announcement-attachment-url">Attachment URL (optional)</Label>
+              <Input
+                id="announcement-attachment-url"
+                placeholder="https://..."
+                value={announcementAttachmentUrl}
+                onChange={(e) => setAnnouncementAttachmentUrl(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="announcement-attachment-file">Attachment file (optional)</Label>
+              <Input
+                id="announcement-attachment-file"
+                type="file"
+                onChange={(e) => setAnnouncementAttachmentFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Choose either a file or a URL (max 5MB).
+              </p>
             </div>
           </div>
 
