@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -310,24 +310,22 @@ export function StudentMessagesPage() {
   const announcementPagination = announcementsQuery.data?.pagination
   const announcementsTotalPages = announcementPagination?.pages ?? 1
 
-  const announcements: Announcement[] = useMemo(() => {
-    if (!announcementItems) return []
+  const announcements: Announcement[] = announcementItems
+    ? announcementItems.map((item) => {
+        const priority = item.priority === "HIGH" ? "high" : item.priority === "LOW" ? "low" : "medium"
+        const authorName =
+          [item.createdBy?.firstName, item.createdBy?.lastName].filter(Boolean).join(" ") || "Unknown"
 
-    return announcementItems.map((item) => {
-      const priority = item.priority === "HIGH" ? "high" : item.priority === "LOW" ? "low" : "medium"
-      const authorName =
-        [item.createdBy?.firstName, item.createdBy?.lastName].filter(Boolean).join(" ") || "Unknown"
-
-      return {
-        id: item.id,
-        title: item.title,
-        content: item.message,
-        date: item.createdAt,
-        author: authorName,
-        priority,
-      }
-    })
-  }, [announcementItems])
+        return {
+          id: item.id,
+          title: item.title,
+          content: item.message,
+          date: item.createdAt,
+          author: authorName,
+          priority,
+        }
+      })
+    : []
 
   const isEditingAnnouncement = editingAnnouncementId !== null
 
