@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
@@ -37,6 +38,7 @@ interface TeamMember {
   id: string
   name: string
   email: string
+  avatarUrl?: string | null
   isManager?: boolean
 }
 
@@ -164,6 +166,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             `${myGroup.leader.firstName ?? ""} ${myGroup.leader.lastName ?? ""}`.trim() ||
             myGroup.leader.email,
           email: myGroup.leader.email,
+          avatarUrl: myGroup.leader.avatarUrl,
           isManager: true,
         },
         ...(myGroup.members ?? []).map((member) => ({
@@ -171,6 +174,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           name:
             `${member.user.firstName ?? ""} ${member.user.lastName ?? ""}`.trim() || member.user.email,
           email: member.user.email,
+          avatarUrl: member.user.avatarUrl,
         })),
       ]
     : []
@@ -419,9 +423,17 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                     className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {(member.name || member.email || "?").charAt(0)}
-                      </div>
+                      <Avatar className="h-9 w-9">
+                        {member.avatarUrl ? (
+                          <AvatarImage
+                            src={member.avatarUrl}
+                            alt={member.name || member.email}
+                          />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                          {(member.name || member.email || "?").charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium leading-tight truncate">
