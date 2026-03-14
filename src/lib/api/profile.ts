@@ -227,8 +227,17 @@ export async function updateStudentProfile(
     techStack,
   }
 
-  const response = await apiClient.patch<unknown>("/profile/student/me", payload)
-  return normalizeStudentProfilePayload(response.data)
+  try {
+    const response = await apiClient.patch<unknown>("/profile/student", payload)
+    return normalizeStudentProfilePayload(response.data)
+  } catch (error: unknown) {
+    const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === 404) {
+      const response = await apiClient.patch<unknown>("/profile/student/me", payload)
+      return normalizeStudentProfilePayload(response.data)
+    }
+    throw error
+  }
 }
 
 export async function getStudentPublicProfile(studentId: string): Promise<StudentPublicProfile> {

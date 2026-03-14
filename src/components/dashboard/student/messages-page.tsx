@@ -41,6 +41,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
+import { useAuthStore } from "@/store/auth-store"
+import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import {
+  useCreateMyGroupAnnouncement,
+  useDeleteMyGroupAnnouncement,
+  useMyGroupAnnouncements,
+  useUpdateMyGroupAnnouncement,
+} from "@/lib/hooks/use-project-groups"
+import {
+  announcementIdSchema,
+  createMyGroupAnnouncementSchema,
+  updateMyGroupAnnouncementSchema,
+} from "@/validations/announcements"
 
 type MessageStatus = 'sent' | 'delivered' | 'read'
 type UserStatus = 'online' | 'away' | 'offline'
@@ -83,15 +96,54 @@ interface Announcement {
   date: string
   author: string
   priority: 'high' | 'medium' | 'low'
+
+  attachmentType?: "NONE" | "FILE" | "LINK"
+  attachmentUrl?: string | null
+  attachmentFileName?: string | null
 }
 
 export function StudentMessagesPage() {
-  const currentUser = {
-    id: "STU001",
-    name: "You",
-    managerApprovalStatus: "pending" as "approved" | "pending" | "rejected" | "not_requested",
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
+  const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
+
+  const [announcementsPage, setAnnouncementsPage] = useState(1)
+  const ANNOUNCEMENTS_PAGE_SIZE = 10
+
+  const announcementsQuery = useMyGroupAnnouncements({
+    enabled: Boolean(accessToken),
+    page: announcementsPage,
+    limit: ANNOUNCEMENTS_PAGE_SIZE,
+  })
+
+  const createAnnouncementMutation = useCreateMyGroupAnnouncement()
+  const updateAnnouncementMutation = useUpdateMyGroupAnnouncement()
+  const deleteAnnouncementMutation = useDeleteMyGroupAnnouncement()
+
+  const canManageAnnouncements =
+    isApprovedGroupManager && announcementsQuery.data?.items !== undefined
+
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    const parsedId = announcementIdSchema.safeParse(announcementId)
+    if (!parsedId.success) {
+      toast.error(parsedId.error.issues[0]?.message ?? "Invalid announcement ID")
+      return
+    }
+
+    const ok = window.confirm("Delete this announcement? This cannot be undone.")
+    if (!ok) return
+
+    try {
+      await deleteAnnouncementMutation.mutateAsync({ announcementId: parsedId.data })
+      toast.success("Announcement deleted")
+
+      if (announcements.length === 1 && announcementsPage > 1) {
+        setAnnouncementsPage((prev) => Math.max(1, prev - 1))
+      }
+    } catch {
+      toast.error("Failed to delete announcement")
+    }
   }
-  const isApprovedGroupManager = currentUser.managerApprovalStatus === "approved"
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messageInput, setMessageInput] = useState('')
@@ -252,38 +304,72 @@ export function StudentMessagesPage() {
     ]
   }
 
-  const initialAnnouncements: Announcement[] = [
-    {
-      id: 'a1',
-      title: 'Team Meeting Schedule',
-      content: 'Weekly sync meeting moved to Fridays at 3pm. Please update your calendars.',
-      date: '2024-07-25',
-      author: 'Dr. Sarah Chen',
-      priority: 'medium'
-    },
-    {
-      id: 'a2',
-      title: 'Milestone Deadline Reminder',
-      content: 'Design phase due in 3 days. All deliverables must be submitted by Friday.',
-      date: '2024-07-24',
-      author: 'Prof. James Wilson',
-      priority: 'high'
-    },
-    {
-      id: 'a3',
-      title: 'New Resource Available',
-      content: 'Research papers on AI ethics have been added to the shared drive.',
-      date: '2024-07-23',
-      author: 'John Smith',
-      priority: 'low'
-    },
-  ]
-
-  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements)
   const [createAnnouncementOpen, setCreateAnnouncementOpen] = useState(false)
   const [announcementTitle, setAnnouncementTitle] = useState("")
   const [announcementContent, setAnnouncementContent] = useState("")
   const [announcementPriority, setAnnouncementPriority] = useState<Announcement["priority"]>("medium")
+  const [announcementAttachmentUrl, setAnnouncementAttachmentUrl] = useState("")
+  const [announcementAttachmentFile, setAnnouncementAttachmentFile] = useState<File | null>(null)
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null)
+
+  const announcementItems = announcementsQuery.data?.items
+  const announcementPagination = announcementsQuery.data?.pagination
+  const announcementsTotalPages = announcementPagination?.pages ?? 1
+
+  const announcements: Announcement[] = announcementItems
+    ? announcementItems.map((item) => {
+        const priority = item.priority === "HIGH" ? "high" : item.priority === "LOW" ? "low" : "medium"
+        const authorName =
+          [item.createdBy?.firstName, item.createdBy?.lastName].filter(Boolean).join(" ") || "Unknown"
+
+        return {
+          id: item.id,
+          title: item.title,
+          content: item.message,
+          date: item.createdAt,
+          author: authorName,
+          priority,
+
+          attachmentType: item.attachmentType,
+          attachmentUrl: item.attachmentUrl,
+          attachmentFileName: item.attachmentFileName,
+        }
+      })
+    : []
+
+  const isEditingAnnouncement = editingAnnouncementId !== null
+
+  const openNewAnnouncementDialog = () => {
+    setEditingAnnouncementId(null)
+    setAnnouncementTitle("")
+    setAnnouncementContent("")
+    setAnnouncementPriority("medium")
+    setAnnouncementAttachmentUrl("")
+    setAnnouncementAttachmentFile(null)
+    setCreateAnnouncementOpen(true)
+  }
+
+  const openEditAnnouncementDialog = (announcement: Announcement) => {
+    setEditingAnnouncementId(announcement.id)
+    setAnnouncementTitle(announcement.title)
+    setAnnouncementContent(announcement.content)
+    setAnnouncementPriority(announcement.priority)
+    setAnnouncementAttachmentUrl("")
+    setAnnouncementAttachmentFile(null)
+    setCreateAnnouncementOpen(true)
+  }
+
+  const handleAnnouncementDialogOpenChange = (open: boolean) => {
+    setCreateAnnouncementOpen(open)
+    if (!open) {
+      setEditingAnnouncementId(null)
+      setAnnouncementTitle("")
+      setAnnouncementContent("")
+      setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
+    }
+  }
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
@@ -354,27 +440,122 @@ export function StudentMessagesPage() {
     alert(`${type === 'audio' ? 'Audio' : 'Video'} call initiated with ${selectedConversation?.name}`)
   }
 
-  const handleCreateAnnouncement = () => {
-    if (!announcementTitle.trim() || !announcementContent.trim()) {
-      toast.error("Title and content are required")
+  const handleCreateAnnouncement = async () => {
+    if (announcementAttachmentFile && announcementAttachmentUrl.trim()) {
+      toast.error("Choose either an attachment file or an attachment URL")
       return
     }
 
-    const newAnnouncement: Announcement = {
-      id: `a-${Date.now()}`,
-      title: announcementTitle.trim(),
-      content: announcementContent.trim(),
-      date: new Date().toISOString().split("T")[0],
-      author: currentUser.name,
-      priority: announcementPriority,
+    if (announcementAttachmentFile && announcementAttachmentFile.size > 5 * 1024 * 1024) {
+      toast.error("Attachment must be 5MB or less")
+      return
     }
 
-    setAnnouncements((prev) => [newAnnouncement, ...prev])
-    setAnnouncementTitle("")
-    setAnnouncementContent("")
-    setAnnouncementPriority("medium")
-    setCreateAnnouncementOpen(false)
-    toast.success("Announcement posted")
+    const priorityApi =
+      announcementPriority === "high" ? "HIGH" : announcementPriority === "low" ? "LOW" : "MEDIUM"
+
+    const parsed = createMyGroupAnnouncementSchema.safeParse({
+      title: announcementTitle,
+      priority: priorityApi,
+      message: announcementContent,
+      attachmentUrl: announcementAttachmentUrl.trim() ? announcementAttachmentUrl : undefined,
+    })
+
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "Invalid announcement"
+      toast.error(message)
+      return
+    }
+
+    try {
+      await createAnnouncementMutation.mutateAsync({
+        title: parsed.data.title,
+        priority: parsed.data.priority,
+        message: parsed.data.message,
+        attachmentUrl: parsed.data.attachmentUrl,
+        attachment: announcementAttachmentFile ?? undefined,
+      })
+
+      setAnnouncementTitle("")
+      setAnnouncementContent("")
+      setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
+      setCreateAnnouncementOpen(false)
+      toast.success("Announcement posted")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to post announcement"
+      toast.error(message)
+    }
+  }
+
+  const handleUpdateAnnouncement = async (announcementId: string) => {
+    const parsedId = announcementIdSchema.safeParse(announcementId)
+    if (!parsedId.success) {
+      toast.error(parsedId.error.issues[0]?.message ?? "Invalid announcement ID")
+      return
+    }
+
+    if (announcementAttachmentFile && announcementAttachmentUrl.trim()) {
+      toast.error("Choose either an attachment file or an attachment URL")
+      return
+    }
+
+    if (announcementAttachmentFile && announcementAttachmentFile.size > 5 * 1024 * 1024) {
+      toast.error("Attachment must be 5MB or less")
+      return
+    }
+
+    const priorityApi =
+      announcementPriority === "high" ? "HIGH" : announcementPriority === "low" ? "LOW" : "MEDIUM"
+
+    const parsed = updateMyGroupAnnouncementSchema.safeParse({
+      title: announcementTitle,
+      priority: priorityApi,
+      message: announcementContent,
+      attachmentUrl: announcementAttachmentUrl.trim() ? announcementAttachmentUrl : undefined,
+    })
+
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "Invalid announcement"
+      toast.error(message)
+      return
+    }
+
+    try {
+      await updateAnnouncementMutation.mutateAsync({
+        announcementId: parsedId.data,
+        dto: {
+          title: parsed.data.title,
+          priority: parsed.data.priority,
+          message: parsed.data.message,
+          attachmentUrl: parsed.data.attachmentUrl,
+          attachment: announcementAttachmentFile ?? undefined,
+        },
+      })
+
+      setEditingAnnouncementId(null)
+      setAnnouncementTitle("")
+      setAnnouncementContent("")
+      setAnnouncementPriority("medium")
+      setAnnouncementAttachmentUrl("")
+      setAnnouncementAttachmentFile(null)
+      setCreateAnnouncementOpen(false)
+      toast.success("Announcement updated")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update announcement"
+      toast.error(message)
+    }
+  }
+
+  const handleSubmitAnnouncement = async () => {
+    if (!isEditingAnnouncement) {
+      await handleCreateAnnouncement()
+      return
+    }
+
+    if (!editingAnnouncementId) return
+    await handleUpdateAnnouncement(editingAnnouncementId)
   }
 
   return (
@@ -385,7 +566,7 @@ export function StudentMessagesPage() {
           Messages
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Chat with your group managers and team members
+          Chat with your group leader and team members
         </p>
       </div>
 
@@ -838,24 +1019,65 @@ export function StudentMessagesPage() {
                     Team Announcements
                   </CardTitle>
                   <CardDescription>
-                    Important updates from your group managers
+                    Important updates from your Group Leader
                   </CardDescription>
                 </div>
 
                 {isApprovedGroupManager && (
-                  <Button className="gap-2" onClick={() => setCreateAnnouncementOpen(true)}>
+                  <Button className="gap-2" onClick={openNewAnnouncementDialog}>
                     <Plus className="h-4 w-4" />
                     Create Announcement
                   </Button>
                 )}
               </div>
-              <CardDescription>
-                Important updates from your group managers
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {announcements.map((announcement) => (
+                {announcementsQuery.isLoading ? (
+                  <div className="py-10 text-center">
+                    <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">Loading announcements…</p>
+                  </div>
+                ) : announcementsQuery.isError ? (
+                  <div className="py-10 text-center">
+                    <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="mt-3 text-sm font-medium">Couldn’t load announcements</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Please try again.
+                    </p>
+                    <div className="mt-4 flex justify-center">
+                      <Button variant="outline" onClick={() => announcementsQuery.refetch()}>
+                        Retry
+                      </Button>
+                    </div>
+                  </div>
+                ) : (announcementPagination?.total ?? 0) === 0 ? (
+                  <div className="py-10 text-center">
+                    <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <Bell className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="mt-3 text-sm font-medium">No announcements yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {isApprovedGroupManager
+                        ? "Create the first announcement for your team."
+                        : "Your group leader will post updates here."}
+                    </p>
+
+                    {isApprovedGroupManager && (
+                      <div className="mt-4 flex justify-center">
+                        <Button className="gap-2" onClick={openNewAnnouncementDialog}>
+                          <Plus className="h-4 w-4" />
+                          Create Announcement
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  announcements.map((announcement) => (
                   <Card key={announcement.id} className="overflow-hidden">
                     <CardContent className="p-0">
                       <div className="flex items-start border-l-4 border-l-transparent hover:border-l-primary transition-all">
@@ -879,6 +1101,21 @@ export function StudentMessagesPage() {
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+
+                                {announcement.attachmentUrl && (
+                                  <div className="mt-2">
+                                    <a
+                                      href={announcement.attachmentUrl}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4"
+                                    >
+                                      <Paperclip className="h-3 w-3" />
+                                      Open link
+                                    </a>
+                                  </div>
+                                )}
+
                                 <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                                   <span>Posted by {announcement.author}</span>
                                   <span>•</span>
@@ -890,27 +1127,89 @@ export function StudentMessagesPage() {
                                 </div>
                               </div>
                             </div>
-                            <Badge variant="outline" className="whitespace-nowrap">
-                              New
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              {canManageAnnouncements && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      aria-label="Announcement actions"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      disabled={updateAnnouncementMutation.isPending}
+                                      onSelect={(e) => {
+                                        e.preventDefault()
+                                        openEditAnnouncementDialog(announcement)
+                                      }}
+                                    >
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={deleteAnnouncementMutation.isPending}
+                                      onSelect={(e) => {
+                                        e.preventDefault()
+                                        void handleDeleteAnnouncement(announcement.id)
+                                      }}
+                                    >
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  ))
+                )}
+
+                {announcementPagination && announcementPagination.pages > 1 && !announcementsQuery.isLoading && (
+                  <div className="flex items-center justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAnnouncementsPage((prev) => Math.max(1, prev - 1))}
+                      disabled={announcementsPage <= 1}
+                    >
+                      Previous
+                    </Button>
+
+                    <p className="text-sm text-muted-foreground">
+                      Page {announcementsPage} of {announcementsTotalPages}
+                    </p>
+
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setAnnouncementsPage((prev) => Math.min(announcementsTotalPages, prev + 1))
+                      }
+                      disabled={announcementsPage >= announcementsTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <Dialog open={createAnnouncementOpen} onOpenChange={setCreateAnnouncementOpen}>
+      <Dialog open={createAnnouncementOpen} onOpenChange={handleAnnouncementDialogOpenChange}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
-            <DialogTitle>Create Announcement</DialogTitle>
+            <DialogTitle>{isEditingAnnouncement ? "Edit Announcement" : "Create Announcement"}</DialogTitle>
             <DialogDescription>
-              Post an update to your team. This is visible to group members.
+              {isEditingAnnouncement
+                ? "Update this announcement. Changes are visible to group members."
+                : "Post an update to your team. This is visible to group members."}
             </DialogDescription>
           </DialogHeader>
 
@@ -949,13 +1248,37 @@ export function StudentMessagesPage() {
                 onChange={(e) => setAnnouncementContent(e.target.value)}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="announcement-attachment-url">Attachment URL (optional)</Label>
+              <Input
+                id="announcement-attachment-url"
+                placeholder="https://..."
+                value={announcementAttachmentUrl}
+                onChange={(e) => setAnnouncementAttachmentUrl(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="announcement-attachment-file">Attachment file (optional)</Label>
+              <Input
+                id="announcement-attachment-file"
+                type="file"
+                onChange={(e) => setAnnouncementAttachmentFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Choose either a file or a URL (max 5MB).
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateAnnouncementOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateAnnouncement}>Post Announcement</Button>
+            <Button onClick={handleSubmitAnnouncement}>
+              {isEditingAnnouncement ? "Save Changes" : "Post Announcement"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
