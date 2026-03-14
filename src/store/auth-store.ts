@@ -31,7 +31,7 @@ interface AuthState {
   pendingEmailVerification?: boolean;
   registration?: RegisterResult;
 
-  // Persistent auth state
+  // In-memory auth state (not persisted across browser restarts)
   accessToken?: string;
   refreshToken?: string;
   user?: AuthUser;
@@ -436,11 +436,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = (persistedState as { tenantDomain?: string } | null) ?? null
+        return {
+          tenantDomain: state?.tenantDomain,
+        }
+      },
       partialize: (state) => ({
         tenantDomain: state.tenantDomain,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        user: state.user,
       }),
     }
   )
