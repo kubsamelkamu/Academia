@@ -18,16 +18,15 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   const authState = useAuthStore.getState()
   let tenantDomain = authState.tenantDomain
-  let accessToken = authState.accessToken
+  const accessToken = authState.accessToken
 
-  // Fallback to persisted auth-storage (useful very early in app init)
-  if (!tenantDomain || !accessToken) {
+  // Fallback to persisted auth-storage for tenant domain only.
+  if (!tenantDomain) {
     const authStorage = window.localStorage.getItem("auth-storage")
     if (authStorage) {
       try {
         const parsed = JSON.parse(authStorage)
         tenantDomain = tenantDomain ?? parsed.state?.tenantDomain
-        accessToken = accessToken ?? parsed.state?.accessToken
       } catch {
         // ignore
       }
@@ -75,7 +74,8 @@ apiClient.interceptors.response.use(
       const isAuthEndpoint =
         requestUrl.includes("/auth/login") ||
         requestUrl.includes("/auth/register") ||
-        requestUrl.includes("/auth/email-verification")
+        requestUrl.includes("/auth/email-verification") ||
+        requestUrl.includes("/auth/forgot-password")
 
       // For invalid credentials on auth endpoints, let the caller handle the error
       // (e.g., show an inline message on the login page) instead of hard redirect.

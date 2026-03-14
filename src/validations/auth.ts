@@ -84,3 +84,34 @@ export const resendOtpSchema = z.object({
 });
 
 export type ResendOtpFormData = z.infer<typeof resendOtpSchema>;
+
+// Forgot Password Schemas
+export const forgotPasswordRequestSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+});
+
+export type ForgotPasswordRequestFormData = z.infer<typeof forgotPasswordRequestSchema>;
+
+export const forgotPasswordVerifySchema = z.object({
+  otp: z
+    .string()
+    .length(6, 'OTP must be exactly 6 digits')
+    .regex(/^\d{6}$/, 'OTP must contain only numbers'),
+});
+
+export type ForgotPasswordVerifyFormData = z.infer<typeof forgotPasswordVerifySchema>;
+
+export const forgotPasswordResetSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(8, 'New password must be at least 8 characters')
+      .max(100, 'New password is too long'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+export type ForgotPasswordResetFormData = z.infer<typeof forgotPasswordResetSchema>;
