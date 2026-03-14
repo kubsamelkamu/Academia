@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
@@ -38,7 +38,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const user = useAuthStore((s) => s.user)
@@ -160,5 +160,19 @@ export default function ForgotPasswordPage() {
         </motion.div>
       </motion.div>
     </div>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      }
+    >
+      <ForgotPasswordPageContent />
+    </Suspense>
   )
 }

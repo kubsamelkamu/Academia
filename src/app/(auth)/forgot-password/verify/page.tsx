@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -37,7 +37,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-export default function ForgotPasswordVerifyPage() {
+function ForgotPasswordVerifyPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const user = useAuthStore((s) => s.user)
@@ -277,5 +277,19 @@ export default function ForgotPasswordVerifyPage() {
         </div>
       </motion.div>
     </div>
+  )
+}
+
+export default function ForgotPasswordVerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      }
+    >
+      <ForgotPasswordVerifyPageContent />
+    </Suspense>
   )
 }
