@@ -37,7 +37,7 @@ export function AdvisorMeetingsPage() {
           <p className="text-sm text-muted-foreground">Upcoming and recent meetings with your project teams.</p>
         </div>
         <Button asChild className="btn-gradient">
-          <Link href="/dashboard/advisor/schedule-meeting">
+          <Link href="/dashboard/advisor/schedule">
             <Video className="h-4 w-4 mr-2" />
             Schedule Meeting
           </Link>
