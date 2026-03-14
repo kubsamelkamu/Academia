@@ -1045,10 +1045,17 @@ export function StudentMessagesPage() {
     const handleTypingUpdate = (payload: unknown) => {
       const raw = payload as TypingUpdatePayload
       if (!raw || typeof raw !== "object") return
-      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      // Some backends omit extra fields for typing payloads. Be tolerant.
+      const rawRoomId = (raw as { roomId?: unknown }).roomId
+      if (typeof rawRoomId === "string") {
+        if (rawRoomId !== roomId) return
+      } else {
+        // If roomId is missing, only accept when we're joined to this room.
+        if (joinedRoomIdRef.current !== roomId) return
+      }
       if (typeof raw.userId !== "string") return
       if (typeof raw.isTyping !== "boolean") return
-      if (typeof raw.at !== "string") return
+      // `at` is informational; do not require it.
 
       // Ignore self typing updates.
       if (raw.userId === currentUser?.id) return
@@ -2002,10 +2009,31 @@ export function StudentMessagesPage() {
                           {typingUserIds.length > 0 && effectiveSelectedConversation.type === 'group' && (
                             <p className="text-xs text-muted-foreground">
                               {(() => {
+                                const group = myProjectGroupQuery.data
+                                const nameById = new Map<string, string>()
+
                                 const participants = effectiveSelectedConversation.participants ?? []
-                                const names = participants
-                                  .filter((p) => typingUserIds.includes(p.id))
-                                  .map((p) => p.name.split(' ')[0])
+                                for (const p of participants) {
+                                  nameById.set(p.id, p.name)
+                                }
+
+                                if (group) {
+                                  const leaderName = `${group.leader.firstName} ${group.leader.lastName}`.trim() || group.leader.email
+                                  nameById.set(group.leader.id, leaderName)
+
+                                  for (const member of group.members) {
+                                    const memberName = `${member.user.firstName} ${member.user.lastName}`.trim() || member.user.email
+                                    // Map both the membership id and the underlying user id to the same display name.
+                                    nameById.set(member.id, memberName)
+                                    nameById.set(member.user.id, memberName)
+                                  }
+                                }
+
+                                const names = typingUserIds
+                                  .map((id) => nameById.get(id))
+                                  .filter((n): n is string => Boolean(n))
+                                  .map((n) => n.split(' ')[0]!)
+
                                 const label = names.length > 0 ? names.join(', ') : 'Someone'
                                 return `${label} typing...`
                               })()}
