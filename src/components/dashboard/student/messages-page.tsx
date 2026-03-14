@@ -16,6 +16,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import {
@@ -37,6 +40,7 @@ import {
   Paperclip,
   Smile,
   MoreVertical,
+  Check,
   CheckCheck,
   Clock,
   UserRound,
@@ -98,6 +102,11 @@ import type {
 type MessageStatus = 'sent' | 'delivered' | 'read'
 type UserStatus = 'online' | 'away' | 'offline'
 
+type MessageReactions = {
+  items: { emoji: string; count: number }[]
+  myReaction: string | null
+}
+
 interface Message {
   id: string
   senderId: string
@@ -107,6 +116,7 @@ interface Message {
   timestamp: string
   status: MessageStatus
   isPinned?: boolean
+  reactions?: MessageReactions
   replyTo?: {
     messageId: string
     senderName: string
@@ -176,7 +186,8 @@ export function StudentMessagesPage() {
     fetchNextPage: chatFetchNextPage,
   } = chatMessagesQuery
 
-  const latestMessageId = chatMessagesData?.pages?.[0]?.items?.[0]?.id ?? null
+  const latestMessage = chatMessagesData?.pages?.[0]?.items?.[0] ?? null
+  const latestMessageId = latestMessage && roomId && latestMessage.roomId === roomId ? latestMessage.id : null
 
   const pendingTopPaginationScrollRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(null)
   const autoFillRoomIdRef = useRef<string | null>(null)
@@ -392,6 +403,7 @@ export function StudentMessagesPage() {
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messageInput, setMessageInput] = useState('')
+  const messageInputRef = useRef<HTMLInputElement | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null)
 
@@ -426,6 +438,7 @@ export function StudentMessagesPage() {
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isTypingRef = useRef(false)
   const typingUserIdsRef = useRef<Set<string>>(new Set())
+  const [typingUserIds, setTypingUserIds] = useState<string[]>([])
 
   const socketRef = useRef<ReturnType<typeof acquireChatSocket> | null>(null)
   const joinedRoomIdRef = useRef<string | null>(null)
@@ -731,6 +744,7 @@ export function StudentMessagesPage() {
         timestamp: m.createdAt,
         status,
         isPinned: pinsHydrated ? pinnedMessageIdsRef.current.has(m.id) : Boolean(m.isPinned),
+        reactions: m.reactions,
         replyTo,
         attachments,
       }
@@ -917,6 +931,22 @@ export function StudentMessagesPage() {
     }
   }
 
+  const insertEmojiIntoMessageInput = useCallback((emoji: string) => {
+    setMessageInput((prev) => `${prev}${emoji}`)
+
+    requestAnimationFrame(() => {
+      const el = messageInputRef.current
+      if (!el) return
+      try {
+        const pos = el.value.length
+        el.focus()
+        el.setSelectionRange(pos, pos)
+      } catch {
+        // ignore
+      }
+    })
+  }, [])
+
   const filteredConversations = conversations.filter(conv =>
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -1028,6 +1058,8 @@ export function StudentMessagesPage() {
       } else {
         typingUserIdsRef.current.delete(raw.userId)
       }
+
+      setTypingUserIds(Array.from(typingUserIdsRef.current))
     }
 
     const handleReactionUpdated = (payload: unknown) => {
@@ -1200,6 +1232,7 @@ export function StudentMessagesPage() {
 
       // Clear typing state while disconnected.
       typingUserIdsRef.current.clear()
+      setTypingUserIds([])
     }
 
     socket.on("connect", handleConnect)
@@ -1293,7 +1326,7 @@ export function StudentMessagesPage() {
     })
 
     const socket = socketRef.current
-    if (socket) {
+    if (socket?.connected && joinedRoomIdRef.current === roomId) {
       socket.emit(
         "message:markReadUpTo",
         { roomId, messageId },
@@ -1639,42 +1672,48 @@ export function StudentMessagesPage() {
     })
   }, [updateInfiniteMessageById])
 
-  const toggleDefaultReactionOnMessage = useCallback(async (messageId: string) => {
+  const setReactionOnMessage = useCallback(async (params: { messageId: string; emoji: string | null }) => {
     if (!roomId) return
-    if (messageId.startsWith("client-")) {
+    if (params.messageId.startsWith("client-")) {
       toast.error("Message is not delivered yet")
       return
     }
 
-    const current = findMessageInCache(messageId)
+    const current = findMessageInCache(params.messageId)
     if (!current) return
 
-    const DEFAULT_EMOJI = "😊"
     const prevEmoji = current.reactions?.myReaction ?? null
-    const nextEmoji = prevEmoji === DEFAULT_EMOJI ? null : DEFAULT_EMOJI
+    const nextEmoji = params.emoji
+
+    if (prevEmoji === nextEmoji) {
+      // Toggle off (or no-op if already removed).
+      if (!nextEmoji) return
+      return setReactionOnMessage({ messageId: params.messageId, emoji: null })
+    }
 
     applyMyReactionOptimistic({
-      messageId,
+      messageId: params.messageId,
       prevEmoji,
       nextEmoji,
     })
 
     const socket = socketRef.current
     if (socket?.connected && joinedRoomIdRef.current === roomId) {
-      if (nextEmoji) socket.emit("reaction:set", { roomId, messageId, emoji: nextEmoji })
-      else socket.emit("reaction:remove", { roomId, messageId })
+      if (nextEmoji) socket.emit("reaction:set", { roomId, messageId: params.messageId, emoji: nextEmoji })
+      else socket.emit("reaction:remove", { roomId, messageId: params.messageId })
       return
     }
 
     try {
       if (nextEmoji) {
-        await setChatRoomMessageReaction({ roomId, messageId, emoji: nextEmoji })
+        await setChatRoomMessageReaction({ roomId, messageId: params.messageId, emoji: nextEmoji })
       } else {
-        await removeChatRoomMessageReaction({ roomId, messageId })
+        await removeChatRoomMessageReaction({ roomId, messageId: params.messageId })
       }
     } catch (error) {
+      // Revert.
       applyMyReactionOptimistic({
-        messageId,
+        messageId: params.messageId,
         prevEmoji: nextEmoji,
         nextEmoji: prevEmoji,
       })
@@ -1683,11 +1722,14 @@ export function StudentMessagesPage() {
     }
   }, [applyMyReactionOptimistic, findMessageInCache, roomId])
 
-  const toggleDefaultReactionOnLatestMessage = useCallback(async () => {
-    const latest = chatMessagesQuery.data?.pages?.[0]?.items?.[0] ?? null
-    if (!latest) return
-    await toggleDefaultReactionOnMessage(latest.id)
-  }, [chatMessagesQuery.data, toggleDefaultReactionOnMessage])
+  const toggleDefaultReactionOnMessage = useCallback(async (messageId: string) => {
+    if (!roomId) return
+    const DEFAULT_EMOJI = "😊"
+    await setReactionOnMessage({
+      messageId,
+      emoji: DEFAULT_EMOJI,
+    })
+  }, [roomId, setReactionOnMessage])
 
   const handleSendAdvisorMessage = () => {
     if (!advisorInput.trim()) return
@@ -1957,6 +1999,18 @@ export function StudentMessagesPage() {
                               ? `${effectiveSelectedConversation.participants?.length} participants` 
                               : effectiveSelectedConversation.status === 'online' ? 'Online' : 'Offline'}
                           </p>
+                          {typingUserIds.length > 0 && effectiveSelectedConversation.type === 'group' && (
+                            <p className="text-xs text-muted-foreground">
+                              {(() => {
+                                const participants = effectiveSelectedConversation.participants ?? []
+                                const names = participants
+                                  .filter((p) => typingUserIds.includes(p.id))
+                                  .map((p) => p.name.split(' ')[0])
+                                const label = names.length > 0 ? names.join(', ') : 'Someone'
+                                return `${label} typing...`
+                              })()}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2082,11 +2136,35 @@ export function StudentMessagesPage() {
                                       {msg.attachments && msg.attachments.length > 0 && (
                                         <div className="mt-2 space-y-1">
                                           {msg.attachments.map((att, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 text-xs bg-background/20 rounded p-1">
+                                            <a
+                                              key={idx}
+                                              className="flex items-center gap-2 text-xs bg-background/20 rounded p-1 hover:underline"
+                                              href={att.url}
+                                              download={att.name}
+                                              onClick={(e) => e.stopPropagation()}
+                                              rel="noreferrer"
+                                            >
                                               <Paperclip className="h-3 w-3" />
                                               <span className="truncate">{att.name}</span>
                                               <span className="text-xs opacity-70">({att.size})</span>
-                                            </div>
+                                            </a>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {msg.reactions && msg.reactions.items.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                          {msg.reactions.items.map((r) => (
+                                            <span
+                                              key={r.emoji}
+                                              className={
+                                                "inline-flex items-center gap-1 rounded-full bg-background/20 px-2 py-0.5 text-xs" +
+                                                (msg.reactions?.myReaction === r.emoji ? " ring-1 ring-border" : "")
+                                              }
+                                            >
+                                              <span>{r.emoji}</span>
+                                              <span className="opacity-80">{r.count}</span>
+                                            </span>
                                           ))}
                                         </div>
                                       )}
@@ -2102,15 +2180,61 @@ export function StudentMessagesPage() {
                                       Reply
                                       <ContextMenuShortcut>Shift+RClick</ContextMenuShortcut>
                                     </ContextMenuItem>
-                                    <ContextMenuItem
-                                      onSelect={() => {
-                                        void toggleDefaultReactionOnMessage(msg.id)
-                                      }}
-                                      disabled={msg.id.startsWith('client-')}
-                                    >
-                                      React
-                                      <ContextMenuShortcut>Alt+RClick</ContextMenuShortcut>
-                                    </ContextMenuItem>
+                                    <ContextMenuSub>
+                                      <ContextMenuSubTrigger inset disabled={msg.id.startsWith('client-')}>
+                                        React
+                                        <ContextMenuShortcut>Alt+RClick</ContextMenuShortcut>
+                                      </ContextMenuSubTrigger>
+                                      <ContextMenuSubContent>
+                                        <ContextMenuItem
+                                          onSelect={() => {
+                                            void setReactionOnMessage({ messageId: msg.id, emoji: null })
+                                          }}
+                                          disabled={msg.id.startsWith('client-') || !msg.reactions?.myReaction}
+                                        >
+                                          Remove reaction
+                                        </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                        <div className="grid grid-cols-5 gap-1 p-1">
+                                          {[
+                                            "😀",
+                                            "😂",
+                                            "😍",
+                                            "👍",
+                                            "🎉",
+                                            "🙏",
+                                            "😢",
+                                            "😡",
+                                            "😊",
+                                            "🤔",
+                                            "😮",
+                                            "🔥",
+                                            "💯",
+                                            "✅",
+                                            "❌",
+                                            "👏",
+                                            "🤝",
+                                            "💪",
+                                            "😎",
+                                            "❤️",
+                                          ].map((emoji) => (
+                                            <ContextMenuItem
+                                              key={emoji}
+                                              className="h-9 w-9 justify-center px-0 py-0"
+                                              onSelect={() => {
+                                                void setReactionOnMessage({ messageId: msg.id, emoji })
+                                              }}
+                                              disabled={msg.id.startsWith('client-')}
+                                            >
+                                              <span className="text-base leading-none">{emoji}</span>
+                                              {msg.reactions?.myReaction === emoji ? (
+                                                <Check className="absolute right-1 top-1 h-3 w-3 opacity-70" />
+                                              ) : null}
+                                            </ContextMenuItem>
+                                          ))}
+                                        </div>
+                                      </ContextMenuSubContent>
+                                    </ContextMenuSub>
                                     <ContextMenuItem
                                       onSelect={() => {
                                         void togglePinForMessage({
@@ -2151,8 +2275,8 @@ export function StudentMessagesPage() {
                                   <span>{formatMessageTime(msg.timestamp)}</span>
                                   {msg.senderId === 'current' && (
                                     <>
-                                      {msg.status === 'read' && <CheckCheck className="h-3 w-3 text-blue-500" />}
-                                      {msg.status === 'delivered' && <CheckCheck className="h-3 w-3" />}
+                                      {msg.status === 'read' && <CheckCheck className="h-3 w-3 text-primary" />}
+                                      {msg.status === 'delivered' && <Check className="h-3 w-3" />}
                                       {msg.status === 'sent' && <Clock className="h-3 w-3" />}
                                     </>
                                   )}
@@ -2188,6 +2312,23 @@ export function StudentMessagesPage() {
                         </Button>
                       </div>
                     )}
+
+                    {queuedAttachment && (
+                      <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1">
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">Attached file</p>
+                          <p className="text-xs truncate">
+                            {queuedAttachment.name}{" "}
+                            <span className="opacity-70">
+                              ({Math.max(1, Math.round(queuedAttachment.size / 1024))} KB)
+                            </span>
+                          </p>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setQueuedAttachment(null)}>
+                          Remove
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <input
                         ref={attachmentInputRef}
@@ -2203,6 +2344,7 @@ export function StudentMessagesPage() {
                         <Paperclip className="h-4 w-4" />
                       </Button>
                       <Input
+                        ref={messageInputRef}
                         placeholder="Type your message..."
                         value={messageInput}
                         onChange={(e) => handleMessageInputChange(e.target.value)}
@@ -2217,16 +2359,31 @@ export function StudentMessagesPage() {
                         }}
                         className="flex-1"
                       />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          void toggleDefaultReactionOnLatestMessage()
-                        }}
-                        disabled={!roomId || !(chatMessagesQuery.data?.pages?.[0]?.items?.[0]?.id)}
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon" type="button">
+                            <Smile className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {[
+                            "😀",
+                            "😂",
+                            "😍",
+                            "👍",
+                            "🎉",
+                            "🙏",
+                            "😢",
+                            "😡",
+                            "😊",
+                          ].map((emoji) => (
+                            <DropdownMenuItem key={emoji} onSelect={() => insertEmojiIntoMessageInput(emoji)}>
+                              <span className="text-base leading-none">{emoji}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button
                         onClick={handleSendMessage}
                         disabled={(!messageInput.trim() && !queuedAttachment) || isUploadingAttachment}
@@ -2391,8 +2548,8 @@ export function StudentMessagesPage() {
                               <span>{formatMessageTime(msg.timestamp)}</span>
                               {msg.senderId === 'current' && (
                                 <>
-                                  {msg.status === 'read' && <CheckCheck className="h-3 w-3 text-blue-500" />}
-                                  {msg.status === 'delivered' && <CheckCheck className="h-3 w-3" />}
+                                  {msg.status === 'read' && <CheckCheck className="h-3 w-3 text-primary" />}
+                                  {msg.status === 'delivered' && <Check className="h-3 w-3" />}
                                   {msg.status === 'sent' && <Clock className="h-3 w-3" />}
                                 </>
                               )}
