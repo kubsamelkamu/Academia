@@ -75,7 +75,8 @@ apiClient.interceptors.response.use(
       const isAuthEndpoint =
         requestUrl.includes("/auth/login") ||
         requestUrl.includes("/auth/register") ||
-        requestUrl.includes("/auth/email-verification")
+        requestUrl.includes("/auth/email-verification") ||
+        requestUrl.includes("/auth/forgot-password")
 
       // For invalid credentials on auth endpoints, let the caller handle the error
       // (e.g., show an inline message on the login page) instead of hard redirect.

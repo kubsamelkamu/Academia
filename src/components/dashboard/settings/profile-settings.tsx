@@ -122,6 +122,9 @@ export function ProfileSettings() {
 
   const avatarUrl = user?.avatarUrl ?? null
 
+  const primaryRole = getPrimaryRoleFromBackendRoles(user?.roles)
+  const isStudent = primaryRole === "student"
+
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null)
   const [showCropModal, setShowCropModal] = React.useState(false)
   const [avatarCrop, setAvatarCrop] = React.useState({ x: 0, y: 0 })
@@ -156,13 +159,11 @@ export function ProfileSettings() {
 
   React.useEffect(() => {
     // Best-effort refresh (keeps profile up to date when this page is opened).
-    const primaryRole = getPrimaryRoleFromBackendRoles(user?.roles)
-
-    const refresh = primaryRole === "student" ? fetchStudentProfile : fetchProfile
+    const refresh = isStudent ? fetchStudentProfile : fetchProfile
     refresh().catch(() => {
       // store already captures profileError
     })
-  }, [fetchProfile, fetchStudentProfile, user?.roles])
+  }, [fetchProfile, fetchStudentProfile, isStudent])
 
   React.useEffect(() => {
     accountForm.reset({
@@ -222,6 +223,15 @@ export function ProfileSettings() {
   }, [selectedImage, croppedAreaPixels])
 
   async function handleSaveProfile(values: AccountFormValues) {
+    if (isStudent) {
+      toast.message("Your name is read-only")
+      accountForm.reset({
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
+      })
+      return
+    }
+
     try {
       await updateProfileName({ firstName: values.firstName, lastName: values.lastName })
       toast.success("Name updated")
@@ -408,6 +418,7 @@ export function ProfileSettings() {
                           placeholder="Your first name"
                           {...field}
                           value={field.value ?? ""}
+                          readOnly={isStudent}
                           className="transition-all focus:ring-2 focus:ring-primary"
                         />
                       </FormControl>
@@ -426,6 +437,7 @@ export function ProfileSettings() {
                           placeholder="Your last name"
                           {...field}
                           value={field.value ?? ""}
+                          readOnly={isStudent}
                           className="transition-all focus:ring-2 focus:ring-primary"
                         />
                       </FormControl>
@@ -439,9 +451,11 @@ export function ProfileSettings() {
                 <Badge variant="secondary" className="text-xs sm:text-sm">
                   Signed in as: {email}
                 </Badge>
-                <Button type="submit" disabled={profileIsLoading} className="w-full sm:w-auto">
-                  {profileIsLoading ? "Updating..." : "Update profile"}
-                </Button>
+                {!isStudent ? (
+                  <Button type="submit" disabled={profileIsLoading} className="w-full sm:w-auto">
+                    {profileIsLoading ? "Updating..." : "Update profile"}
+                  </Button>
+                ) : null}
               </div>
             </form>
           </Form>

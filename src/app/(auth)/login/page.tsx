@@ -2,8 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -82,6 +83,7 @@ function LoginPageContent() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -90,6 +92,11 @@ function LoginPageContent() {
       password: '',
     },
   });
+
+  const emailValue = useWatch({ control, name: 'email' }) ?? '';
+  const forgotPasswordHref = emailValue.trim()
+    ? `/forgot-password?email=${encodeURIComponent(emailValue.trim())}`
+    : '/forgot-password';
 
   const redirectToDashboard = useCallback((userRoles?: string[]) => {
     const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
@@ -367,6 +374,15 @@ function LoginPageContent() {
                         {errors.password.message}
                       </motion.p>
                     )}
+
+                    <div className="flex justify-end">
+                      <Link
+                        href={forgotPasswordHref}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                   </motion.div>
 
                   {error && (
