@@ -1278,6 +1278,9 @@ export function StudentMessagesPage() {
     const userId = currentUser?.id
     if (!userId) return
 
+    // Don't mark read for optimistic client-side messages; wait for server reconciliation.
+    if (messageId.startsWith("client-")) return
+
     if (lastReadUpToMessageIdRef.current === messageId) return
     lastReadUpToMessageIdRef.current = messageId
 
@@ -1407,6 +1410,8 @@ export function StudentMessagesPage() {
     if (!roomId) return
     if (!isAtBottom) return
     if (!latestMessageId) return
+
+    if (latestMessageId.startsWith("client-")) return
 
     void markReadUpToLatest(latestMessageId)
   }, [isAtBottom, latestMessageId, markReadUpToLatest, roomId])
