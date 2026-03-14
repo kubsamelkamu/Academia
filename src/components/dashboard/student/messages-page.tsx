@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import {
   Dialog,
   DialogContent,
@@ -42,7 +50,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
+import { useQueryClient } from "@tanstack/react-query"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import {
   useCreateMyGroupAnnouncement,
   useDeleteMyGroupAnnouncement,
@@ -50,10 +60,40 @@ import {
   useUpdateMyGroupAnnouncement,
 } from "@/lib/hooks/use-project-groups"
 import {
+  deleteChatRoomMessage,
+  listChatRoomPins,
+  markChatRoomReadUpTo,
+  patchChatRoomMessage,
+  pinChatRoomMessage,
+  removeChatRoomMessageReaction,
+  setChatRoomMessageReaction,
+  unpinChatRoomMessage,
+  uploadChatRoomAttachment,
+} from "@/lib/api/chat"
+import { chatKeys, useInfiniteChatRoomMessages, useMyChatRoom } from "@/lib/hooks/use-chat"
+import { acquireChatSocket, releaseChatSocket } from "@/lib/realtime/chat-socket"
+import {
   announcementIdSchema,
   createMyGroupAnnouncementSchema,
   updateMyGroupAnnouncementSchema,
 } from "@/validations/announcements"
+import type {
+  ChatMessageAttachment,
+  ChatMessage,
+  ListChatRoomMessagesResponse,
+  MessageDeletedPayload,
+  MessageEditedPayload,
+  MessageNewPayload,
+  MessageReadUpToPayload,
+  MessageSendAckData,
+  PinAddedPayload,
+  PinRemovedPayload,
+  PresenceUpdatePayload,
+  ReactionRemovedPayload,
+  ReactionUpdatedPayload,
+  TypingUpdatePayload,
+  SocketAck,
+} from "@/types/chat"
 
 type MessageStatus = 'sent' | 'delivered' | 'read'
 type UserStatus = 'online' | 'away' | 'offline'
@@ -66,6 +106,12 @@ interface Message {
   content: string
   timestamp: string
   status: MessageStatus
+  isPinned?: boolean
+  replyTo?: {
+    messageId: string
+    senderName: string
+    content: string
+  } | null
   attachments?: {
     name: string
     size: string
@@ -104,8 +150,207 @@ interface Announcement {
 
 export function StudentMessagesPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  const tenantDomain = useAuthStore((s) => s.tenantDomain)
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+
   const groupLeaderMeQuery = useMyGroupLeaderRequest(Boolean(accessToken))
   const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
+
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+  const myChatRoomQuery = useMyChatRoom({ enabled: Boolean(accessToken) })
+
+  const roomId = myChatRoomQuery.data?.roomId ?? null
+  const projectGroupId = myChatRoomQuery.data?.projectGroupId ?? null
+
+  const chatMessagesQuery = useInfiniteChatRoomMessages({
+    enabled: Boolean(accessToken) && Boolean(roomId),
+    roomId,
+    limit: 30,
+  })
+
+  const {
+    data: chatMessagesData,
+    hasNextPage: chatHasNextPage,
+    isFetchingNextPage: chatIsFetchingNextPage,
+    fetchNextPage: chatFetchNextPage,
+  } = chatMessagesQuery
+
+  const latestMessageId = chatMessagesData?.pages?.[0]?.items?.[0]?.id ?? null
+
+  const pendingTopPaginationScrollRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(null)
+  const autoFillRoomIdRef = useRef<string | null>(null)
+  const autoFillAttemptsRef = useRef(0)
+
+  const pinnedMessageIdsRef = useRef<Set<string>>(new Set())
+  const [pinsHydrated, setPinsHydrated] = useState(false)
+
+  const findMessageInCache = useCallback((messageId: string): ChatMessage | null => {
+    const pages = chatMessagesData?.pages ?? []
+    for (const page of pages) {
+      const hit = page.items.find((m) => m.id === messageId)
+      if (hit) return hit
+    }
+    return null
+  }, [chatMessagesData])
+
+  const emitSocketWithTimeoutAck = useCallback(<T,>(params: {
+    socket: { emit: (event: string, payload: unknown, cb?: (ack: SocketAck<T>) => void) => void }
+    event: string
+    payload: unknown
+    timeoutMs?: number
+  }): Promise<SocketAck<T> | null> => {
+    return new Promise((resolve) => {
+      let settled = false
+      const timeout = setTimeout(() => {
+        if (settled) return
+        settled = true
+        resolve(null)
+      }, params.timeoutMs ?? 1500)
+
+      params.socket.emit(params.event, params.payload, (ack: SocketAck<T>) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        resolve(ack)
+      })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!roomId) {
+      pinnedMessageIdsRef.current = new Set()
+      setPinsHydrated(false)
+      return
+    }
+
+    let cancelled = false
+    setPinsHydrated(false)
+
+    void listChatRoomPins({ roomId })
+      .then((pins) => {
+        if (cancelled) return
+        pinnedMessageIdsRef.current = new Set(pins.map((p) => p.messageId))
+        setPinsHydrated(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        // Non-fatal; we can still rely on per-message `isPinned` and realtime pin events.
+        setPinsHydrated(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [roomId])
+
+  const updateInfiniteMessagesCache = useCallback((updater: (page: ListChatRoomMessagesResponse) => ListChatRoomMessagesResponse) => {
+    if (!roomId) return
+
+    queryClient.setQueryData(
+      chatKeys().roomMessagesInfinite({ roomId, limit: 30 }),
+      (previous: { pages: ListChatRoomMessagesResponse[]; pageParams: unknown[] } | undefined) => {
+        if (!previous) return previous
+        return {
+          ...previous,
+          pages: previous.pages.map(updater),
+        }
+      }
+    )
+  }, [queryClient, roomId])
+
+  const updateInfiniteMessageById = useCallback((params: {
+    messageId: string
+    update: (message: ChatMessage) => ChatMessage
+  }) => {
+    updateInfiniteMessagesCache((page) => {
+      const idx = page.items.findIndex((m) => m.id === params.messageId)
+      if (idx < 0) return page
+      const nextItems = [...page.items]
+      nextItems[idx] = params.update(nextItems[idx]!)
+      return { ...page, items: nextItems }
+    })
+  }, [updateInfiniteMessagesCache])
+
+  const upsertOptimisticMessageInCache = useCallback((params: {
+    roomId: string
+    message: ChatMessage & { __optimistic?: true }
+    limit: number
+  }) => {
+    queryClient.setQueryData(
+      chatKeys().roomMessagesInfinite({ roomId: params.roomId, limit: params.limit }),
+      (previous: { pages: ListChatRoomMessagesResponse[]; pageParams: unknown[] } | undefined) => {
+        const basePage: ListChatRoomMessagesResponse =
+          previous?.pages?.[0] ?? { items: [], nextCursor: null, readStates: [] }
+
+        const nextItems = [params.message, ...basePage.items]
+          .filter((m, idx, arr) => arr.findIndex((x) => x.id === m.id) === idx)
+          .slice(0, params.limit)
+
+        const nextFirstPage: ListChatRoomMessagesResponse = {
+          ...basePage,
+          items: nextItems,
+        }
+
+        if (!previous) {
+          return {
+            pages: [nextFirstPage],
+            pageParams: [null],
+          }
+        }
+
+        return {
+          ...previous,
+          pages: [nextFirstPage, ...previous.pages.slice(1)],
+        }
+      }
+    )
+  }, [queryClient])
+
+  const reconcileClientMessageIdInCache = useCallback((params: {
+    roomId: string
+    clientMessageId?: string
+    canonicalMessage: ChatMessage
+    limit: number
+  }) => {
+    queryClient.setQueryData(
+      chatKeys().roomMessagesInfinite({ roomId: params.roomId, limit: params.limit }),
+      (previous: { pages: ListChatRoomMessagesResponse[]; pageParams: unknown[] } | undefined) => {
+        const basePage: ListChatRoomMessagesResponse =
+          previous?.pages?.[0] ?? { items: [], nextCursor: null, readStates: [] }
+
+        const withoutOptimistic = params.clientMessageId
+          ? basePage.items.filter((m) => m.id !== params.clientMessageId)
+          : basePage.items
+
+        const withoutCanonicalDup = withoutOptimistic.filter(
+          (m) => m.id !== params.canonicalMessage.id
+        )
+
+        const nextFirstPage: ListChatRoomMessagesResponse = {
+          ...basePage,
+          items: [params.canonicalMessage, ...withoutCanonicalDup].slice(0, params.limit),
+        }
+
+        if (!previous) {
+          return {
+            pages: [nextFirstPage],
+            pageParams: [null],
+          }
+        }
+
+        return {
+          ...previous,
+          pages: [nextFirstPage, ...previous.pages.slice(1)],
+        }
+      }
+    )
+  }, [queryClient])
+
+  const invalidateRoomMessages = useCallback(() => {
+    if (!roomId) return
+    queryClient.invalidateQueries({ queryKey: chatKeys().roomMessagesInfinite({ roomId, limit: 30 }) })
+  }, [queryClient, roomId])
 
   const [announcementsPage, setAnnouncementsPage] = useState(1)
   const ANNOUNCEMENTS_PAGE_SIZE = 10
@@ -148,6 +393,169 @@ export function StudentMessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messageInput, setMessageInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null)
+
+  const toggleReplyToMessage = useCallback((messageId: string, preview?: { senderName?: string; content?: string }) => {
+    if (messageId.startsWith("client-")) {
+      toast.error("Message is not delivered yet")
+      return
+    }
+
+    setReplyToMessageId((prev) => {
+      const next = prev === messageId ? null : messageId
+      if (next) {
+        const title = preview?.senderName ? `Replying to ${preview.senderName}` : "Replying to message"
+        const body = preview?.content ? preview.content.slice(0, 80) : ""
+        toast.message(title, body ? { description: body } : undefined)
+      } else {
+        toast.message("Reply cleared")
+      }
+      return next
+    })
+  }, [])
+
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [queuedAttachment, setQueuedAttachment] = useState<ChatMessageAttachment | null>(null)
+
+  const messagesScrollRootRef = useRef<HTMLDivElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(false)
+  const isAtBottomRef = useRef(false)
+  const lastReadUpToMessageIdRef = useRef<string | null>(null)
+
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTypingRef = useRef(false)
+  const typingUserIdsRef = useRef<Set<string>>(new Set())
+
+  const socketRef = useRef<ReturnType<typeof acquireChatSocket> | null>(null)
+  const joinedRoomIdRef = useRef<string | null>(null)
+  const onlineUserIdsRef = useRef<string[]>([])
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
+
+  const editMessage = useCallback(async (params: { messageId: string; fallbackText?: string }) => {
+    if (!roomId) return
+    if (params.messageId.startsWith("client-")) {
+      toast.error("Message is not delivered yet")
+      return
+    }
+
+    const message = findMessageInCache(params.messageId)
+    if (!message) return
+    if (!currentUser?.id || message.senderUserId !== currentUser.id) {
+      toast.error("You can only edit your own messages")
+      return
+    }
+
+    const nextTextRaw = window.prompt("Edit message", message.text ?? params.fallbackText ?? "")
+    if (nextTextRaw === null) return
+    const nextText = nextTextRaw.trim()
+    if (!nextText) {
+      toast.error("Message text is required")
+      return
+    }
+
+    const prevText = message.text
+    const prevEditedAt = message.editedAt
+    const optimisticEditedAt = new Date().toISOString()
+
+    updateInfiniteMessageById({
+      messageId: params.messageId,
+      update: (currentMsg) => ({
+        ...currentMsg,
+        text: nextText,
+        editedAt: optimisticEditedAt,
+      }),
+    })
+
+    const socket = socketRef.current
+    if (socket?.connected && joinedRoomIdRef.current === roomId) {
+      const ack = await emitSocketWithTimeoutAck<unknown>({
+        socket,
+        event: "message:edit",
+        payload: { roomId, messageId: params.messageId, text: nextText },
+      })
+
+      if (ack && typeof ack === "object" && "ok" in ack && ack.ok === false) {
+        updateInfiniteMessageById({
+          messageId: params.messageId,
+          update: (currentMsg) => ({
+            ...currentMsg,
+            text: prevText,
+            editedAt: prevEditedAt,
+          }),
+        })
+        toast.error(ack.error?.message ?? "Failed to edit message")
+        return
+      }
+
+      if (ack !== null) return
+      // No ack -> fall back to REST (idempotent for same text)
+    }
+
+    try {
+      await patchChatRoomMessage({ roomId, messageId: params.messageId, text: nextText })
+    } catch (error) {
+      updateInfiniteMessageById({
+        messageId: params.messageId,
+        update: (currentMsg) => ({
+          ...currentMsg,
+          text: prevText,
+          editedAt: prevEditedAt,
+        }),
+      })
+      const msg = error instanceof Error ? error.message : "Failed to edit message"
+      toast.error(msg)
+    }
+  }, [currentUser?.id, emitSocketWithTimeoutAck, findMessageInCache, roomId, updateInfiniteMessageById])
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!roomId) return
+    if (messageId.startsWith("client-")) {
+      toast.error("Message is not delivered yet")
+      return
+    }
+
+    const message = findMessageInCache(messageId)
+    if (!message) return
+    if (!currentUser?.id || message.senderUserId !== currentUser.id) {
+      toast.error("You can only delete your own messages")
+      return
+    }
+
+    const ok = window.confirm("Delete this message? This cannot be undone.")
+    if (!ok) return
+
+    pinnedMessageIdsRef.current.delete(messageId)
+    updateInfiniteMessagesCache((page) => {
+      const nextItems = page.items.filter((m) => m.id !== messageId)
+      if (nextItems.length === page.items.length) return page
+      return { ...page, items: nextItems }
+    })
+
+    const socket = socketRef.current
+    if (socket?.connected && joinedRoomIdRef.current === roomId) {
+      const ack = await emitSocketWithTimeoutAck<unknown>({
+        socket,
+        event: "message:delete",
+        payload: { roomId, messageId },
+      })
+
+      if (ack && typeof ack === "object" && "ok" in ack && ack.ok === false) {
+        toast.error(ack.error?.message ?? "Failed to delete message")
+        invalidateRoomMessages()
+        return
+      }
+
+      if (ack !== null) return
+      // No ack -> fall back to REST
+    }
+
+    try {
+      await deleteChatRoomMessage({ roomId, messageId })
+    } catch {
+      // If the socket delete already succeeded, REST might 404; keep UI as-is.
+    }
+  }, [currentUser?.id, emitSocketWithTimeoutAck, findMessageInCache, invalidateRoomMessages, roomId, updateInfiniteMessagesCache])
   const [advisorInput, setAdvisorInput] = useState('')
   const [advisorMessages, setAdvisorMessages] = useState<Message[]>([
     {
@@ -179,130 +587,229 @@ export function StudentMessagesPage() {
   ])
   const advisorProfile = { name: 'Dr. Sarah Chen', role: 'Project Advisor', status: 'online' as UserStatus }
 
-  // Mock data - would come from API in production
-  const conversations: Conversation[] = [
-    {
-      id: '1',
-      name: 'AI Research Group',
-      type: 'group',
-      lastMessage: 'Meeting at 3pm tomorrow to discuss findings',
-      lastMessageTime: '2024-07-25T14:30:00',
-      unreadCount: 2,
-      participants: [
-        { id: '101', name: 'Dr. Sarah Chen', status: 'online' },
-        { id: '102', name: 'John Smith', status: 'away' },
-        { id: '103', name: 'Emily Brown', status: 'offline' },
-      ]
-    },
-    {
-      id: '2',
-      name: 'Dr. Sarah Chen',
-      type: 'manager',
-      avatar: '/avatars/sarah.jpg',
-      lastMessage: 'Great progress on the research proposal',
-      lastMessageTime: '2024-07-25T11:20:00',
-      unreadCount: 1,
-      status: 'online'
-    },
-    {
-      id: '3',
-      name: 'Web Development Team',
-      type: 'group',
-      lastMessage: 'I will complete my task today',
-      lastMessageTime: '2024-07-24T16:45:00',
-      unreadCount: 0,
-      participants: [
-        { id: '104', name: 'Prof. James Wilson', status: 'away' },
-        { id: '105', name: 'David Kim', status: 'online' },
-        { id: '106', name: 'Lisa Wang', status: 'online' },
-      ]
-    },
-    {
-      id: '4',
-      name: 'Prof. James Wilson',
-      type: 'manager',
-      avatar: '/avatars/james.jpg',
-      lastMessage: 'Please review the updated timeline',
-      lastMessageTime: '2024-07-24T09:15:00',
-      unreadCount: 0,
-      status: 'away'
-    },
-  ]
+  const conversations: Conversation[] = useMemo(() => {
+    const group = myProjectGroupQuery.data
+    const room = myChatRoomQuery.data
+    if (!group || !room) return []
 
-  const messages: Record<string, Message[]> = {
-    '1': [
+    const rawItems = chatMessagesQuery.data?.pages?.[0]?.items ?? []
+    const newest = rawItems[0] ?? null
+
+    const participants = [
       {
-        id: 'm1',
-        senderId: '101',
-        senderName: 'Dr. Sarah Chen',
-        senderAvatar: '/avatars/sarah.jpg',
-        content: 'Good morning team! Let\'s discuss our findings from this week.',
-        timestamp: '2024-07-25T09:00:00',
-        status: 'read'
+        id: group.leader.id,
+        name: `${group.leader.firstName} ${group.leader.lastName}`.trim() || group.leader.email,
+        status: onlineUserIds.includes(group.leader.id) ? ("online" as const) : ("offline" as const),
       },
+      ...group.members.map((m) => {
+        const name = `${m.user.firstName} ${m.user.lastName}`.trim() || m.user.email
+        return {
+          id: m.user.id,
+          name,
+          status: onlineUserIds.includes(m.user.id) ? ("online" as const) : ("offline" as const),
+        }
+      }),
+    ]
+
+    // Remove duplicates (in case leader appears in members)
+    const uniqueParticipants = Array.from(new Map(participants.map((p) => [p.id, p])).values())
+
+    return [
       {
-        id: 'm2',
-        senderId: '102',
-        senderName: 'John Smith',
-        content: 'I\'ve completed the data analysis. Results look promising.',
-        timestamp: '2024-07-25T09:15:00',
-        status: 'read'
-      },
-      {
-        id: 'm3',
-        senderId: '103',
-        senderName: 'Emily Brown',
-        content: 'Great! I\'ll prepare the presentation slides.',
-        timestamp: '2024-07-25T09:20:00',
-        status: 'read'
-      },
-      {
-        id: 'm4',
-        senderId: '101',
-        senderName: 'Dr. Sarah Chen',
-        senderAvatar: '/avatars/sarah.jpg',
-        content: 'Perfect. Let\'s meet at 3pm to go through everything.',
-        timestamp: '2024-07-25T09:25:00',
-        status: 'read'
-      },
-      {
-        id: 'm5',
-        senderId: '102',
-        senderName: 'John Smith',
-        content: 'Works for me. Should I share the data before the meeting?',
-        timestamp: '2024-07-25T09:30:00',
-        status: 'delivered'
-      },
-    ],
-    '2': [
-      {
-        id: 'm6',
-        senderId: '101',
-        senderName: 'Dr. Sarah Chen',
-        senderAvatar: '/avatars/sarah.jpg',
-        content: 'Your research proposal draft looks excellent. I have a few suggestions.',
-        timestamp: '2024-07-25T10:00:00',
-        status: 'read'
-      },
-      {
-        id: 'm7',
-        senderId: 'current',
-        senderName: 'You',
-        content: 'Thank you! I\'d love to hear your feedback.',
-        timestamp: '2024-07-25T10:05:00',
-        status: 'read'
-      },
-      {
-        id: 'm8',
-        senderId: '101',
-        senderName: 'Dr. Sarah Chen',
-        senderAvatar: '/avatars/sarah.jpg',
-        content: 'Great progress on the research proposal. The methodology section is particularly strong.',
-        timestamp: '2024-07-25T11:20:00',
-        status: 'delivered'
+        id: room.roomId,
+        name: group.name,
+        type: "group" as const,
+        lastMessage: newest?.text || (newest?.attachment?.name ? `Attachment: ${newest.attachment.name}` : ""),
+        lastMessageTime: newest?.createdAt ?? group.updatedAt,
+        unreadCount: 0,
+        participants: uniqueParticipants,
       },
     ]
-  }
+  }, [chatMessagesQuery.data, myChatRoomQuery.data, myProjectGroupQuery.data, onlineUserIds])
+
+  const messages: Record<string, Message[]> = useMemo(() => {
+    if (!roomId) return {}
+
+    const currentUserId = currentUser?.id
+    const itemsNewestFirst = chatMessagesQuery.data?.pages?.flatMap((p) => p.items) ?? []
+    const itemsOldestFirst = [...itemsNewestFirst].reverse()
+
+    const truncatePreview = (text: string, max = 80) => {
+      const trimmed = text.trim()
+      if (trimmed.length <= max) return trimmed
+      return `${trimmed.slice(0, max).trimEnd()}…`
+    }
+
+    const messageIdToIndex = new Map<string, number>()
+    for (let i = 0; i < itemsOldestFirst.length; i += 1) {
+      messageIdToIndex.set(itemsOldestFirst[i]!.id, i)
+    }
+
+    const otherParticipantUserIds = (() => {
+      const group = myProjectGroupQuery.data
+      if (!group || !currentUserId) return []
+      const ids = [group.leader.id, ...group.members.map((m) => m.user.id)].filter(
+        (id) => id && id !== currentUserId
+      )
+      return Array.from(new Set(ids))
+    })()
+
+    const readStates = chatMessagesQuery.data?.pages?.[0]?.readStates ?? []
+    const lastReadIndexByUserId = new Map<string, number>()
+    for (const state of readStates) {
+      const idx = messageIdToIndex.get(state.lastReadMessageId)
+      lastReadIndexByUserId.set(state.userId, typeof idx === "number" ? idx : -1)
+    }
+
+    const mapped: Message[] = itemsOldestFirst.map((m, idx) => {
+      const senderName = `${m.sender.firstName} ${m.sender.lastName}`.trim() || "Unknown"
+
+      const attachments = m.attachment
+        ? [
+            {
+              name: m.attachment.name,
+              size: `${Math.max(1, Math.round(m.attachment.size / 1024))} KB`,
+              url: m.attachment.url,
+            },
+          ]
+        : undefined
+
+      const isMine = m.senderUserId === currentUserId
+      const isOptimistic = (m as { __optimistic?: boolean }).__optimistic === true
+      const status: MessageStatus = (() => {
+        if (!isMine) return "read"
+
+        if (isOptimistic) return "sent"
+
+        if (otherParticipantUserIds.length === 0) return "delivered"
+        const everyoneRead = otherParticipantUserIds.every(
+          (userId) => (lastReadIndexByUserId.get(userId) ?? -1) >= idx
+        )
+
+        return everyoneRead ? "read" : "delivered"
+      })()
+
+      const replyTo = (() => {
+        const referenced =
+          m.replyTo ??
+          (m.replyToMessageId
+            ? itemsOldestFirst[messageIdToIndex.get(m.replyToMessageId) ?? -1] ?? null
+            : null)
+
+        if (!referenced) {
+          return m.replyToMessageId
+            ? {
+                messageId: m.replyToMessageId,
+                senderName: "Message",
+                content: "",
+              }
+            : null
+        }
+
+        const referencedSenderName =
+          referenced.senderUserId === currentUserId
+            ? "You"
+            : `${referenced.sender.firstName} ${referenced.sender.lastName}`.trim() || "Unknown"
+
+        const referencedContent =
+          referenced.text ||
+          (referenced.attachment?.name ? `Attachment: ${referenced.attachment.name}` : "")
+
+        return {
+          messageId: referenced.id,
+          senderName: referencedSenderName,
+          content: truncatePreview(referencedContent, 80),
+        }
+      })()
+
+      return {
+        id: m.id,
+        senderId: m.senderUserId === currentUserId ? "current" : m.senderUserId,
+        senderName: m.senderUserId === currentUserId ? "You" : senderName,
+        senderAvatar: m.sender.avatarUrl ?? undefined,
+        content: m.text,
+        timestamp: m.createdAt,
+        status,
+        isPinned: pinsHydrated ? pinnedMessageIdsRef.current.has(m.id) : Boolean(m.isPinned),
+        replyTo,
+        attachments,
+      }
+    })
+
+    return {
+      [roomId]: mapped,
+    }
+  }, [chatMessagesQuery.data, currentUser?.id, myProjectGroupQuery.data, pinsHydrated, roomId])
+
+  const activeReplyPreview = useMemo(() => {
+    if (!replyToMessageId) return null
+    const target = findMessageInCache(replyToMessageId)
+    if (!target) {
+      return {
+        senderName: "Message",
+        content: "",
+      }
+    }
+
+    const senderName =
+      target.senderUserId === currentUser?.id
+        ? "You"
+        : `${target.sender.firstName} ${target.sender.lastName}`.trim() || "Unknown"
+
+    const rawContent =
+      target.text || (target.attachment?.name ? `Attachment: ${target.attachment.name}` : "")
+
+    const content = rawContent.trim().length > 80 ? `${rawContent.trim().slice(0, 80).trimEnd()}…` : rawContent.trim()
+
+    return {
+      senderName,
+      content,
+    }
+  }, [currentUser?.id, findMessageInCache, replyToMessageId])
+
+  const updateReadStateInCache = useCallback((payload: {
+    roomId: string
+    userId: string
+    readUpToMessageId: string
+    readAt: string
+  }) => {
+    queryClient.setQueryData(
+      chatKeys().roomMessagesInfinite({ roomId: payload.roomId, limit: 30 }),
+      (previous: { pages: ListChatRoomMessagesResponse[]; pageParams: unknown[] } | undefined) => {
+        if (!previous) return previous
+        if (!previous.pages[0]) return previous
+
+        const firstPage = previous.pages[0]
+        const existing = firstPage.readStates ?? []
+        const next = existing.some((s) => s.userId === payload.userId)
+          ? existing.map((s) =>
+              s.userId === payload.userId
+                ? {
+                    ...s,
+                    lastReadMessageId: payload.readUpToMessageId,
+                    readAt: payload.readAt,
+                  }
+                : s
+            )
+          : [
+              ...existing,
+              {
+                userId: payload.userId,
+                lastReadMessageId: payload.readUpToMessageId,
+                readAt: payload.readAt,
+              },
+            ]
+
+        const nextPages = [...previous.pages]
+        nextPages[0] = { ...firstPage, readStates: next }
+
+        return {
+          ...previous,
+          pages: nextPages,
+        }
+      }
+    )
+  }, [queryClient])
 
   const [createAnnouncementOpen, setCreateAnnouncementOpen] = useState(false)
   const [announcementTitle, setAnnouncementTitle] = useState("")
@@ -414,11 +921,768 @@ export function StudentMessagesPage() {
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const effectiveSelectedConversation = selectedConversation ?? filteredConversations[0] ?? null
+
+  useEffect(() => {
+    if (!accessToken || !projectGroupId || !roomId) {
+      socketRef.current?.disconnect?.()
+      socketRef.current = null
+      joinedRoomIdRef.current = null
+      onlineUserIdsRef.current = []
+      return
+    }
+
+    const socket = acquireChatSocket({
+      accessToken,
+      tenantDomain,
+    })
+
+    socketRef.current = socket
+
+    const handlePresenceUpdate = (payload: unknown) => {
+      const raw = payload as PresenceUpdatePayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (!Array.isArray(raw.onlineUserIds)) return
+
+      onlineUserIdsRef.current = raw.onlineUserIds.filter((id) => typeof id === "string")
+      setOnlineUserIds(onlineUserIdsRef.current)
+    }
+
+    const handleMessageNew = (payload: unknown) => {
+      const raw = payload as MessageNewPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (!raw.message || typeof raw.message !== "object") return
+
+      reconcileClientMessageIdInCache({
+        roomId,
+        clientMessageId: raw.clientMessageId,
+        canonicalMessage: raw.message,
+        limit: 30,
+      })
+    }
+
+    const handleReadUpTo = (payload: unknown) => {
+      const raw = payload as MessageReadUpToPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.userId !== "string") return
+      if (typeof raw.readUpToMessageId !== "string") return
+      if (typeof raw.readAt !== "string") return
+
+      updateReadStateInCache({
+        roomId: raw.roomId,
+        userId: raw.userId,
+        readUpToMessageId: raw.readUpToMessageId,
+        readAt: raw.readAt,
+      })
+    }
+
+    const handleMessageEdited = (payload: unknown) => {
+      const raw = payload as MessageEditedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+      if (!raw.message || typeof raw.message !== "object") return
+
+      updateInfiniteMessageById({
+        messageId: raw.messageId,
+        update: (current) => ({
+          ...current,
+          editedAt:
+            typeof raw.message.editedAt === "string" || raw.message.editedAt === null
+              ? raw.message.editedAt
+              : current.editedAt,
+          ...(typeof raw.message.text === "string" ? { text: raw.message.text } : {}),
+        }),
+      })
+    }
+
+    const handleMessageDeleted = (payload: unknown) => {
+      const raw = payload as MessageDeletedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+
+      updateInfiniteMessagesCache((page) => {
+        const nextItems = page.items.filter((m) => m.id !== raw.messageId)
+        if (nextItems.length === page.items.length) return page
+        return { ...page, items: nextItems }
+      })
+    }
+
+    const handleTypingUpdate = (payload: unknown) => {
+      const raw = payload as TypingUpdatePayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.userId !== "string") return
+      if (typeof raw.isTyping !== "boolean") return
+      if (typeof raw.at !== "string") return
+
+      // Ignore self typing updates.
+      if (raw.userId === currentUser?.id) return
+
+      if (raw.isTyping) {
+        typingUserIdsRef.current.add(raw.userId)
+      } else {
+        typingUserIdsRef.current.delete(raw.userId)
+      }
+    }
+
+    const handleReactionUpdated = (payload: unknown) => {
+      const raw = payload as ReactionUpdatedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+      if (typeof raw.userId !== "string") return
+      if (typeof raw.emoji !== "string") return
+      if (typeof raw.reactedAt !== "string") return
+
+      // We can precisely update only for current user (myReaction). For other users, refetch.
+      if (raw.userId !== currentUser?.id) {
+        invalidateRoomMessages()
+        return
+      }
+
+      updateInfiniteMessageById({
+        messageId: raw.messageId,
+        update: (current) => {
+          const prevEmoji = current.reactions?.myReaction
+          const items = [...(current.reactions?.items ?? [])]
+
+          const bump = (emoji: string, delta: number) => {
+            const i = items.findIndex((x) => x.emoji === emoji)
+            if (i < 0) {
+              if (delta > 0) items.push({ emoji, count: delta })
+              return
+            }
+            const nextCount = items[i]!.count + delta
+            if (nextCount <= 0) items.splice(i, 1)
+            else items[i] = { ...items[i]!, count: nextCount }
+          }
+
+          if (prevEmoji && prevEmoji !== raw.emoji) bump(prevEmoji, -1)
+          bump(raw.emoji, prevEmoji === raw.emoji ? 0 : 1)
+
+          return {
+            ...current,
+            reactions: {
+              items,
+              myReaction: raw.emoji,
+            },
+          }
+        },
+      })
+    }
+
+    const handleReactionRemoved = (payload: unknown) => {
+      const raw = payload as ReactionRemovedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+      if (typeof raw.userId !== "string") return
+      if (typeof raw.removedAt !== "string") return
+
+      if (raw.userId !== currentUser?.id) {
+        invalidateRoomMessages()
+        return
+      }
+
+      updateInfiniteMessageById({
+        messageId: raw.messageId,
+        update: (current) => {
+          const prevEmoji = current.reactions?.myReaction
+          if (!prevEmoji) return current
+
+          const items = [...(current.reactions?.items ?? [])]
+          const i = items.findIndex((x) => x.emoji === prevEmoji)
+          if (i >= 0) {
+            const nextCount = items[i]!.count - 1
+            if (nextCount <= 0) items.splice(i, 1)
+            else items[i] = { ...items[i]!, count: nextCount }
+          }
+
+          return {
+            ...current,
+            reactions: {
+              items,
+              myReaction: null,
+            },
+          }
+        },
+      })
+    }
+
+    const handlePinAdded = (payload: unknown) => {
+      const raw = payload as PinAddedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+      if (typeof raw.pinnedByUserId !== "string") return
+      if (typeof raw.pinnedAt !== "string") return
+
+      pinnedMessageIdsRef.current.add(raw.messageId)
+
+      updateInfiniteMessageById({
+        messageId: raw.messageId,
+        update: (current) => (current.isPinned ? current : { ...current, isPinned: true }),
+      })
+    }
+
+    const handlePinRemoved = (payload: unknown) => {
+      const raw = payload as PinRemovedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.messageId !== "string") return
+      if (typeof raw.unpinnedByUserId !== "string") return
+      if (typeof raw.unpinnedAt !== "string") return
+
+      pinnedMessageIdsRef.current.delete(raw.messageId)
+
+      updateInfiniteMessageById({
+        messageId: raw.messageId,
+        update: (current) => (!current.isPinned ? current : { ...current, isPinned: false }),
+      })
+    }
+
+    socket.on("presence:update", handlePresenceUpdate)
+    socket.on("message:new", handleMessageNew)
+    socket.on("message:readUpTo", handleReadUpTo)
+    socket.on("message:edited", handleMessageEdited)
+    socket.on("message:deleted", handleMessageDeleted)
+    socket.on("typing:update", handleTypingUpdate)
+    socket.on("reaction:updated", handleReactionUpdated)
+    socket.on("reaction:removed", handleReactionRemoved)
+    socket.on("pin:added", handlePinAdded)
+    socket.on("pin:removed", handlePinRemoved)
+
+    const joinRoom = () => {
+      socket.emit(
+        "chat:join",
+        { projectGroupId },
+        (ack: SocketAck<{ roomId: string; projectGroupId: string; onlineUserIds: string[] }>) => {
+          if (!ack || typeof ack !== "object") return
+          if (ack.ok !== true) {
+            toast.error("Failed to join chat")
+            return
+          }
+
+          joinedRoomIdRef.current = ack.data.roomId
+          onlineUserIdsRef.current = ack.data.onlineUserIds
+          setOnlineUserIds(ack.data.onlineUserIds)
+
+          socket.emit(
+            "presence:get",
+            { roomId: ack.data.roomId },
+            (presenceAck: SocketAck<{ roomId: string; onlineUserIds: string[] }>) => {
+              if (!presenceAck || typeof presenceAck !== "object") return
+              if (presenceAck.ok !== true) return
+              if (presenceAck.data.roomId !== roomId && presenceAck.data.roomId !== ack.data.roomId) return
+
+              onlineUserIdsRef.current = presenceAck.data.onlineUserIds
+              setOnlineUserIds(presenceAck.data.onlineUserIds)
+            }
+          )
+        }
+      )
+    }
+
+    const handleConnect = () => {
+      joinedRoomIdRef.current = null
+      joinRoom()
+    }
+
+    const handleDisconnect = () => {
+      joinedRoomIdRef.current = null
+      onlineUserIdsRef.current = []
+      setOnlineUserIds([])
+
+      // Clear typing state while disconnected.
+      typingUserIdsRef.current.clear()
+    }
+
+    socket.on("connect", handleConnect)
+    socket.on("disconnect", handleDisconnect)
+
+    if (socket.connected) {
+      handleConnect()
+    }
+
+    return () => {
+      socket.off("presence:update", handlePresenceUpdate)
+      socket.off("message:new", handleMessageNew)
+      socket.off("message:readUpTo", handleReadUpTo)
+      socket.off("message:edited", handleMessageEdited)
+      socket.off("message:deleted", handleMessageDeleted)
+      socket.off("typing:update", handleTypingUpdate)
+      socket.off("reaction:updated", handleReactionUpdated)
+      socket.off("reaction:removed", handleReactionRemoved)
+      socket.off("pin:added", handlePinAdded)
+      socket.off("pin:removed", handlePinRemoved)
+      socket.off("connect", handleConnect)
+      socket.off("disconnect", handleDisconnect)
+      releaseChatSocket(socket)
+      if (socketRef.current === socket) {
+        socketRef.current = null
+      }
+    }
+  }, [accessToken, currentUser?.id, invalidateRoomMessages, projectGroupId, reconcileClientMessageIdInCache, roomId, tenantDomain, updateInfiniteMessageById, updateInfiniteMessagesCache, updateReadStateInCache])
+
+  const emitTypingStop = useCallback(() => {
+    if (!roomId) return
+
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current)
+      typingStopTimerRef.current = null
+    }
+
+    if (!isTypingRef.current) return
+    isTypingRef.current = false
+
+    const socket = socketRef.current
+    if (!socket) return
+    socket.emit("typing:stop", { roomId })
+  }, [roomId])
+
+  const emitTypingStart = useCallback(() => {
+    if (!roomId) return
+
+    const socket = socketRef.current
+    if (!socket) return
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      socket.emit("typing:start", { roomId })
+    }
+
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current)
+    }
+
+    // Debounce stop: if no activity for a short window, emit typing:stop.
+    typingStopTimerRef.current = setTimeout(() => {
+      emitTypingStop()
+    }, 1500)
+  }, [emitTypingStop, roomId])
+
+  useEffect(() => {
+    return () => {
+      // Best-effort: stop typing when leaving the page.
+      emitTypingStop()
+    }
+  }, [emitTypingStop])
+
+  const markReadUpToLatest = useCallback(async (messageId: string) => {
+    if (!roomId) return
+    const userId = currentUser?.id
+    if (!userId) return
+
+    if (lastReadUpToMessageIdRef.current === messageId) return
+    lastReadUpToMessageIdRef.current = messageId
+
+    const nowIso = new Date().toISOString()
+    updateReadStateInCache({
+      roomId,
+      userId,
+      readUpToMessageId: messageId,
+      readAt: nowIso,
+    })
+
+    const socket = socketRef.current
+    if (socket) {
+      socket.emit(
+        "message:markReadUpTo",
+        { roomId, messageId },
+        (ack: SocketAck<unknown>) => {
+          if (!ack || typeof ack !== "object") return
+          if (ack.ok === false) {
+            toast.error(ack.error?.message ?? "Failed to mark messages as read")
+          }
+        }
+      )
+      return
+    }
+
+    try {
+      await markChatRoomReadUpTo({ roomId, messageId })
+    } catch {
+      // Non-fatal; UI already updated optimistically.
+    }
+  }, [currentUser?.id, roomId, updateReadStateInCache])
+
+  useEffect(() => {
+    const root = messagesScrollRootRef.current
+    if (!root) return
+
+    const viewport = root.querySelector<HTMLDivElement>(
+      '[data-slot="scroll-area-viewport"]'
+    )
+    if (!viewport) return
+
+    const thresholdPx = 24
+    const computeAtBottom = () => {
+      const distance = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+      return distance <= thresholdPx
+    }
+
+    const computeAtTop = () => {
+      return viewport.scrollTop <= thresholdPx
+    }
+
+    const sync = () => {
+      const atBottom = computeAtBottom()
+      isAtBottomRef.current = atBottom
+      setIsAtBottom(atBottom)
+    }
+
+    const maybeLoadOlder = () => {
+      if (!roomId) return
+      if (!chatHasNextPage) return
+      if (chatIsFetchingNextPage) return
+      if (!computeAtTop()) return
+
+      pendingTopPaginationScrollRef.current = {
+        prevScrollHeight: viewport.scrollHeight,
+        prevScrollTop: viewport.scrollTop,
+      }
+
+      void chatFetchNextPage().then(() => {
+        const pending = pendingTopPaginationScrollRef.current
+        if (!pending) return
+        pendingTopPaginationScrollRef.current = null
+
+        requestAnimationFrame(() => {
+          const nextScrollHeight = viewport.scrollHeight
+          const delta = nextScrollHeight - pending.prevScrollHeight
+          viewport.scrollTop = pending.prevScrollTop + delta
+        })
+      })
+    }
+
+    const onScroll = () => {
+      sync()
+      maybeLoadOlder()
+    }
+
+    viewport.addEventListener("scroll", onScroll, { passive: true })
+    // Initial sync (also covers non-overflow content)
+    sync()
+
+    if (autoFillRoomIdRef.current !== roomId) {
+      autoFillRoomIdRef.current = roomId
+      autoFillAttemptsRef.current = 0
+    }
+
+    // If content doesn't overflow, auto-fill up to a small cap so history is reachable.
+    if (
+      viewport.scrollHeight <= viewport.clientHeight + 1 &&
+      chatHasNextPage &&
+      !chatIsFetchingNextPage &&
+      autoFillAttemptsRef.current < 3
+    ) {
+      autoFillAttemptsRef.current += 1
+      pendingTopPaginationScrollRef.current = {
+        prevScrollHeight: viewport.scrollHeight,
+        prevScrollTop: viewport.scrollTop,
+      }
+      void chatFetchNextPage().then(() => {
+        const pending = pendingTopPaginationScrollRef.current
+        if (!pending) return
+        pendingTopPaginationScrollRef.current = null
+        requestAnimationFrame(() => {
+          const nextScrollHeight = viewport.scrollHeight
+          const delta = nextScrollHeight - pending.prevScrollHeight
+          viewport.scrollTop = pending.prevScrollTop + delta
+        })
+      })
+    }
+
+    return () => {
+      viewport.removeEventListener("scroll", onScroll)
+    }
+  }, [chatFetchNextPage, chatHasNextPage, chatIsFetchingNextPage, chatMessagesData, effectiveSelectedConversation?.id, roomId])
+
+  useEffect(() => {
+    if (!roomId) return
+    if (!isAtBottom) return
+    if (!latestMessageId) return
+
+    void markReadUpToLatest(latestMessageId)
+  }, [isAtBottom, latestMessageId, markReadUpToLatest, roomId])
+
   const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return
-    // In production, this would send the message
-    setMessageInput('')
+    sendMessageWithOptionalAttachment({
+      text: messageInput,
+      attachment: queuedAttachment,
+    })
   }
+
+  const sendMessageWithOptionalAttachment = (params: {
+    text: string | null
+    attachment: ChatMessageAttachment | null
+  }) => {
+    if (!effectiveSelectedConversation) return
+    if (!roomId) return
+
+    const replyingTo = replyToMessageId
+    if (replyingTo) {
+      setReplyToMessageId(null)
+    }
+
+    const socket = socketRef.current
+    if (!socket) {
+      toast.error("Chat is not connected")
+      return
+    }
+
+    const text = params.text?.trim() ?? ""
+    const attachment = params.attachment
+
+    if (!text && !attachment) return
+
+    const clientMessageId = `client-${Date.now()}`
+
+    if (currentUser?.id) {
+      const optimisticMessage: ChatMessage & { __optimistic: true } = {
+        __optimistic: true,
+        id: clientMessageId,
+        roomId,
+        senderUserId: currentUser.id,
+        sender: {
+          id: currentUser.id,
+          firstName: currentUser.firstName ?? "",
+          lastName: currentUser.lastName ?? "",
+          avatarUrl: currentUser.avatarUrl ?? null,
+        },
+        replyToMessageId: replyingTo ?? null,
+        replyTo: null,
+        text,
+        attachment,
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        isPinned: false,
+        reactions: {
+          items: [],
+          myReaction: null,
+        },
+      }
+
+      upsertOptimisticMessageInCache({
+        roomId,
+        message: optimisticMessage,
+        limit: 30,
+      })
+    }
+
+    socket.emit(
+      "message:send",
+      {
+        roomId,
+        clientMessageId,
+        ...(replyingTo ? { replyToMessageId: replyingTo } : {}),
+        ...(text ? { text } : {}),
+        ...(attachment ? { attachment } : {}),
+      },
+      (ack: SocketAck<MessageSendAckData>) => {
+        if (!ack || typeof ack !== "object") return
+        if (ack.ok === false) {
+          toast.error(ack.error?.message ?? "Failed to send message")
+          return
+        }
+
+        reconcileClientMessageIdInCache({
+          roomId,
+          clientMessageId: ack.data.clientMessageId ?? clientMessageId,
+          canonicalMessage: ack.data.message,
+          limit: 30,
+        })
+      }
+    )
+
+    setMessageInput("")
+    setQueuedAttachment(null)
+    emitTypingStop()
+  }
+
+  const handleMessageInputChange = (value: string) => {
+    setMessageInput(value)
+
+    if (!roomId) return
+    if (value.trim()) {
+      emitTypingStart()
+    } else {
+      emitTypingStop()
+    }
+  }
+
+  const handlePickAttachment = () => {
+    if (isUploadingAttachment) return
+    attachmentInputRef.current?.click()
+  }
+
+  const handleAttachmentSelected = async (file: File | null) => {
+    if (!file) return
+    if (!roomId) {
+      toast.error("Chat room not ready")
+      return
+    }
+
+    const MAX_BYTES = 5 * 1024 * 1024
+    if (file.size > MAX_BYTES) {
+      toast.error("Attachment must be 5MB or less")
+      return
+    }
+
+    const allowedTypes = new Set<string>([
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "image/jpeg",
+      "image/png",
+    ])
+
+    if (!allowedTypes.has(file.type)) {
+      toast.error("Unsupported file type")
+      return
+    }
+
+    try {
+      setIsUploadingAttachment(true)
+      const uploaded = await uploadChatRoomAttachment({ roomId, file })
+      setQueuedAttachment(uploaded)
+      toast.success(`Attached: ${uploaded.name}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload attachment"
+      toast.error(message)
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }
+
+  const setPinnedOptimistic = useCallback((params: { roomId: string; messageId: string; isPinned: boolean }) => {
+    if (params.isPinned) pinnedMessageIdsRef.current.add(params.messageId)
+    else pinnedMessageIdsRef.current.delete(params.messageId)
+
+    updateInfiniteMessageById({
+      messageId: params.messageId,
+      update: (current) => (current.isPinned === params.isPinned ? current : { ...current, isPinned: params.isPinned }),
+    })
+  }, [updateInfiniteMessageById])
+
+  const togglePinForMessage = useCallback(async (params: { messageId: string; currentlyPinned: boolean }) => {
+    if (!roomId) return
+
+    if (params.messageId.startsWith("client-")) {
+      toast.error("Message is not delivered yet")
+      return
+    }
+
+    const nextPinned = !params.currentlyPinned
+    setPinnedOptimistic({ roomId, messageId: params.messageId, isPinned: nextPinned })
+
+    const socket = socketRef.current
+    if (socket?.connected && joinedRoomIdRef.current === roomId) {
+      socket.emit(nextPinned ? "pin:add" : "pin:remove", { roomId, messageId: params.messageId })
+      return
+    }
+
+    try {
+      if (nextPinned) {
+        await pinChatRoomMessage({ roomId, messageId: params.messageId })
+      } else {
+        await unpinChatRoomMessage({ roomId, messageId: params.messageId })
+      }
+    } catch (error) {
+      // Revert on failure.
+      setPinnedOptimistic({ roomId, messageId: params.messageId, isPinned: params.currentlyPinned })
+      const message = error instanceof Error ? error.message : "Failed to update pin"
+      toast.error(message)
+    }
+  }, [roomId, setPinnedOptimistic])
+
+  const applyMyReactionOptimistic = useCallback((params: {
+    messageId: string
+    prevEmoji: string | null
+    nextEmoji: string | null
+  }) => {
+    updateInfiniteMessageById({
+      messageId: params.messageId,
+      update: (current) => {
+        const items = [...(current.reactions?.items ?? [])]
+        const bump = (emoji: string, delta: number) => {
+          const i = items.findIndex((x) => x.emoji === emoji)
+          if (i < 0) {
+            if (delta > 0) items.push({ emoji, count: delta })
+            return
+          }
+          const nextCount = items[i]!.count + delta
+          if (nextCount <= 0) items.splice(i, 1)
+          else items[i] = { ...items[i]!, count: nextCount }
+        }
+
+        if (params.prevEmoji && params.prevEmoji !== params.nextEmoji) bump(params.prevEmoji, -1)
+        if (params.nextEmoji && params.nextEmoji !== params.prevEmoji) bump(params.nextEmoji, 1)
+
+        return {
+          ...current,
+          reactions: {
+            items,
+            myReaction: params.nextEmoji,
+          },
+        }
+      },
+    })
+  }, [updateInfiniteMessageById])
+
+  const toggleDefaultReactionOnMessage = useCallback(async (messageId: string) => {
+    if (!roomId) return
+    if (messageId.startsWith("client-")) {
+      toast.error("Message is not delivered yet")
+      return
+    }
+
+    const current = findMessageInCache(messageId)
+    if (!current) return
+
+    const DEFAULT_EMOJI = "😊"
+    const prevEmoji = current.reactions?.myReaction ?? null
+    const nextEmoji = prevEmoji === DEFAULT_EMOJI ? null : DEFAULT_EMOJI
+
+    applyMyReactionOptimistic({
+      messageId,
+      prevEmoji,
+      nextEmoji,
+    })
+
+    const socket = socketRef.current
+    if (socket?.connected && joinedRoomIdRef.current === roomId) {
+      if (nextEmoji) socket.emit("reaction:set", { roomId, messageId, emoji: nextEmoji })
+      else socket.emit("reaction:remove", { roomId, messageId })
+      return
+    }
+
+    try {
+      if (nextEmoji) {
+        await setChatRoomMessageReaction({ roomId, messageId, emoji: nextEmoji })
+      } else {
+        await removeChatRoomMessageReaction({ roomId, messageId })
+      }
+    } catch (error) {
+      applyMyReactionOptimistic({
+        messageId,
+        prevEmoji: nextEmoji,
+        nextEmoji: prevEmoji,
+      })
+      const message = error instanceof Error ? error.message : "Failed to update reaction"
+      toast.error(message)
+    }
+  }, [applyMyReactionOptimistic, findMessageInCache, roomId])
+
+  const toggleDefaultReactionOnLatestMessage = useCallback(async () => {
+    const latest = chatMessagesQuery.data?.pages?.[0]?.items?.[0] ?? null
+    if (!latest) return
+    await toggleDefaultReactionOnMessage(latest.id)
+  }, [chatMessagesQuery.data, toggleDefaultReactionOnMessage])
 
   const handleSendAdvisorMessage = () => {
     if (!advisorInput.trim()) return
@@ -661,7 +1925,7 @@ export function StudentMessagesPage() {
 
             {/* Chat Window */}
             <Card className="lg:col-span-2 flex flex-col">
-              {selectedConversation ? (
+              {effectiveSelectedConversation ? (
                 <>
                   {/* Chat Header */}
                   <CardHeader className="border-b py-3">
@@ -669,24 +1933,24 @@ export function StudentMessagesPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <Avatar className="h-10 w-10">
-                            {selectedConversation.avatar ? (
-                              <AvatarImage src={selectedConversation.avatar} />
+                            {effectiveSelectedConversation.avatar ? (
+                              <AvatarImage src={effectiveSelectedConversation.avatar} />
                             ) : (
                               <AvatarFallback className="bg-primary/10 text-primary">
-                                {selectedConversation.type === 'group' ? <Users className="h-5 w-5" /> : getInitials(selectedConversation.name)}
+                                {effectiveSelectedConversation.type === 'group' ? <Users className="h-5 w-5" /> : getInitials(effectiveSelectedConversation.name)}
                               </AvatarFallback>
                             )}
                           </Avatar>
-                          {selectedConversation.status && (
-                            <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(selectedConversation.status)} ring-2 ring-white`} />
+                          {effectiveSelectedConversation.status && (
+                            <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(effectiveSelectedConversation.status)} ring-2 ring-white`} />
                           )}
                         </div>
                         <div>
-                          <CardTitle className="text-base">{selectedConversation.name}</CardTitle>
+                          <CardTitle className="text-base">{effectiveSelectedConversation.name}</CardTitle>
                           <p className="text-xs text-muted-foreground">
-                            {selectedConversation.type === 'group' 
-                              ? `${selectedConversation.participants?.length} participants` 
-                              : selectedConversation.status === 'online' ? 'Online' : 'Offline'}
+                            {effectiveSelectedConversation.type === 'group' 
+                              ? `${effectiveSelectedConversation.participants?.length} participants` 
+                              : effectiveSelectedConversation.status === 'online' ? 'Online' : 'Offline'}
                           </p>
                         </div>
                       </div>
@@ -713,11 +1977,11 @@ export function StudentMessagesPage() {
                     </div>
 
                     {/* Group Participants (if group chat) - Using div border instead of Separator */}
-                    {selectedConversation.type === 'group' && selectedConversation.participants && (
+                    {effectiveSelectedConversation.type === 'group' && effectiveSelectedConversation.participants && (
                       <>
                         <div className="h-px w-full bg-border my-2" />
                         <div className="flex items-center gap-2 overflow-x-auto py-1">
-                          {selectedConversation.participants.map((participant) => (
+                          {effectiveSelectedConversation.participants.map((participant) => (
                             <div key={participant.id} className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-1">
                               <span className={`h-2 w-2 rounded-full ${getStatusColor(participant.status)}`} />
                               <span className="text-xs">{participant.name.split(' ')[0]}</span>
@@ -730,9 +1994,10 @@ export function StudentMessagesPage() {
 
                   {/* Messages */}
                   <CardContent className="flex-1 p-4">
-                    <ScrollArea className="h-full">
+                    <div ref={messagesScrollRootRef} className="h-full">
+                      <ScrollArea className="h-full">
                       <div className="space-y-4">
-                        {messages[selectedConversation.id]?.map((msg) => (
+                        {messages[effectiveSelectedConversation.id]?.map((msg) => (
                           <div
                             key={msg.id}
                             className={`flex ${msg.senderId === 'current' ? 'justify-end' : 'justify-start'}`}
@@ -753,26 +2018,128 @@ export function StudentMessagesPage() {
                                 {msg.senderId !== 'current' && (
                                   <p className="text-xs font-medium mb-1 ml-1">{msg.senderName}</p>
                                 )}
-                                <div
-                                  className={`p-3 rounded-lg ${
-                                    msg.senderId === 'current'
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted'
-                                  }`}
-                                >
-                                  <p className="text-sm">{msg.content}</p>
-                                  {msg.attachments && msg.attachments.length > 0 && (
-                                    <div className="mt-2 space-y-1">
-                                      {msg.attachments.map((att, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 text-xs bg-background/20 rounded p-1">
-                                          <Paperclip className="h-3 w-3" />
-                                          <span className="truncate">{att.name}</span>
-                                          <span className="text-xs opacity-70">({att.size})</span>
+                                <ContextMenu>
+                                  <ContextMenuTrigger asChild>
+                                    <div
+                                      className={`p-3 rounded-lg ${
+                                        msg.senderId === 'current'
+                                          ? 'bg-primary text-primary-foreground'
+                                          : 'bg-muted'
+                                      }`}
+                                      onDoubleClick={() => {
+                                        void togglePinForMessage({
+                                          messageId: msg.id,
+                                          currentlyPinned: Boolean(msg.isPinned),
+                                        })
+                                      }}
+                                      onContextMenu={(e) => {
+                                        // Power shortcuts (optional):
+                                        // - Shift + Right click: reply-to toggle
+                                        // - Alt + Right click: default reaction toggle
+                                        // - Ctrl/Meta + Right click: edit (sender only)
+                                        // - Shift + Alt + Right click: delete (sender only)
+                                        // Plain right-click opens the menu.
+                                        if (e.shiftKey && e.altKey) {
+                                          e.preventDefault()
+                                          void deleteMessage(msg.id)
+                                          return
+                                        }
+
+                                        if (e.ctrlKey || e.metaKey) {
+                                          e.preventDefault()
+                                          void editMessage({ messageId: msg.id, fallbackText: msg.content })
+                                          return
+                                        }
+
+                                        if (e.shiftKey) {
+                                          e.preventDefault()
+                                          toggleReplyToMessage(msg.id, { senderName: msg.senderName, content: msg.content })
+                                          return
+                                        }
+
+                                        if (e.altKey) {
+                                          e.preventDefault()
+                                          void toggleDefaultReactionOnMessage(msg.id)
+                                        }
+                                      }}
+                                    >
+                                      {msg.replyTo && (
+                                        <div className="mb-2 rounded bg-background/20 px-2 py-1">
+                                          <p className="text-xs opacity-80">
+                                            Replying to {msg.replyTo.senderName}
+                                          </p>
+                                          {msg.replyTo.content ? (
+                                            <p className="text-xs opacity-70">“{msg.replyTo.content}”</p>
+                                          ) : null}
                                         </div>
-                                      ))}
+                                      )}
+                                      <p className="text-sm">{msg.content}</p>
+                                      {msg.attachments && msg.attachments.length > 0 && (
+                                        <div className="mt-2 space-y-1">
+                                          {msg.attachments.map((att, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 text-xs bg-background/20 rounded p-1">
+                                              <Paperclip className="h-3 w-3" />
+                                              <span className="truncate">{att.name}</span>
+                                              <span className="text-xs opacity-70">({att.size})</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
+                                  </ContextMenuTrigger>
+                                  <ContextMenuContent>
+                                    <ContextMenuItem
+                                      onSelect={() => {
+                                        toggleReplyToMessage(msg.id, { senderName: msg.senderName, content: msg.content })
+                                      }}
+                                      disabled={msg.id.startsWith('client-')}
+                                    >
+                                      Reply
+                                      <ContextMenuShortcut>Shift+RClick</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                      onSelect={() => {
+                                        void toggleDefaultReactionOnMessage(msg.id)
+                                      }}
+                                      disabled={msg.id.startsWith('client-')}
+                                    >
+                                      React
+                                      <ContextMenuShortcut>Alt+RClick</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                      onSelect={() => {
+                                        void togglePinForMessage({
+                                          messageId: msg.id,
+                                          currentlyPinned: Boolean(msg.isPinned),
+                                        })
+                                      }}
+                                      disabled={msg.id.startsWith('client-')}
+                                    >
+                                      {msg.isPinned ? 'Unpin' : 'Pin'}
+                                      <ContextMenuShortcut>Double‑click</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuSeparator />
+                                    <ContextMenuItem
+                                      onSelect={() => {
+                                        void editMessage({ messageId: msg.id, fallbackText: msg.content })
+                                      }}
+                                      disabled={msg.senderId !== 'current' || msg.id.startsWith('client-')}
+                                    >
+                                      Edit
+                                      <ContextMenuShortcut>Ctrl+RClick</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                      variant="destructive"
+                                      onSelect={() => {
+                                        void deleteMessage(msg.id)
+                                      }}
+                                      disabled={msg.senderId !== 'current' || msg.id.startsWith('client-')}
+                                    >
+                                      Delete
+                                      <ContextMenuShortcut>Shift+Alt+RClick</ContextMenuShortcut>
+                                    </ContextMenuItem>
+                                  </ContextMenuContent>
+                                </ContextMenu>
                                 <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground ${
                                   msg.senderId === 'current' ? 'justify-end' : 'justify-start'
                                 }`}>
@@ -790,26 +2157,75 @@ export function StudentMessagesPage() {
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                      </ScrollArea>
+                    </div>
                   </CardContent>
 
                   {/* Message Input */}
                   <div className="p-4 border-t">
+                    {replyToMessageId && (
+                      <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1">
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">
+                            Replying to {activeReplyPreview?.senderName ?? "message"}
+                          </p>
+                          {activeReplyPreview?.content ? (
+                            <p className="text-xs truncate">“{activeReplyPreview.content}”</p>
+                          ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setReplyToMessageId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex gap-2">
-                      <Button variant="outline" size="icon">
+                      <input
+                        ref={attachmentInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.currentTarget.files?.[0] ?? null
+                          e.currentTarget.value = ""
+                          void handleAttachmentSelected(file)
+                        }}
+                      />
+                      <Button variant="outline" size="icon" onClick={handlePickAttachment} disabled={isUploadingAttachment}>
                         <Paperclip className="h-4 w-4" />
                       </Button>
                       <Input
                         placeholder="Type your message..."
                         value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onChange={(e) => handleMessageInputChange(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setReplyToMessageId(null)
+                            return
+                          }
+                          if (e.key === 'Enter') {
+                            handleSendMessage()
+                          }
+                        }}
                         className="flex-1"
                       />
-                      <Button variant="outline" size="icon">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          void toggleDefaultReactionOnLatestMessage()
+                        }}
+                        disabled={!roomId || !(chatMessagesQuery.data?.pages?.[0]?.items?.[0]?.id)}
+                      >
                         <Smile className="h-4 w-4" />
                       </Button>
-                      <Button onClick={handleSendMessage} disabled={!messageInput.trim()}>
+                      <Button
+                        onClick={handleSendMessage}
+                        disabled={(!messageInput.trim() && !queuedAttachment) || isUploadingAttachment}
+                      >
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
