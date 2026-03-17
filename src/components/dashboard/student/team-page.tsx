@@ -56,6 +56,7 @@ import {
   projectGroupKeys,
   useAvailableStudents,
   useCreateProjectGroupInvitation,
+  usePreviewProjectGroupInvitation,
   useCreateProjectGroup,
   useApproveMyGroupJoinRequest,
   useRejectMyGroupJoinRequest,
@@ -67,7 +68,11 @@ import {
 import { useDepartmentGroupSizeSettings } from "@/lib/hooks/use-department-group-size-settings"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/errors"
-import type { AvailableStudentListItem, MyProjectGroupJoinRequestStatus } from "@/types/project-groups"
+import type {
+  AvailableStudentListItem,
+  MyProjectGroupJoinRequestStatus,
+  ProjectGroupInvitationPreviewResult,
+} from "@/types/project-groups"
 import {
   createProjectGroupSchema,
   parseTechnologiesInput,
@@ -192,6 +197,7 @@ export function StudentTeamPage() {
   const [rejectReason, setRejectReason] = useState("")
   const createProjectGroupMutation = useCreateProjectGroup()
   const createInvitationMutation = useCreateProjectGroupInvitation()
+  const previewInvitationMutation = usePreviewProjectGroupInvitation()
   const approveJoinRequestMutation = useApproveMyGroupJoinRequest()
   const rejectJoinRequestMutation = useRejectMyGroupJoinRequest()
   const submitMyProjectGroupMutation = useSubmitMyProjectGroup()
@@ -215,6 +221,12 @@ export function StudentTeamPage() {
   const [availableStudentDetailsOpen, setAvailableStudentDetailsOpen] = useState(false)
   const [selectedAvailableStudent, setSelectedAvailableStudent] = useState<AvailableStudentListItem | null>(null)
   const [invitingUserId, setInvitingUserId] = useState<string | null>(null)
+
+  const [invitationPreviewOpen, setInvitationPreviewOpen] = useState(false)
+  const [invitationPreviewTab, setInvitationPreviewTab] = useState<"html" | "text">("html")
+  const [previewingUserId, setPreviewingUserId] = useState<string | null>(null)
+  const [previewInvitee, setPreviewInvitee] = useState<null | { id: string; name: string }>(null)
+  const [invitationPreview, setInvitationPreview] = useState<ProjectGroupInvitationPreviewResult | null>(null)
 
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<StudentProfileListItem | null>(null)
   const [studentProfileDetailsOpen, setStudentProfileDetailsOpen] = useState(false)
@@ -1725,52 +1737,105 @@ export function StudentTeamPage() {
                                     </Button>
 
                                     {canEditGroup && (
-                                      <Button
-                                        size="sm"
-                                        disabled={
-                                          !canInviteMoreMembers ||
-                                          (createInvitationMutation.isPending && invitingUserId === item.user.id)
-                                        }
-                                        onClick={async () => {
-                                          if (!item.user.id) return
-                                          if (!canInviteMoreMembers) {
-                                            toast.error("Group has reached the maximum size")
-                                            return
+                                      <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={
+                                            !canInviteMoreMembers ||
+                                            (previewInvitationMutation.isPending && previewingUserId === item.user.id)
                                           }
-
-                                          setInvitingUserId(item.user.id)
-                                          try {
-                                            const result = await createInvitationMutation.mutateAsync({
-                                              invitedUserId: item.user.id,
-                                            })
-
-                                            if (result.message) {
-                                              toast.message(result.message)
-                                            } else {
-                                              toast.success("Invitation sent")
+                                          onClick={async () => {
+                                            if (!item.user.id) return
+                                            if (!canInviteMoreMembers) {
+                                              toast.error("Group has reached the maximum size")
+                                              return
                                             }
 
-                                            queryClient.invalidateQueries({ queryKey: projectGroupKeys().root }).catch(() => {})
-                                          } catch (error) {
-                                            const message = getErrorMessage(error, "Failed to send invitation")
-                                            toast.error(message)
-                                          } finally {
-                                            setInvitingUserId(null)
+                                            const first = item.user.firstName?.trim() ?? ""
+                                            const last = item.user.lastName?.trim() ?? ""
+                                            const displayName = [first, last].filter(Boolean).join(" ")
+                                            const name = displayName || item.user.email || "Student"
+
+                                            setPreviewingUserId(item.user.id)
+                                            setPreviewInvitee({ id: item.user.id, name })
+                                            setInvitationPreview(null)
+                                            setInvitationPreviewTab("html")
+
+                                            try {
+                                              const result = await previewInvitationMutation.mutateAsync({
+                                                invitedUserId: item.user.id,
+                                              })
+                                              setInvitationPreview(result)
+                                              setInvitationPreviewOpen(true)
+                                            } catch (error) {
+                                              const message = getErrorMessage(error, "Failed to preview invitation")
+                                              toast.error(message)
+                                            } finally {
+                                              setPreviewingUserId(null)
+                                            }
+                                          }}
+                                        >
+                                          {previewInvitationMutation.isPending && previewingUserId === item.user.id ? (
+                                            <>
+                                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                              Previewing…
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Eye className="h-4 w-4 mr-2" />
+                                              Preview
+                                            </>
+                                          )}
+                                        </Button>
+
+                                        <Button
+                                          size="sm"
+                                          disabled={
+                                            !canInviteMoreMembers ||
+                                            (createInvitationMutation.isPending && invitingUserId === item.user.id)
                                           }
-                                        }}
-                                      >
-                                        {createInvitationMutation.isPending && invitingUserId === item.user.id ? (
-                                          <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            Inviting…
-                                          </>
-                                        ) : (
-                                          <>
-                                            <UserPlus className="h-4 w-4 mr-2" />
-                                            Invite
-                                          </>
-                                        )}
-                                      </Button>
+                                          onClick={async () => {
+                                            if (!item.user.id) return
+                                            if (!canInviteMoreMembers) {
+                                              toast.error("Group has reached the maximum size")
+                                              return
+                                            }
+
+                                            setInvitingUserId(item.user.id)
+                                            try {
+                                              const result = await createInvitationMutation.mutateAsync({
+                                                invitedUserId: item.user.id,
+                                              })
+
+                                              if (result.message) {
+                                                toast.message(result.message)
+                                              } else {
+                                                toast.success("Invitation sent")
+                                              }
+
+                                              queryClient.invalidateQueries({ queryKey: projectGroupKeys().root }).catch(() => {})
+                                            } catch (error) {
+                                              const message = getErrorMessage(error, "Failed to send invitation")
+                                              toast.error(message)
+                                            } finally {
+                                              setInvitingUserId(null)
+                                            }
+                                          }}
+                                        >
+                                          {createInvitationMutation.isPending && invitingUserId === item.user.id ? (
+                                            <>
+                                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                              Inviting…
+                                            </>
+                                          ) : (
+                                            <>
+                                              <UserPlus className="h-4 w-4 mr-2" />
+                                              Invite
+                                            </>
+                                          )}
+                                        </Button>
+                                      </>
                                     )}
                                   </div>
                                 )}
@@ -1919,6 +1984,136 @@ export function StudentTeamPage() {
                   </div>
                 )
               })()}
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={invitationPreviewOpen}
+            onOpenChange={(open) => {
+              setInvitationPreviewOpen(open)
+              if (!open) {
+                setInvitationPreview(null)
+                setPreviewInvitee(null)
+                setInvitationPreviewTab("html")
+              }
+            }}
+          >
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Invitation Preview</DialogTitle>
+                <DialogDescription>
+                  {previewInvitee ? `Preview email for ${previewInvitee.name}.` : "Preview group invitation email."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {invitationPreview ? (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Subject</p>
+                    <p className="text-sm text-muted-foreground break-words">{invitationPreview.subject}</p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <span className="font-medium text-foreground">Expires:</span>{" "}
+                      {(() => {
+                        const time = new Date(invitationPreview.expiresAt).getTime()
+                        return Number.isFinite(time)
+                          ? new Date(time).toLocaleString()
+                          : invitationPreview.expiresAt
+                      })()}
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Template:</span>{" "}
+                      {invitationPreview.templateId ?? "—"}
+                    </div>
+                  </div>
+
+                  <Tabs value={invitationPreviewTab} onValueChange={(v) => setInvitationPreviewTab(v as "html" | "text")}>
+                    <TabsList>
+                      <TabsTrigger value="html">HTML</TabsTrigger>
+                      <TabsTrigger value="text">Text</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="html" className="mt-3">
+                      <div className="border rounded-md overflow-hidden">
+                        <iframe
+                          title="Invitation email preview"
+                          sandbox=""
+                          className="w-full h-[420px]"
+                          srcDoc={invitationPreview.htmlContent}
+                        />
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="text" className="mt-3">
+                      <ScrollArea className="h-[420px] border rounded-md p-3">
+                        <pre className="whitespace-pre-wrap text-sm text-muted-foreground">
+                          {invitationPreview.textContent}
+                        </pre>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading preview…
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setInvitationPreviewOpen(false)}
+                  disabled={createInvitationMutation.isPending}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const invitedUserId = previewInvitee?.id
+                    if (!invitedUserId) {
+                      toast.error("Select a student to invite")
+                      return
+                    }
+                    if (!canInviteMoreMembers) {
+                      toast.error("Group has reached the maximum size")
+                      return
+                    }
+
+                    setInvitingUserId(invitedUserId)
+                    try {
+                      const result = await createInvitationMutation.mutateAsync({ invitedUserId })
+                      if (result.message) {
+                        toast.message(result.message)
+                      } else {
+                        toast.success("Invitation sent")
+                      }
+                      setInvitationPreviewOpen(false)
+                      queryClient.invalidateQueries({ queryKey: projectGroupKeys().root }).catch(() => {})
+                    } catch (error) {
+                      const message = getErrorMessage(error, "Failed to send invitation")
+                      toast.error(message)
+                    } finally {
+                      setInvitingUserId(null)
+                    }
+                  }}
+                  disabled={!canEditGroup || !canInviteMoreMembers || createInvitationMutation.isPending}
+                >
+                  {createInvitationMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </TabsContent>

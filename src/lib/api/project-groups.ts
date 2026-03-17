@@ -12,6 +12,7 @@ import type {
   CreateProjectGroupJoinRequestResult,
   CreateProjectGroupInvitationDto,
   CreateProjectGroupInvitationResult,
+  ProjectGroupInvitationPreviewResult,
   CreateProjectGroupDto,
   MyProjectGroupJoinRequestStatus,
   MyProjectGroupJoinRequestsPage,
@@ -170,6 +171,16 @@ export async function createProjectGroupInvitation(
   dto: CreateProjectGroupInvitationDto
 ): Promise<CreateProjectGroupInvitationResult> {
   const response = await apiClient.post<CreateProjectGroupInvitationResult>("/project-groups/invitations", dto)
+  return response.data
+}
+
+export async function previewProjectGroupInvitation(
+  dto: CreateProjectGroupInvitationDto
+): Promise<ProjectGroupInvitationPreviewResult> {
+  const response = await apiClient.post<ProjectGroupInvitationPreviewResult>(
+    "/project-groups/invitations/preview",
+    dto
+  )
   return response.data
 }
 

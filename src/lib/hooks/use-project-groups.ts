@@ -6,6 +6,7 @@ import {
   createProjectGroup,
   createProjectGroupJoinRequest,
   createProjectGroupInvitation,
+  previewProjectGroupInvitation,
   cancelProjectGroupJoinRequest,
   approveMyGroupJoinRequest,
   rejectMyGroupJoinRequest,
@@ -35,6 +36,7 @@ import type {
   CreateProjectGroupJoinRequestResult,
   CreateProjectGroupInvitationDto,
   CreateProjectGroupInvitationResult,
+  ProjectGroupInvitationPreviewResult,
   CreateProjectGroupDto,
   MyGroupJoinRequestsPage,
   MyProjectGroupJoinRequestStatus,
@@ -143,6 +145,12 @@ export function useBrowseProjectGroups(params: {
 export function useCreateProjectGroupInvitation() {
   return useMutation<CreateProjectGroupInvitationResult, Error, CreateProjectGroupInvitationDto>({
     mutationFn: (dto) => createProjectGroupInvitation(dto),
+  })
+}
+
+export function usePreviewProjectGroupInvitation() {
+  return useMutation<ProjectGroupInvitationPreviewResult, Error, CreateProjectGroupInvitationDto>({
+    mutationFn: (dto) => previewProjectGroupInvitation(dto),
   })
 }
 
