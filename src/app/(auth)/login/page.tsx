@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,9 @@ import { useAuthStore } from '@/store/auth-store';
 import { loginSchema, LoginFormData } from '@/validations/auth';
 import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from '@/lib/auth/dashboard-role-paths';
 import { DEFAULT_RATE_LIMIT_RETRY_AFTER_MS, getErrorMessage, isRateLimitMessage } from '@/lib/api/errors';
+import { InvitationOnboardingStepper } from '@/components/auth/invitation-onboarding-stepper';
+import { InvitationOnboardingShell } from '@/components/auth/invitation-onboarding-shell';
+import { readInviteAcceptResult } from '@/lib/auth/invite-onboarding-storage';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -43,9 +48,15 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading, error, clearError, tenantDomain, user } = useAuthStore();
+  const isInviteFlow = (searchParams.get('from') ?? '') === 'invite';
+  const inviteEmailPrefill = useMemo(() => {
+    if (!isInviteFlow) return '';
+    return readInviteAcceptResult()?.result.email ?? '';
+  }, [isInviteFlow]);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,10 +83,20 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: inviteEmailPrefill,
+      password: '',
+    },
   });
+
+  const emailValue = useWatch({ control, name: 'email' }) ?? '';
+  const forgotPasswordHref = emailValue.trim()
+    ? `/forgot-password?email=${encodeURIComponent(emailValue.trim())}`
+    : '/forgot-password';
 
   const redirectToDashboard = useCallback((userRoles?: string[]) => {
     const primaryRole = getPrimaryRoleFromBackendRoles(userRoles);
@@ -88,10 +109,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
+      if (user.mustChangePassword) {
+        router.push(isInviteFlow ? "/change-password?from=invite" : "/change-password")
+        return
+      }
+
       redirectToDashboard(user.roles);
       return;
     }
-  }, [user, redirectToDashboard]);
+  }, [isInviteFlow, router, user, redirectToDashboard]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -99,10 +125,14 @@ export default function LoginPage() {
       await login(data);
 
       const state = useAuthStore.getState();
+      if (state.user?.mustChangePassword) {
+        router.push(isInviteFlow ? "/change-password?from=invite" : "/change-password")
+        return
+      }
       redirectToDashboard(state.user?.roles);
     } catch (e: unknown) {
       const message = getErrorMessage(e, '');
-      if (message === 'Tenant account is not active') {
+      if (message === 'account is not active') {
         router.push('/account-suspended');
         return;
       }
@@ -112,6 +142,79 @@ export default function LoginPage() {
       // Error handled by store
     }
   };
+
+  if (isInviteFlow) {
+    return (
+      <InvitationOnboardingShell
+        currentStep="login"
+        title="Sign in to continue"
+        description={
+          tenantDomain
+            ? (
+                <>
+                  Use the email and temporary password from your invitation. Institution:{" "}
+                  <span className="font-medium text-foreground">{tenantDomain}</span>
+                </>
+              )
+            : "Use the email and temporary password from your invitation."
+        }
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              {...register('email')}
+              placeholder="john.doe@university.edu"
+            />
+            {errors.email ? <p className="text-sm text-destructive">{errors.email.message}</p> : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Temporary password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={isPasswordVisible ? 'text' : 'password'}
+                {...register('password')}
+                placeholder="••••••••"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setIsPasswordVisible((prev) => !prev)}
+                aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+              >
+                {isPasswordVisible ? <EyeOff /> : <Eye />}
+              </Button>
+            </div>
+            {errors.password ? <p className="text-sm text-destructive">{errors.password.message}</p> : null}
+          </div>
+
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <Button type="submit" className="w-full" disabled={isLoading || isRateLimited}>
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Signing in...
+              </span>
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+      </InvitationOnboardingShell>
+    )
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -126,11 +229,18 @@ export default function LoginPage() {
           variants={itemVariants}
         >
           <motion.div
-            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl mb-4"
-            whileHover={{ scale: 1.05, rotate: 10 }}
+            className="mx-auto relative h-24 w-24 overflow-hidden rounded-2xl border bg-white/60 mb-4"
+            whileHover={{ scale: 1.03, rotate: 2 }}
             whileTap={{ scale: 0.95 }}
           >
-            <LogIn className="w-8 h-8 text-white" />
+            <Image
+              src="/haramaya.png"
+              alt="Haramaya University"
+              fill
+              sizes="96px"
+              className="object-contain p-3"
+              priority
+            />
           </motion.div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
             Welcome Back
@@ -188,6 +298,11 @@ export default function LoginPage() {
           <motion.div variants={itemVariants}>
             <Card className="backdrop-blur-sm bg-white/80 border-white/20 shadow-xl">
               <CardHeader className="space-y-1 pb-4">
+                {isInviteFlow ? (
+                  <div className="pb-2">
+                    <InvitationOnboardingStepper currentStep="login" />
+                  </div>
+                ) : null}
                 <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
                   <LogIn className="w-6 h-6 text-purple-500" />
                   Sign In
@@ -259,6 +374,15 @@ export default function LoginPage() {
                         {errors.password.message}
                       </motion.p>
                     )}
+
+                    <div className="flex justify-end">
+                      <Link
+                        href={forgotPasswordHref}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                   </motion.div>
 
                   {error && (
@@ -310,5 +434,19 @@ export default function LoginPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

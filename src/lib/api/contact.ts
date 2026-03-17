@@ -1,6 +1,8 @@
 import type { ContactData } from '@/store/contact-store'
 import { DEFAULT_RATE_LIMIT_RETRY_AFTER_MS, RateLimitError, isRateLimitMessage } from '@/lib/api/errors'
 
+const looksLikeHtml = (value: string): boolean => /<!doctype html>|<html[\s>]/i.test(value)
+
 export const submitContact = async (data: ContactData): Promise<ContactData> => {
   const response = await fetch('/api/contact', {
     method: 'POST',
@@ -22,6 +24,13 @@ export const submitContact = async (data: ContactData): Promise<ContactData> => 
       }
     } catch {
       // ignore
+    }
+
+    if (looksLikeHtml(message)) {
+      message =
+        response.status === 503
+          ? 'Service is temporarily unavailable. Please try again later.'
+          : 'Failed to submit contact form'
     }
 
     const isRateLimited = response.status === 429 || isRateLimitMessage(message)

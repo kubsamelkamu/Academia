@@ -8,6 +8,7 @@ export interface AuthUser {
 
   status?: string;
   emailVerified?: boolean;
+  mustChangePassword?: boolean;
 
   tenantDomain?: string;
   tenant?: {
@@ -39,9 +40,16 @@ export interface AuthUser {
   lastLoginAt?: string | null;
   twoFactorEnabled?: boolean;
   twoFactorVerifiedAt?: string | null;
+
+  bio?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  portfolioUrl?: string | null;
+
+  techStack?: string[];
+  technologies?: string[];
 }
 
-// GET /api/v1/auth/me response payload (after envelope unwrapping)
 export type AuthMeUser = AuthUser;
 
 export interface RegisterInstitutionDto {

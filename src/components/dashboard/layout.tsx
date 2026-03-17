@@ -11,6 +11,7 @@ import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
 import { TenantEnforcementNotice } from "@/components/notifications/tenant-enforcement-notice"
 import { NotificationsRealtime } from "@/components/notifications/notifications-realtime"
+import { ProjectGroupAnnouncementsRealtime } from "@/components/realtime/project-group-announcements-realtime"
 
 export default function DashboardLayout({
   children,
@@ -44,6 +45,11 @@ export default function DashboardLayout({
       return
     }
 
+    if (user.mustChangePassword && pathname !== "/change-password") {
+      router.replace("/change-password")
+      return
+    }
+
     const tenantStatus = user.tenant?.status
     if (tenantStatus && tenantStatus !== "ACTIVE") {
       router.replace("/account-suspended")
@@ -62,7 +68,7 @@ export default function DashboardLayout({
         // ignore; axios interceptor handles 401
       })
     }
-  }, [accessToken, primaryRole, router, user])
+  }, [accessToken, pathname, primaryRole, router, user])
 
   useEffect(() => {
     if (!accessToken || !user) {
@@ -115,6 +121,7 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       <NotificationsRealtime />
+      <ProjectGroupAnnouncementsRealtime />
       <ThemeCustomizer />
       <aside className="hidden lg:block">
         <Sidebar user={shellUser} />

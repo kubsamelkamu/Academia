@@ -1,100 +1,119 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import {
-  DashboardKpiGrid,
-  DashboardPageHeader,
-  DashboardSectionCard,
-} from "@/components/dashboard/page-primitives"
+import * as React from "react"
+import Link from "next/link"
+import { FileSearch } from "lucide-react"
+
+import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, ClipboardList, Clock3, Users } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-type EvaluationFilter = "All" | "Pending" | "Completed"
+type EvaluationStatus = "Pending Review" | "Evaluated" | "Needs Revision"
 
-interface AdvisorEvaluation {
+interface EvaluationRow {
   id: string
-  team: string
-  type: string
-  status: Exclude<EvaluationFilter, "All">
+  studentName: string
+  projectTitle: string
+  status: EvaluationStatus
+  submittedDate: string
 }
 
-const initialEvaluations: AdvisorEvaluation[] = [
-  { id: "ae1", team: "Team Atlas", type: "Midterm", status: "Pending" },
-  { id: "ae2", team: "Team Orion", type: "Final", status: "Pending" },
-  { id: "ae3", team: "Team Nova", type: "Progress", status: "Completed" },
+const evaluationData: EvaluationRow[] = [
+  {
+    id: "eval-1",
+    studentName: "Alex Mercer",
+    projectTitle: "Machine Learning applied to Smart Grids",
+    status: "Pending Review",
+    submittedDate: "2024-05-10",
+  },
+  {
+    id: "eval-2",
+    studentName: "Maria Garcia",
+    projectTitle: "Blockchain for Supply Chain Transparency",
+    status: "Evaluated",
+    submittedDate: "2024-05-08",
+  },
+  {
+    id: "eval-3",
+    studentName: "Liam Johnson",
+    projectTitle: "IoT Home Automation Prototype",
+    status: "Needs Revision",
+    submittedDate: "2024-05-12",
+  },
+  {
+    id: "eval-4",
+    studentName: "Sophia Chen",
+    projectTitle: "Natural Language Processing for Healthcare",
+    status: "Pending Review",
+    submittedDate: "2024-05-14",
+  },
 ]
 
+function statusClass(status: EvaluationStatus) {
+  if (status === "Pending Review") return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+  if (status === "Evaluated") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+  return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+}
+
 export function AdvisorEvaluationsPage() {
-  const [filter, setFilter] = useState<EvaluationFilter>("All")
-  const [rows, setRows] = useState(initialEvaluations)
-
-  const visibleRows = useMemo(
-    () => rows.filter((row) => (filter === "All" ? true : row.status === filter)),
-    [filter, rows]
-  )
-
-  const markDone = (rowId: string) => {
-    setRows((current) => current.map((row) => (row.id === rowId ? { ...row, status: "Completed" } : row)))
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <DashboardPageHeader
-        title="Evaluations"
-        description="Complete project evaluations and keep submission turnaround healthy."
-        badge="Advisor"
+        title="Project Evaluations"
+        description="Review student projects, provide feedback, and submit final evaluations."
+        badge="Evaluations"
       />
 
-      <DashboardKpiGrid
-        items={[
-          { title: "Pending", value: "4", note: "Need completion", icon: ClipboardList },
-          { title: "Completed", value: "16", note: "This cycle", icon: CheckCircle2 },
-          { title: "Overdue", value: "1", note: "Requires attention", icon: Clock3 },
-          { title: "Teams Evaluated", value: "8", note: "Assigned supervision set", icon: Users },
-        ]}
-      />
+      <Card className="shadow-sm">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="w-[200px]">Student Name</TableHead>
+                <TableHead>Project Title</TableHead>
+                <TableHead className="w-[150px]">Date Submitted</TableHead>
+                <TableHead className="w-[150px]">Status</TableHead>
+                <TableHead className="text-right w-[150px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {evaluationData.map((evaluation) => (
+                <TableRow key={evaluation.id} className="group hover:bg-muted/50 transition-colors">
+                  <TableCell className="font-medium">{evaluation.studentName}</TableCell>
+                  <TableCell className="text-muted-foreground">{evaluation.projectTitle}</TableCell>
+                  <TableCell className="text-sm">
+                    {new Date(evaluation.submittedDate).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className={statusClass(evaluation.status)}>
+                      {evaluation.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant={evaluation.status === "Pending Review" ? "default" : "outline"}
+                      className="gap-2"
+                    >
+                      <Link href={`/dashboard/advisor/evaluations/${evaluation.id}`}>
+                        <FileSearch className="h-4 w-4" />
+                        <span className="sr-only sm:not-sr-only">View Evaluation</span>
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
-      <DashboardSectionCard
-        title="Evaluation Tasks"
-        description="Use filters and quickly mark evaluations complete."
-      >
-        <div className="mb-3 flex flex-wrap gap-2">
-          {(["All", "Pending", "Completed"] as EvaluationFilter[]).map((item) => (
-            <Button
-              key={item}
-              type="button"
-              size="sm"
-              variant={filter === item ? "default" : "outline"}
-              onClick={() => setFilter(item)}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          {visibleRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No evaluations in this filter.</p>
-          ) : (
-            visibleRows.map((row) => (
-              <div key={row.id} className="rounded-lg border p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium">{row.team} • {row.type}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={row.status === "Completed" ? "secondary" : "outline"}>{row.status}</Badge>
-                    {row.status === "Pending" ? (
-                      <Button size="sm" variant="outline" onClick={() => markDone(row.id)}>
-                        Mark Complete
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))
+          {evaluationData.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">No evaluations found.</div>
           )}
-        </div>
-      </DashboardSectionCard>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -7,19 +7,57 @@ export interface UpdateProfileNameDto {
 }
 
 export interface ChangePasswordDto {
-  currentPassword: string
+  oldPassword?: string
+  currentPassword?: string
   newPassword: string
+}
+
+export interface UpdateStudentProfileDto {
+  bio?: string | null
+  githubUrl?: string | null
+  linkedinUrl?: string | null
+  portfolioUrl?: string | null
+  /** Preferred field name (matches backend docs). */
+  techStack?: string[]
+  /** Backward-compatible alias (some backends/older UI use this). */
+  technologies?: string[]
+}
+
+export type StudentPublicProfile = {
+  user: Partial<AuthUser>
+  profile: {
+    bio: string | null
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+    technologies?: string[]
+  }
+}
+
+export type StudentProfileListItem = {
+  user: Partial<AuthUser>
+  profile: {
+    bio: string | null
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+    updatedAt?: string | null
+  }
+}
+
+export type StudentProfilesPage = {
+  items: StudentProfileListItem[]
+  page?: number
+  limit?: number
+  total?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-/**
- * Backend implementations vary: some endpoints return the updated user directly,
- * others may wrap it in `{ user: ... }` or return a partial like `{ avatarUrl: ... }`.
- * This normalizer lets the UI/store remain stable.
- */
 function normalizeProfilePayload(payload: unknown): Partial<AuthUser> {
   if (!isRecord(payload)) return {}
 
@@ -28,6 +66,74 @@ function normalizeProfilePayload(payload: unknown): Partial<AuthUser> {
   }
 
   return payload as Partial<AuthUser>
+}
+
+function normalizeStudentProfilePayload(payload: unknown): Partial<AuthUser> {
+  if (!isRecord(payload)) return {}
+
+  const baseUser: Record<string, unknown> =
+    "user" in payload && isRecord(payload.user)
+      ? payload.user
+      : payload
+
+  const profile: Record<string, unknown> =
+    "profile" in payload && isRecord(payload.profile)
+      ? payload.profile
+      : {}
+
+  const bio = typeof profile.bio === "string" ? profile.bio : (profile.bio as null) ?? undefined
+  const githubUrl = typeof profile.githubUrl === "string" ? profile.githubUrl : (profile.githubUrl as null) ?? undefined
+  const linkedinUrl = typeof profile.linkedinUrl === "string" ? profile.linkedinUrl : (profile.linkedinUrl as null) ?? undefined
+  const portfolioUrl = typeof profile.portfolioUrl === "string" ? profile.portfolioUrl : (profile.portfolioUrl as null) ?? undefined
+
+  const techStack =
+    (Array.isArray(profile.techStack) ? (profile.techStack as unknown[]).filter((v): v is string => typeof v === "string") : undefined) ??
+    (Array.isArray(profile.technologies) ? (profile.technologies as unknown[]).filter((v): v is string => typeof v === "string") : undefined)
+
+  return {
+    ...(baseUser as Partial<AuthUser>),
+    ...(bio !== undefined ? { bio } : null),
+    ...(githubUrl !== undefined ? { githubUrl } : null),
+    ...(linkedinUrl !== undefined ? { linkedinUrl } : null),
+    ...(portfolioUrl !== undefined ? { portfolioUrl } : null),
+    ...(techStack !== undefined ? { techStack, technologies: techStack } : null),
+  }
+}
+
+function normalizeStudentProfileListItem(payload: unknown): StudentProfileListItem {
+  if (!isRecord(payload)) {
+    return {
+      user: {},
+      profile: {
+        bio: null,
+        githubUrl: null,
+        linkedinUrl: null,
+        portfolioUrl: null,
+        techStack: [],
+        updatedAt: null,
+      },
+    }
+  }
+
+  const user = ("user" in payload && isRecord(payload.user) ? payload.user : {}) as Partial<AuthUser>
+  const profileRaw = ("profile" in payload && isRecord(payload.profile) ? payload.profile : {}) as Record<string, unknown>
+
+  const asNullableString = (value: unknown): string | null => (typeof value === "string" ? value : null)
+  const techStack = Array.isArray(profileRaw.techStack)
+    ? (profileRaw.techStack as unknown[]).filter((v): v is string => typeof v === "string")
+    : []
+
+  return {
+    user,
+    profile: {
+      bio: asNullableString(profileRaw.bio),
+      githubUrl: asNullableString(profileRaw.githubUrl),
+      linkedinUrl: asNullableString(profileRaw.linkedinUrl),
+      portfolioUrl: asNullableString(profileRaw.portfolioUrl),
+      techStack,
+      updatedAt: asNullableString(profileRaw.updatedAt),
+    },
+  }
 }
 
 export async function getProfile(): Promise<Partial<AuthUser>> {
@@ -42,7 +148,6 @@ export async function updateProfileName(dto: UpdateProfileNameDto): Promise<Part
 
 export async function uploadProfileAvatar(file: File): Promise<Partial<AuthUser>> {
   const formData = new FormData()
-  // Common convention: backend expects `avatar` field
   formData.append("avatar", file)
 
   const response = await apiClient.post<unknown>("/profile/avatar", formData, {
@@ -59,6 +164,112 @@ export async function deleteProfileAvatar(): Promise<Partial<AuthUser>> {
   return normalizeProfilePayload(response.data)
 }
 
+export async function getStudentProfile(): Promise<Partial<AuthUser>> {
+  const response = await apiClient.get<unknown>("/profile/student/me")
+  return normalizeStudentProfilePayload(response.data)
+}
+
+export async function getStudentProfiles(params: {
+  page?: number
+  limit?: number
+} = {}): Promise<StudentProfilesPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 10
+
+  const response = await apiClient.get<unknown>("/profile/student", {
+    params: {
+      page,
+      limit,
+    },
+  })
+
+  const payload = response.data
+  if (!isRecord(payload)) {
+    throw new Error("Invalid student profiles response")
+  }
+
+  const rawItems = ("items" in payload && Array.isArray(payload.items) ? payload.items : []) as unknown[]
+  const items = rawItems.map(normalizeStudentProfileListItem)
+
+  const asOptionalNumber = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined
+
+  return {
+    items,
+    page: asOptionalNumber(payload.page) ?? page,
+    limit: asOptionalNumber(payload.limit) ?? limit,
+    total: asOptionalNumber(payload.total),
+  }
+}
+
 export async function changeProfilePassword(dto: ChangePasswordDto): Promise<void> {
-  await apiClient.post("/profile/change-password", dto)
+  const oldPassword = dto.oldPassword ?? dto.currentPassword
+  if (!oldPassword) {
+    throw new Error("Current password is required")
+  }
+
+  await apiClient.post("/auth/change-password", {
+    oldPassword,
+    newPassword: dto.newPassword,
+  })
+}
+
+export async function updateStudentProfile(
+  dto: UpdateStudentProfileDto
+): Promise<Partial<AuthUser>> {
+
+  const techStack = dto.techStack ?? dto.technologies
+  const payload: Omit<UpdateStudentProfileDto, "technologies"> = {
+    bio: dto.bio,
+    githubUrl: dto.githubUrl,
+    linkedinUrl: dto.linkedinUrl,
+    portfolioUrl: dto.portfolioUrl,
+    techStack,
+  }
+
+  try {
+    const response = await apiClient.patch<unknown>("/profile/student", payload)
+    return normalizeStudentProfilePayload(response.data)
+  } catch (error: unknown) {
+    const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === 404) {
+      const response = await apiClient.patch<unknown>("/profile/student/me", payload)
+      return normalizeStudentProfilePayload(response.data)
+    }
+    throw error
+  }
+}
+
+export async function getStudentPublicProfile(studentId: string): Promise<StudentPublicProfile> {
+  const response = await apiClient.get<unknown>(`/students/${encodeURIComponent(studentId)}/profile`)
+  const payload = response.data
+
+  if (!isRecord(payload)) {
+    throw new Error("Invalid public profile response")
+  }
+
+  const user = ("user" in payload && isRecord(payload.user) ? payload.user : {}) as Partial<AuthUser>
+  const profileRaw = ("profile" in payload && isRecord(payload.profile) ? payload.profile : {}) as Record<string, unknown>
+
+  const asNullableString = (value: unknown): string | null => (typeof value === "string" ? value : null)
+
+  const techStack =
+    (Array.isArray(profileRaw.techStack)
+      ? (profileRaw.techStack as unknown[]).filter((v): v is string => typeof v === "string")
+      : undefined) ??
+    (Array.isArray(profileRaw.technologies)
+      ? (profileRaw.technologies as unknown[]).filter((v): v is string => typeof v === "string")
+      : [])
+
+  return {
+    user,
+    profile: {
+      bio: asNullableString(profileRaw.bio),
+      githubUrl: asNullableString(profileRaw.githubUrl),
+      linkedinUrl: asNullableString(profileRaw.linkedinUrl),
+      portfolioUrl: asNullableString(profileRaw.portfolioUrl),
+      techStack,
+      technologies: techStack,
+    },
+  }
 }

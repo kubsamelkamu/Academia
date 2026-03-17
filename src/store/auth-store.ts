@@ -16,10 +16,13 @@ import {
   changeProfilePassword,
   deleteProfileAvatar,
   getProfile,
+  getStudentProfile,
   updateProfileName,
   uploadProfileAvatar,
+  updateStudentProfile,
   type ChangePasswordDto,
   type UpdateProfileNameDto,
+  type UpdateStudentProfileDto,
 } from '@/lib/api/profile';
 
 interface AuthState {
@@ -28,7 +31,7 @@ interface AuthState {
   pendingEmailVerification?: boolean;
   registration?: RegisterResult;
 
-  // Persistent auth state
+  // In-memory auth state (not persisted across browser restarts)
   accessToken?: string;
   refreshToken?: string;
   user?: AuthUser;
@@ -48,9 +51,11 @@ interface AuthState {
   login: (dto: LoginDto) => Promise<void>;
   fetchMe: () => Promise<void>;
   fetchProfile: () => Promise<void>;
+  fetchStudentProfile: () => Promise<void>;
   updateProfileName: (dto: UpdateProfileNameDto) => Promise<void>;
   uploadProfileAvatar: (file: File) => Promise<void>;
   deleteProfileAvatar: () => Promise<void>;
+  updateStudentProfile: (dto: UpdateStudentProfileDto) => Promise<void>;
   changePassword: (dto: ChangePasswordDto) => Promise<void>;
   bootstrap: () => Promise<void>;
   clearAuthSession: () => void;
@@ -223,6 +228,38 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      fetchStudentProfile: async (): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const profile = await getStudentProfile()
+          const currentUser = get().user
+
+          // Normalize field naming differences.
+          const normalized = {
+            ...profile,
+            techStack:
+              (profile as { techStack?: string[]; technologies?: string[] }).techStack ??
+              (profile as { techStack?: string[]; technologies?: string[] }).technologies,
+            technologies:
+              (profile as { techStack?: string[]; technologies?: string[] }).technologies ??
+              (profile as { techStack?: string[]; technologies?: string[] }).techStack,
+          }
+
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(normalized as AuthUser),
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to load student profile';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
       updateProfileName: async (dto: UpdateProfileNameDto): Promise<void> => {
         set({ profileIsLoading: true, profileError: undefined })
         try {
@@ -287,11 +324,57 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      updateStudentProfile: async (dto: UpdateStudentProfileDto): Promise<void> => {
+        set({ profileIsLoading: true, profileError: undefined })
+        try {
+          const updated = await updateStudentProfile(dto)
+          const currentUser = get().user
+          set({
+            user: {
+              ...(currentUser ?? ({} as AuthUser)),
+              ...(updated as AuthUser),
+              // Keep both fields populated for UI compatibility.
+              techStack:
+                (updated as AuthUser).techStack ?? (updated as AuthUser).technologies ??
+                dto.techStack ?? dto.technologies,
+              technologies:
+                (updated as AuthUser).technologies ?? (updated as AuthUser).techStack ??
+                dto.technologies ?? dto.techStack,
+            },
+            profileIsLoading: false,
+          })
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response?.status
+          const currentUser = get().user
+          if ((status === 404 || status === 501) && currentUser) {
+            const mergedTechStack = dto.techStack ?? dto.technologies
+            set({
+              user: {
+                ...currentUser,
+                ...dto,
+                techStack: mergedTechStack ?? currentUser.techStack ?? currentUser.technologies,
+                technologies: (dto.technologies ?? dto.techStack) ?? currentUser.technologies ?? currentUser.techStack,
+              },
+              profileIsLoading: false,
+            })
+            return
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to save student profile';
+          set({ profileError: message, profileIsLoading: false })
+          throw new Error(message)
+        }
+      },
+
       changePassword: async (dto: ChangePasswordDto): Promise<void> => {
         set({ profileIsLoading: true, profileError: undefined })
         try {
           await changeProfilePassword(dto)
-          set({ profileIsLoading: false })
+          const currentUser = get().user
+          set({
+            user: currentUser ? { ...currentUser, mustChangePassword: false } : currentUser,
+            profileIsLoading: false,
+          })
         } catch (error: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const message = (error as Error)?.message || ((error as any)?.response?.data?.message) || 'Failed to change password';
@@ -353,11 +436,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = (persistedState as { tenantDomain?: string } | null) ?? null
+        return {
+          tenantDomain: state?.tenantDomain,
+        }
+      },
       partialize: (state) => ({
         tenantDomain: state.tenantDomain,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        user: state.user,
       }),
     }
   )

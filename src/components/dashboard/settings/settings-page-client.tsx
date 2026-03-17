@@ -15,6 +15,7 @@ import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/depart
 import { UniversitySettingsForm } from "@/components/dashboard/department-head/university-settings"
 import { AppearanceWizard } from "@/components/dashboard/settings/appearance-wizard"
 import { DepartmentGroupSizeSettings } from "@/components/dashboard/settings/department-group-size-settings"
+import { PushNotificationSettings } from "@/components/dashboard/settings/push-notification-settings"
 
 interface PolicyToggle {
   id: string
@@ -138,6 +139,7 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
       <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          <TabsTrigger value="notifications">Notification Preferences</TabsTrigger>
           {showGovernance ? <TabsTrigger value="governance">Governance</TabsTrigger> : null}
           {showDepartment ? <TabsTrigger value="department">Department</TabsTrigger> : null}
           {showUniversity ? <TabsTrigger value="university">University</TabsTrigger> : null}
@@ -147,8 +149,18 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
           <DashboardSectionCard
             title="Appearance"
             description="Customize theme mode, brand color, radius, font, and scaling."
+            className="text-inherit"
           >
             <AppearanceWizard />
+          </DashboardSectionCard>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <DashboardSectionCard
+            title="Notification Preferences"
+            description="Manage browser alerts, notification sound, and Web Push preferences for this browser."
+          >
+            <PushNotificationSettings />
           </DashboardSectionCard>
         </TabsContent>
 

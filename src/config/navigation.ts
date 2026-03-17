@@ -10,7 +10,10 @@ import {
   ClipboardList,
   GraduationCap,
   CheckSquare,
+  ClipboardCheck,
   Clock,
+  Bell,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react"
 
@@ -32,14 +35,19 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
-      title: "Coordinators",
-      href: "/dashboard/department-head/coordinators",
-      icon: UserCheck,
+      title: "Invitations",
+      href: "/dashboard/department-head/invitations",
+      icon: Users,
     },
     {
       title: "Faculty",
       href: "/dashboard/department-head/faculty",
-      icon: Users,
+      icon: UserCheck,
+    },
+    {
+      title: "Review & Approval",
+      href: "/dashboard/department-head/grades",
+      icon: ClipboardCheck,
     },
     {
       title: "Projects Overview",
@@ -52,9 +60,19 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
+      title: "Announcements",
+      href: "/dashboard/department-head/announcements",
+      icon: Megaphone,
+    },
+    {
       title: "Verification",
       href: "/dashboard/verify-institution",
       icon: CheckSquare,
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/department-head/messages",
+      icon: FileText,
     },
     {
       title: "Profile",
@@ -158,14 +176,19 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
+      title: "Team",
+      href: "/dashboard/student/team",
+      icon: Users,
+    },
+    {
       title: "My Project",
       href: "/dashboard/student/my-project",
       icon: FolderKanban,
     },
     {
-      title: "Team",
-      href: "/dashboard/student/team",
-      icon: Users,
+      title: "Milestones",
+      href: "/dashboard/student/milestones",
+      icon: Calendar,
     },
     {
       title: "Submissions",
@@ -173,19 +196,24 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
-      title: "Defense",
-      href: "/dashboard/student/defense",
-      icon: Calendar,
-    },
-    {
       title: "Timeline",
       href: "/dashboard/student/timeline",
       icon: Clock,
     },
     {
+      title: "Defense",
+      href: "/dashboard/student/defense",
+      icon: Calendar,
+    },
+    {
       title: "Messages",
       href: "/dashboard/student/messages",
       icon: FileText,
+    },
+    {
+      title: "Notifications",
+      href: "/dashboard/notifications",
+      icon: Bell,
     },
     {
       title: "Profile",

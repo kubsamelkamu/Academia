@@ -15,6 +15,15 @@ import { type DashboardLayoutState, type GridLayouts } from "@/types/dashboard-l
 import { LayoutDashboard, RotateCcw, Save, Settings, X } from "lucide-react"
 import { Responsive, useContainerWidth, verticalCompactor, type Layout } from "react-grid-layout"
 
+function useLiveTime(intervalMs = 1000): Date {
+  const [now, setNow] = React.useState(() => new Date())
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), intervalMs)
+    return () => window.clearInterval(id)
+  }, [intervalMs])
+  return now
+}
+
 const GRID_BREAKPOINTS = { lg: 1024, md: 768, sm: 640, xs: 0 }
 const GRID_COLS = { lg: 12, md: 10, sm: 6, xs: 4 }
 
@@ -113,6 +122,17 @@ export function CustomizableDashboard(props: { role: UserRole; userId: string; u
   const enabledWidgetIds = isEditing ? draftEnabled : baseLayout.enabledWidgetIds
   const activeLayouts = isEditing ? draftLayouts : toLayouts(baseLayout)
 
+  const now = useLiveTime(1000)
+  const timeString = React.useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(now),
+    [now]
+  )
+
   const actions = (
     <>
       {isEditing ? (
@@ -154,12 +174,22 @@ export function CustomizableDashboard(props: { role: UserRole; userId: string; u
         </>
       ) : (
         <>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/settings">
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
+          {props.role !== "student" && (
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/settings">
+                <Settings className="h-4 w-4" />
+                Settings
+              </Link>
+            </Button>
+          )}
+          {props.role === "student" && (
+            <span
+              className="tabular-nums text-sm font-medium text-muted-foreground"
+              aria-live="polite"
+            >
+              {timeString}
+            </span>
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -177,11 +207,12 @@ export function CustomizableDashboard(props: { role: UserRole; userId: string; u
   )
 
   const header = roleHeader(props.role)
+  const studentTitle = props.role === "student" ? `Welcome, ${props.userName?.trim() || "User"}` : null
 
   return (
     <div className="space-y-6">
       <DashboardPageHeader
-        title={header.title}
+        title={studentTitle ?? header.title}
         description={header.description}
         badge={header.badge}
         actions={actions}

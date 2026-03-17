@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import Cropper, { type Area } from "react-easy-crop"
-import { Eye, EyeOff } from "lucide-react"
+import { AlertCircle, Camera, Eye, EyeOff, Trash2 } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -27,9 +27,14 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 
 import { cropImageToBlob, type PixelCropArea } from "@/lib/crop-image"
+import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useAuthStore } from "@/store/auth-store"
+import { StudentProfileSection } from "@/components/dashboard/settings/student-profile-section"
 
 const accountFormSchema = z.object({
   firstName: z
@@ -107,6 +112,7 @@ export function ProfileSettings() {
   const profileIsLoading = useAuthStore((s) => s.profileIsLoading)
   const profileError = useAuthStore((s) => s.profileError)
   const fetchProfile = useAuthStore((s) => s.fetchProfile)
+  const fetchStudentProfile = useAuthStore((s) => s.fetchStudentProfile)
   const updateProfileName = useAuthStore((s) => s.updateProfileName)
   const uploadProfileAvatar = useAuthStore((s) => s.uploadProfileAvatar)
   const deleteProfileAvatar = useAuthStore((s) => s.deleteProfileAvatar)
@@ -115,6 +121,9 @@ export function ProfileSettings() {
   const email = user?.email ?? "head@university.edu"
 
   const avatarUrl = user?.avatarUrl ?? null
+
+  const primaryRole = getPrimaryRoleFromBackendRoles(user?.roles)
+  const isStudent = primaryRole === "student"
 
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null)
   const [showCropModal, setShowCropModal] = React.useState(false)
@@ -150,10 +159,11 @@ export function ProfileSettings() {
 
   React.useEffect(() => {
     // Best-effort refresh (keeps profile up to date when this page is opened).
-    fetchProfile().catch(() => {
+    const refresh = isStudent ? fetchStudentProfile : fetchProfile
+    refresh().catch(() => {
       // store already captures profileError
     })
-  }, [fetchProfile])
+  }, [fetchProfile, fetchStudentProfile, isStudent])
 
   React.useEffect(() => {
     accountForm.reset({
@@ -213,6 +223,15 @@ export function ProfileSettings() {
   }, [selectedImage, croppedAreaPixels])
 
   async function handleSaveProfile(values: AccountFormValues) {
+    if (isStudent) {
+      toast.message("Your name is read-only")
+      accountForm.reset({
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
+      })
+      return
+    }
+
     try {
       await updateProfileName({ firstName: values.firstName, lastName: values.lastName })
       toast.success("Name updated")
@@ -370,500 +389,577 @@ export function ProfileSettings() {
   const currentInitials = initials(accountForm.getValues("firstName"), accountForm.getValues("lastName"))
 
   return (
-    <div className="space-y-10">
-      {profileError ? <p className="text-sm text-destructive">{profileError}</p> : null}
+    <div className="space-y-8 md:space-y-10 max-w-5xl mx-auto">
+      {profileError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{profileError}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold">Account</h3>
-          <p className="text-sm text-muted-foreground">Update your name and profile picture.</p>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+          <CardDescription>Update your name and profile picture.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Form {...accountForm}>
+            <form onSubmit={accountForm.handleSubmit(handleSaveProfile)} className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={accountForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your first name"
+                          {...field}
+                          value={field.value ?? ""}
+                          readOnly={isStudent}
+                          className="transition-all focus:ring-2 focus:ring-primary"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={accountForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your last name"
+                          {...field}
+                          value={field.value ?? ""}
+                          readOnly={isStudent}
+                          className="transition-all focus:ring-2 focus:ring-primary"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-        <Form {...accountForm}>
-          <form onSubmit={accountForm.handleSubmit(handleSaveProfile)} className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={accountForm.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your first name" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={accountForm.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your last name" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-muted-foreground">Signed in as: {email}</div>
-              <Button type="submit" disabled={profileIsLoading}>Update profile</Button>
-            </div>
-          </form>
-        </Form>
-
-        <div className="h-px w-full bg-border" />
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Profile Picture</h3>
-
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <Avatar className="h-20 w-20">
-              {avatarUrl ? <AvatarImage src={avatarUrl} alt="Avatar" /> : null}
-              <AvatarFallback className="text-lg">{currentInitials}</AvatarFallback>
-            </Avatar>
-
-            <div className="space-y-2">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                id="avatar-upload"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    if (!file.type.startsWith("image/")) {
-                      toast.error("Please select an image file")
-                      e.currentTarget.value = ""
-                      return
-                    }
-
-                    const maxBytes = 1 * 1024 * 1024
-                    if (file.size > maxBytes) {
-                      toast.error("Image must be 1MB or less")
-                      e.currentTarget.value = ""
-                      return
-                    }
-
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      setSelectedImage(reader.result as string)
-                      setAvatarCrop({ x: 0, y: 0 })
-                      setAvatarZoom(1)
-                      setCroppedAreaPixels(null)
-                      setCropPreviewUrl(null)
-                      setShowCropModal(true)
-                    }
-                    reader.readAsDataURL(file)
-                  }
-
-                  // Allow selecting the same file again
-                  e.currentTarget.value = ""
-                }}
-              />
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => document.getElementById("avatar-upload")?.click()}
-                  disabled={profileIsLoading || isSavingAvatar}
-                >
-                  Upload new picture
-                </Button>
-                {avatarUrl ? (
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      deleteProfileAvatar()
-                        .then(() => {
-                            toast.success("Avatar removed")
-                        })
-                        .catch((e: unknown) => {
-                            toast.error(e instanceof Error ? e.message : "Failed to delete avatar")
-                        })
-                    }}
-                    disabled={profileIsLoading || isSavingAvatar}
-                  >
-                    Remove
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <Badge variant="secondary" className="text-xs sm:text-sm">
+                  Signed in as: {email}
+                </Badge>
+                {!isStudent ? (
+                  <Button type="submit" disabled={profileIsLoading} className="w-full sm:w-auto">
+                    {profileIsLoading ? "Updating..." : "Update profile"}
                   </Button>
                 ) : null}
               </div>
+            </form>
+          </Form>
 
-              <p className="text-sm text-muted-foreground">JPG, GIF or PNG. 1MB max.</p>
-            </div>
-          </div>
-        </div>
+          <div className="h-px w-full bg-border" />
 
-        <Dialog
-          open={showCropModal}
-          onOpenChange={(open) => {
-            setShowCropModal(open)
-            if (!open) {
-              setSelectedImage(null)
-              setAvatarCrop({ x: 0, y: 0 })
-              setAvatarZoom(1)
-              setCroppedAreaPixels(null)
-              setCropPreviewUrl(null)
-            }
-          }}
-        >
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Crop avatar</DialogTitle>
-              <DialogDescription>
-                Drag to reposition and use the zoom slider. This will be saved as a square image and displayed as a circle.
-              </DialogDescription>
-            </DialogHeader>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Profile Picture</h3>
 
-            <div className="space-y-4">
-              {selectedImage ? (
-                <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-                  <div className="relative h-[360px] w-full overflow-hidden rounded-md bg-muted">
-                    <Cropper
-                      image={selectedImage}
-                      crop={avatarCrop}
-                      zoom={avatarZoom}
-                      aspect={1}
-                      cropShape="round"
-                      showGrid={false}
-                      onCropChange={setAvatarCrop}
-                      onZoomChange={setAvatarZoom}
-                      onCropComplete={onCropComplete}
-                    />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                <Avatar className="h-24 w-24 shrink-0 ring-2 ring-primary/10">
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt="Avatar" /> : null}
+                  <AvatarFallback className="text-lg">{currentInitials}</AvatarFallback>
+                </Avatar>
+
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="avatar-upload"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (!file.type.startsWith("image/")) {
+                          toast.error("Please select an image file")
+                          e.currentTarget.value = ""
+                          return
+                        }
+
+                        const maxBytes = 1 * 1024 * 1024
+                        if (file.size > maxBytes) {
+                          toast.error("Image must be 1MB or less")
+                          e.currentTarget.value = ""
+                          return
+                        }
+
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          setSelectedImage(reader.result as string)
+                          setAvatarCrop({ x: 0, y: 0 })
+                          setAvatarZoom(1)
+                          setCroppedAreaPixels(null)
+                          setCropPreviewUrl(null)
+                          setShowCropModal(true)
+                        }
+                        reader.readAsDataURL(file)
+                      }
+
+                      // Allow selecting the same file again
+                      e.currentTarget.value = ""
+                    }}
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => document.getElementById("avatar-upload")?.click()}
+                      disabled={profileIsLoading || isSavingAvatar}
+                      className="flex-1 sm:flex-none"
+                    >
+                      <Camera className="mr-2 h-4 w-4" />
+                      Upload new picture
+                    </Button>
+                    {avatarUrl ? (
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          deleteProfileAvatar()
+                            .then(() => {
+                              toast.success("Avatar removed")
+                            })
+                            .catch((e: unknown) => {
+                              toast.error(e instanceof Error ? e.message : "Failed to delete avatar")
+                            })
+                        }}
+                        disabled={profileIsLoading || isSavingAvatar}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
+                    ) : null}
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm">Preview</Label>
-                      <div className="mt-2 flex items-center gap-3">
-                        <div className="relative h-20 w-20 overflow-hidden rounded-full bg-muted">
-                          {cropPreviewUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={cropPreviewUrl} alt="Avatar preview" className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full" />
-                          )}
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    JPG, GIF or PNG. 1MB max. Square images work best for avatars.
+                  </p>
+                </div>
+              </div>
+
+              {getPrimaryRoleFromBackendRoles(user?.roles) === "student" && (
+                <div className="rounded-lg border bg-muted/40 p-4">
+                  <StudentProfileSection />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Dialog
+            open={showCropModal}
+            onOpenChange={(open) => {
+              setShowCropModal(open)
+              if (!open) {
+                setSelectedImage(null)
+                setAvatarCrop({ x: 0, y: 0 })
+                setAvatarZoom(1)
+                setCroppedAreaPixels(null)
+                setCropPreviewUrl(null)
+              }
+            }}
+          >
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Crop avatar</DialogTitle>
+                <DialogDescription>
+                  Drag to reposition and use the zoom slider. This will be saved as a square image and displayed as a circle.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {selectedImage ? (
+                  <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+                    <div className="relative h-[360px] w-full overflow-hidden rounded-md bg-muted">
+                      <Cropper
+                        image={selectedImage}
+                        crop={avatarCrop}
+                        zoom={avatarZoom}
+                        aspect={1}
+                        cropShape="round"
+                        showGrid={false}
+                        onCropChange={setAvatarCrop}
+                        onZoomChange={setAvatarZoom}
+                        onCropComplete={onCropComplete}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm">Preview</Label>
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="relative h-20 w-20 overflow-hidden rounded-full bg-muted">
+                            {cropPreviewUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={cropPreviewUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full" />
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">This is how it will look.</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">This is how it will look.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm">Zoom</Label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={3}
+                          step={0.01}
+                          value={avatarZoom}
+                          onChange={(e) => setAvatarZoom(Number(e.target.value))}
+                          className="w-full"
+                        />
                       </div>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm">Zoom</Label>
-                      <input
-                        type="range"
-                        min={1}
-                        max={3}
-                        step={0.01}
-                        value={avatarZoom}
-                        onChange={(e) => setAvatarZoom(Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCropModal(false)}
-                  disabled={isSavingAvatar}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleSaveCroppedAvatar}
-                  disabled={!selectedImage || !croppedAreaPixels || isSavingAvatar}
-                >
-                  {isSavingAvatar ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="h-px w-full bg-border" />
-
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold">Change Password</h3>
-          <p className="text-sm text-muted-foreground">Update your password (stubbed for now).</p>
-        </div>
-
-        <Form {...changePasswordForm}>
-          <form
-            onSubmit={changePasswordForm.handleSubmit(handleChangePassword)}
-            className="space-y-5 max-w-md"
-          >
-            <FormField
-              control={changePasswordForm.control}
-              name="currentPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={showCurrentPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrentPassword((v) => !v)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-                      >
-                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={changePasswordForm.control}
-              name="newPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={showNewPassword ? "text" : "password"}
-                        autoComplete="new-password"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPassword((v) => !v)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                      >
-                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={changePasswordForm.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm New Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={showConfirmPassword ? "text" : "password"}
-                        autoComplete="new-password"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((v) => !v)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit" disabled={changePasswordForm.formState.isSubmitting}>
-              {changePasswordForm.formState.isSubmitting ? "Changing..." : "Change Password"}
-            </Button>
-          </form>
-        </Form>
-      </div>
-
-      <div className="h-px w-full bg-border" />
-
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Two-Factor Authentication (2FA)</h3>
-          <p className="text-sm text-muted-foreground">UI only for now — endpoints can be wired later.</p>
-        </div>
-
-        <div className="flex flex-col gap-4 max-w-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="font-medium">Two-Factor Authentication (2FA)</div>
-              <div className="text-sm text-muted-foreground">
-                {twoFactorEnabled ? "2FA is enabled." : "2FA is currently disabled."}
-                {twoFactorEnabled && twoFactorVerifiedAt
-                  ? ` Verified at: ${new Date(twoFactorVerifiedAt).toLocaleString()}`
-                  : ""}
-              </div>
-            </div>
-
-            {twoFactorEnabled ? (
-              <Button variant="destructive" type="button" onClick={disableTwoFactor} disabled={twoFactorLoading}>
-                {twoFactorLoading ? "Disabling..." : "Disable"}
-              </Button>
-            ) : (
-              <Button type="button" onClick={enableTwoFactor} disabled={twoFactorLoading}>
-                {twoFactorLoading ? "Enabling..." : "Enable"}
-              </Button>
-            )}
-          </div>
-
-          {twoFactorError ? <p className="text-destructive text-sm">{twoFactorError}</p> : null}
-
-          {!twoFactorEnabled && !twoFactorSetup && !twoFactorLoading ? (
-            <div className="rounded-md border p-4 bg-muted/50">
-              <div className="text-sm text-muted-foreground">
-                Enable 2FA to add an extra layer of security to your account.
-              </div>
-            </div>
-          ) : null}
-
-          {!twoFactorEnabled && twoFactorLoading && !twoFactorSetup ? (
-            <div className="rounded-md border p-4 space-y-4">
-              <div className="animate-pulse space-y-2">
-                <div className="h-4 bg-muted rounded w-3/4" />
-                <div className="h-3 bg-muted rounded w-1/2" />
-              </div>
-              <div className="animate-pulse">
-                <div className="h-44 w-44 bg-muted rounded" />
-              </div>
-            </div>
-          ) : null}
-
-          {!twoFactorEnabled && twoFactorSetup ? (
-            <div className="rounded-md border p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Set up 2FA</div>
-                <div className="text-sm text-muted-foreground">Follow these steps to enable two-factor authentication.</div>
-
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                      1
-                    </div>
-                    <span>Scan the QR code with your authenticator app</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-medium">
-                      2
-                    </div>
-                    <span>Enter the verification code below</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="rounded-md border bg-background p-3">
-                  <QRCodeCanvas value={twoFactorSetup.otpauthUrl} size={176} includeMargin level="M" />
-                </div>
-
-                <div className="flex-1 space-y-3">
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Label</div>
-                    <div className="text-sm break-words">{twoFactorSetup.label}</div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Secret</div>
-                    <div className="flex items-center gap-2">
-                      <div className="font-mono text-sm break-all">{twoFactorSetup.secret}</div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(twoFactorSetup.secret, "Secret copied.")}
-                      >
-                        Copy
-                      </Button>
-                    </div>
-                    <div className="text-xs text-muted-foreground">If you can’t scan the QR code, enter this secret manually.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-md bg-muted p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="text-xs text-muted-foreground">otpauthUrl</div>
+                <div className="flex justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(twoFactorSetup.otpauthUrl, "Setup link copied.")}
+                    onClick={() => setShowCropModal(false)}
+                    disabled={isSavingAvatar}
                   >
-                    Copy link
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSaveCroppedAvatar}
+                    disabled={!selectedImage || !croppedAreaPixels || isSavingAvatar}
+                  >
+                    {isSavingAvatar ? "Saving…" : "Save"}
                   </Button>
                 </div>
-                <div className="break-all text-xs font-mono">{twoFactorSetup.otpauthUrl}</div>
               </div>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
 
-              <div className="space-y-2">
-                <Label htmlFor="verifyCode" className="text-sm font-medium">
-                  Verification Code
-                </Label>
-                <Input
-                  id="verifyCode"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Enter 6-digit code from app"
-                  value={verifyCode}
-                  onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  disabled={twoFactorLoading}
-                  maxLength={6}
-                />
-                <div className="text-xs text-muted-foreground">
-                  Codes are time-sensitive. If invalid, check your device time sync.
+      <Card>
+        <CardHeader>
+          <CardTitle>Change Password</CardTitle>
+          <CardDescription>Use a strong, unique password to keep your account secure.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...changePasswordForm}>
+            <form
+              onSubmit={changePasswordForm.handleSubmit(handleChangePassword)}
+              className="space-y-5 max-w-md"
+            >
+              <FormField
+                control={changePasswordForm.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          type={showCurrentPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          className="pr-10 transition-all focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
+                        >
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={changePasswordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          type={showNewPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          className="pr-10 transition-all focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={changePasswordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          type={showConfirmPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          className="pr-10 transition-all focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button
+                type="submit"
+                disabled={changePasswordForm.formState.isSubmitting}
+                className="w-full sm:w-auto"
+              >
+                {changePasswordForm.formState.isSubmitting ? "Changing..." : "Change Password"}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Two-Factor Authentication (2FA)</CardTitle>
+          <CardDescription>
+            Add an extra layer of security to your account. This is UI-only for now; backend wiring can be added later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4 max-w-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="font-medium">2FA Status</div>
+                <div className="text-sm text-muted-foreground">
+                  {twoFactorEnabled ? "2FA is enabled." : "2FA is currently disabled."}
+                  {twoFactorEnabled && twoFactorVerifiedAt
+                    ? ` Verified at: ${new Date(twoFactorVerifiedAt).toLocaleString()}`
+                    : ""}
                 </div>
               </div>
 
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => verifyTwoFactor(verifyCode)}
-                disabled={twoFactorLoading || !verifyCode.trim()}
-              >
-                {twoFactorLoading ? "Verifying..." : "Verify 2FA Setup"}
-              </Button>
+              {twoFactorEnabled ? (
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={disableTwoFactor}
+                  disabled={twoFactorLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {twoFactorLoading ? "Disabling..." : "Disable 2FA"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={enableTwoFactor}
+                  disabled={twoFactorLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {twoFactorLoading ? "Enabling..." : "Enable 2FA"}
+                </Button>
+              )}
             </div>
-          ) : null}
+
+            {twoFactorError ? (
+              <p className="text-destructive text-sm">{twoFactorError}</p>
+            ) : null}
+
+            {!twoFactorEnabled && !twoFactorSetup && !twoFactorLoading ? (
+              <div className="rounded-md border p-4 bg-muted/50">
+                <div className="text-sm text-muted-foreground">
+                  Enable 2FA to add an extra layer of security to your account.
+                </div>
+              </div>
+            ) : null}
+
+            {!twoFactorEnabled && twoFactorLoading && !twoFactorSetup ? (
+              <div className="rounded-md border p-4 space-y-4">
+                <div className="animate-pulse space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4" />
+                  <div className="h-3 bg-muted rounded w-1/2" />
+                </div>
+                <div className="animate-pulse">
+                  <div className="h-44 w-44 bg-muted rounded" />
+                </div>
+              </div>
+            ) : null}
+
+            {!twoFactorEnabled && twoFactorSetup ? (
+              <div className="rounded-md border p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Set up 2FA</div>
+                  <div className="text-sm text-muted-foreground">
+                    Follow these steps to enable two-factor authentication.
+                  </div>
+
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                        1
+                      </div>
+                      <span>Scan the QR code with your authenticator app</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                        2
+                      </div>
+                      <span>Enter the verification code below</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="rounded-md border bg-background p-3">
+                    <QRCodeCanvas value={twoFactorSetup.otpauthUrl} size={176} includeMargin level="M" />
+                  </div>
+
+                  <div className="flex-1 space-y-3">
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Label</div>
+                      <div className="text-sm break-words">{twoFactorSetup.label}</div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Secret</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono text-sm break-all">{twoFactorSetup.secret}</div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(twoFactorSetup.secret, "Secret copied.")}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        If you can’t scan the QR code, enter this secret manually.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-md bg-muted p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-xs text-muted-foreground">otpauth URL</div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(twoFactorSetup.otpauthUrl, "Setup link copied.")}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                  <div className="break-all text-xs font-mono">{twoFactorSetup.otpauthUrl}</div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="verifyCode" className="text-sm font-medium">
+                    Verification Code
+                  </Label>
+                  <Input
+                    id="verifyCode"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Enter 6-digit code from app"
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    disabled={twoFactorLoading}
+                    maxLength={6}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Codes are time-sensitive. If invalid, check your device time sync.
+                  </div>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => verifyTwoFactor(verifyCode)}
+                  disabled={twoFactorLoading || !verifyCode.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  {twoFactorLoading ? "Verifying..." : "Verify 2FA Setup"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
 
           <div className="h-px w-full bg-border" />
 
           <div className="space-y-2">
             <div className="font-medium">Backup Codes</div>
-            <div className="text-sm text-muted-foreground">Remaining codes: {backupCodesRemaining ?? "—"}</div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={generateCodes} disabled={twoFactorLoading || !twoFactorEnabled}>
+            <div className="text-sm text-muted-foreground">
+              Remaining codes: {backupCodesRemaining ?? "—"}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateCodes}
+                disabled={twoFactorLoading || !twoFactorEnabled}
+                className="w-full sm:w-auto"
+              >
                 Generate
               </Button>
-              <Button type="button" variant="outline" onClick={regenerateCodes} disabled={twoFactorLoading || !twoFactorEnabled}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={regenerateCodes}
+                disabled={twoFactorLoading || !twoFactorEnabled}
+                className="w-full sm:w-auto"
+              >
                 Regenerate
               </Button>
             </div>
             {!twoFactorEnabled ? (
-              <p className="text-xs text-muted-foreground">Enable and verify 2FA to generate backup codes.</p>
+              <p className="text-xs text-muted-foreground">
+                Enable and verify 2FA to generate backup codes.
+              </p>
             ) : null}
           </div>
 
@@ -880,26 +976,35 @@ export function ProfileSettings() {
                 <DialogDescription>Store these codes securely. They may not be shown again.</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(backupCodesLastGenerated ?? []).map((code) => (
                     <div key={code} className="rounded-md border px-2 py-1 font-mono text-sm">
                       {code}
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={handleCopyAllBackupCodes}>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCopyAllBackupCodes}
+                    className="w-full sm:w-auto"
+                  >
                     Copy all
                   </Button>
-                  <Button type="button" onClick={() => setBackupCodesDialogOpen(false)}>
+                  <Button
+                    type="button"
+                    onClick={() => setBackupCodesDialogOpen(false)}
+                    className="w-full sm:w-auto"
+                  >
                     Done
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

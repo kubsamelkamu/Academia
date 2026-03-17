@@ -6,9 +6,11 @@ import { io, type Socket } from "socket.io-client"
 import { toast } from "sonner"
 
 import { useAuthStore } from "@/store/auth-store"
-import { notificationsKeys } from "@/lib/hooks/use-notifications"
+import { playNotificationSound, showBrowserNotification } from "@/lib/browser-notifications"
+import { getNotificationsListParams, notificationsKeys } from "@/lib/hooks/use-notifications"
 import { departmentSettingsKeys } from "@/lib/hooks/use-department-group-size-settings"
 import type {
+  ListNotificationsParams,
   ListNotificationsResponse,
   Notification,
   NotificationSeverity,
@@ -71,11 +73,19 @@ function normalizeIncomingNotification(payload: unknown): Notification | null {
     severity,
     title,
     message,
-    metadata: (raw.metadata as Notification["metadata"]) ?? null,
+    metadata: normalizeMetadata(raw.metadata),
     status,
     readAt,
     createdAt,
   }
+}
+
+function normalizeMetadata(value: unknown): Notification["metadata"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Notification["metadata"]
 }
 
 function clampNonNegative(value: number): number {
@@ -83,15 +93,25 @@ function clampNonNegative(value: number): number {
 }
 
 function addToSummaryCache(previous: NotificationSummaryResponse, notification: Notification): NotificationSummaryResponse {
-  const nextUnread = previous.unread + (notification.status === "UNREAD" ? 1 : 0)
+  const alreadyPresent = previous.recent.some((n) => n.id === notification.id)
+  const unreadDelta = notification.status === "UNREAD" ? 1 : 0
+  const nextUnread = previous.unread + unreadDelta
   const nextTotal = previous.total + 1
 
+  if (alreadyPresent) {
+    return previous
+  }
+
   const nextBySeverity = { ...previous.bySeverity }
-  const current = nextBySeverity[notification.severity]
-  nextBySeverity[notification.severity] = (typeof current === "number" ? current : 0) + 1
+  if (unreadDelta > 0) {
+    const current = nextBySeverity[notification.severity]
+    nextBySeverity[notification.severity] = (typeof current === "number" ? current : 0) + 1
+  }
 
   const maxRecent = Math.max(previous.recent.length, 5)
-  const nextRecent = [notification, ...previous.recent.filter((n) => n.id !== notification.id)].slice(0, maxRecent)
+  const nextRecent = unreadDelta > 0
+    ? [notification, ...previous.recent].slice(0, maxRecent)
+    : previous.recent
 
   return {
     ...previous,
@@ -102,16 +122,30 @@ function addToSummaryCache(previous: NotificationSummaryResponse, notification: 
   }
 }
 
-function addToListCache(previous: ListNotificationsResponse, notification: Notification): ListNotificationsResponse {
-  // Avoid shifting older pages.
-  if (previous.offset > 0) return previous
+function addToListCache(
+  previous: ListNotificationsResponse,
+  params: ListNotificationsParams,
+  notification: Notification
+): ListNotificationsResponse {
+  const matchesFilter = params.status !== "UNREAD" || notification.status === "UNREAD"
+  const unreadDelta = notification.status === "UNREAD" ? 1 : 0
+
+  if (!matchesFilter) {
+    return {
+      ...previous,
+      unreadCount: previous.unreadCount + unreadDelta,
+    }
+  }
 
   const alreadyPresent = previous.notifications.some((n) => n.id === notification.id)
   if (alreadyPresent) return previous
 
-  const isReadOnlyList = previous.notifications.length > 0 && previous.notifications.every((n) => n.status === "READ")
-  if (isReadOnlyList && notification.status === "UNREAD") {
-    return previous
+  if (previous.offset > 0) {
+    return {
+      ...previous,
+      total: previous.total + 1,
+      unreadCount: previous.unreadCount + unreadDelta,
+    }
   }
 
   const nextNotifications = [notification, ...previous.notifications].slice(0, previous.limit)
@@ -120,7 +154,7 @@ function addToListCache(previous: ListNotificationsResponse, notification: Notif
     ...previous,
     notifications: nextNotifications,
     total: previous.total + 1,
-    unreadCount: notification.status === "UNREAD" ? previous.unreadCount + 1 : previous.unreadCount,
+    unreadCount: previous.unreadCount + unreadDelta,
   }
 }
 
@@ -131,12 +165,14 @@ export function NotificationsRealtime() {
 
   const socketRef = useRef<Socket | null>(null)
   const tokenRef = useRef<string | undefined>(undefined)
+  const seenNotificationIdsRef = useRef(new Set<string>())
 
   useEffect(() => {
     if (!accessToken) {
       socketRef.current?.disconnect()
       socketRef.current = null
       tokenRef.current = undefined
+      seenNotificationIdsRef.current.clear()
       return
     }
 
@@ -145,6 +181,7 @@ export function NotificationsRealtime() {
     }
 
     socketRef.current?.disconnect()
+    seenNotificationIdsRef.current.clear()
 
     const origin = deriveSocketOrigin(process.env.NEXT_PUBLIC_API_BASE_URL)
     if (!origin) {
@@ -166,9 +203,16 @@ export function NotificationsRealtime() {
       const notification = normalizeIncomingNotification(payload)
       if (!notification) return
 
+      if (seenNotificationIdsRef.current.has(notification.id)) {
+        return
+      }
+      seenNotificationIdsRef.current.add(notification.id)
+
       toast(notification.title, {
         description: notification.message,
       })
+      showBrowserNotification(notification)
+      void playNotificationSound()
 
       queryClient.setQueryData<NotificationUnreadCountResponse>(
         notificationsKeys().unreadCount,
@@ -187,12 +231,18 @@ export function NotificationsRealtime() {
         }
       )
 
-      queryClient.setQueriesData({ queryKey: notificationsKeys().root }, (old) => {
-        if (!old) return old
-        if (typeof old !== "object") return old
-        if (old && typeof (old as ListNotificationsResponse).limit !== "number") return old
-        return addToListCache(old as ListNotificationsResponse, notification)
+      const cachedLists = queryClient.getQueriesData<ListNotificationsResponse>({
+        queryKey: notificationsKeys().root,
       })
+
+      for (const [queryKey, previous] of cachedLists) {
+        if (!previous || !Array.isArray(queryKey)) continue
+
+        const params = getNotificationsListParams(queryKey)
+        if (!params) continue
+
+        queryClient.setQueryData<ListNotificationsResponse>(queryKey, addToListCache(previous, params, notification))
+      }
 
       if (notification.eventType === "DEPARTMENT_GROUP_SIZE_UPDATED") {
         void queryClient.invalidateQueries({ queryKey: departmentSettingsKeys().groupSize })

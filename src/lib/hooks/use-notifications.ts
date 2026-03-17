@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
@@ -72,23 +73,50 @@ export function useNotificationsSummary(
   })
 }
 
+export function getNotificationsListParams(queryKey: readonly unknown[]): ListNotificationsParams | null {
+  if (queryKey[0] !== "notifications" || queryKey[1] !== "list") return null
+
+  const params = queryKey[2]
+  if (!params || typeof params !== "object") return null
+
+  return params as ListNotificationsParams
+}
+
+function updateCachedNotificationLists(
+  queryClient: QueryClient,
+  updater: (previous: ListNotificationsResponse, params: ListNotificationsParams) => ListNotificationsResponse
+) {
+  const cachedLists = queryClient.getQueriesData<ListNotificationsResponse>({
+    queryKey: notificationsKeys().root,
+  })
+
+  for (const [queryKey, previous] of cachedLists) {
+    if (!previous || !Array.isArray(queryKey)) continue
+
+    const params = getNotificationsListParams(queryKey)
+    if (!params) continue
+
+    queryClient.setQueryData<ListNotificationsResponse>(queryKey, updater(previous, params))
+  }
+}
+
 function clampNonNegative(value: number): number {
   return value < 0 ? 0 : value
 }
 
 function markOneInListCache(
   previous: ListNotificationsResponse,
+  params: ListNotificationsParams,
   notificationId: string,
   readAtIso: string
 ): ListNotificationsResponse {
-  const isUnreadList = previous.notifications.every((n) => n.status === "UNREAD")
   const hasItem = previous.notifications.some((n) => n.id === notificationId)
 
-  // If this is an UNREAD-filtered list, removing the item gives a better UX.
-  // We can't reliably know the list params from here, so we use a heuristic:
-  // if every item is UNREAD, treat as an unread-only list.
-  if (isUnreadList && hasItem) {
-    const nextNotifications = previous.notifications.filter((n) => n.id !== notificationId)
+  if (params.status === "UNREAD") {
+    const nextNotifications = hasItem
+      ? previous.notifications.filter((n) => n.id !== notificationId)
+      : previous.notifications
+
     return {
       ...previous,
       notifications: nextNotifications,
@@ -97,7 +125,12 @@ function markOneInListCache(
     }
   }
 
-  if (!hasItem) return previous
+  if (!hasItem) {
+    return {
+      ...previous,
+      unreadCount: clampNonNegative(previous.unreadCount - 1),
+    }
+  }
 
   const nextNotifications = previous.notifications.map((n) =>
     n.id === notificationId
@@ -112,10 +145,12 @@ function markOneInListCache(
   }
 }
 
-function markAllInListCache(previous: ListNotificationsResponse, readAtIso: string): ListNotificationsResponse {
-  const isUnreadList = previous.notifications.every((n) => n.status === "UNREAD")
-
-  if (isUnreadList) {
+function markAllInListCache(
+  previous: ListNotificationsResponse,
+  params: ListNotificationsParams,
+  readAtIso: string
+): ListNotificationsResponse {
+  if (params.status === "UNREAD") {
     return {
       ...previous,
       notifications: [],
@@ -194,12 +229,8 @@ export function useMarkNotificationRead() {
           queryClient.setQueryData<NotificationSummaryResponse>(notificationsKeys().summary, markOneInSummaryCache(previousSummary, id))
         }
 
-        // Update all cached list pages (any params)
-        queryClient.setQueriesData({ queryKey: notificationsKeys().root }, (old) => {
-          if (!old) return old
-          if (typeof old !== "object") return old
-          if (old && typeof (old as ListNotificationsResponse).limit !== "number") return old
-          return markOneInListCache(old as ListNotificationsResponse, id, readAtIso)
+        updateCachedNotificationLists(queryClient, (previous, params) => {
+          return markOneInListCache(previous, params, id, readAtIso)
         })
 
         return { previousUnread, previousSummary }
@@ -239,15 +270,9 @@ export function useMarkAllNotificationsRead() {
           queryClient.setQueryData<NotificationSummaryResponse>(notificationsKeys().summary, markAllInSummaryCache(previousSummary))
         }
 
-        queryClient.setQueriesData<ListNotificationsResponse>(
-          { queryKey: notificationsKeys().root },
-          (old) => {
-            if (!old) return old
-            if (typeof old !== "object") return old
-            if (old && typeof (old as ListNotificationsResponse).limit !== "number") return old
-            return markAllInListCache(old as ListNotificationsResponse, readAtIso)
-          }
-        )
+        updateCachedNotificationLists(queryClient, (previous, params) => {
+          return markAllInListCache(previous, params, readAtIso)
+        })
 
         return { previousUnread, previousSummary }
       },
