@@ -69,6 +69,7 @@ interface DashboardSectionCardProps {
   description?: string
   children: ReactNode
   className?: string
+  contentClassName?: string
 }
 
 export function DashboardSectionCard({
@@ -76,6 +77,7 @@ export function DashboardSectionCard({
   description,
   children,
   className,
+  contentClassName,
 }: DashboardSectionCardProps) {
   return (
     <Card className={className}>
@@ -83,7 +85,7 @@ export function DashboardSectionCard({
         <CardTitle>{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className={contentClassName}>{children}</CardContent>
     </Card>
   )
 }

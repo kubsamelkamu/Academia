@@ -9,19 +9,33 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { MessageSquare, Send, Users, Clock3 } from "lucide-react"
+import type { ChatMessage } from "@/types/messages"
 
-interface AdvisorMessage {
-  id: string
-  from: string
-  subject: string
-  status: "Unread" | "Read"
-  time: string
-}
-
-const inbox: AdvisorMessage[] = [
-  { id: "m1", from: "Team Atlas", subject: "Clarification on chapter feedback", status: "Unread", time: "10 min ago" },
-  { id: "m2", from: "Coordinator", subject: "Defense rehearsal update", status: "Read", time: "1 hour ago" },
-  { id: "m3", from: "Team Nova", subject: "Request for quick review", status: "Unread", time: "3 hours ago" },
+const inbox: ChatMessage[] = [
+  {
+    id: "m1",
+    sender: "Team Atlas",
+    body: "Clarification on chapter feedback",
+    readState: "Unread",
+    at: "10 min ago",
+    direction: "incoming",
+  },
+  {
+    id: "m2",
+    sender: "Coordinator",
+    body: "Defense rehearsal update",
+    readState: "Read",
+    at: "1 hour ago",
+    direction: "incoming",
+  },
+  {
+    id: "m3",
+    sender: "Team Nova",
+    body: "Request for quick review",
+    readState: "Unread",
+    at: "3 hours ago",
+    direction: "incoming",
+  },
 ]
 
 export function AdvisorMessagesPage() {
@@ -33,7 +47,7 @@ export function AdvisorMessagesPage() {
         const normalized = query.toLowerCase().trim()
         return normalized.length === 0
           ? true
-          : item.from.toLowerCase().includes(normalized) || item.subject.toLowerCase().includes(normalized)
+          : item.sender.toLowerCase().includes(normalized) || item.body.toLowerCase().includes(normalized)
       }),
     [query]
   )
@@ -62,7 +76,7 @@ export function AdvisorMessagesPage() {
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by sender or subject"
+          placeholder="Search by sender or message"
           className="mb-3"
         />
         <div className="space-y-3">
@@ -72,11 +86,13 @@ export function AdvisorMessagesPage() {
             visibleInbox.map((item) => (
               <div key={item.id} className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium">{item.from}</p>
-                  <Badge variant={item.status === "Unread" ? "destructive" : "outline"}>{item.status}</Badge>
+                  <p className="text-sm font-medium">{item.sender}</p>
+                  <Badge variant={item.readState === "Unread" ? "destructive" : "outline"}>
+                    {item.readState ?? "Read"}
+                  </Badge>
                 </div>
-                <p className="mt-1 text-sm">{item.subject}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{item.time}</p>
+                <p className="mt-1 text-sm">{item.body}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.at}</p>
               </div>
             ))
           )}
