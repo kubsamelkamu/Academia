@@ -97,6 +97,17 @@ export type CreateProjectGroupInvitationDto = {
   invitedUserId: string
 }
 
+export type ProjectGroupInvitationPreviewResult = {
+  subject: string
+  htmlContent: string
+  textContent: string
+  templateParams: Record<string, unknown>
+  acceptUrl: string
+  rejectUrl: string
+  expiresAt: string
+  templateId: number | null
+}
+
 export type ProjectGroupInvitation = {
   id: string
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED" | string

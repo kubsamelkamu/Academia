@@ -65,13 +65,10 @@ import {
 } from "@/lib/hooks/use-project-groups"
 import {
   deleteChatRoomMessage,
-  listChatRoomPins,
   markChatRoomReadUpTo,
   patchChatRoomMessage,
-  pinChatRoomMessage,
   removeChatRoomMessageReaction,
   setChatRoomMessageReaction,
-  unpinChatRoomMessage,
   uploadChatRoomAttachment,
 } from "@/lib/api/chat"
 import { chatKeys, useInfiniteChatRoomMessages, useMyChatRoom } from "@/lib/hooks/use-chat"
@@ -90,8 +87,6 @@ import type {
   MessageNewPayload,
   MessageReadUpToPayload,
   MessageSendAckData,
-  PinAddedPayload,
-  PinRemovedPayload,
   PresenceUpdatePayload,
   ReactionRemovedPayload,
   ReactionUpdatedPayload,
@@ -115,8 +110,8 @@ interface Message {
   content: string
   timestamp: string
   status: MessageStatus
-  isPinned?: boolean
   reactions?: MessageReactions
+  readBy?: string[]
   replyTo?: {
     messageId: string
     senderName: string
@@ -124,8 +119,9 @@ interface Message {
   } | null
   attachments?: {
     name: string
-    size: string
+    sizeBytes: number
     url: string
+    mimeType?: string
   }[]
 }
 
@@ -189,12 +185,17 @@ export function StudentMessagesPage() {
   const latestMessage = chatMessagesData?.pages?.[0]?.items?.[0] ?? null
   const latestMessageId = latestMessage && roomId && latestMessage.roomId === roomId ? latestMessage.id : null
 
+  const latestMyMessageId = useMemo(() => {
+    const currentUserId = currentUser?.id
+    if (!currentUserId) return null
+    const itemsNewestFirst = chatMessagesData?.pages?.flatMap((p) => p.items) ?? []
+    const mine = itemsNewestFirst.find((m) => m.senderUserId === currentUserId) ?? null
+    return mine?.id ?? null
+  }, [chatMessagesData, currentUser?.id])
+
   const pendingTopPaginationScrollRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(null)
   const autoFillRoomIdRef = useRef<string | null>(null)
   const autoFillAttemptsRef = useRef(0)
-
-  const pinnedMessageIdsRef = useRef<Set<string>>(new Set())
-  const [pinsHydrated, setPinsHydrated] = useState(false)
 
   const findMessageInCache = useCallback((messageId: string): ChatMessage | null => {
     const pages = chatMessagesData?.pages ?? []
@@ -227,33 +228,6 @@ export function StudentMessagesPage() {
       })
     })
   }, [])
-
-  useEffect(() => {
-    if (!roomId) {
-      pinnedMessageIdsRef.current = new Set()
-      setPinsHydrated(false)
-      return
-    }
-
-    let cancelled = false
-    setPinsHydrated(false)
-
-    void listChatRoomPins({ roomId })
-      .then((pins) => {
-        if (cancelled) return
-        pinnedMessageIdsRef.current = new Set(pins.map((p) => p.messageId))
-        setPinsHydrated(true)
-      })
-      .catch(() => {
-        if (cancelled) return
-        // Non-fatal; we can still rely on per-message `isPinned` and realtime pin events.
-        setPinsHydrated(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [roomId])
 
   const updateInfiniteMessagesCache = useCallback((updater: (page: ListChatRoomMessagesResponse) => ListChatRoomMessagesResponse) => {
     if (!roomId) return
@@ -537,8 +511,6 @@ export function StudentMessagesPage() {
 
     const ok = window.confirm("Delete this message? This cannot be undone.")
     if (!ok) return
-
-    pinnedMessageIdsRef.current.delete(messageId)
     updateInfiniteMessagesCache((page) => {
       const nextItems = page.items.filter((m) => m.id !== messageId)
       if (nextItems.length === page.items.length) return page
@@ -667,6 +639,22 @@ export function StudentMessagesPage() {
       return Array.from(new Set(ids))
     })()
 
+    const userNameById = (() => {
+      const group = myProjectGroupQuery.data
+      const map = new Map<string, string>()
+      if (!group) return map
+
+      const leaderName = `${group.leader.firstName} ${group.leader.lastName}`.trim() || group.leader.email
+      map.set(group.leader.id, leaderName)
+
+      for (const member of group.members) {
+        const name = `${member.user.firstName} ${member.user.lastName}`.trim() || member.user.email
+        map.set(member.user.id, name)
+      }
+
+      return map
+    })()
+
     const readStates = chatMessagesQuery.data?.pages?.[0]?.readStates ?? []
     const lastReadIndexByUserId = new Map<string, number>()
     for (const state of readStates) {
@@ -681,8 +669,9 @@ export function StudentMessagesPage() {
         ? [
             {
               name: m.attachment.name,
-              size: `${Math.max(1, Math.round(m.attachment.size / 1024))} KB`,
+              sizeBytes: m.attachment.size,
               url: m.attachment.url,
+              mimeType: m.attachment.mimeType,
             },
           ]
         : undefined
@@ -700,6 +689,17 @@ export function StudentMessagesPage() {
         )
 
         return everyoneRead ? "read" : "delivered"
+      })()
+
+      const readBy = (() => {
+        if (!isMine) return []
+        if (isOptimistic) return []
+        if (otherParticipantUserIds.length === 0) return []
+        const readers = otherParticipantUserIds
+          .filter((userId) => (lastReadIndexByUserId.get(userId) ?? -1) >= idx)
+          .map((userId) => userNameById.get(userId) ?? "")
+          .filter((name) => Boolean(name))
+        return readers
       })()
 
       const replyTo = (() => {
@@ -743,8 +743,8 @@ export function StudentMessagesPage() {
         content: m.text,
         timestamp: m.createdAt,
         status,
-        isPinned: pinsHydrated ? pinnedMessageIdsRef.current.has(m.id) : Boolean(m.isPinned),
         reactions: m.reactions,
+        readBy,
         replyTo,
         attachments,
       }
@@ -753,7 +753,7 @@ export function StudentMessagesPage() {
     return {
       [roomId]: mapped,
     }
-  }, [chatMessagesQuery.data, currentUser?.id, myProjectGroupQuery.data, pinsHydrated, roomId])
+  }, [chatMessagesQuery.data, currentUser?.id, myProjectGroupQuery.data, roomId])
 
   const activeReplyPreview = useMemo(() => {
     if (!replyToMessageId) return null
@@ -780,6 +780,77 @@ export function StudentMessagesPage() {
       content,
     }
   }, [currentUser?.id, findMessageInCache, replyToMessageId])
+
+  const formatBytes = useCallback((bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
+    const units = ["B", "KB", "MB", "GB"] as const
+    const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+    const value = bytes / Math.pow(1024, i)
+    const digits = i === 0 ? 0 : value >= 10 ? 1 : 2
+    return `${value.toFixed(digits)} ${units[i]}`
+  }, [])
+
+  const ensureFilenameHasExtension = useCallback((params: { name: string; mimeType?: string; url?: string }) => {
+    const raw = (params.name || "download").trim() || "download"
+    if (/\.[a-zA-Z0-9]{1,8}$/.test(raw)) return raw
+
+    const mime = (params.mimeType || "").toLowerCase()
+    const extByMime: Record<string, string> = {
+      "application/pdf": ".pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+      "application/msword": ".doc",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+      "application/vnd.ms-excel": ".xls",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+      "application/vnd.ms-powerpoint": ".ppt",
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/gif": ".gif",
+      "image/webp": ".webp",
+      "text/plain": ".txt",
+      "text/csv": ".csv",
+      "application/zip": ".zip",
+      "application/x-zip-compressed": ".zip",
+    }
+
+    if (mime && extByMime[mime]) return `${raw}${extByMime[mime]}`
+
+    if (params.url) {
+      try {
+        const u = new URL(params.url)
+        const file = u.pathname.split("/").pop() ?? ""
+        const m = file.match(/\.[a-zA-Z0-9]{1,8}$/)
+        if (m) return `${raw}${m[0]}`
+      } catch {
+        // ignore
+      }
+    }
+
+    return raw
+  }, [])
+
+  const downloadAttachment = useCallback(async (att: { url: string; name: string; mimeType?: string }) => {
+    const filename = ensureFilenameHasExtension({ name: att.name, mimeType: att.mimeType, url: att.url })
+    try {
+      const response = await fetch(att.url)
+      if (!response.ok) throw new Error(`Download failed (${response.status})`)
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = objectUrl
+      a.download = filename
+      a.rel = "noreferrer"
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to download file"
+      toast.error(message)
+      window.open(att.url, "_blank", "noopener,noreferrer")
+    }
+  }, [ensureFilenameHasExtension])
 
   const updateReadStateInCache = useCallback((payload: {
     roomId: string
@@ -1153,38 +1224,6 @@ export function StudentMessagesPage() {
       })
     }
 
-    const handlePinAdded = (payload: unknown) => {
-      const raw = payload as PinAddedPayload
-      if (!raw || typeof raw !== "object") return
-      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
-      if (typeof raw.messageId !== "string") return
-      if (typeof raw.pinnedByUserId !== "string") return
-      if (typeof raw.pinnedAt !== "string") return
-
-      pinnedMessageIdsRef.current.add(raw.messageId)
-
-      updateInfiniteMessageById({
-        messageId: raw.messageId,
-        update: (current) => (current.isPinned ? current : { ...current, isPinned: true }),
-      })
-    }
-
-    const handlePinRemoved = (payload: unknown) => {
-      const raw = payload as PinRemovedPayload
-      if (!raw || typeof raw !== "object") return
-      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
-      if (typeof raw.messageId !== "string") return
-      if (typeof raw.unpinnedByUserId !== "string") return
-      if (typeof raw.unpinnedAt !== "string") return
-
-      pinnedMessageIdsRef.current.delete(raw.messageId)
-
-      updateInfiniteMessageById({
-        messageId: raw.messageId,
-        update: (current) => (!current.isPinned ? current : { ...current, isPinned: false }),
-      })
-    }
-
     socket.on("presence:update", handlePresenceUpdate)
     socket.on("message:new", handleMessageNew)
     socket.on("message:readUpTo", handleReadUpTo)
@@ -1193,8 +1232,6 @@ export function StudentMessagesPage() {
     socket.on("typing:update", handleTypingUpdate)
     socket.on("reaction:updated", handleReactionUpdated)
     socket.on("reaction:removed", handleReactionRemoved)
-    socket.on("pin:added", handlePinAdded)
-    socket.on("pin:removed", handlePinRemoved)
 
     const joinRoom = () => {
       socket.emit(
@@ -1258,8 +1295,6 @@ export function StudentMessagesPage() {
       socket.off("typing:update", handleTypingUpdate)
       socket.off("reaction:updated", handleReactionUpdated)
       socket.off("reaction:removed", handleReactionRemoved)
-      socket.off("pin:added", handlePinAdded)
-      socket.off("pin:removed", handlePinRemoved)
       socket.off("connect", handleConnect)
       socket.off("disconnect", handleDisconnect)
       releaseChatSocket(socket)
@@ -1573,21 +1608,10 @@ export function StudentMessagesPage() {
       return
     }
 
-    const MAX_BYTES = 5 * 1024 * 1024
+    // Keep this conservative unless/until backend limits are confirmed.
+    const MAX_BYTES = 10 * 1024 * 1024
     if (file.size > MAX_BYTES) {
-      toast.error("Attachment must be 5MB or less")
-      return
-    }
-
-    const allowedTypes = new Set<string>([
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "image/jpeg",
-      "image/png",
-    ])
-
-    if (!allowedTypes.has(file.type)) {
-      toast.error("Unsupported file type")
+      toast.error("Attachment must be 10MB or less")
       return
     }
 
@@ -1603,47 +1627,6 @@ export function StudentMessagesPage() {
       setIsUploadingAttachment(false)
     }
   }
-
-  const setPinnedOptimistic = useCallback((params: { roomId: string; messageId: string; isPinned: boolean }) => {
-    if (params.isPinned) pinnedMessageIdsRef.current.add(params.messageId)
-    else pinnedMessageIdsRef.current.delete(params.messageId)
-
-    updateInfiniteMessageById({
-      messageId: params.messageId,
-      update: (current) => (current.isPinned === params.isPinned ? current : { ...current, isPinned: params.isPinned }),
-    })
-  }, [updateInfiniteMessageById])
-
-  const togglePinForMessage = useCallback(async (params: { messageId: string; currentlyPinned: boolean }) => {
-    if (!roomId) return
-
-    if (params.messageId.startsWith("client-")) {
-      toast.error("Message is not delivered yet")
-      return
-    }
-
-    const nextPinned = !params.currentlyPinned
-    setPinnedOptimistic({ roomId, messageId: params.messageId, isPinned: nextPinned })
-
-    const socket = socketRef.current
-    if (socket?.connected && joinedRoomIdRef.current === roomId) {
-      socket.emit(nextPinned ? "pin:add" : "pin:remove", { roomId, messageId: params.messageId })
-      return
-    }
-
-    try {
-      if (nextPinned) {
-        await pinChatRoomMessage({ roomId, messageId: params.messageId })
-      } else {
-        await unpinChatRoomMessage({ roomId, messageId: params.messageId })
-      }
-    } catch (error) {
-      // Revert on failure.
-      setPinnedOptimistic({ roomId, messageId: params.messageId, isPinned: params.currentlyPinned })
-      const message = error instanceof Error ? error.message : "Failed to update pin"
-      toast.error(message)
-    }
-  }, [roomId, setPinnedOptimistic])
 
   const applyMyReactionOptimistic = useCallback((params: {
     messageId: string
@@ -2006,39 +1989,6 @@ export function StudentMessagesPage() {
                               ? `${effectiveSelectedConversation.participants?.length} participants` 
                               : effectiveSelectedConversation.status === 'online' ? 'Online' : 'Offline'}
                           </p>
-                          {typingUserIds.length > 0 && effectiveSelectedConversation.type === 'group' && (
-                            <p className="text-xs text-muted-foreground">
-                              {(() => {
-                                const group = myProjectGroupQuery.data
-                                const nameById = new Map<string, string>()
-
-                                const participants = effectiveSelectedConversation.participants ?? []
-                                for (const p of participants) {
-                                  nameById.set(p.id, p.name)
-                                }
-
-                                if (group) {
-                                  const leaderName = `${group.leader.firstName} ${group.leader.lastName}`.trim() || group.leader.email
-                                  nameById.set(group.leader.id, leaderName)
-
-                                  for (const member of group.members) {
-                                    const memberName = `${member.user.firstName} ${member.user.lastName}`.trim() || member.user.email
-                                    // Map both the membership id and the underlying user id to the same display name.
-                                    nameById.set(member.id, memberName)
-                                    nameById.set(member.user.id, memberName)
-                                  }
-                                }
-
-                                const names = typingUserIds
-                                  .map((id) => nameById.get(id))
-                                  .filter((n): n is string => Boolean(n))
-                                  .map((n) => n.split(' ')[0]!)
-
-                                const label = names.length > 0 ? names.join(', ') : 'Someone'
-                                return `${label} typing...`
-                              })()}
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2113,12 +2063,6 @@ export function StudentMessagesPage() {
                                           ? 'bg-primary text-primary-foreground'
                                           : 'bg-muted'
                                       }`}
-                                      onDoubleClick={() => {
-                                        void togglePinForMessage({
-                                          messageId: msg.id,
-                                          currentlyPinned: Boolean(msg.isPinned),
-                                        })
-                                      }}
                                       onContextMenu={(e) => {
                                         // Power shortcuts (optional):
                                         // - Shift + Right click: reply-to toggle
@@ -2168,13 +2112,24 @@ export function StudentMessagesPage() {
                                               key={idx}
                                               className="flex items-center gap-2 text-xs bg-background/20 rounded p-1 hover:underline"
                                               href={att.url}
-                                              download={att.name}
-                                              onClick={(e) => e.stopPropagation()}
+                                              onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                void downloadAttachment({ url: att.url, name: att.name, mimeType: att.mimeType })
+                                              }}
                                               rel="noreferrer"
                                             >
-                                              <Paperclip className="h-3 w-3" />
+                                              {att.mimeType?.startsWith("image/") ? (
+                                                <img
+                                                  src={att.url}
+                                                  alt={att.name}
+                                                  className="h-8 w-8 rounded border object-cover"
+                                                />
+                                              ) : (
+                                                <Paperclip className="h-3 w-3" />
+                                              )}
                                               <span className="truncate">{att.name}</span>
-                                              <span className="text-xs opacity-70">({att.size})</span>
+                                              <span className="text-xs opacity-70">({formatBytes(att.sizeBytes)})</span>
                                             </a>
                                           ))}
                                         </div>
@@ -2265,19 +2220,6 @@ export function StudentMessagesPage() {
                                     </ContextMenuSub>
                                     <ContextMenuItem
                                       onSelect={() => {
-                                        void togglePinForMessage({
-                                          messageId: msg.id,
-                                          currentlyPinned: Boolean(msg.isPinned),
-                                        })
-                                      }}
-                                      disabled={msg.id.startsWith('client-')}
-                                    >
-                                      {msg.isPinned ? 'Unpin' : 'Pin'}
-                                      <ContextMenuShortcut>Double‑click</ContextMenuShortcut>
-                                    </ContextMenuItem>
-                                    <ContextMenuSeparator />
-                                    <ContextMenuItem
-                                      onSelect={() => {
                                         void editMessage({ messageId: msg.id, fallbackText: msg.content })
                                       }}
                                       disabled={msg.senderId !== 'current' || msg.id.startsWith('client-')}
@@ -2303,12 +2245,27 @@ export function StudentMessagesPage() {
                                   <span>{formatMessageTime(msg.timestamp)}</span>
                                   {msg.senderId === 'current' && (
                                     <>
-                                      {msg.status === 'read' && <CheckCheck className="h-3 w-3 text-primary" />}
-                                      {msg.status === 'delivered' && <Check className="h-3 w-3" />}
-                                      {msg.status === 'sent' && <Clock className="h-3 w-3" />}
+                                      {msg.id.startsWith('client-') ? (
+                                        <Clock className="h-3 w-3" />
+                                      ) : msg.status === 'read' ? (
+                                        <CheckCheck className="h-3 w-3 text-primary" />
+                                      ) : msg.status === 'delivered' ? (
+                                        <Check className="h-3 w-3" />
+                                      ) : (
+                                        <Check className="h-3 w-3" />
+                                      )}
                                     </>
                                   )}
                                 </div>
+                                {msg.senderId === 'current' && msg.id === latestMyMessageId && (msg.readBy?.length ?? 0) > 0 && (
+                                  <div
+                                    className="mt-0.5 text-xs text-muted-foreground text-right"
+                                    title={`Seen by ${msg.readBy!.join(', ')}`}
+                                  >
+                                    Seen by {msg.readBy!.slice(0, 2).join(', ')}
+                                    {msg.readBy!.length > 2 ? ` +${msg.readBy!.length - 2}` : ''}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2346,16 +2303,57 @@ export function StudentMessagesPage() {
                         <div className="min-w-0">
                           <p className="text-xs text-muted-foreground">Attached file</p>
                           <p className="text-xs truncate">
-                            {queuedAttachment.name}{" "}
-                            <span className="opacity-70">
-                              ({Math.max(1, Math.round(queuedAttachment.size / 1024))} KB)
-                            </span>
+                            {queuedAttachment.name}{" "}<span className="opacity-70">({formatBytes(queuedAttachment.size)})</span>
                           </p>
+                          {queuedAttachment.mimeType?.startsWith("image/") ? (
+                            <div className="mt-2">
+                              <img
+                                src={queuedAttachment.url}
+                                alt={queuedAttachment.name}
+                                className="max-h-40 max-w-[240px] rounded-md border object-contain"
+                                onClick={() => window.open(queuedAttachment.url, "_blank", "noopener,noreferrer")}
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setQueuedAttachment(null)}>
                           Remove
                         </Button>
                       </div>
+                    )}
+
+                    {typingUserIds.length > 0 && effectiveSelectedConversation.type === 'group' && (
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        {(() => {
+                          const group = myProjectGroupQuery.data
+                          const nameById = new Map<string, string>()
+
+                          const participants = effectiveSelectedConversation.participants ?? []
+                          for (const p of participants) {
+                            nameById.set(p.id, p.name)
+                          }
+
+                          if (group) {
+                            const leaderName = `${group.leader.firstName} ${group.leader.lastName}`.trim() || group.leader.email
+                            nameById.set(group.leader.id, leaderName)
+
+                            for (const member of group.members) {
+                              const memberName = `${member.user.firstName} ${member.user.lastName}`.trim() || member.user.email
+                              // Map both the membership id and the underlying user id to the same display name.
+                              nameById.set(member.id, memberName)
+                              nameById.set(member.user.id, memberName)
+                            }
+                          }
+
+                          const names = typingUserIds
+                            .map((id) => nameById.get(id))
+                            .filter((n): n is string => Boolean(n))
+                            .map((n) => n.split(' ')[0]!)
+
+                          const label = names.length > 0 ? names.join(', ') : 'Someone'
+                          return `${label} typing...`
+                        })()}
+                      </p>
                     )}
                     <div className="flex gap-2">
                       <input
@@ -2561,11 +2559,28 @@ export function StudentMessagesPage() {
                               {msg.attachments && msg.attachments.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   {msg.attachments.map((att, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 text-xs bg-background/20 rounded p-1">
-                                      <Paperclip className="h-3 w-3" />
+                                    <a
+                                      key={idx}
+                                      className="flex items-center gap-2 text-xs bg-background/20 rounded p-1 hover:underline"
+                                      href={att.url}
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        void downloadAttachment({ url: att.url, name: att.name, mimeType: att.mimeType })
+                                      }}
+                                      rel="noreferrer"
+                                    >
+                                      {att.mimeType?.startsWith("image/") ? (
+                                        <img
+                                          src={att.url}
+                                          alt={att.name}
+                                          className="h-8 w-8 rounded border object-cover"
+                                        />
+                                      ) : (
+                                        <Paperclip className="h-3 w-3" />
+                                      )}
                                       <span className="truncate">{att.name}</span>
-                                      <span className="text-xs opacity-70">({att.size})</span>
-                                    </div>
+                                      <span className="text-xs opacity-70">({formatBytes(att.sizeBytes)})</span>
+                                    </a>
                                   ))}
                                 </div>
                               )}
