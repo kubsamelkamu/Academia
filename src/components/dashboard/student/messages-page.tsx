@@ -1874,19 +1874,23 @@ export function StudentMessagesPage() {
       return
     }
 
-    if (!jitsiContainerRef.current) {
-      toast.error("Video container is not ready")
-      return
-    }
-
     try {
       setVideoCallError(null)
       setCallPhase("joining")
 
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+
+      const parentNode = jitsiContainerRef.current
+      if (!parentNode) {
+        throw new Error("Video container is not ready")
+      }
+
       const ExternalApi = await loadJitsiExternalApi()
       const options: JitsiApiOptions = {
         roomName: jitsiRoomName,
-        parentNode: jitsiContainerRef.current,
+        parentNode,
         width: "100%",
         height: "100%",
         userInfo: {
@@ -1904,7 +1908,26 @@ export function StudentMessagesPage() {
       const api = new ExternalApi("meet.jit.si", options)
       jitsiApiRef.current = api
 
+      const joinTimeout = window.setTimeout(() => {
+        if (jitsiApiRef.current !== api) return
+        setVideoCallError("Call join timed out. Please try again.")
+        setCallPhase("prejoin")
+        try {
+          api.dispose()
+        } catch {
+          // no-op
+        }
+        if (jitsiApiRef.current === api) {
+          jitsiApiRef.current = null
+        }
+      }, 20000)
+
+      const clearJoinTimeout = () => {
+        window.clearTimeout(joinTimeout)
+      }
+
       api.addListener("videoConferenceJoined", () => {
+        clearJoinTimeout()
         setCallPhase("live")
         setIsGroupCallOngoing(true)
         setGroupCallParticipantCount((prev) => (typeof prev === "number" && prev > 0 ? prev : 1))
@@ -1914,10 +1937,12 @@ export function StudentMessagesPage() {
       })
 
       api.addListener("readyToClose", () => {
+        clearJoinTimeout()
         endVideoCall()
       })
 
       api.addListener("videoConferenceLeft", () => {
+        clearJoinTimeout()
         endVideoCall()
       })
     } catch (error) {
