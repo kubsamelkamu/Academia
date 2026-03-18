@@ -3104,7 +3104,7 @@ export function StudentMessagesPage() {
               </Button>
             </div>
 
-            {(callPhase === "prejoin" || callPhase === "joining") && (
+            {callPhase === "prejoin" && (
               <div className="flex flex-1 items-center justify-center px-6">
                 <div className="w-full max-w-md space-y-4 rounded-lg border bg-card p-6">
                   <div className="space-y-1">
@@ -3123,19 +3123,26 @@ export function StudentMessagesPage() {
                   </div>
 
                   <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={endVideoCall} disabled={callPhase === "joining"}>
+                    <Button variant="outline" onClick={endVideoCall}>
                       Cancel
                     </Button>
-                    <Button onClick={() => void joinVideoCall()} disabled={callPhase === "joining" || !jitsiRoomName}>
-                      {callPhase === "joining" ? "Joining..." : "Join call"}
+                    <Button onClick={() => void joinVideoCall()} disabled={!jitsiRoomName}>
+                      Join call
                     </Button>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className={callPhase === "live" ? "flex-1" : "hidden"}>
+            <div className={callPhase === "joining" || callPhase === "live" ? "relative flex-1" : "hidden"}>
               <div ref={jitsiContainerRef} className="h-full w-full bg-black" />
+              {callPhase === "joining" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
+                  <div className="rounded-md border border-white/20 bg-black/35 px-4 py-2 text-sm">
+                    Joining call...
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>
