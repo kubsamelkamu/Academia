@@ -435,6 +435,10 @@ export function StudentMessagesPage() {
   const [callPhase, setCallPhase] = useState<JitsiCallPhase>("idle")
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false)
   const [videoCallError, setVideoCallError] = useState<string | null>(null)
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null)
+  const [hasMicrophone, setHasMicrophone] = useState<boolean | null>(null)
+  const [deviceCheckError, setDeviceCheckError] = useState<string | null>(null)
+  const [isCheckingDevices, setIsCheckingDevices] = useState(false)
   const [isGroupCallOngoing, setIsGroupCallOngoing] = useState(false)
   const [groupCallParticipantCount, setGroupCallParticipantCount] = useState<number | null>(null)
   const [groupCallStartedByUserId, setGroupCallStartedByUserId] = useState<string | null>(null)
@@ -1856,6 +1860,37 @@ export function StudentMessagesPage() {
     socket.emit(eventName, payload)
   }, [projectGroupId, roomId])
 
+  const detectMediaDevices = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+      setHasCamera(null)
+      setHasMicrophone(null)
+      setDeviceCheckError("Device detection is not supported in this browser")
+      return
+    }
+
+    try {
+      setIsCheckingDevices(true)
+      setDeviceCheckError(null)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const cameraAvailable = devices.some((device) => device.kind === "videoinput")
+      const micAvailable = devices.some((device) => device.kind === "audioinput")
+
+      setHasCamera(cameraAvailable)
+      setHasMicrophone(micAvailable)
+    } catch {
+      setHasCamera(null)
+      setHasMicrophone(null)
+      setDeviceCheckError("Unable to detect camera/microphone. You can still try joining.")
+    } finally {
+      setIsCheckingDevices(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isVideoDialogOpen || callPhase !== "prejoin") return
+    void detectMediaDevices()
+  }, [callPhase, detectMediaDevices, isVideoDialogOpen])
+
   const endVideoCall = useCallback(() => {
     emitCallPresence("call:leave")
     setCallPhase("ending")
@@ -1901,6 +1936,8 @@ export function StudentMessagesPage() {
         configOverwrite: {
           prejoinPageEnabled: false,
           enableWelcomePage: false,
+          startWithVideoMuted: hasCamera === false,
+          startWithAudioMuted: hasMicrophone === false,
         },
       }
 
@@ -1920,7 +1957,7 @@ export function StudentMessagesPage() {
         if (jitsiApiRef.current === api) {
           jitsiApiRef.current = null
         }
-      }, 20000)
+      }, 90000)
 
       const clearJoinTimeout = () => {
         window.clearTimeout(joinTimeout)
@@ -1960,6 +1997,8 @@ export function StudentMessagesPage() {
     endVideoCall,
     jitsiDisplayName,
     jitsiRoomName,
+    hasCamera,
+    hasMicrophone,
     projectGroupId,
   ])
 
@@ -3147,6 +3186,50 @@ export function StudentMessagesPage() {
                     <span className="font-mono text-xs">{jitsiRoomName ?? "Not ready"}</span>
                   </div>
 
+                  <div className="space-y-2 rounded-md border px-3 py-2">
+                    <p className="text-xs font-medium">Device status</p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Camera</span>
+                      <span>
+                        {isCheckingDevices
+                          ? "Checking..."
+                          : hasCamera === true
+                            ? "Available"
+                            : hasCamera === false
+                              ? "Not detected"
+                              : "Unknown"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Microphone</span>
+                      <span>
+                        {isCheckingDevices
+                          ? "Checking..."
+                          : hasMicrophone === true
+                            ? "Available"
+                            : hasMicrophone === false
+                              ? "Not detected"
+                              : "Unknown"}
+                      </span>
+                    </div>
+
+                    {hasCamera === false && (
+                      <p className="text-xs text-muted-foreground">
+                        No camera detected. You can still join in audio-only mode.
+                      </p>
+                    )}
+
+                    {hasMicrophone === false && (
+                      <p className="text-xs text-muted-foreground">
+                        No microphone detected. You can still join as a listener.
+                      </p>
+                    )}
+
+                    {deviceCheckError && (
+                      <p className="text-xs text-muted-foreground">{deviceCheckError}</p>
+                    )}
+                  </div>
+
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" onClick={endVideoCall}>
                       Cancel
@@ -3162,8 +3245,8 @@ export function StudentMessagesPage() {
             <div className={callPhase === "joining" || callPhase === "live" ? "relative flex-1" : "hidden"}>
               <div ref={jitsiContainerRef} className="h-full w-full bg-black" />
               {callPhase === "joining" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
-                  <div className="rounded-md border border-white/20 bg-black/35 px-4 py-2 text-sm">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-white">
+                  <div className="rounded-md border border-white/20 bg-black/25 px-4 py-2 text-sm">
                     Joining call...
                   </div>
                 </div>
