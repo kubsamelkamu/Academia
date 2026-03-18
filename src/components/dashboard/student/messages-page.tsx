@@ -3087,6 +3087,12 @@ export function StudentMessagesPage() {
 
       <Dialog open={isVideoDialogOpen} onOpenChange={handleVideoDialogOpenChange}>
         <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden h-[85vh]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Group video call</DialogTitle>
+            <DialogDescription>
+              Join and manage your project group video call session.
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
