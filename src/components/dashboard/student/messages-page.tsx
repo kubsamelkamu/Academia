@@ -442,6 +442,7 @@ export function StudentMessagesPage() {
   const [isGroupCallOngoing, setIsGroupCallOngoing] = useState(false)
   const [groupCallParticipantCount, setGroupCallParticipantCount] = useState<number | null>(null)
   const [groupCallStartedByUserId, setGroupCallStartedByUserId] = useState<string | null>(null)
+  const [activeMeetingRoomName, setActiveMeetingRoomName] = useState<string | null>(null)
   const jitsiContainerRef = useRef<HTMLDivElement | null>(null)
   const jitsiApiRef = useRef<JitsiExternalApi | null>(null)
 
@@ -455,6 +456,14 @@ export function StudentMessagesPage() {
     const normalizedGroup = projectGroupId.toLowerCase().replace(/[^a-z0-9-]/g, "-")
     return `academia-${normalizedTenant}-${normalizedGroup}`.slice(0, 128)
   }, [normalizedTenant, projectGroupId])
+
+  const effectiveMeetingRoomName = useMemo(() => {
+    return activeMeetingRoomName ?? jitsiRoomName
+  }, [activeMeetingRoomName, jitsiRoomName])
+
+  const waitingForSessionRoom = useMemo(() => {
+    return isGroupCallOngoing && !activeMeetingRoomName
+  }, [activeMeetingRoomName, isGroupCallOngoing])
 
   const jitsiDisplayName = useMemo(() => {
     const fullName = `${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`.trim()
@@ -1273,6 +1282,9 @@ export function StudentMessagesPage() {
       if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
 
       setIsGroupCallOngoing(true)
+      if (typeof raw.meetingRoomName === "string" && raw.meetingRoomName.trim().length > 0) {
+        setActiveMeetingRoomName(raw.meetingRoomName)
+      }
       if (typeof raw.startedByUserId === "string") setGroupCallStartedByUserId(raw.startedByUserId)
       if (typeof raw.participantCount === "number") {
         setGroupCallParticipantCount(raw.participantCount)
@@ -1284,6 +1296,10 @@ export function StudentMessagesPage() {
       if (!raw || typeof raw !== "object") return
       if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
       if (typeof raw.participantCount !== "number") return
+
+      if (typeof raw.meetingRoomName === "string" && raw.meetingRoomName.trim().length > 0) {
+        setActiveMeetingRoomName(raw.meetingRoomName)
+      }
 
       setGroupCallParticipantCount(raw.participantCount)
       setIsGroupCallOngoing(raw.participantCount > 0)
@@ -1300,6 +1316,7 @@ export function StudentMessagesPage() {
       setIsGroupCallOngoing(false)
       setGroupCallParticipantCount(null)
       setGroupCallStartedByUserId(null)
+      setActiveMeetingRoomName(null)
     }
 
     socket.on("presence:update", handlePresenceUpdate)
@@ -1362,6 +1379,7 @@ export function StudentMessagesPage() {
       setIsGroupCallOngoing(false)
       setGroupCallParticipantCount(null)
       setGroupCallStartedByUserId(null)
+      setActiveMeetingRoomName(null)
     }
 
     socket.on("connect", handleConnect)
@@ -1846,19 +1864,26 @@ export function StudentMessagesPage() {
     jitsiApiRef.current = null
   }, [])
 
-  const emitCallPresence = useCallback((eventName: "call:start" | "call:join" | "call:leave" | "call:end") => {
+  const emitCallPresence = useCallback((
+    eventName: "call:start" | "call:join" | "call:leave" | "call:end",
+    meetingRoomName?: string
+  ) => {
     if (!roomId || !projectGroupId) return
     const socket = socketRef.current
     if (!socket) return
 
+    const resolvedMeetingRoomName = meetingRoomName ?? effectiveMeetingRoomName
+    if (!resolvedMeetingRoomName) return
+
     const payload: CallStartEmitPayload | CallJoinEmitPayload | CallLeaveEmitPayload | CallEndEmitPayload = {
       roomId,
       projectGroupId,
+      meetingRoomName: resolvedMeetingRoomName,
       at: new Date().toISOString(),
     }
 
     socket.emit(eventName, payload)
-  }, [projectGroupId, roomId])
+  }, [effectiveMeetingRoomName, projectGroupId, roomId])
 
   const detectMediaDevices = useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
@@ -1900,7 +1925,13 @@ export function StudentMessagesPage() {
   }, [disposeJitsiCall, emitCallPresence])
 
   const joinVideoCall = useCallback(async () => {
-    if (!jitsiRoomName) {
+    if (waitingForSessionRoom) {
+      setVideoCallError("Call session is syncing. Please wait a moment and try Join call again.")
+      return
+    }
+
+    const meetingRoomName = effectiveMeetingRoomName
+    if (!meetingRoomName) {
       toast.error("Chat room is not ready for video call")
       return
     }
@@ -1908,6 +1939,8 @@ export function StudentMessagesPage() {
       toast.error("Project group not found")
       return
     }
+
+    const joiningExistingCall = Boolean(isGroupCallOngoing && activeMeetingRoomName)
 
     try {
       setVideoCallError(null)
@@ -1924,7 +1957,7 @@ export function StudentMessagesPage() {
 
       const ExternalApi = await loadJitsiExternalApi()
       const options: JitsiApiOptions = {
-        roomName: jitsiRoomName,
+        roomName: meetingRoomName,
         parentNode,
         width: "100%",
         height: "100%",
@@ -1969,8 +2002,10 @@ export function StudentMessagesPage() {
         setIsGroupCallOngoing(true)
         setGroupCallParticipantCount((prev) => (typeof prev === "number" && prev > 0 ? prev : 1))
         setGroupCallStartedByUserId((prev) => prev ?? currentUser?.id ?? null)
-        emitCallPresence("call:start")
-        emitCallPresence("call:join")
+        if (!joiningExistingCall) {
+          emitCallPresence("call:start", meetingRoomName)
+        }
+        emitCallPresence("call:join", meetingRoomName)
       })
 
       api.addListener("readyToClose", () => {
@@ -1995,8 +2030,11 @@ export function StudentMessagesPage() {
     disposeJitsiCall,
     emitCallPresence,
     endVideoCall,
+    effectiveMeetingRoomName,
+    activeMeetingRoomName,
+    isGroupCallOngoing,
+    waitingForSessionRoom,
     jitsiDisplayName,
-    jitsiRoomName,
     hasCamera,
     hasMicrophone,
     projectGroupId,
@@ -2008,10 +2046,14 @@ export function StudentMessagesPage() {
       return
     }
 
-    setVideoCallError(null)
+    setVideoCallError(
+      waitingForSessionRoom
+        ? "Active call session is syncing from server. Join will be enabled shortly."
+        : null
+    )
     setIsVideoDialogOpen(true)
     setCallPhase("prejoin")
-  }, [effectiveSelectedConversation])
+  }, [effectiveSelectedConversation, waitingForSessionRoom])
 
   const handleCall = useCallback((type: 'audio' | 'video') => {
     if (type === "audio") {
@@ -2333,7 +2375,7 @@ export function StudentMessagesPage() {
                     {(callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
                       <div className="mt-2 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
                         <p className="text-xs text-muted-foreground">
-                          Video call in progress
+                          {waitingForSessionRoom ? "Video call is syncing..." : "Video call in progress"}
                           {typeof groupCallParticipantCount === "number" && groupCallParticipantCount > 0
                             ? ` • ${groupCallParticipantCount} participant${groupCallParticipantCount > 1 ? "s" : ""}`
                             : ""}
@@ -2341,6 +2383,7 @@ export function StudentMessagesPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={waitingForSessionRoom}
                           onClick={() => {
                             if (callPhase === "live") {
                               setIsVideoDialogOpen(true)
@@ -3183,7 +3226,7 @@ export function StudentMessagesPage() {
 
                   <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                     <span className="text-muted-foreground">Room</span>
-                    <span className="font-mono text-xs">{jitsiRoomName ?? "Not ready"}</span>
+                    <span className="font-mono text-xs">{effectiveMeetingRoomName ?? "Not ready"}</span>
                   </div>
 
                   <div className="space-y-2 rounded-md border px-3 py-2">
@@ -3234,7 +3277,7 @@ export function StudentMessagesPage() {
                     <Button variant="outline" onClick={endVideoCall}>
                       Cancel
                     </Button>
-                    <Button onClick={() => void joinVideoCall()} disabled={!jitsiRoomName}>
+                    <Button onClick={() => void joinVideoCall()} disabled={!effectiveMeetingRoomName || waitingForSessionRoom}>
                       Join call
                     </Button>
                   </div>
