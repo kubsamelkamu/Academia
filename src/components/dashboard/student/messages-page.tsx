@@ -74,11 +74,24 @@ import {
 import { chatKeys, useInfiniteChatRoomMessages, useMyChatRoom } from "@/lib/hooks/use-chat"
 import { acquireChatSocket, releaseChatSocket } from "@/lib/realtime/chat-socket"
 import {
+  loadJitsiExternalApi,
+  type JitsiApiOptions,
+  type JitsiCallPhase,
+  type JitsiExternalApi,
+} from "@/lib/realtime/jitsi-loader"
+import {
   announcementIdSchema,
   createMyGroupAnnouncementSchema,
   updateMyGroupAnnouncementSchema,
 } from "@/validations/announcements"
 import type {
+  CallEndedPayload,
+  CallEndEmitPayload,
+  CallJoinEmitPayload,
+  CallLeaveEmitPayload,
+  CallParticipantChangedPayload,
+  CallStartedPayload,
+  CallStartEmitPayload,
   ChatMessageAttachment,
   ChatMessage,
   ListChatRoomMessagesResponse,
@@ -418,6 +431,32 @@ export function StudentMessagesPage() {
   const joinedRoomIdRef = useRef<string | null>(null)
   const onlineUserIdsRef = useRef<string[]>([])
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
+
+  const [callPhase, setCallPhase] = useState<JitsiCallPhase>("idle")
+  const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false)
+  const [videoCallError, setVideoCallError] = useState<string | null>(null)
+  const [isGroupCallOngoing, setIsGroupCallOngoing] = useState(false)
+  const [groupCallParticipantCount, setGroupCallParticipantCount] = useState<number | null>(null)
+  const [groupCallStartedByUserId, setGroupCallStartedByUserId] = useState<string | null>(null)
+  const jitsiContainerRef = useRef<HTMLDivElement | null>(null)
+  const jitsiApiRef = useRef<JitsiExternalApi | null>(null)
+
+  const normalizedTenant = useMemo(() => {
+    const value = (tenantDomain ?? "academia").toLowerCase().trim()
+    return value.replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-")
+  }, [tenantDomain])
+
+  const jitsiRoomName = useMemo(() => {
+    if (!projectGroupId) return null
+    const normalizedGroup = projectGroupId.toLowerCase().replace(/[^a-z0-9-]/g, "-")
+    return `academia-${normalizedTenant}-${normalizedGroup}`.slice(0, 128)
+  }, [normalizedTenant, projectGroupId])
+
+  const jitsiDisplayName = useMemo(() => {
+    const fullName = `${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`.trim()
+    if (fullName) return fullName
+    return currentUser?.email ?? "Student"
+  }, [currentUser?.email, currentUser?.firstName, currentUser?.lastName])
 
   const editMessage = useCallback(async (params: { messageId: string; fallbackText?: string }) => {
     if (!roomId) return
@@ -1224,6 +1263,41 @@ export function StudentMessagesPage() {
       })
     }
 
+    const handleCallStarted = (payload: unknown) => {
+      const raw = payload as CallStartedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+
+      setIsGroupCallOngoing(true)
+      if (typeof raw.startedByUserId === "string") setGroupCallStartedByUserId(raw.startedByUserId)
+      if (typeof raw.participantCount === "number") {
+        setGroupCallParticipantCount(raw.participantCount)
+      }
+    }
+
+    const handleCallParticipantChanged = (payload: unknown) => {
+      const raw = payload as CallParticipantChangedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.participantCount !== "number") return
+
+      setGroupCallParticipantCount(raw.participantCount)
+      setIsGroupCallOngoing(raw.participantCount > 0)
+      if (raw.participantCount <= 0) {
+        setGroupCallStartedByUserId(null)
+      }
+    }
+
+    const handleCallEnded = (payload: unknown) => {
+      const raw = payload as CallEndedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+
+      setIsGroupCallOngoing(false)
+      setGroupCallParticipantCount(null)
+      setGroupCallStartedByUserId(null)
+    }
+
     socket.on("presence:update", handlePresenceUpdate)
     socket.on("message:new", handleMessageNew)
     socket.on("message:readUpTo", handleReadUpTo)
@@ -1232,6 +1306,9 @@ export function StudentMessagesPage() {
     socket.on("typing:update", handleTypingUpdate)
     socket.on("reaction:updated", handleReactionUpdated)
     socket.on("reaction:removed", handleReactionRemoved)
+    socket.on("call:started", handleCallStarted)
+    socket.on("call:participantChanged", handleCallParticipantChanged)
+    socket.on("call:ended", handleCallEnded)
 
     const joinRoom = () => {
       socket.emit(
@@ -1277,6 +1354,10 @@ export function StudentMessagesPage() {
       // Clear typing state while disconnected.
       typingUserIdsRef.current.clear()
       setTypingUserIds([])
+
+      setIsGroupCallOngoing(false)
+      setGroupCallParticipantCount(null)
+      setGroupCallStartedByUserId(null)
     }
 
     socket.on("connect", handleConnect)
@@ -1295,6 +1376,9 @@ export function StudentMessagesPage() {
       socket.off("typing:update", handleTypingUpdate)
       socket.off("reaction:updated", handleReactionUpdated)
       socket.off("reaction:removed", handleReactionRemoved)
+      socket.off("call:started", handleCallStarted)
+      socket.off("call:participantChanged", handleCallParticipantChanged)
+      socket.off("call:ended", handleCallEnded)
       socket.off("connect", handleConnect)
       socket.off("disconnect", handleDisconnect)
       releaseChatSocket(socket)
@@ -1302,7 +1386,18 @@ export function StudentMessagesPage() {
         socketRef.current = null
       }
     }
-  }, [accessToken, currentUser?.id, invalidateRoomMessages, projectGroupId, reconcileClientMessageIdInCache, roomId, tenantDomain, updateInfiniteMessageById, updateInfiniteMessagesCache, updateReadStateInCache])
+  }, [
+    accessToken,
+    currentUser?.id,
+    invalidateRoomMessages,
+    projectGroupId,
+    reconcileClientMessageIdInCache,
+    roomId,
+    tenantDomain,
+    updateInfiniteMessageById,
+    updateInfiniteMessagesCache,
+    updateReadStateInCache,
+  ])
 
   const emitTypingStop = useCallback(() => {
     if (!roomId) return
@@ -1737,9 +1832,152 @@ export function StudentMessagesPage() {
     setAdvisorInput('')
   }
 
-  const handleCall = (type: 'audio' | 'video') => {
-    alert(`${type === 'audio' ? 'Audio' : 'Video'} call initiated with ${selectedConversation?.name}`)
-  }
+  const disposeJitsiCall = useCallback(() => {
+    if (!jitsiApiRef.current) return
+    try {
+      jitsiApiRef.current.dispose()
+    } catch {
+      // no-op
+    }
+    jitsiApiRef.current = null
+  }, [])
+
+  const emitCallPresence = useCallback((eventName: "call:start" | "call:join" | "call:leave" | "call:end") => {
+    if (!roomId || !projectGroupId) return
+    const socket = socketRef.current
+    if (!socket) return
+
+    const payload: CallStartEmitPayload | CallJoinEmitPayload | CallLeaveEmitPayload | CallEndEmitPayload = {
+      roomId,
+      projectGroupId,
+      at: new Date().toISOString(),
+    }
+
+    socket.emit(eventName, payload)
+  }, [projectGroupId, roomId])
+
+  const endVideoCall = useCallback(() => {
+    emitCallPresence("call:leave")
+    setCallPhase("ending")
+    disposeJitsiCall()
+    setIsVideoDialogOpen(false)
+    setCallPhase("idle")
+  }, [disposeJitsiCall, emitCallPresence])
+
+  const joinVideoCall = useCallback(async () => {
+    if (!jitsiRoomName) {
+      toast.error("Chat room is not ready for video call")
+      return
+    }
+    if (!projectGroupId) {
+      toast.error("Project group not found")
+      return
+    }
+
+    if (!jitsiContainerRef.current) {
+      toast.error("Video container is not ready")
+      return
+    }
+
+    try {
+      setVideoCallError(null)
+      setCallPhase("joining")
+
+      const ExternalApi = await loadJitsiExternalApi()
+      const options: JitsiApiOptions = {
+        roomName: jitsiRoomName,
+        parentNode: jitsiContainerRef.current,
+        width: "100%",
+        height: "100%",
+        userInfo: {
+          displayName: jitsiDisplayName,
+          email: currentUser?.email,
+          avatarURL: currentUser?.avatarUrl ?? undefined,
+        },
+        configOverwrite: {
+          prejoinPageEnabled: false,
+          enableWelcomePage: false,
+        },
+      }
+
+      disposeJitsiCall()
+      const api = new ExternalApi("meet.jit.si", options)
+      jitsiApiRef.current = api
+
+      api.addListener("videoConferenceJoined", () => {
+        setCallPhase("live")
+        setIsGroupCallOngoing(true)
+        setGroupCallParticipantCount((prev) => (typeof prev === "number" && prev > 0 ? prev : 1))
+        setGroupCallStartedByUserId((prev) => prev ?? currentUser?.id ?? null)
+        emitCallPresence("call:start")
+        emitCallPresence("call:join")
+      })
+
+      api.addListener("readyToClose", () => {
+        endVideoCall()
+      })
+
+      api.addListener("videoConferenceLeft", () => {
+        endVideoCall()
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to start video call"
+      setVideoCallError(message)
+      setCallPhase("prejoin")
+      toast.error(message)
+    }
+  }, [
+    currentUser?.avatarUrl,
+    currentUser?.email,
+    currentUser?.id,
+    disposeJitsiCall,
+    emitCallPresence,
+    endVideoCall,
+    jitsiDisplayName,
+    jitsiRoomName,
+    projectGroupId,
+  ])
+
+  const openVideoPrejoin = useCallback(() => {
+    if (!effectiveSelectedConversation || effectiveSelectedConversation.type !== "group") {
+      toast.error("Video call is only available for group chat")
+      return
+    }
+
+    setVideoCallError(null)
+    setIsVideoDialogOpen(true)
+    setCallPhase("prejoin")
+  }, [effectiveSelectedConversation])
+
+  const handleCall = useCallback((type: 'audio' | 'video') => {
+    if (type === "audio") {
+      toast.message(`Audio call for ${effectiveSelectedConversation?.name ?? "group"} is coming soon`)
+      return
+    }
+
+    if (callPhase === "live") {
+      setIsVideoDialogOpen(true)
+      return
+    }
+
+    openVideoPrejoin()
+  }, [callPhase, effectiveSelectedConversation?.name, openVideoPrejoin])
+
+  const handleVideoDialogOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      setIsVideoDialogOpen(true)
+      if (callPhase === "idle") setCallPhase("prejoin")
+      return
+    }
+
+    endVideoCall()
+  }, [callPhase, endVideoCall])
+
+  useEffect(() => {
+    return () => {
+      disposeJitsiCall()
+    }
+  }, [disposeJitsiCall])
 
   const handleCreateAnnouncement = async () => {
     if (announcementAttachmentFile && announcementAttachmentUrl.trim()) {
@@ -2026,6 +2264,30 @@ export function StudentMessagesPage() {
                           ))}
                         </div>
                       </>
+                    )}
+
+                    {(callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
+                      <div className="mt-2 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
+                        <p className="text-xs text-muted-foreground">
+                          Video call in progress
+                          {typeof groupCallParticipantCount === "number" && groupCallParticipantCount > 0
+                            ? ` • ${groupCallParticipantCount} participant${groupCallParticipantCount > 1 ? "s" : ""}`
+                            : ""}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (callPhase === "live") {
+                              setIsVideoDialogOpen(true)
+                              return
+                            }
+                            openVideoPrejoin()
+                          }}
+                        >
+                          {callPhase === "live" ? "Return to call" : "Join call"}
+                        </Button>
+                      </div>
                     )}
                   </CardHeader>
 
@@ -2822,6 +3084,56 @@ export function StudentMessagesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isVideoDialogOpen} onOpenChange={handleVideoDialogOpenChange}>
+        <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden h-[85vh]">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold">Group video call</p>
+                <p className="text-xs text-muted-foreground">{effectiveSelectedConversation?.name ?? "Project Group"}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={endVideoCall}>
+                Leave call
+              </Button>
+            </div>
+
+            {(callPhase === "prejoin" || callPhase === "joining") && (
+              <div className="flex flex-1 items-center justify-center px-6">
+                <div className="w-full max-w-md space-y-4 rounded-lg border bg-card p-6">
+                  <div className="space-y-1">
+                    <h3 className="text-base font-semibold">Ready to join?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      This call is for your current project group. You can return to chat anytime.
+                    </p>
+                    {videoCallError && (
+                      <p className="text-sm text-destructive">{videoCallError}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Room</span>
+                    <span className="font-mono text-xs">{jitsiRoomName ?? "Not ready"}</span>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="outline" onClick={endVideoCall} disabled={callPhase === "joining"}>
+                      Cancel
+                    </Button>
+                    <Button onClick={() => void joinVideoCall()} disabled={callPhase === "joining" || !jitsiRoomName}>
+                      {callPhase === "joining" ? "Joining..." : "Join call"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={callPhase === "live" ? "flex-1" : "hidden"}>
+              <div ref={jitsiContainerRef} className="h-full w-full bg-black" />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createAnnouncementOpen} onOpenChange={handleAnnouncementDialogOpenChange}>
         <DialogContent className="sm:max-w-[560px]">

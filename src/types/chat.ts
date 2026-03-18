@@ -162,3 +162,45 @@ export type PinRemovedPayload = {
   unpinnedByUserId: string
   unpinnedAt: string
 }
+
+export type CallStartEmitPayload = {
+  roomId: string
+  projectGroupId: string
+  at: string
+}
+
+export type CallJoinEmitPayload = {
+  roomId: string
+  projectGroupId: string
+  at: string
+}
+
+export type CallLeaveEmitPayload = {
+  roomId: string
+  projectGroupId: string
+  at: string
+}
+
+export type CallEndEmitPayload = {
+  roomId: string
+  projectGroupId: string
+  at: string
+}
+
+export type CallStartedPayload = {
+  roomId: string
+  startedByUserId: string
+  startedAt: string
+  participantCount: number
+}
+
+export type CallParticipantChangedPayload = {
+  roomId: string
+  participantCount: number
+}
+
+export type CallEndedPayload = {
+  roomId: string
+  endedByUserId: string
+  endedAt: string
+}
