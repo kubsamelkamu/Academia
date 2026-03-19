@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import {
   BarChart3,
   Calendar,
@@ -75,6 +76,14 @@ function formatDate(dateString: string): string {
     month: "short",
     day: "numeric",
   })
+}
+
+function mapMilestoneStatus(status: string): Milestone["status"] {
+  const normalized = status.trim().toLowerCase()
+  if (normalized === "approved" || normalized === "completed") return "approved"
+  if (normalized === "submitted") return "submitted"
+  if (normalized === "overdue" || normalized === "rejected") return "overdue"
+  return "pending"
 }
 
 function buildMockDashboardData(): StudentDashboardData {
@@ -150,11 +159,81 @@ interface StudentDashboardProps {
 }
 
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
-  const data = useMemo(() => buildMockDashboardData(), [])
-
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const studentId = user?.id ?? null
+
+  const { data: projectsData } = useStudentProjects({
+    departmentId,
+    studentId,
+  })
+
+  const activeProject = useMemo(() => {
+    const items = projectsData?.items ?? []
+    if (!items.length) return null
+
+    return (
+      items.find((project) => project.status.toLowerCase() === "in-progress") ??
+      items.find((project) => project.status.toLowerCase() === "active") ??
+      items[0]
+    )
+  }, [projectsData?.items])
+
+  const { data: milestonesData } = useProjectMilestones({
+    projectId: activeProject?.id,
+    enabled: Boolean(activeProject?.id),
+  })
+
+  const backendMilestones = useMemo<Milestone[]>(() => {
+    const items = milestonesData?.items ?? []
+
+    return items
+      .map((milestone) => ({
+        id: milestone.id,
+        name: milestone.title,
+        status: mapMilestoneStatus(milestone.status),
+        dueDate: milestone.dueDate,
+      }))
+      .filter((milestone) => {
+        const dueDate = new Date(milestone.dueDate)
+        return milestone.name.trim().length > 0 && !Number.isNaN(dueDate.getTime())
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+  }, [milestonesData?.items])
+
+  const data = useMemo(() => {
+    const mockData = buildMockDashboardData()
+    if (!backendMilestones.length) return mockData
+
+    const now = new Date()
+    const completedCount = backendMilestones.filter(
+      (milestone) => milestone.status === "approved" || milestone.status === "submitted"
+    ).length
+    const progress = Math.round((completedCount / backendMilestones.length) * 100)
+
+    const upcomingMilestone =
+      backendMilestones.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
+      backendMilestones[backendMilestones.length - 1]
+
+    const nextDeadlineDays = Math.max(
+      0,
+      Math.ceil((new Date(upcomingMilestone.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    )
+
+    return {
+      ...mockData,
+      project: {
+        ...mockData.project,
+        progress,
+        milestones: backendMilestones,
+        nextDeadlineLabel: upcomingMilestone.name,
+        nextDeadlineDays,
+      },
+    }
+  }, [backendMilestones])
 
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
