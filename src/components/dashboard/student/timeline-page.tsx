@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +52,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useStudentProjects, useProjectMilestones } from "@/lib/hooks/use-student-milestones"
+import { useAuthStore } from "@/store/auth-store"
 
 type TimelineItemType = 'milestone' | 'task' | 'event' | 'deadline' | 'review'
 type TimelineItemStatus = 'completed' | 'in-progress' | 'pending' | 'blocked' | 'overdue'
@@ -112,6 +114,7 @@ interface Phase {
 }
 
 export function StudentTimelinePage() {
+  const user = useAuthStore((state) => state.user)
   const [, setViewMode] = useState<'timeline' | 'calendar' | 'list' | 'gantt'>('timeline')
   const [selectedItem, setSelectedItem] = useState<TimelineItem | null>(null)
   const [showItemDialog, setShowItemDialog] = useState(false)
@@ -130,8 +133,32 @@ export function StudentTimelinePage() {
   const [newItemDueDate, setNewItemDueDate] = useState('')
   const [newItemAssignee, setNewItemAssignee] = useState('')
 
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const studentId = user?.id ?? null
+
+  const { data: projectsData } = useStudentProjects({
+    departmentId,
+    studentId,
+  })
+
+  const activeProject = useMemo(() => {
+    const items = projectsData?.items ?? []
+    if (!items.length) return null
+
+    return (
+      items.find((project) => project.status.toLowerCase() === "in-progress") ??
+      items.find((project) => project.status.toLowerCase() === "active") ??
+      items[0]
+    )
+  }, [projectsData?.items])
+
+  const { data: milestonesData } = useProjectMilestones({
+    projectId: activeProject?.id,
+    enabled: Boolean(activeProject?.id),
+  })
+
   // Mock data - would come from API in production
-  const projectInfo = {
+  const defaultProjectInfo = {
     name: "AI Research Project",
     startDate: "2024-01-15",
     endDate: "2024-05-30",
@@ -142,6 +169,66 @@ export function StudentTimelinePage() {
     milestones: 8,
     completedMilestones: 5
   }
+
+  const projectInfo = useMemo(() => {
+    if (!activeProject) {
+      return defaultProjectInfo
+    }
+
+    const milestones = milestonesData?.items ?? []
+    const totalMilestones = milestones.length
+    const completedMilestones = milestones.filter((milestone) => {
+      const status = milestone.status.toLowerCase()
+      return (
+        status === "approved" ||
+        status === "submitted" ||
+        status === "completed"
+      )
+    }).length
+
+    const progress =
+      totalMilestones > 0
+        ? Math.round((completedMilestones / totalMilestones) * 100)
+        : 0
+
+    const milestoneDates = milestones
+      .map((milestone) => new Date(milestone.dueDate))
+      .filter((date) => !Number.isNaN(date.getTime()))
+
+    const latestDueDate = milestoneDates.length
+      ? new Date(Math.max(...milestoneDates.map((date) => date.getTime())))
+      : null
+
+    const endDate = latestDueDate
+      ? latestDueDate.toISOString()
+      : defaultProjectInfo.endDate
+
+    const daysRemaining = latestDueDate
+      ? Math.max(0, Math.ceil((latestDueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : defaultProjectInfo.daysRemaining
+
+    return {
+      name: activeProject.title || defaultProjectInfo.name,
+      startDate: defaultProjectInfo.startDate,
+      endDate,
+      progress,
+      daysRemaining,
+      totalTasks: totalMilestones,
+      completedTasks: completedMilestones,
+      milestones: totalMilestones,
+      completedMilestones,
+    }
+  }, [activeProject, milestonesData?.items])
+
+  const tasksProgress =
+    projectInfo.totalTasks > 0
+      ? (projectInfo.completedTasks / projectInfo.totalTasks) * 100
+      : 0
+
+  const milestonesProgress =
+    projectInfo.milestones > 0
+      ? (projectInfo.completedMilestones / projectInfo.milestones) * 100
+      : 0
 
   const phases: Phase[] = [
     {
@@ -557,7 +644,7 @@ export function StudentTimelinePage() {
                 <CheckCheck className="h-6 w-6 text-green-600" />
               </div>
             </div>
-            <Progress value={(projectInfo.completedTasks / projectInfo.totalTasks) * 100} className="mt-4" />
+            <Progress value={tasksProgress} className="mt-4" />
           </CardContent>
         </Card>
 
@@ -572,7 +659,7 @@ export function StudentTimelinePage() {
                 <Flag className="h-6 w-6 text-purple-600" />
               </div>
             </div>
-            <Progress value={(projectInfo.completedMilestones / projectInfo.milestones) * 100} className="mt-4" />
+            <Progress value={milestonesProgress} className="mt-4" />
           </CardContent>
         </Card>
       </div>
