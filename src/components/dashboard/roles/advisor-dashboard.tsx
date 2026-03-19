@@ -23,6 +23,7 @@ import {
   Users,
   Video,
   Calendar,
+  Bell,
   AlertCircle,
 } from "lucide-react"
 
@@ -320,6 +321,11 @@ const ProjectCard = React.memo(({
           <Button asChild variant="outline" size="sm">
             <Link href={`/dashboard/advisor/messages?group=${project.id}`}>
               <MessageSquare className="mr-2 h-4 w-4" /> Message
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/advisor/announcements">
+              <Bell className="mr-2 h-4 w-4" /> Announcements
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
