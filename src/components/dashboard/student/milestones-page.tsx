@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,9 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Upload, Clock3, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { useAuthStore } from "@/store/auth-store"
+import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -92,12 +95,92 @@ function milestoneStatusBadge(status: MilestoneStatus) {
   )
 }
 
+function normalizeMilestoneName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function mapBackendStatus(status: string): MilestoneStatus {
+  const normalized = status.trim().toLowerCase()
+  if (normalized === "approved" || normalized === "completed") return "approved"
+  if (normalized === "submitted") return "submitted"
+  return "pending"
+}
+
 export function StudentMilestonesPage() {
   const router = useRouter()
   const [progressDialogOpen, setProgressDialogOpen] = useState(false)
   const [weekEnding, setWeekEnding] = useState("")
   const [summary, setSummary] = useState("")
   const [blockers, setBlockers] = useState("")
+
+  const user = useAuthStore((state) => state.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const studentId = user?.id ?? null
+
+  const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
+    page: 1,
+    limit: 100,
+  })
+
+  const { data: projectsData } = useStudentProjects({
+    departmentId,
+    studentId,
+  })
+
+  const activeProject = useMemo(() => {
+    const items = projectsData?.items ?? []
+    if (!items.length) return null
+
+    return (
+      items.find((project) => project.status.toLowerCase() === "in-progress") ??
+      items.find((project) => project.status.toLowerCase() === "active") ??
+      items[0]
+    )
+  }, [projectsData?.items])
+
+  const { data: projectMilestonesData } = useProjectMilestones({
+    projectId: activeProject?.id,
+    enabled: Boolean(activeProject?.id),
+  })
+
+  const milestones = useMemo<Milestone[]>(() => {
+    const templateMilestones = (templatesData?.templates ?? [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((template) => ({
+        id: template.templateId,
+        name: template.name,
+        dueDate: template.createdAt,
+        status: "pending" as const,
+      }))
+
+    const projectMilestonesByName = new Map(
+      (projectMilestonesData?.items ?? []).map((milestone) => [
+        normalizeMilestoneName(milestone.title),
+        milestone,
+      ])
+    )
+
+    if (templateMilestones.length) {
+      return templateMilestones.map((templateMilestone) => {
+        const matchedProjectMilestone = projectMilestonesByName.get(
+          normalizeMilestoneName(templateMilestone.name)
+        )
+
+        if (!matchedProjectMilestone) return templateMilestone
+
+        return {
+          id: matchedProjectMilestone.id,
+          name: templateMilestone.name,
+          dueDate: matchedProjectMilestone.dueDate,
+          status: mapBackendStatus(matchedProjectMilestone.status),
+          submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
+        }
+      })
+    }
+
+    return myProject.milestones
+  }, [projectMilestonesData?.items, templatesData?.templates])
 
   const completedMilestones = myProject.milestones.filter((m) => m.status === "approved").length
   const totalMilestones = myProject.milestones.length
@@ -205,7 +288,7 @@ export function StudentMilestonesPage() {
           <CardDescription>Submit pending milestones through the upload flow.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {myProject.milestones.map((milestone, index) => (
+          {milestones.map((milestone, index) => (
             <div
               key={milestone.id}
               className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
