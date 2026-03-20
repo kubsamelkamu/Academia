@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
+import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import {
   BarChart3,
   Calendar,
@@ -84,6 +85,10 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
   if (normalized === "submitted") return "submitted"
   if (normalized === "overdue" || normalized === "rejected") return "overdue"
   return "pending"
+}
+
+function normalizeMilestoneName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
 function buildMockDashboardData(): StudentDashboardData {
@@ -171,6 +176,11 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     studentId,
   })
 
+  const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
+    page: 1,
+    limit: 100,
+  })
+
   const activeProject = useMemo(() => {
     const items = projectsData?.items ?? []
     if (!items.length) return null
@@ -188,9 +198,41 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   })
 
   const backendMilestones = useMemo<Milestone[]>(() => {
-    const items = milestonesData?.items ?? []
+    const templateMilestones = (templatesData?.templates ?? [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((template) => ({
+        id: template.templateId,
+        name: template.name,
+        status: "pending" as const,
+        dueDate: template.createdAt,
+      }))
 
-    return items
+    const projectMilestonesByName = new Map(
+      (milestonesData?.items ?? []).map((milestone) => [
+        normalizeMilestoneName(milestone.title),
+        milestone,
+      ])
+    )
+
+    if (templateMilestones.length) {
+      return templateMilestones.map((templateMilestone) => {
+        const matchedProjectMilestone = projectMilestonesByName.get(
+          normalizeMilestoneName(templateMilestone.name)
+        )
+
+        if (!matchedProjectMilestone) return templateMilestone
+
+        return {
+          id: matchedProjectMilestone.id,
+          name: templateMilestone.name,
+          status: mapMilestoneStatus(matchedProjectMilestone.status),
+          dueDate: matchedProjectMilestone.dueDate,
+        }
+      })
+    }
+
+    return (milestonesData?.items ?? [])
       .map((milestone) => ({
         id: milestone.id,
         name: milestone.title,
@@ -202,7 +244,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         return milestone.name.trim().length > 0 && !Number.isNaN(dueDate.getTime())
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-  }, [milestonesData?.items])
+  }, [milestonesData?.items, templatesData?.templates])
 
   const data = useMemo(() => {
     const mockData = buildMockDashboardData()
@@ -272,10 +314,16 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     [now]
   )
 
-  const completedMilestones = data.project.milestones.filter(
-    (m) => m.status === "approved" || m.status === "submitted"
-  ).length
-  const totalMilestones = data.project.milestones.length
+  const existingProjectMilestones = milestonesData?.items ?? []
+  const completedMilestones = existingProjectMilestones.length
+    ? existingProjectMilestones.filter((milestone) => {
+        const status = milestone.status.toLowerCase()
+        return status === "approved" || status === "submitted"
+      }).length
+    : data.project.milestones.filter(
+        (m) => m.status === "approved" || m.status === "submitted"
+      ).length
+  const totalMilestones = existingProjectMilestones.length || data.project.milestones.length
 
   const evaluatorAverage =
     data.grade && data.grade.evaluatorScores.length > 0
