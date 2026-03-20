@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -17,6 +17,9 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/auth-store"
+import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -102,6 +105,17 @@ const StatusBadge = ({ status }: { status: string }) => {
       {displayStatus}
     </Badge>
   )
+}
+
+const normalizeMilestoneName = (value: string): string =>
+  value.trim().toLowerCase().replace(/\s+/g, " ")
+
+const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
+  const normalized = status.trim().toLowerCase()
+  if (normalized === "approved" || normalized === "completed") return "approved"
+  if (normalized === "submitted") return "submitted"
+  if (normalized === "rejected") return "rejected"
+  return "pending"
 }
 
 // ----------------------------------------------------------------------
@@ -212,6 +226,114 @@ export function StudentMyProjectPage() {
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [myProject, setMyProject] = useState<ProjectData>(initialProjectData)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const user = useAuthStore((state) => state.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const studentId = user?.id ?? null
+
+  const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
+    page: 1,
+    limit: 100,
+  })
+
+  const { data: projectsData } = useStudentProjects({
+    departmentId,
+    studentId,
+  })
+
+  const activeProject = useMemo(() => {
+    const items = projectsData?.items ?? []
+    if (!items.length) return null
+
+    return (
+      items.find((project) => project.status.toLowerCase() === "in-progress") ??
+      items.find((project) => project.status.toLowerCase() === "active") ??
+      items[0]
+    )
+  }, [projectsData?.items])
+
+  const { data: projectMilestonesData } = useProjectMilestones({
+    projectId: activeProject?.id,
+    enabled: Boolean(activeProject?.id),
+  })
+
+  const templateMilestones = useMemo<Milestone[]>(() => {
+    const templates = templatesData?.templates ?? []
+    if (!templates.length) return []
+
+    return templates
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((template) => ({
+        id: template.templateId,
+        name: template.name,
+        dueDate: template.createdAt,
+        status: "pending" as const,
+        description:
+          template.milestones?.[0]?.description ??
+          template.description ??
+          undefined,
+      }))
+  }, [templatesData?.templates])
+
+  const mergedBackendMilestones = useMemo<Milestone[]>(() => {
+    if (!templateMilestones.length) return []
+
+    const projectMilestonesByName = new Map(
+      (projectMilestonesData?.items ?? []).map((milestone) => [
+        normalizeMilestoneName(milestone.title),
+        milestone,
+      ])
+    )
+
+    return templateMilestones.map((templateMilestone) => {
+      const matchedProjectMilestone = projectMilestonesByName.get(
+        normalizeMilestoneName(templateMilestone.name)
+      )
+
+      if (!matchedProjectMilestone) return templateMilestone
+
+      return {
+        ...templateMilestone,
+        id: matchedProjectMilestone.id,
+        dueDate: matchedProjectMilestone.dueDate,
+        status: mapStudentMilestoneStatus(matchedProjectMilestone.status),
+        submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
+      }
+    })
+  }, [templateMilestones, projectMilestonesData?.items])
+
+  useEffect(() => {
+    if (!mergedBackendMilestones.length) return
+
+    setMyProject((prevProject) => {
+      const existingMilestonesById = new Map(
+        prevProject.milestones.map((milestone) => [milestone.id, milestone])
+      )
+
+      const mergedMilestones = mergedBackendMilestones.map((milestone) => {
+        const existing = existingMilestonesById.get(milestone.id)
+        if (!existing) return milestone
+
+        return {
+          ...milestone,
+          status: milestone.status,
+          submittedAt: milestone.submittedAt ?? existing.submittedAt,
+        }
+      })
+
+      const completedMilestonesCount = mergedMilestones.filter(
+        (milestone) => milestone.status === "approved" || milestone.status === "submitted"
+      ).length
+      const progress = Math.round((completedMilestonesCount / mergedMilestones.length) * 100)
+
+      return {
+        ...prevProject,
+        milestones: mergedMilestones,
+        progress,
+      }
+    })
+  }, [mergedBackendMilestones])
 
   // Ensure we have valid project data
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {

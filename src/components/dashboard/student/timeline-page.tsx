@@ -53,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useStudentProjects, useProjectMilestones } from "@/lib/hooks/use-student-milestones"
+import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useAuthStore } from "@/store/auth-store"
 
 type TimelineItemType = 'milestone' | 'task' | 'event' | 'deadline' | 'review'
@@ -113,6 +114,10 @@ interface Phase {
   milestones: Milestone[]
 }
 
+function normalizeMilestoneName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
 export function StudentTimelinePage() {
   const user = useAuthStore((state) => state.user)
   const [, setViewMode] = useState<'timeline' | 'calendar' | 'list' | 'gantt'>('timeline')
@@ -141,6 +146,11 @@ export function StudentTimelinePage() {
     studentId,
   })
 
+  const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
+    page: 1,
+    limit: 100,
+  })
+
   const activeProject = useMemo(() => {
     const items = projectsData?.items ?? []
     if (!items.length) return null
@@ -156,6 +166,51 @@ export function StudentTimelinePage() {
     projectId: activeProject?.id,
     enabled: Boolean(activeProject?.id),
   })
+
+  const mergedMilestones = useMemo(() => {
+    const templateMilestones = (templatesData?.templates ?? [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((template) => ({
+        id: template.templateId,
+        title: template.name,
+        dueDate: template.createdAt,
+        status: "pending",
+      }))
+
+    const projectMilestonesByName = new Map(
+      (milestonesData?.items ?? []).map((milestone) => [
+        normalizeMilestoneName(milestone.title),
+        milestone,
+      ])
+    )
+
+    if (templateMilestones.length) {
+      return templateMilestones.map((templateMilestone) => {
+        const matchedProjectMilestone = projectMilestonesByName.get(
+          normalizeMilestoneName(templateMilestone.title)
+        )
+
+        if (!matchedProjectMilestone) return templateMilestone
+
+        return {
+          id: matchedProjectMilestone.id,
+          title: templateMilestone.title,
+          dueDate: matchedProjectMilestone.dueDate,
+          status: matchedProjectMilestone.status,
+          submittedAt: matchedProjectMilestone.submittedAt,
+        }
+      })
+    }
+
+    return (milestonesData?.items ?? []).map((milestone) => ({
+      id: milestone.id,
+      title: milestone.title,
+      dueDate: milestone.dueDate,
+      status: milestone.status,
+      submittedAt: milestone.submittedAt,
+    }))
+  }, [milestonesData?.items, templatesData?.templates])
 
   // Mock data - would come from API in production
   const defaultProjectInfo = {
@@ -175,7 +230,7 @@ export function StudentTimelinePage() {
       return defaultProjectInfo
     }
 
-    const milestones = milestonesData?.items ?? []
+    const milestones = mergedMilestones
     const totalMilestones = milestones.length
     const completedMilestones = milestones.filter((milestone) => {
       const status = milestone.status.toLowerCase()
@@ -218,7 +273,7 @@ export function StudentTimelinePage() {
       milestones: totalMilestones,
       completedMilestones,
     }
-  }, [activeProject, milestonesData?.items])
+  }, [activeProject, mergedMilestones])
 
   const tasksProgress =
     projectInfo.totalTasks > 0
