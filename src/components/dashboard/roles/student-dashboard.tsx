@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import {
   BarChart3,
@@ -90,6 +91,48 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
 
 function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function getAnnouncementActionLabel(
+  actionType: string | null | undefined,
+  actionLabel: string | null | undefined
+): string {
+  if (actionLabel?.trim()) return actionLabel.trim()
+
+  switch (actionType) {
+    case "FORM_PROJECT_GROUP":
+      return "Form Group"
+    case "SUBMIT_PROPOSAL":
+      return "Submit Proposal"
+    case "UPLOAD_DOCUMENT":
+      return "Upload Document"
+    case "REGISTER_PRESENTATION":
+      return "Register Presentation"
+    default:
+      return "Open Announcement"
+  }
+}
+
+type CountdownParts = {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+}
+
+function toCountdownParts(totalSeconds: number | null): CountdownParts | null {
+  if (totalSeconds === null || totalSeconds <= 0) return null
+
+  const days = Math.floor(totalSeconds / 86_400)
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600)
+  const minutes = Math.floor((totalSeconds % 3_600) / 60)
+  const seconds = totalSeconds % 60
+
+  return { days, hours, minutes, seconds }
+}
+
+function formatCountdown(parts: CountdownParts): string {
+  return `${parts.days}d ${parts.hours}h ${parts.minutes}m ${String(parts.seconds).padStart(2, "0")}s`
 }
 
 function buildMockDashboardData(): StudentDashboardData {
@@ -198,6 +241,14 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     enabled: Boolean(activeProject?.id),
   })
 
+  const departmentAnnouncementsQuery = useDepartmentAnnouncements({
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    departmentId,
+    page: 1,
+    limit: 20,
+    refetchIntervalMs: 60_000,
+  })
+
   const backendMilestones = useMemo<Milestone[]>(() => {
     const templateMilestones = (templatesData?.templates ?? [])
       .slice()
@@ -281,6 +332,83 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
   const projectDisplayName = myGroup?.name?.trim() || data.project.title
+  const nextDeadlineAnnouncement = useMemo(() => {
+    const items = departmentAnnouncementsQuery.data?.items ?? []
+    const withDeadline = items.filter((item) => item.deadlineAt)
+    if (!withDeadline.length) return null
+
+    return withDeadline
+      .slice()
+      .sort((a, b) => {
+        const aSeconds = typeof a.secondsRemaining === "number" ? a.secondsRemaining : Number.POSITIVE_INFINITY
+        const bSeconds = typeof b.secondsRemaining === "number" ? b.secondsRemaining : Number.POSITIVE_INFINITY
+        if (aSeconds !== bSeconds) return aSeconds - bSeconds
+
+        const aDeadline = new Date(a.deadlineAt ?? "").getTime()
+        const bDeadline = new Date(b.deadlineAt ?? "").getTime()
+        return aDeadline - bDeadline
+      })[0]
+  }, [departmentAnnouncementsQuery.data?.items])
+
+  const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(null)
+
+  useEffect(() => {
+    setUiSecondsRemaining(nextDeadlineAnnouncement?.secondsRemaining ?? null)
+  }, [nextDeadlineAnnouncement?.id, nextDeadlineAnnouncement?.secondsRemaining])
+
+  useEffect(() => {
+    if (uiSecondsRemaining === null || uiSecondsRemaining <= 0) return
+
+    const timerId = window.setInterval(() => {
+      setUiSecondsRemaining((prev) => {
+        if (prev === null || prev <= 0) return 0
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [uiSecondsRemaining])
+
+  const countdownParts = toCountdownParts(uiSecondsRemaining)
+  const isAnnouncementDeadlinePassed =
+    Boolean(nextDeadlineAnnouncement?.isExpired) ||
+    (uiSecondsRemaining !== null && uiSecondsRemaining <= 0)
+
+  const nextDeadlineTitle = nextDeadlineAnnouncement?.title || data.project.nextDeadlineLabel
+  const nextDeadlineDueText = nextDeadlineAnnouncement
+    ? isAnnouncementDeadlinePassed
+      ? "Deadline passed"
+      : countdownParts
+        ? `${formatCountdown(countdownParts)} remaining`
+        : "No deadline"
+    : data.project.nextDeadlineDays === 0
+      ? "Due today"
+      : `Due in ${data.project.nextDeadlineDays} day${data.project.nextDeadlineDays === 1 ? "" : "s"}`
+
+  const nextDeadlineSummary =
+    nextDeadlineAnnouncement?.message?.trim() ||
+    "Submit early so your advisor has time to review and give feedback."
+
+  const nextDeadlineActionTitle = nextDeadlineAnnouncement
+    ? getAnnouncementActionLabel(
+        nextDeadlineAnnouncement.actionType,
+        nextDeadlineAnnouncement.actionLabel
+      )
+    : "Upload latest document"
+
+  const nextDeadlineActionText = nextDeadlineAnnouncement?.actionUrl
+    ? `Action link is ready: ${nextDeadlineAnnouncement.actionUrl}`
+    : "Make sure your SRS and SDD are up to date before implementation starts."
+
+  const announcementCreator = nextDeadlineAnnouncement?.createdBy
+  const creatorName =
+    `${announcementCreator?.firstName ?? ""} ${announcementCreator?.lastName ?? ""}`.trim() ||
+    "Department Team"
+
+  const secondaryCardText = nextDeadlineAnnouncement?.deadlineAt
+    ? `Deadline set for ${formatDate(nextDeadlineAnnouncement.deadlineAt)}.`
+    : "Respond to any pending questions or requested clarifications."
+
   const myTeamMembers: TeamMember[] = myGroup
     ? [
         {
@@ -485,34 +613,28 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardTitle>
             <CardDescription>
-              {data.project.nextDeadlineLabel}
+              {nextDeadlineTitle}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-dashed p-4 text-center">
-              <p className="text-sm font-medium">
-                {data.project.nextDeadlineDays === 0
-                  ? "Due today"
-                  : `Due in ${data.project.nextDeadlineDays} day${
-                      data.project.nextDeadlineDays === 1 ? "" : "s"
-                    }`}
-              </p>
+              <p className="text-sm font-medium">{nextDeadlineDueText}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Submit early so your advisor has time to review and give feedback.
+                {nextDeadlineSummary}
               </p>
             </div>
 
             <div className="space-y-3">
               <div className="rounded-lg border p-3">
-                <p className="text-sm font-medium">Upload latest document</p>
+                <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Make sure your SRS and SDD are up to date before implementation starts.
+                  {nextDeadlineActionText}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-sm font-medium">Check advisor comments</p>
+                <p className="text-sm font-medium">Announcement by {creatorName}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Respond to any pending questions or requested clarifications.
+                  {secondaryCardText}
                 </p>
               </div>
             </div>
