@@ -339,16 +339,24 @@ export function StudentMyProjectPage() {
 
   useEffect(() => {
     const backendGroupName = myGroupData?.name?.trim()
-    if (!backendGroupName) return
+    const backendObjectives = myGroupData?.objectives?.trim()
+    if (!backendGroupName && !backendObjectives) return
 
     setMyProject((prevProject) => {
-      if (prevProject.groupName === backendGroupName) return prevProject
+      const nextGroupName = backendGroupName || prevProject.groupName
+      const nextDescription = backendObjectives || prevProject.description
+
+      if (prevProject.groupName === nextGroupName && prevProject.description === nextDescription) {
+        return prevProject
+      }
+
       return {
         ...prevProject,
-        groupName: backendGroupName,
+        groupName: nextGroupName,
+        description: nextDescription,
       }
     })
-  }, [myGroupData?.name])
+  }, [myGroupData?.name, myGroupData?.objectives])
 
   // Ensure we have valid project data
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {
