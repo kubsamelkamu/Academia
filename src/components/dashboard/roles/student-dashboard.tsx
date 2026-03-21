@@ -279,6 +279,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
+  const projectDisplayName = myGroup?.name?.trim() || data.project.title
   const myTeamMembers: TeamMember[] = myGroup
     ? [
         {
@@ -372,7 +373,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardContent>
             <p className="text-2xl font-bold truncate">In Progress</p>
             <p className="mt-1 text-xs text-muted-foreground truncate">
-              {data.project.title}
+              {projectDisplayName}
             </p>
           </CardContent>
         </Card>
@@ -424,7 +425,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg font-semibold">
-                {data.project.title}
+                {projectDisplayName}
               </CardTitle>
               <CardDescription>
                 Advisor: <span className="font-medium">{data.project.advisorName}</span>

@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
+import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -230,6 +231,7 @@ export function StudentMyProjectPage() {
   const user = useAuthStore((state) => state.user)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
+  const { data: myGroupData } = useMyProjectGroup(Boolean(user))
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -334,6 +336,27 @@ export function StudentMyProjectPage() {
       }
     })
   }, [mergedBackendMilestones])
+
+  useEffect(() => {
+    const backendGroupName = myGroupData?.name?.trim()
+    const backendObjectives = myGroupData?.objectives?.trim()
+    if (!backendGroupName && !backendObjectives) return
+
+    setMyProject((prevProject) => {
+      const nextGroupName = backendGroupName || prevProject.groupName
+      const nextDescription = backendObjectives || prevProject.description
+
+      if (prevProject.groupName === nextGroupName && prevProject.description === nextDescription) {
+        return prevProject
+      }
+
+      return {
+        ...prevProject,
+        groupName: nextGroupName,
+        description: nextDescription,
+      }
+    })
+  }, [myGroupData?.name, myGroupData?.objectives])
 
   // Ensure we have valid project data
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {
