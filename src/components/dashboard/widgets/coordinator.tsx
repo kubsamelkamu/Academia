@@ -1,159 +1,65 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
+import { AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useCoordinatorDashboard } from "@/lib/hooks/use-coordinator-dashboard"
-import { type CoordinatorKpi } from "@/types/dashboard"
-import {
-  Calendar,
-  ClipboardList,
-  FileClock,
-  FolderKanban,
-  GraduationCap,
-  type LucideIcon,
-} from "lucide-react"
-import { DashboardKpiSkeleton, DashboardSectionsSkeleton } from "@/components/dashboard/roles/shared-skeletons"
-
-const coordinatorKpiIcons: Record<CoordinatorKpi["icon"], LucideIcon> = {
-  folderKanban: FolderKanban,
-  graduationCap: GraduationCap,
-  calendar: Calendar,
-  clipboardList: ClipboardList,
-}
+import { DashboardSectionCard } from "@/components/dashboard/page-primitives"
 
 function CoordinatorKpisWidget() {
-  const { data, isLoading } = useCoordinatorDashboard()
-
-  if (isLoading) {
-    return <DashboardKpiSkeleton />
-  }
-
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {data?.kpis.map((card) => {
-        const Icon = coordinatorKpiIcons[card.icon]
-
-        return (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-muted-foreground">{card.note}</p>
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
+    <DashboardSectionCard
+      title="Coordinator KPIs Placeholder"
+      description="Coordinator KPI widgets are temporarily disabled."
+    >
+      <p className="text-sm text-muted-foreground">
+        Replace this with real KPI cards when coordinator dashboard implementation starts.
+      </p>
+    </DashboardSectionCard>
   )
 }
 
 function CoordinatorPriorityQueueWidget() {
-  const { data, isLoading } = useCoordinatorDashboard()
-
-  if (isLoading) {
-    return <DashboardSectionsSkeleton />
-  }
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileClock className="h-4 w-4" />
-          Priority Queue
+          <AlertCircle className="h-4 w-4" />
+          Priority Queue Placeholder
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {!data || data.pendingQueue.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No high-priority items right now.</p>
-        ) : (
-          <div className="space-y-3">
-            {data.pendingQueue.map((item) => (
-              <div key={item.title} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.detail}</p>
-                  </div>
-                  <Badge variant={item.priority === "High" ? "destructive" : "secondary"}>
-                    {item.priority}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Coordinator priority queue is intentionally set to placeholder content.
+        </p>
       </CardContent>
     </Card>
   )
 }
 
 function CoordinatorExecutionFocusWidget() {
-  if (typeof window === "undefined") {
-    return null
-  }
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Execution Focus</CardTitle>
+        <CardTitle>Execution Focus Placeholder</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          <div className="rounded-lg border p-3">
-            <p className="text-sm font-medium">Advisor Allocation</p>
-            <p className="mt-1 text-xs text-muted-foreground">7 projects need advisor balancing</p>
-          </div>
-          <div className="rounded-lg border p-3">
-            <p className="text-sm font-medium">Evaluation Follow-ups</p>
-            <p className="mt-1 text-xs text-muted-foreground">4 pending committee submissions</p>
-          </div>
-          <div className="rounded-lg border p-3">
-            <p className="text-sm font-medium">Schedule Conflicts</p>
-            <p className="mt-1 text-xs text-muted-foreground">2 defense conflicts unresolved</p>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Add coordinator execution focus cards later during full dashboard implementation.
+        </p>
       </CardContent>
     </Card>
   )
 }
 
 function CoordinatorUpcomingDefensesWidget() {
-  const { data, isLoading } = useCoordinatorDashboard()
-
-  if (isLoading) {
-    return <DashboardSectionsSkeleton />
-  }
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          Upcoming Defenses
-        </CardTitle>
+        <CardTitle>Upcoming Defenses Placeholder</CardTitle>
       </CardHeader>
       <CardContent>
-        {!data || data.upcomingDefenses.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center">
-            <p className="text-sm font-medium">No upcoming defenses</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Scheduled defense sessions will appear here once published.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {data.upcomingDefenses.map((item) => (
-              <div key={`${item.team}-${item.date}`} className="rounded-lg border p-3">
-                <p className="text-sm font-medium">{item.team}</p>
-                <p className="text-xs text-muted-foreground">{item.date}</p>
-                <p className="text-xs text-muted-foreground">{item.room}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Upcoming defenses list is currently a placeholder for upcoming coordinator work.
+        </p>
       </CardContent>
     </Card>
   )

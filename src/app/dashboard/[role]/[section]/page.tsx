@@ -25,13 +25,15 @@ import { StudentSubmissionsPage } from "@/components/dashboard/student/submissio
 import { StudentTeamPage } from "@/components/dashboard/student/team-page"
 import { StudentTimelinePage } from "@/components/dashboard/student/timeline-page"
 import { StudentUploadDocumentsPage } from "@/components/dashboard/student/upload-documents-page"
-import AdvisorsPage from "@/app/dashboard/advisors/page"
-import DefensesPage from "@/app/dashboard/defenses/page"
-import EvaluationsPage from "@/app/dashboard/evaluations/page"
-import ProjectsOverviewPage from "@/app/dashboard/projects/page"
-import ReportsPage from "@/app/dashboard/reports/page"
 import SettingsPage from "@/app/dashboard/settings/page"
-import StudentsPage from "@/app/dashboard/students/page"
+import {
+  CoordinatorAdvisorsPlaceholderPage,
+  CoordinatorDefensesPlaceholderPage,
+  CoordinatorEvaluationsPlaceholderPage,
+  CoordinatorProjectsPlaceholderPage,
+  CoordinatorReportsPlaceholderPage,
+  CoordinatorStudentsPlaceholderPage,
+} from "@/components/dashboard/coordinator/placeholder-pages"
 import { notFound, redirect } from "next/navigation"
 import { type ComponentType } from "react"
 
@@ -56,12 +58,12 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     settings: DepartmentHeadSettingsPage,
   },
   coordinator: {
-    projects: ProjectsOverviewPage,
-    students: StudentsPage,
-    advisors: AdvisorsPage,
-    defenses: DefensesPage,
-    evaluations: EvaluationsPage,
-    reports: ReportsPage,
+    projects: CoordinatorProjectsPlaceholderPage,
+    students: CoordinatorStudentsPlaceholderPage,
+    advisors: CoordinatorAdvisorsPlaceholderPage,
+    defenses: CoordinatorDefensesPlaceholderPage,
+    evaluations: CoordinatorEvaluationsPlaceholderPage,
+    reports: CoordinatorReportsPlaceholderPage,
     settings: SettingsPage,
   },
   advisor: {
