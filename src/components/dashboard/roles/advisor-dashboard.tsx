@@ -3,7 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { useMemo, useCallback } from "react"
+import { useMemo, useCallback, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/auth-store"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -358,6 +360,17 @@ interface AdvisorDashboardProps {
 }
 
 export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: AdvisorDashboardProps) {
+  const router = useRouter()
+  const [now, setNow] = useState<Date>(new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const formattedDate = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
+  const formattedTime = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+
   // Data fetching (would typically be in a useEffect)
   const myProjects = useMemo(() => 
     mockAdvisorProjects.filter((p) => p.advisorId === advisorId), 
@@ -401,10 +414,10 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
       duration: 5000,
       action: {
         label: "Add Feedback",
-        onClick: () => window.location.href = `/dashboard/advisor/reviews/${project.id}`
+        onClick: () => router.push(`/dashboard/advisor/reviews`)
       }
     })
-  }, [])
+  }, [router])
 
   const handleClearForEvaluation = useCallback((project: AdvisorProject) => {
     toast.success("Project Cleared for Evaluation", { 
@@ -414,28 +427,24 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     // Here you would typically update the backend
   }, [])
 
+  const authUser = useAuthStore((state) => state.user)
+  const displayName = authUser ? `${authUser.firstName ?? ""} ${authUser.lastName ?? ""}`.trim() : "Advisor"
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {userName}!</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Welcome back, {displayName || "Advisor"}!</h1>
           <p className="text-muted-foreground">
             You have {stats.activeProjects} active project{stats.activeProjects !== 1 ? 's' : ''} and {stats.pendingReviews} pending review{stats.pendingReviews !== 1 ? 's' : ''}.
           </p>
         </div>
-        
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/advisor/schedule">
-              <Calendar className="mr-2 h-4 w-4" /> View Calendar
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/dashboard/advisor/reviews">
-              <Clock className="mr-2 h-4 w-4" /> Review Queue
-            </Link>
-          </Button>
+
+        <div className="flex gap-2 items-center">
+          <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground">
+            {formattedDate} {formattedTime}
+          </div>
         </div>
       </div>
 

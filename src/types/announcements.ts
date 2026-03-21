@@ -1,4 +1,5 @@
 export type AnnouncementPriority = "HIGH" | "MEDIUM" | "LOW"
+export type AnnouncementStatus = "published" | "draft"
 export type AttachmentType = "NONE" | "FILE" | "LINK"
 export type AttachmentResourceType = "image" | "raw"
 

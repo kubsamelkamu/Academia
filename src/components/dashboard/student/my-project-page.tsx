@@ -226,7 +226,7 @@ function MyProjectHeader() {
 export function StudentMyProjectPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
-  const [myProject, setMyProject] = useState<ProjectData>(initialProjectData)
+  const [projectState, setProjectState] = useState<ProjectData>(initialProjectData)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const user = useAuthStore((state) => state.user)
@@ -306,12 +306,12 @@ export function StudentMyProjectPage() {
     })
   }, [templateMilestones, projectMilestonesData?.items])
 
-  useEffect(() => {
-    if (!mergedBackendMilestones.length) return
+  const computedMyProject = useMemo<ProjectData>(() => {
+    let nextProject = projectState
 
-    setMyProject((prevProject) => {
+    if (mergedBackendMilestones.length) {
       const existingMilestonesById = new Map(
-        prevProject.milestones.map((milestone) => [milestone.id, milestone])
+        nextProject.milestones.map((milestone) => [milestone.id, milestone])
       )
 
       const mergedMilestones = mergedBackendMilestones.map((milestone) => {
@@ -330,27 +330,25 @@ export function StudentMyProjectPage() {
       ).length
       const progress = Math.round((completedMilestonesCount / mergedMilestones.length) * 100)
 
-      return {
-        ...prevProject,
+      nextProject = {
+        ...nextProject,
         milestones: mergedMilestones,
         progress,
       }
-    })
-  }, [mergedBackendMilestones])
+    }
 
-  useEffect(() => {
     const backendGroupName = myGroupData?.name?.trim()
-    if (!backendGroupName) return
-
-    setMyProject((prevProject) => {
-      if (prevProject.groupName === backendGroupName) return prevProject
-
-      return {
-        ...prevProject,
+    if (backendGroupName && backendGroupName !== nextProject.groupName) {
+      nextProject = {
+        ...nextProject,
         groupName: backendGroupName,
       }
-    })
-  }, [myGroupData?.name])
+    }
+
+    return nextProject
+  }, [projectState, mergedBackendMilestones, myGroupData?.name])
+
+  const myProject = computedMyProject
 
   // Ensure we have valid project data
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {
@@ -408,7 +406,7 @@ export function StudentMyProjectPage() {
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
     // Update UI state
-    setMyProject((prevProject) => {
+    setProjectState((prevProject) => {
       const updatedMilestones = prevProject.milestones.map((m) =>
         m.id === selectedMilestoneId
           ? {

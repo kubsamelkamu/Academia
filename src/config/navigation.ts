@@ -144,7 +144,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FolderKanban,
     },
     {
-      title: "Students",
+      title: "Clear",
       href: "/dashboard/advisor/students",
       icon: GraduationCap,
     },

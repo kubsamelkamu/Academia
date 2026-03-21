@@ -191,7 +191,7 @@ export function AdvisorSchedulePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Meeting Scheduler</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Meeting Scheduler</h1>
           <p className="text-muted-foreground">Schedule and manage project meetings</p>
         </div>
 

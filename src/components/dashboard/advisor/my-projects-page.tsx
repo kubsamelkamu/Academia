@@ -17,80 +17,57 @@ import {
   FileText,
   Eye,
   CheckCircle,
-  Video,
   Clock,
   AlertCircle,
-  Award,
   TrendingUp,
-  Filter,
   Search,
   Download,
-  Upload,
   Plus,
-  MoreVertical,
   Star,
   Flag,
-  GitBranch,
   AlertTriangle,
-  CheckCheck,
   ListChecks,
-  BarChart3,
-  PieChart,
-  Bell,
-  Mail,
-  Phone,
-  ExternalLink,
-  BookOpen,
-  GraduationCap,
-  UserCheck,
-  UserPlus,
+  Activity,
   XCircle,
   HelpCircle,
   ChevronDown,
-  Grid3X3,
+  Send,
+  Paperclip,
+  Settings,
+  Menu,
+  Filter,
+  LayoutGrid,
   List,
-  FileText as FileTextIcon,
-  Video as VideoIcon,
-  Calendar as CalendarIcon,
-  MessageCircle,
-  Rocket,
-  Target,
+  UserCheck,
+  Award,
+  BookOpen,
+  Video,
+  Link2,
+  Github,
+  ExternalLink,
+  ThumbsUp,
+  CalendarDays,
+  CheckCheck,
+  MoreHorizontal,
+  Phone,
+  Mail,
+  Briefcase,
+  GraduationCap,
+  Sparkles,
+  Shield,
   Zap,
+  Target,
+  Compass,
+  BarChart3,
+  PieChart,
   Layers,
   Users2,
   ArrowUpRight,
-  Clock3,
-  CircleDashed,
   CircleDot,
-  PauseCircle,
-  Upload as UploadIcon,
-  CheckCircle2,
-  AlertOctagon,
-  ThumbsUp,
-  Briefcase,
-  Bookmark,
+  Upload,
   Pin,
+  Bookmark,
   Share2,
-  MoreHorizontal,
-  PlayCircle,
-  Send,
-  Paperclip,
-  Link2,
-  Github,
-  Code,
-  Database,
-  Cloud,
-  Smartphone,
-  Globe,
-  Server,
-  Cpu,
-  Shield,
-  Lock,
-  Key,
-  Settings,
-  Sliders,
-  Menu,
-  Activity,
 } from 'lucide-react'
 import {
   Dialog,
@@ -196,28 +173,28 @@ interface AdvisorProject {
 }
 
 // ==================== Constants & Utilities ====================
-const STATUS_CONFIG: Record<ProjectStatus, { label: string; className: string; icon: unknown }> = {
-  'active': { label: 'Active', className: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400', icon: Activity },
-  'in-progress': { label: 'In Progress', className: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400', icon: TrendingUp },
-  'completed': { label: 'Completed', className: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
-  'on-hold': { label: 'On Hold', className: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400', icon: PauseCircle },
-  'pending-review': { label: 'Pending Review', className: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400', icon: ClipboardCheck },
-  'cleared': { label: 'Cleared', className: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle }
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon: any }> = {
+  'active': { label: 'Active', color: 'blue', icon: Activity },
+  'in-progress': { label: 'In Progress', color: 'indigo', icon: TrendingUp },
+  'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
+  'on-hold': { label: 'On Hold', color: 'amber', icon: AlertCircle },
+  'pending-review': { label: 'Pending Review', color: 'purple', icon: ClipboardCheck },
+  'cleared': { label: 'Cleared', color: 'emerald', icon: CheckCheck }
 }
 
-const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; className: string; icon: unknown }> = {
-  'completed': { label: 'Completed', className: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
-  'approved': { label: 'Approved', className: 'bg-green-100 text-green-800 border-green-200', icon: ThumbsUp },
-  'in-progress': { label: 'In Progress', className: 'bg-blue-100 text-blue-800 border-blue-200', icon: TrendingUp },
-  'pending': { label: 'Pending', className: 'bg-gray-100 text-gray-800 border-gray-200', icon: Clock },
-  'overdue': { label: 'Overdue', className: 'bg-red-100 text-red-800 border-red-200', icon: AlertTriangle },
-  'submitted': { label: 'Submitted', className: 'bg-purple-100 text-purple-800 border-purple-200', icon: Upload }
+const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: any }> = {
+  'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
+  'approved': { label: 'Approved', color: 'green', icon: ThumbsUp },
+  'in-progress': { label: 'In Progress', color: 'blue', icon: TrendingUp },
+  'pending': { label: 'Pending', color: 'gray', icon: Clock },
+  'overdue': { label: 'Overdue', color: 'red', icon: AlertTriangle },
+  'submitted': { label: 'Submitted', color: 'purple', icon: Upload }
 }
 
-const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; className: string; icon: unknown }> = {
-  'high': { label: 'High', className: 'bg-red-100 text-red-800 border-red-200', icon: Flag },
-  'medium': { label: 'Medium', className: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: AlertCircle },
-  'low': { label: 'Low', className: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle }
+const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; icon: any }> = {
+  'high': { label: 'High', color: 'red', icon: Flag },
+  'medium': { label: 'Medium', color: 'amber', icon: AlertCircle },
+  'low': { label: 'Low', color: 'green', icon: CheckCircle }
 }
 
 const formatDate = (dateString: string) => {
@@ -248,12 +225,26 @@ const getDaysRemaining = (dueDate: string) => {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
+const getStatusColor = (color: string) => {
+  const colors: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800',
+    green: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
+    purple: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+    red: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800',
+    gray: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700',
+  }
+  return colors[color] || colors.gray
+}
+
 // ==================== Mock Data ====================
 const MOCK_PROJECTS: AdvisorProject[] = [
   {
     id: 'p1',
     title: 'AI-Powered Healthcare Diagnostics',
-    description: 'Developing an AI system for early disease detection using medical imaging',
+    description: 'Developing an AI system for early disease detection using medical imaging and deep learning algorithms.',
     groupName: 'HealthTech Innovators',
     groupId: 'g1',
     advisorId: 'adv1',
@@ -265,9 +256,9 @@ const MOCK_PROJECTS: AdvisorProject[] = [
     tags: ['AI', 'Healthcare', 'Medical Imaging'],
     technologies: ['Python', 'TensorFlow', 'PyTorch', 'React', 'Docker'],
     members: [
-      { id: 'm1', name: 'John Smith', email: 'john.s@university.edu', role: 'Team Lead', avatar: '/avatars/john.jpg', joinedAt: '2024-01-15', contributions: 45, lastActive: '2024-03-20' },
-      { id: 'm2', name: 'Emily Brown', email: 'emily.b@university.edu', role: 'ML Engineer', avatar: '/avatars/emily.jpg', joinedAt: '2024-01-15', contributions: 38, lastActive: '2024-03-21' },
-      { id: 'm3', name: 'Michael Lee', email: 'michael.l@university.edu', role: 'Backend Dev', avatar: '/avatars/michael.jpg', joinedAt: '2024-01-16', contributions: 42, lastActive: '2024-03-20' },
+      { id: 'm1', name: 'John Smith', email: 'john.s@university.edu', role: 'Team Lead', joinedAt: '2024-01-15', contributions: 45, lastActive: '2024-03-20' },
+      { id: 'm2', name: 'Emily Brown', email: 'emily.b@university.edu', role: 'ML Engineer', joinedAt: '2024-01-15', contributions: 38, lastActive: '2024-03-21' },
+      { id: 'm3', name: 'Michael Lee', email: 'michael.l@university.edu', role: 'Backend Dev', joinedAt: '2024-01-16', contributions: 42, lastActive: '2024-03-20' },
     ],
     milestones: [
       { id: 'ms1', name: 'Requirements Analysis', description: 'Complete requirements gathering and analysis', dueDate: '2024-02-15', status: 'approved', completedDate: '2024-02-10', priority: 'high', deliverables: ['Requirements Document', 'User Stories'] },
@@ -293,8 +284,8 @@ const MOCK_PROJECTS: AdvisorProject[] = [
   },
   {
     id: 'p2',
-    title: 'AI-Powered Campus Navigation System',
-    description: 'AR-based navigation application for university campus',
+    title: 'AI-Powered Campus Navigation',
+    description: 'AR-based navigation application for university campus with real-time location tracking.',
     groupName: 'Team Alpha',
     groupId: 'g2',
     advisorId: 'adv1',
@@ -332,7 +323,7 @@ const MOCK_PROJECTS: AdvisorProject[] = [
   {
     id: 'p3',
     title: 'E-Learning Platform for STEM',
-    description: 'Interactive learning platform for STEM education',
+    description: 'Interactive learning platform for STEM education with gamification features.',
     groupName: 'EduTech Solutions',
     groupId: 'g3',
     advisorId: 'adv1',
@@ -372,31 +363,35 @@ const MOCK_PROJECTS: AdvisorProject[] = [
 interface StatCardProps {
   title: string
   value: number
-  icon: React.ElementType
-  iconClassName?: string
+  icon: any
   trend?: number
+  color?: string
 }
 
-const StatCard = ({ title, value, icon: Icon, iconClassName = "bg-primary/10 text-primary", trend }: StatCardProps) => (
-  <Card className="hover:shadow-lg transition-all duration-300">
+const StatCard = ({ title, value, icon: Icon, trend, color = 'blue' }: StatCardProps) => (
+  <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/30">
     <CardContent className="p-6">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-bold">{value}</p>
+            <p className="text-3xl font-bold tracking-tight">{value}</p>
             {trend !== undefined && (
               <span className={cn(
-                "text-xs font-medium",
-                trend > 0 ? "text-green-600" : "text-red-600"
+                "text-xs font-medium px-1.5 py-0.5 rounded-full",
+                trend > 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : 
+                            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
               )}>
                 {trend > 0 ? "+" : ""}{trend}%
               </span>
             )}
           </div>
         </div>
-        <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", iconClassName)}>
-          <Icon className="h-6 w-6" />
+        <div className={cn(
+          "h-12 w-12 rounded-xl flex items-center justify-center transition-all group-hover:scale-110",
+          `bg-${color}-100 text-${color}-600 dark:bg-${color}-900/30 dark:text-${color}-400`
+        )}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </CardContent>
@@ -408,29 +403,26 @@ interface MilestoneItemProps {
 }
 
 const MilestoneItem = ({ milestone }: MilestoneItemProps) => {
-  const StatusIcon = (MILESTONE_STATUS_CONFIG[milestone.status]?.icon || Clock) as React.ElementType
+  const config = MILESTONE_STATUS_CONFIG[milestone.status]
+  const StatusIcon = config?.icon || Clock
   const PriorityIcon = PRIORITY_CONFIG[milestone.priority]?.icon || Flag
 
   return (
-    <div className="flex items-center justify-between py-2 hover:bg-muted/30 px-2 rounded-lg transition-colors">
+    <div className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
       <div className="flex items-center gap-3 min-w-0">
         <div className={cn(
           "h-2 w-2 rounded-full flex-shrink-0",
-          milestone.status === 'approved' ? 'bg-green-500' :
+          milestone.status === 'approved' || milestone.status === 'completed' ? 'bg-green-500' :
           milestone.status === 'in-progress' ? 'bg-blue-500' :
           milestone.status === 'submitted' ? 'bg-purple-500' :
-          milestone.status === 'completed' ? 'bg-green-500' :
           milestone.status === 'pending' ? 'bg-gray-300' :
-          'bg-yellow-500'
+          'bg-red-500'
         )} />
         <span className="text-sm font-medium truncate">{milestone.name}</span>
       </div>
-      <Badge variant="outline" className={cn(
-        "text-xs whitespace-nowrap",
-        MILESTONE_STATUS_CONFIG[milestone.status]?.className
-      )}>
+      <Badge variant="outline" className={cn("text-xs whitespace-nowrap", getStatusColor(config?.color || 'gray'))}>
         <StatusIcon className="h-3 w-3 mr-1" />
-        {MILESTONE_STATUS_CONFIG[milestone.status]?.label || milestone.status}
+        {config?.label || milestone.status}
       </Badge>
     </div>
   )
@@ -446,37 +438,71 @@ interface ProjectCardProps {
 const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: ProjectCardProps) => {
   const daysRemaining = getDaysRemaining(project.dueDate)
   const completedMilestones = project.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length
-  const StatusIcon = (STATUS_CONFIG[project.status]?.icon || FolderOpen) as React.ElementType
+  const statusConfig = STATUS_CONFIG[project.status]
+  const StatusIcon = statusConfig?.icon || FolderOpen
+  const isDueSoon = daysRemaining <= 14 && daysRemaining > 0
+  const isOverdue = daysRemaining < 0
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-t-4 border-t-primary/20">
+    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-xl hover:text-primary transition-colors cursor-pointer line-clamp-1"
-                       onClick={() => onViewDetails(project)}>
+          <div className="space-y-2 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle 
+                className="text-xl font-semibold hover:text-primary transition-colors cursor-pointer line-clamp-1"
+                onClick={() => onViewDetails(project)}
+              >
                 {project.title}
               </CardTitle>
-              <Badge className={STATUS_CONFIG[project.status]?.className}>
+              <Badge className={cn(getStatusColor(statusConfig?.color || 'gray'), "text-xs")}>
                 <StatusIcon className="h-3 w-3 mr-1" />
-                {STATUS_CONFIG[project.status]?.label || project.status}
+                {statusConfig?.label || project.status}
               </Badge>
             </div>
-            <CardDescription className="flex items-center gap-2">
-              <Users className="h-3.5 w-3.5" />
-              <span>{project.groupName}</span>
-              <span className="text-muted-foreground">•</span>
-              <Calendar className="h-3.5 w-3.5" />
-              <span>Due: {formatDate(project.dueDate)}</span>
-            </CardDescription>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Users className="h-3.5 w-3.5" />
+                <span>{project.groupName}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Due {formatDate(project.dueDate)}</span>
+              </div>
+            </div>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onViewDetails(project)}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMessage(project)}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Message Team
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onClearance(project)}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Clear for Evaluation
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Progress Bar */}
-        <div className="space-y-1">
+        <p className="text-sm text-muted-foreground line-clamp-2">
+          {project.description}
+        </p>
+
+        <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="font-medium">Progress</span>
             <span className="text-muted-foreground">{project.progress}%</span>
@@ -484,54 +510,43 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
           <Progress value={project.progress} className="h-2" />
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 bg-muted/30 rounded-lg">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center p-2 rounded-lg bg-muted/30">
             <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
               <span>{project.members.length}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Members</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Members</p>
           </div>
-          <div className="p-2 bg-muted/30 rounded-lg">
+          <div className="text-center p-2 rounded-lg bg-muted/30">
             <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <GitBranch className="h-4 w-4 text-muted-foreground" />
-              <span>{project.milestones.length}</span>
+              <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>{completedMilestones}/{project.milestones.length}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Milestones</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Milestones</p>
           </div>
-          <div className="p-2 bg-muted/30 rounded-lg">
+          <div className="text-center p-2 rounded-lg bg-muted/30">
             <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>{formatDate(project.startDate).split(' ')[1]}</span>
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className={cn(
+                isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : ""
+              )}>
+                {isOverdue ? 'Overdue' : `${daysRemaining}d`}
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Started</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
           </div>
         </div>
 
-        {/* Recent Milestones */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <ListChecks className="h-4 w-4 text-muted-foreground" />
-            Recent Milestones
-          </h4>
-          <div className="space-y-1">
-            {project.milestones.slice(0, 3).map((milestone) => (
-              <MilestoneItem key={milestone.id} milestone={milestone} />
-            ))}
-          </div>
-        </div>
-
-        {/* Action Buttons - Exactly as in the image */}
         <div className="flex gap-2 pt-2">
           <Button
             variant="default"
             size="sm"
-            className="flex-1 bg-primary hover:bg-primary/90"
+            className="flex-1"
             onClick={() => onViewDetails(project)}
           >
             <Eye className="h-4 w-4 mr-2" />
-            View Details
+            Details
           </Button>
           <Button
             variant="outline"
@@ -540,90 +555,23 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
             onClick={() => onMessage(project)}
           >
             <MessageSquare className="h-4 w-4 mr-2" />
-            Message Team
+            Message
           </Button>
           <Button
             variant="outline"
             size="sm"
             className={cn(
               "flex-1",
-              project.status === 'cleared' ? 'bg-green-50 text-green-700 border-green-200' : ''
+              project.status === 'cleared' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30"
             )}
             onClick={() => onClearance(project)}
           >
             <CheckCircle className="h-4 w-4 mr-2" />
-            {project.status === 'cleared' ? 'Cleared' : 'Clear for Evaluation'}
+            {project.status === 'cleared' ? 'Cleared' : 'Clear'}
           </Button>
         </div>
-
-        {/* Status Indicator */}
-        {project.status === 'in-progress' && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-            <span>In Progress</span>
-          </div>
-        )}
       </CardContent>
     </Card>
-  )
-}
-
-interface StatusFilterProps {
-  value: string
-  onChange: (value: string) => void
-  isOpen: boolean
-  onToggle: () => void
-  onClose: () => void
-}
-
-const StatusFilter = ({ value, onChange, isOpen, onToggle, onClose }: StatusFilterProps) => {
-  const options = [
-    { value: 'all', label: 'All Status' },
-    { value: 'active', label: 'Active' },
-    { value: 'in-progress', label: 'In Progress' },
-    { value: 'pending-review', label: 'Pending Review' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'on-hold', label: 'On Hold' },
-    { value: 'cleared', label: 'Cleared' },
-  ]
-
-  return (
-    <div className="relative">
-      <Button
-        variant="outline"
-        className="w-[180px] justify-between"
-        onClick={onToggle}
-      >
-        <Filter className="h-4 w-4 mr-2" />
-        <span>Status: {options.find(opt => opt.value === value)?.label || 'All'}</span>
-        <ChevronDown className={cn(
-          "h-4 w-4 ml-2 transition-transform",
-          isOpen && "transform rotate-180"
-        )} />
-      </Button>
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={onClose} />
-          <div className="absolute top-full left-0 mt-1 w-[180px] bg-background border rounded-md shadow-lg z-50 py-1">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                className={cn(
-                  "w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors",
-                  value === option.value && "bg-muted font-medium"
-                )}
-                onClick={() => {
-                  onChange(option.value)
-                  onClose()
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   )
 }
 
@@ -636,23 +584,18 @@ export function AdvisorMyProjectsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
 
-  // Use mock data (would come from API in production)
   const advisorProjects = MOCK_PROJECTS
 
-  // Memoized filtered projects
   const filteredProjects = useMemo(() => {
     return advisorProjects.filter(project => {
       const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           project.groupName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           project.description.toLowerCase().includes(searchQuery.toLowerCase())
+                           project.groupName.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesStatus = filterStatus === 'all' || project.status === filterStatus
       return matchesSearch && matchesStatus
     })
   }, [advisorProjects, searchQuery, filterStatus])
 
-  // Memoized statistics
   const stats = useMemo(() => ({
     total: advisorProjects.length,
     active: advisorProjects.filter(p => p.status === 'active' || p.status === 'in-progress').length,
@@ -660,7 +603,6 @@ export function AdvisorMyProjectsPage() {
     completed: advisorProjects.filter(p => p.status === 'completed' || p.status === 'cleared').length,
   }), [advisorProjects])
 
-  // Handlers
   const handleViewDetails = (project: AdvisorProject) => {
     setSelectedProject(project)
     setShowProjectDialog(true)
@@ -673,7 +615,6 @@ export function AdvisorMyProjectsPage() {
 
   const handleMessage = (project: AdvisorProject) => {
     toast.info(`Opening chat with ${project.groupName}`)
-    // Navigate to messages or open chat
   }
 
   const handleScheduleMeeting = () => {
@@ -684,258 +625,254 @@ export function AdvisorMyProjectsPage() {
     setShowClearanceDialog(false)
     toast.success("Project cleared for evaluation", {
       description: "The team has been notified.",
-      duration: 5000,
     })
   }
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto px-4 py-8 max-w-7xl animate-in fade-in duration-500">
-        {/* Header - Exactly as in the image */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              My Projects
-            </h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              All projects assigned to you for supervision
-            </p>
-          </div>
-          
-          {/* Keep these buttons exactly as requested */}
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              className="gap-2 hover:bg-muted transition-colors"
-              onClick={handleScheduleMeeting}
-            >
-              <Calendar className="h-4 w-4" />
-              Schedule Meeting
-            </Button>
-            
-            <Button className="gap-2 relative bg-primary hover:bg-primary/90">
-              <ClipboardCheck className="h-4 w-4" />
-              Review Requests
-              {stats.pendingReview > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="ml-1 absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center animate-pulse"
-                >
-                  {stats.pendingReview}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <StatCard 
-            title="Total Projects" 
-            value={stats.total} 
-            icon={FolderOpen}
-            iconClassName="bg-blue-100 text-blue-600 dark:bg-blue-900/30"
-          />
-          <StatCard 
-            title="Active" 
-            value={stats.active} 
-            icon={Activity}
-            iconClassName="bg-green-100 text-green-600 dark:bg-green-900/30"
-            trend={12}
-          />
-          <StatCard 
-            title="Pending Review" 
-            value={stats.pendingReview} 
-            icon={ClipboardCheck}
-            iconClassName="bg-purple-100 text-purple-600 dark:bg-purple-900/30"
-          />
-          <StatCard 
-            title="Completed" 
-            value={stats.completed} 
-            icon={CheckCircle}
-            iconClassName="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30"
-            trend={8}
-          />
-        </div>
-
-        {/* Filters and Search */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search projects..."
-              className="pl-9 pr-4"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
-                onClick={() => setSearchQuery('')}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
-            <StatusFilter
-              value={filterStatus}
-              onChange={setFilterStatus}
-              isOpen={showStatusDropdown}
-              onToggle={() => setShowStatusDropdown(!showStatusDropdown)}
-              onClose={() => setShowStatusDropdown(false)}
-            />
-          </div>
-        </div>
-
-        {/* Projects Grid */}
-        {filteredProjects.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onViewDetails={handleViewDetails}
-                onClearance={handleClearance}
-                onMessage={handleMessage}
-              />
-            ))}
-          </div>
-        ) : (
-          <Card className="p-12 text-center">
-            <div className="flex flex-col items-center max-w-md mx-auto">
-              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No projects found</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                {searchQuery || filterStatus !== 'all' 
-                  ? 'Try adjusting your search filters'
-                  : 'You have no assigned projects yet.'}
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="space-y-6 animate-in fade-in duration-500 px-4 py-8">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                My Projects
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Supervise and track your assigned student projects
               </p>
-              {(searchQuery || filterStatus !== 'all') && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchQuery('')
-                    setFilterStatus('all')
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              )}
             </div>
-          </Card>
-        )}
+            
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={handleScheduleMeeting}
+                className="gap-2"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Schedule Meeting
+              </Button>
+              
+              <Button className="gap-2 relative">
+                <ClipboardCheck className="h-4 w-4" />
+                Review Requests
+                {stats.pendingReview > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
+                  >
+                    {stats.pendingReview}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          </div>
 
-        {/* Project Details Dialog */}
-        <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden p-0">
-            {selectedProject && (
-              <>
-                <DialogHeader className="p-6 pb-0">
-                  <div className="flex items-start justify-between pr-8">
-                    <div>
-                      <DialogTitle className="text-2xl">{selectedProject.title}</DialogTitle>
-                      <DialogDescription className="flex items-center gap-2 mt-1">
-                        <Users className="h-4 w-4" />
-                        {selectedProject.groupName}
-                      </DialogDescription>
+          {/* Stats */}
+          <div className="grid gap-4 md:grid-cols-4 mb-8">
+            <StatCard title="Total Projects" value={stats.total} icon={FolderOpen} color="blue" />
+            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" trend={12} />
+            <StatCard title="Pending Review" value={stats.pendingReview} icon={ClipboardCheck} color="purple" />
+            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" trend={8} />
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search projects..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    {filterStatus === 'all' ? 'All Status' : STATUS_CONFIG[filterStatus as ProjectStatus]?.label}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setFilterStatus('all')}>
+                    All Status
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                    <DropdownMenuItem key={key} onClick={() => setFilterStatus(key)}>
+                      {config.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div className="flex border rounded-md overflow-hidden">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="rounded-none h-9 w-9"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="rounded-none h-9 w-9"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Projects Grid */}
+          {filteredProjects.length > 0 ? (
+            <div className={cn(
+              "grid gap-6",
+              viewMode === 'grid' ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+            )}>
+              {filteredProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onViewDetails={handleViewDetails}
+                  onClearance={handleClearance}
+                  onMessage={handleMessage}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card className="p-12 text-center">
+              <div className="flex flex-col items-center max-w-md mx-auto">
+                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">No projects found</h3>
+                <p className="text-muted-foreground mb-6">
+                  {searchQuery || filterStatus !== 'all' 
+                    ? 'Try adjusting your search or filters'
+                    : 'No projects assigned to you yet.'}
+                </p>
+                {(searchQuery || filterStatus !== 'all') && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSearchQuery('')
+                      setFilterStatus('all')
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Project Details Dialog */}
+          <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden p-0">
+              {selectedProject && (
+                <>
+                  <DialogHeader className="p-6 pb-0">
+                    <div className="flex items-start justify-between pr-8">
+                      <div>
+                        <DialogTitle className="text-2xl">{selectedProject.title}</DialogTitle>
+                        <DialogDescription className="flex items-center gap-2 mt-1">
+                          <Users className="h-4 w-4" />
+                          {selectedProject.groupName}
+                        </DialogDescription>
+                      </div>
+                      <Badge className={getStatusColor(STATUS_CONFIG[selectedProject.status]?.color || 'gray')}>
+                        {STATUS_CONFIG[selectedProject.status]?.label}
+                      </Badge>
                     </div>
-                    <Badge className={STATUS_CONFIG[selectedProject.status]?.className}>
-                      {STATUS_CONFIG[selectedProject.status]?.label}
-                    </Badge>
-                  </div>
-                </DialogHeader>
+                  </DialogHeader>
 
-                <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
-                  <div className="space-y-6 py-4">
-                    {/* Project Stats */}
-                    <div className="grid gap-4 md:grid-cols-4">
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold text-primary">{selectedProject.progress}%</p>
+                  <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
+                    <div className="space-y-6 py-4">
+                      {/* Stats */}
+                      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                        <Card>
+                          <CardContent className="pt-6 text-center">
+                            <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
                             <p className="text-sm text-muted-foreground">Progress</p>
                             <Progress value={selectedProject.progress} className="mt-2 h-1.5" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold">{getDaysRemaining(selectedProject.dueDate)}</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-6 text-center">
+                            <p className={cn(
+                              "text-2xl font-bold",
+                              getDaysRemaining(selectedProject.dueDate) < 0 ? "text-red-600" : ""
+                            )}>
+                              {getDaysRemaining(selectedProject.dueDate)}d
+                            </p>
                             <p className="text-sm text-muted-foreground">Days Left</p>
-                            <p className="text-xs text-muted-foreground mt-1">Due {formatDate(selectedProject.dueDate)}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold">{selectedProject.members.length}</p>
-                            <p className="text-sm text-muted-foreground">Team Members</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold">
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-6 text-center">
+                            <p className="text-2xl font-bold">{selectedProject.members.length}</p>
+                            <p className="text-sm text-muted-foreground">Members</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-6 text-center">
+                            <p className="text-2xl font-bold">
                               {selectedProject.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              of {selectedProject.milestones.length} Milestones
+                              / {selectedProject.milestones.length} Milestones
                             </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Tabs */}
-                    <Tabs defaultValue="overview" className="space-y-4">
-                      <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="milestones">Milestones</TabsTrigger>
-                        <TabsTrigger value="team">Team</TabsTrigger>
-                        <TabsTrigger value="documents">Documents</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="overview" className="space-y-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Project Description</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-muted-foreground">{selectedProject.description}</p>
                           </CardContent>
                         </Card>
+                      </div>
 
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Technologies</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedProject.technologies?.map(tech => (
-                                <Badge key={tech} variant="secondary">{tech}</Badge>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
+                      <Tabs defaultValue="overview" className="space-y-4">
+                        <TabsList className="grid w-full grid-cols-4">
+                          <TabsTrigger value="overview">Overview</TabsTrigger>
+                          <TabsTrigger value="milestones">Milestones</TabsTrigger>
+                          <TabsTrigger value="team">Team</TabsTrigger>
+                          <TabsTrigger value="documents">Documents</TabsTrigger>
+                        </TabsList>
 
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Recent Messages</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-3">
+                        <TabsContent value="overview" className="space-y-4">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Description</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-muted-foreground">{selectedProject.description}</p>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Technologies</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex flex-wrap gap-2">
+                                {selectedProject.technologies?.map(tech => (
+                                  <Badge key={tech} variant="secondary">{tech}</Badge>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Recent Messages</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
                               {selectedProject.messages.map((msg) => (
-                                <div key={msg.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                                  <MessageCircle className="h-4 w-4 text-primary mt-0.5" />
+                                <div key={msg.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
+                                  <MessageSquare className="h-4 w-4 text-primary mt-0.5" />
                                   <div className="flex-1">
                                     <div className="flex items-center justify-between">
                                       <p className="text-sm font-medium">{msg.sender}</p>
@@ -947,33 +884,32 @@ export function AdvisorMyProjectsPage() {
                                   </div>
                                 </div>
                               ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
+                            </CardContent>
+                          </Card>
+                        </TabsContent>
 
-                      <TabsContent value="milestones" className="space-y-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Project Milestones</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
+                        <TabsContent value="milestones" className="space-y-4">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Milestones</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
                               {selectedProject.milestones.map((milestone) => {
-                                const StatusIcon = (MILESTONE_STATUS_CONFIG[milestone.status]?.icon || Clock) as React.ElementType
+                                const config = MILESTONE_STATUS_CONFIG[milestone.status]
+                                const StatusIcon = config?.icon || Clock
                                 return (
                                   <div key={milestone.id} className="p-4 border rounded-lg">
                                     <div className="flex items-start justify-between">
                                       <div className="space-y-2 flex-1">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-semibold">{milestone.name}</h4>
-                                          <Badge className={MILESTONE_STATUS_CONFIG[milestone.status]?.className}>
+                                          <Badge className={getStatusColor(config?.color || 'gray')}>
                                             <StatusIcon className="h-3 w-3 mr-1" />
-                                            {MILESTONE_STATUS_CONFIG[milestone.status]?.label}
+                                            {config?.label}
                                           </Badge>
                                         </div>
                                         <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                                        <div className="flex items-center gap-4 text-xs">
+                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                           <span className="flex items-center gap-1">
                                             <Calendar className="h-3 w-3" />
                                             Due: {formatDate(milestone.dueDate)}
@@ -990,46 +926,58 @@ export function AdvisorMyProjectsPage() {
                                   </div>
                                 )
                               })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
+                            </CardContent>
+                          </Card>
+                        </TabsContent>
 
-                      <TabsContent value="team" className="space-y-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Team Members</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-3">
+                        <TabsContent value="team" className="space-y-4">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Team Members</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
                               {selectedProject.members.map((member) => (
                                 <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
                                   <div className="flex items-center gap-3">
-                                    <Avatar>
+                                    <Avatar className="h-10 w-10">
                                       <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                                     </Avatar>
                                     <div>
                                       <p className="font-medium">{member.name}</p>
                                       <p className="text-sm text-muted-foreground">{member.role}</p>
+                                      <p className="text-xs text-muted-foreground">{member.email}</p>
                                     </div>
                                   </div>
-                                  <Button variant="ghost" size="icon">
-                                    <Mail className="h-4 w-4" />
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <Mail className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Send email</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <MessageSquare className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Send message</TooltipContent>
+                                    </Tooltip>
+                                  </div>
                                 </div>
                               ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
+                            </CardContent>
+                          </Card>
+                        </TabsContent>
 
-                      <TabsContent value="documents" className="space-y-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Project Documents</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-3">
+                        <TabsContent value="documents" className="space-y-4">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Documents</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
                               {selectedProject.documents.map((doc) => (
                                 <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
                                   <div className="flex items-center gap-3">
@@ -1046,125 +994,125 @@ export function AdvisorMyProjectsPage() {
                                   </Button>
                                 </div>
                               ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                </ScrollArea>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Clearance Dialog */}
-        <Dialog open={showClearanceDialog} onOpenChange={setShowClearanceDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Clear Project for Evaluation</DialogTitle>
-              <DialogDescription>
-                Review the project before marking it as ready for final evaluation.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Important</AlertTitle>
-                <AlertDescription>
-                  Once cleared, the project will be marked as ready for final evaluation.
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-2">
-                <Label>Clearance Checklist</Label>
-                <div className="space-y-2">
-                  {[
-                    "All milestones completed",
-                    "Documentation submitted",
-                    "Final presentation ready",
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input type="checkbox" id={`check-${index}`} className="rounded" />
-                      <Label htmlFor={`check-${index}`} className="text-sm">{item}</Label>
+                            </CardContent>
+                          </Card>
+                        </TabsContent>
+                      </Tabs>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </ScrollArea>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
 
-              <div className="space-y-2">
-                <Label htmlFor="comments">Additional Comments</Label>
-                <Textarea id="comments" placeholder="Add any final notes..." rows={3} />
-              </div>
-            </div>
+          {/* Clearance Dialog */}
+          <Dialog open={showClearanceDialog} onOpenChange={setShowClearanceDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clear Project for Evaluation</DialogTitle>
+                <DialogDescription>
+                  Review the project before marking it as ready for final evaluation.
+                </DialogDescription>
+              </DialogHeader>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowClearanceDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleConfirmClearance}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Confirm Clearance
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="space-y-4 py-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Important</AlertTitle>
+                  <AlertDescription>
+                    Once cleared, the project will be marked as ready for final evaluation.
+                  </AlertDescription>
+                </Alert>
 
-        {/* Schedule Meeting Dialog */}
-        <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Schedule Meeting</DialogTitle>
-              <DialogDescription>
-                Set up a new meeting with your project teams.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="meeting-title">Meeting Title</Label>
-                <Input id="meeting-title" placeholder="e.g., Progress Review" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="project-select">Project</Label>
-                <select 
-                  id="project-select"
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                >
-                  <option value="">Select a project</option>
-                  {advisorProjects.map(project => (
-                    <option key={project.id} value={project.id}>{project.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="meeting-date">Date</Label>
-                  <Input id="meeting-date" type="date" />
+                  <Label>Clearance Checklist</Label>
+                  <div className="space-y-2">
+                    {[
+                      "All milestones completed",
+                      "Documentation submitted",
+                      "Final presentation ready",
+                    ].map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input type="checkbox" id={`check-${index}`} className="rounded border-muted-foreground/20" />
+                        <Label htmlFor={`check-${index}`} className="text-sm font-normal">{item}</Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="meeting-time">Time</Label>
-                  <Input id="meeting-time" type="time" />
+                  <Label htmlFor="comments">Additional Comments</Label>
+                  <Textarea id="comments" placeholder="Add any final notes..." rows={3} />
                 </div>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
-                setShowMeetingDialog(false)
-                toast.success("Meeting scheduled successfully")
-              }}>
-                Schedule Meeting
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowClearanceDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleConfirmClearance}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirm Clearance
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Schedule Meeting Dialog */}
+          <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Schedule Meeting</DialogTitle>
+                <DialogDescription>
+                  Set up a new meeting with your project teams.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="meeting-title">Meeting Title</Label>
+                  <Input id="meeting-title" placeholder="e.g., Progress Review" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="project-select">Project</Label>
+                  <select 
+                    id="project-select"
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                  >
+                    <option value="">Select a project</option>
+                    {advisorProjects.map(project => (
+                      <option key={project.id} value={project.id}>{project.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-date">Date</Label>
+                    <Input id="meeting-date" type="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-time">Time</Label>
+                    <Input id="meeting-time" type="time" />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => {
+                  setShowMeetingDialog(false)
+                  toast.success("Meeting scheduled successfully")
+                }}>
+                  Schedule Meeting
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     </TooltipProvider>
   )
