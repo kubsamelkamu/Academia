@@ -135,6 +135,11 @@ function formatCountdown(parts: CountdownParts): string {
   return `${parts.days}d ${parts.hours}h ${parts.minutes}m ${String(parts.seconds).padStart(2, "0")}s`
 }
 
+function formatActionTypeLabel(actionType: string | null | undefined): string {
+  if (!actionType?.trim()) return "CUSTOM_ACTION"
+  return actionType.trim()
+}
+
 function buildMockDashboardData(): StudentDashboardData {
   const now = new Date()
   const inDays = (d: number) => {
@@ -374,40 +379,54 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     Boolean(nextDeadlineAnnouncement?.isExpired) ||
     (uiSecondsRemaining !== null && uiSecondsRemaining <= 0)
 
-  const nextDeadlineTitle = nextDeadlineAnnouncement?.title || data.project.nextDeadlineLabel
+  const isAnnouncementDisabled =
+    Boolean(nextDeadlineAnnouncement?.isDisabled) || isAnnouncementDeadlinePassed
+
+  const isCriticalWindow =
+    uiSecondsRemaining !== null && uiSecondsRemaining > 0 && uiSecondsRemaining <= 3_600
+  const isWarningWindow =
+    uiSecondsRemaining !== null && uiSecondsRemaining > 3_600 && uiSecondsRemaining <= 86_400
+
+  const countdownToneClass = isAnnouncementDeadlinePassed
+    ? "border-destructive/40 bg-destructive/5"
+    : isCriticalWindow
+      ? "border-destructive/30 bg-destructive/5"
+      : isWarningWindow
+        ? "border-yellow-500/30 bg-yellow-500/10"
+        : "border-primary/20 bg-primary/5"
+
+  const nextDeadlineTitle = nextDeadlineAnnouncement?.title?.trim() || "No active deadline"
   const nextDeadlineDueText = nextDeadlineAnnouncement
     ? isAnnouncementDeadlinePassed
       ? "Deadline passed"
       : countdownParts
         ? `${formatCountdown(countdownParts)} remaining`
         : "No deadline"
-    : data.project.nextDeadlineDays === 0
-      ? "Due today"
-      : `Due in ${data.project.nextDeadlineDays} day${data.project.nextDeadlineDays === 1 ? "" : "s"}`
+    : "No deadline"
 
-  const nextDeadlineSummary =
-    nextDeadlineAnnouncement?.message?.trim() ||
-    "Submit early so your advisor has time to review and give feedback."
+  const nextDeadlineSummary = nextDeadlineAnnouncement?.message?.trim() || ""
 
   const nextDeadlineActionTitle = nextDeadlineAnnouncement
     ? getAnnouncementActionLabel(
         nextDeadlineAnnouncement.actionType,
         nextDeadlineAnnouncement.actionLabel
       )
-    : "Upload latest document"
+    : ""
 
-  const nextDeadlineActionText = nextDeadlineAnnouncement?.actionUrl
-    ? `Action link is ready: ${nextDeadlineAnnouncement.actionUrl}`
-    : "Make sure your SRS and SDD are up to date before implementation starts."
+  const nextDeadlineActionTypeLabel = nextDeadlineAnnouncement
+    ? formatActionTypeLabel(nextDeadlineAnnouncement.actionType)
+    : ""
 
   const announcementCreator = nextDeadlineAnnouncement?.createdBy
   const creatorName =
     `${announcementCreator?.firstName ?? ""} ${announcementCreator?.lastName ?? ""}`.trim() ||
-    "Department Team"
+    ""
 
   const secondaryCardText = nextDeadlineAnnouncement?.deadlineAt
     ? `Deadline set for ${formatDate(nextDeadlineAnnouncement.deadlineAt)}.`
-    : "Respond to any pending questions or requested clarifications."
+    : ""
+
+  const hasActionUrl = Boolean(nextDeadlineAnnouncement?.actionUrl?.trim())
 
   const myTeamMembers: TeamMember[] = myGroup
     ? [
@@ -617,27 +636,59 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border border-dashed p-4 text-center">
-              <p className="text-sm font-medium">{nextDeadlineDueText}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {nextDeadlineSummary}
-              </p>
-            </div>
+            {departmentAnnouncementsQuery.isLoading ? (
+              <div className="rounded-lg border border-dashed p-4 text-center">
+                <p className="text-sm text-muted-foreground">Loading deadline...</p>
+              </div>
+            ) : !nextDeadlineAnnouncement ? (
+              <div className="rounded-lg border border-dashed p-4 text-center">
+                <p className="text-sm font-medium">No active deadline</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No department announcement with a deadline is available right now.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
+                    <Badge variant={isAnnouncementDeadlinePassed ? "destructive" : "secondary"}>
+                      {nextDeadlineActionTypeLabel}
+                    </Badge>
+                  </div>
+                  {nextDeadlineSummary ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
+                  ) : null}
+                </div>
 
-            <div className="space-y-3">
-              <div className="rounded-lg border p-3">
-                <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {nextDeadlineActionText}
-                </p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-sm font-medium">Announcement by {creatorName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {secondaryCardText}
-                </p>
-              </div>
-            </div>
+                <div className="space-y-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {creatorName ? `Announcement by ${creatorName}` : "Announcement details"}
+                    </p>
+                    {secondaryCardText ? (
+                      <p className="mt-1 text-xs text-muted-foreground">{secondaryCardText}</p>
+                    ) : null}
+                  </div>
+
+                  {hasActionUrl ? (
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      disabled={isAnnouncementDisabled}
+                      onClick={() => {
+                        const target = nextDeadlineAnnouncement.actionUrl
+                        if (!target) return
+                        window.open(target, "_blank", "noopener,noreferrer")
+                      }}
+                    >
+                      {nextDeadlineActionTitle}
+                    </Button>
+                  ) : null}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
