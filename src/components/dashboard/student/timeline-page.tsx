@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useStudentProjects, useProjectMilestones } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import { useAuthStore } from "@/store/auth-store"
 
 type TimelineItemType = 'milestone' | 'task' | 'event' | 'deadline' | 'review'
@@ -186,7 +187,7 @@ export function StudentTimelinePage() {
       .map((template) => ({
         id: template.templateId,
         title: template.name,
-        dueDate: template.createdAt,
+        dueDate: getTemplateDueDate(template),
         status: "pending",
       }))
 
@@ -272,6 +273,10 @@ export function StudentTimelinePage() {
       .map((milestone) => new Date(milestone.dueDate))
       .filter((date) => !Number.isNaN(date.getTime()))
 
+    const earliestMilestoneDate = milestoneDates.length
+      ? new Date(Math.min(...milestoneDates.map((date) => date.getTime())))
+      : null
+
     const latestDueDate = milestoneDates.length
       ? new Date(Math.max(...milestoneDates.map((date) => date.getTime())))
       : null
@@ -286,12 +291,14 @@ export function StudentTimelinePage() {
 
     return {
       name: activeProject.title || defaultProjectInfo.name,
-      startDate: defaultProjectInfo.startDate,
+      startDate: earliestMilestoneDate
+        ? earliestMilestoneDate.toISOString()
+        : defaultProjectInfo.startDate,
       endDate,
       progress,
       daysRemaining,
-      totalTasks: totalMilestones,
-      completedTasks: completedMilestones,
+      totalTasks: defaultProjectInfo.totalTasks,
+      completedTasks: defaultProjectInfo.completedTasks,
       milestones: totalMilestones,
       completedMilestones,
     }
