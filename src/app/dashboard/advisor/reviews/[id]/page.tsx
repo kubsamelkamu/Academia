@@ -1,12 +1,10 @@
-import { AdvisorStudentsRevisionPage } from "@/components/dashboard/advisor/students-revision-page"
+import { AdvisorProjectReviewsPage } from "@/components/dashboard/advisor/project-reviews-page"
 
 interface PageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
-export default function Page({ params }: PageProps) {
-  return <AdvisorStudentsRevisionPage projectId={params.id} />
+export default async function Page({ params }: PageProps) {
+  const { id } = await params
+  return <AdvisorProjectReviewsPage projectId={id} />
 }
-

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import {
   FolderOpen,
@@ -17,79 +17,24 @@ import {
   FileText,
   Eye,
   CheckCircle,
-  Video,
   Clock,
   AlertCircle,
-  Award,
   TrendingUp,
   Filter,
   Search,
   Download,
   Upload,
-  Plus,
-  MoreVertical,
-  Star,
   Flag,
   GitBranch,
   AlertTriangle,
-  CheckCheck,
   ListChecks,
-  BarChart3,
-  PieChart,
-  Bell,
   Mail,
-  Phone,
-  ExternalLink,
-  BookOpen,
-  GraduationCap,
-  UserCheck,
-  UserPlus,
   XCircle,
-  HelpCircle,
   ChevronDown,
-  Grid3X3,
-  List,
-  FileText as FileTextIcon,
-  Video as VideoIcon,
-  Calendar as CalendarIcon,
   MessageCircle,
-  Rocket,
-  Target,
-  Zap,
-  Layers,
-  Users2,
-  ArrowUpRight,
-  Clock3,
-  CircleDashed,
-  CircleDot,
   PauseCircle,
-  Upload as UploadIcon,
   CheckCircle2,
-  AlertOctagon,
   ThumbsUp,
-  Briefcase,
-  Bookmark,
-  Pin,
-  Share2,
-  MoreHorizontal,
-  PlayCircle,
-  Send,
-  Paperclip,
-  Link2,
-  Github,
-  Code,
-  Database,
-  Cloud,
-  Smartphone,
-  Globe,
-  Server,
-  Cpu,
-  Shield,
-  Lock,
-  Key,
-  Settings,
-  Sliders,
-  Menu,
   Activity,
 } from 'lucide-react'
 import {
@@ -100,23 +45,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
@@ -409,7 +340,6 @@ interface MilestoneItemProps {
 
 const MilestoneItem = ({ milestone }: MilestoneItemProps) => {
   const StatusIcon = (MILESTONE_STATUS_CONFIG[milestone.status]?.icon || Clock) as React.ElementType
-  const PriorityIcon = PRIORITY_CONFIG[milestone.priority]?.icon || Flag
 
   return (
     <div className="flex items-center justify-between py-2 hover:bg-muted/30 px-2 rounded-lg transition-colors">
@@ -444,8 +374,6 @@ interface ProjectCardProps {
 }
 
 const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: ProjectCardProps) => {
-  const daysRemaining = getDaysRemaining(project.dueDate)
-  const completedMilestones = project.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length
   const StatusIcon = (STATUS_CONFIG[project.status]?.icon || FolderOpen) as React.ElementType
 
   return (
@@ -629,13 +557,11 @@ const StatusFilter = ({ value, onChange, isOpen, onToggle, onClose }: StatusFilt
 
 // ==================== Main Component ====================
 export function AdvisorMyProjectsPage() {
-  const [selectedProject, setSelectedProject] = useState<AdvisorProject | null>(null)
   const [showProjectDialog, setShowProjectDialog] = useState(false)
   const [showClearanceDialog, setShowClearanceDialog] = useState(false)
   const [showMeetingDialog, setShowMeetingDialog] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
 
   // Use mock data (would come from API in production)

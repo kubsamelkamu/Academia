@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -118,6 +118,18 @@ function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+const DEFAULT_PROJECT_INFO = {
+  name: "AI Research Project",
+  startDate: "2024-01-15",
+  endDate: "2024-05-30",
+  progress: 65,
+  daysRemaining: 45,
+  totalTasks: 24,
+  completedTasks: 16,
+  milestones: 8,
+  completedMilestones: 5,
+}
+
 export function StudentTimelinePage() {
   const user = useAuthStore((state) => state.user)
   const [, setViewMode] = useState<'timeline' | 'calendar' | 'list' | 'gantt'>('timeline')
@@ -225,6 +237,16 @@ export function StudentTimelinePage() {
     completedMilestones: 5
   }
 
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [])
+
   const projectInfo = useMemo(() => {
     if (!activeProject) {
       return defaultProjectInfo
@@ -259,7 +281,7 @@ export function StudentTimelinePage() {
       : defaultProjectInfo.endDate
 
     const daysRemaining = latestDueDate
-      ? Math.max(0, Math.ceil((latestDueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      ? Math.max(0, Math.ceil((latestDueDate.getTime() - currentTime) / (1000 * 60 * 60 * 24)))
       : defaultProjectInfo.daysRemaining
 
     return {
@@ -273,7 +295,7 @@ export function StudentTimelinePage() {
       milestones: totalMilestones,
       completedMilestones,
     }
-  }, [activeProject, mergedMilestones])
+  }, [activeProject, mergedMilestones, currentTime, defaultProjectInfo])
 
   const tasksProgress =
     projectInfo.totalTasks > 0

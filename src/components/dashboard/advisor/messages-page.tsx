@@ -1,19 +1,30 @@
  "use client"
 
 import * as React from "react"
-import Link from "next/link"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Checkbox,
+} from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Clock,
-  FileText,
   MessageSquare,
   Paperclip,
   Plus,
@@ -156,6 +167,139 @@ function formatTime(timestamp: string) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
+function AdvisorCreateGroupForm() {
+  const [formData, setFormData] = React.useState({
+    name: "",
+    description: "",
+    projectId: "",
+    privacy: "private" as "private" | "project",
+  })
+  const [selectedMembers, setSelectedMembers] = React.useState<string[]>([])
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [isCreating, setIsCreating] = React.useState(false)
+
+  const mockProjects = [
+    { id: "1", name: "Smart Campus System", group: "Team Alpha" },
+    { id: "2", name: "AI Chatbot", group: "Team Beta" },
+    { id: "3", name: "E-Learning Platform", group: "Team Gamma" },
+  ]
+
+  const mockStudents = [
+    { id: "1", name: "John Doe", project: "Smart Campus System" },
+    { id: "2", name: "Jane Smith", project: "Smart Campus System" },
+    { id: "3", name: "Mike Johnson", project: "AI Chatbot" },
+  ]
+
+  const selectedProject = mockProjects.find((p) => p.id === formData.projectId)
+
+  const filteredStudents = mockStudents.filter((student) => {
+    const matchesProject = selectedProject ? student.project === selectedProject.name : true
+    const lower = searchTerm.toLowerCase()
+    return matchesProject && student.name.toLowerCase().includes(lower)
+  })
+
+  const handleInputChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleMemberToggle = (memberId: string) => {
+    setSelectedMembers((prev) =>
+      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
+    )
+  }
+
+  const handleSelectAll = () => {
+    setSelectedMembers(filteredStudents.map((s) => s.id))
+  }
+
+  const handleCreate = () => {
+    if (!formData.name || !formData.projectId || selectedMembers.length === 0) {
+      toast.error("Incomplete")
+      return
+    }
+    toast.success("Group created!")
+  }
+
+  return (
+    <div className="space-y-6 p-1">
+
+      <DialogHeader>
+        <DialogTitle>Create New Group</DialogTitle>
+      </DialogHeader>
+      
+      {/* Fields */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label>Group Name *</Label>
+            <Input value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Project *</Label>
+            <Select value={formData.projectId} onValueChange={(v) => handleInputChange("projectId", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {mockProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Privacy</Label>
+            <Select value={formData.privacy} onValueChange={(v) => handleInputChange("privacy", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="project">Project Members</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea 
+              value={formData.description} 
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              rows={3} 
+            />
+          </div>
+
+          {/* Students */}
+          <div className="space-y-2">
+            <Label>Members ({selectedMembers.length})</Label>
+            <div className="flex gap-2 mb-2">
+              <Button size="sm" variant="outline" onClick={handleSelectAll}>Select All</Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>Clear</Button>
+            </div>
+            <div className="border p-3 rounded-md max-h-32 overflow-auto">
+              <Input placeholder="Search students..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
+              <div className="space-y-2">
+                {filteredStudents.map((student) => (
+                  <div key={student.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                    <Checkbox 
+                      checked={selectedMembers.includes(student.id)}
+                      onCheckedChange={() => handleMemberToggle(student.id)}
+                    />
+                    <span className="text-sm">{student.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">({student.project})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+      <Button onClick={handleCreate} className="w-full" disabled={isCreating}>
+        Create Group
+      </Button>
+    </div>
+  )
+}
+
 export function AdvisorMessagesPage() {
   const [groups, setGroups] = React.useState<Group[]>(baseGroups)
   const [selectedGroup, setSelectedGroup] = React.useState<Group>(baseGroups[0]!)
@@ -194,15 +338,23 @@ export function AdvisorMessagesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Group Messaging</h1>
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Group Messaging</h1>
           <p className="text-sm text-muted-foreground">Communicate with your project teams.</p>
         </div>
-        <Button asChild className="btn-gradient">
-          <Link href="/dashboard/advisor/create-group">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Group
-          </Link>
-        </Button>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="btn-gradient">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Group
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <AdvisorCreateGroupForm />
+          </DialogContent>
+
+        </Dialog>
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
