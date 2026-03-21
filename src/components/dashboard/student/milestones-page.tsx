@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
+import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -114,8 +115,10 @@ export function StudentMilestonesPage() {
   const [blockers, setBlockers] = useState("")
 
   const user = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -185,6 +188,7 @@ export function StudentMilestonesPage() {
   const completedMilestones = myProject.milestones.filter((m) => m.status === "approved").length
   const totalMilestones = myProject.milestones.length
   const progressPercent = (completedMilestones / totalMilestones) * 100
+  const projectDisplayName = myProjectGroupQuery.data?.name?.trim() || myProject.title
 
   const handleSubmitMilestone = (milestone: Milestone) => {
     router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestone.name)}`)
@@ -271,7 +275,7 @@ export function StudentMilestonesPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold">{myProject.title}</h3>
+              <h3 className="font-semibold">{projectDisplayName}</h3>
               <p className="text-sm text-muted-foreground">
                 {completedMilestones} of {totalMilestones} milestones completed
               </p>
