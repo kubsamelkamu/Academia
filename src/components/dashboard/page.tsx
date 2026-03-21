@@ -6,53 +6,12 @@ import { type UserRole } from "@/config/navigation"
 import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard"
 import { StudentDashboard } from "@/components/dashboard/roles/student-dashboard"
 import { DepartmentHeadDashboard } from "@/components/dashboard/roles/department-head-dashboard"
+import { AdvisorDashboard } from "@/components/dashboard/roles/advisor-dashboard"
 import { useAuthStore } from "@/store/auth-store"
 import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 
 function AdvisorDashboardWelcome(props: { userName?: string }) {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 60_000)
-    return () => window.clearInterval(id)
-  }, [])
-
-  const hour = now.getHours()
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
-  const formattedDateTime = new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(now)
-
-  const name = props.userName?.trim()
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-6">
-        <p className="text-sm text-muted-foreground">{formattedDateTime}</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          Welcome{name ? `, ${name}` : ""} to Academia
-        </h1>
-        <p className="mt-2 text-muted-foreground">{greeting}. We’re glad you’re here.</p>
-      </div>
-
-      {/*
-      Previous Advisor dashboard implementation (kept as reference for teammates):
-
-      return (
-        <CustomizableDashboard
-          role={primaryRole ?? role}
-          userId={user.id}
-          userName={userName || undefined}
-        />
-      )
-      */}
-    </div>
-  )
+  return <AdvisorDashboard userName={props.userName} />
 }
 
 function StudentDashboardWelcome(props: { userName?: string }) {

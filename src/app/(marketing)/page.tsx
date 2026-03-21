@@ -62,7 +62,7 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Streamline your university&apos;s academic project workflow from proposal to defense. 
+              Streamline your university&apos;s academic project workflow from proposal to defense.
               Collaborate seamlessly, track progress, and manage student projects effortlessly with clear milestones and real-time visibility.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -74,7 +74,7 @@ export default function HomePage() {
                 </Button>
               </motion.div>
             </div>
-  
+
             <motion.div
               className="mt-12 flex items-center justify-center gap-8 text-sm text-muted-foreground"
               initial={{ opacity: 0 }}
@@ -230,8 +230,8 @@ export default function HomePage() {
         <div className="container">
           <div className="grid gap-8 md:grid-cols-3">
             {stats.map((stat, index) => (
-              <motion.div 
-                key={stat.label} 
+              <motion.div
+                key={stat.label}
                 className="text-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -256,13 +256,13 @@ export default function HomePage() {
             <p className="text-lg text-muted-foreground mb-8">
               Watch how our platform transforms academic project management
             </p>
-            <motion.div 
+            <motion.div
               className="relative aspect-video bg-muted rounded-lg overflow-hidden cursor-pointer group"
               whileHover={{ scale: 1.02 }}
               transition={{ duration: 0.3 }}
             >
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                <motion.div 
+                <motion.div
                   className="bg-white rounded-full p-4"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -382,19 +382,19 @@ const testimonials = [
     quote: "Academia has revolutionized how we manage our computer science projects. The automation saves us hours every week.",
     name: "Dr. Sarah Johnson",
     role: "Department Chair, MIT",
-    avatar: "/avatars/sarah.jpg"
+    avatar: ""
   },
   {
     quote: "Our students love the intuitive interface, and advisors can focus more on mentoring rather than paperwork.",
     name: "Prof. Michael Chen",
     role: "Advisor, Stanford University",
-    avatar: "/avatars/michael.jpg"
+    avatar: ""
   },
   {
     quote: "The analytics features help us identify at-risk projects early and provide timely interventions.",
     name: "Dr. Emily Rodriguez",
     role: "Program Director, UC Berkeley",
-    avatar: "/avatars/emily.jpg"
+    avatar: ""
   }
 ]
 

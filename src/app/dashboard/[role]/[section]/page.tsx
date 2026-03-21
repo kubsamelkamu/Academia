@@ -5,6 +5,7 @@ import { AdvisorMessagesPage } from "@/components/dashboard/advisor/messages-pag
 import { AdvisorMyProjectsPage } from "@/components/dashboard/advisor/my-projects-page"
 import { AdvisorSchedulePage } from "@/components/dashboard/advisor/schedule-page"
 import { AdvisorStudentsPage } from "@/components/dashboard/advisor/students-page"
+import { AdvisorAnnouncementsPage } from "@/components/dashboard/advisor/announcements-page"
 import { CommitteeAssignedProjectsPage } from "@/components/dashboard/committee/assigned-projects-page"
 import { CommitteeDefenseSchedulePage } from "@/components/dashboard/committee/defense-schedule-page"
 import { CommitteeEvaluationsPage } from "@/components/dashboard/committee/evaluations-page"
@@ -71,6 +72,7 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     students: AdvisorStudentsPage,
     evaluations: AdvisorEvaluationsPage,
     schedule: AdvisorSchedulePage,
+    announcements: AdvisorAnnouncementsPage,
     messages: AdvisorMessagesPage,
   },
   student: {
@@ -110,7 +112,7 @@ function getCanonicalSectionForRole(role: UserRole, section: string): string {
 const allowedSectionsByRole: Record<UserRole, string[]> = {
   department_head: ["invitations", "faculty", "grades", "projects", "reports", "announcements", "messages", "settings"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
-  advisor: ["my-projects", "students", "evaluations", "schedule", "messages"],
+  advisor: ["my-projects", "students", "evaluations", "schedule", "announcements", "messages"],
   student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],
   department_committee: ["assigned-projects", "evaluations", "defense-schedule", "reports"],
 }

@@ -45,7 +45,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: UserCheck,
     },
     {
-      title: "Grade Approval",
+      title: "Review & Approval",
       href: "/dashboard/department-head/grades",
       icon: ClipboardCheck,
     },
@@ -162,6 +162,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Messages",
       href: "/dashboard/advisor/messages",
       icon: FileText,
+    },
+    {
+      title: "Announcements",
+      href: "/dashboard/advisor/announcements",
+      icon: Megaphone,
     },
     {
       title: "Profile",
