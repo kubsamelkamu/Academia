@@ -137,7 +137,19 @@ function formatCountdown(parts: CountdownParts): string {
 
 function formatActionTypeLabel(actionType: string | null | undefined): string {
   if (!actionType?.trim()) return "CUSTOM_ACTION"
-  return actionType.trim()
+  return actionType
+    .trim()
+    .toLowerCase()
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ")
+}
+
+function getMeaningfulText(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? ""
+  if (!trimmed) return ""
+  if (trimmed.toLowerCase() === "string") return ""
+  return trimmed
 }
 
 function buildMockDashboardData(): StudentDashboardData {
@@ -395,7 +407,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         ? "border-yellow-500/30 bg-yellow-500/10"
         : "border-primary/20 bg-primary/5"
 
-  const nextDeadlineTitle = nextDeadlineAnnouncement?.title?.trim() || "No active deadline"
+  const announcementTitle = getMeaningfulText(nextDeadlineAnnouncement?.title)
+  const actionTypeLabel = nextDeadlineAnnouncement
+    ? formatActionTypeLabel(nextDeadlineAnnouncement.actionType)
+    : ""
+
+  const nextDeadlineTitle = announcementTitle || actionTypeLabel || "No active deadline"
   const nextDeadlineDueText = nextDeadlineAnnouncement
     ? isAnnouncementDeadlinePassed
       ? "Deadline passed"
@@ -404,18 +421,24 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         : "No deadline"
     : "No deadline"
 
-  const nextDeadlineSummary = nextDeadlineAnnouncement?.message?.trim() || ""
+  const nextDeadlineSummary = getMeaningfulText(nextDeadlineAnnouncement?.message)
 
   const nextDeadlineActionTitle = nextDeadlineAnnouncement
-    ? getAnnouncementActionLabel(
+    ? getMeaningfulText(
+        getAnnouncementActionLabel(
+          nextDeadlineAnnouncement.actionType,
+          nextDeadlineAnnouncement.actionLabel
+        )
+      ) ||
+      getAnnouncementActionLabel(
         nextDeadlineAnnouncement.actionType,
         nextDeadlineAnnouncement.actionLabel
       )
     : ""
 
-  const nextDeadlineActionTypeLabel = nextDeadlineAnnouncement
-    ? formatActionTypeLabel(nextDeadlineAnnouncement.actionType)
-    : ""
+  const shouldShowTypeBadge = Boolean(
+    actionTypeLabel && actionTypeLabel.toLowerCase() !== nextDeadlineTitle.toLowerCase()
+  )
 
   const announcementCreator = nextDeadlineAnnouncement?.createdBy
   const creatorName =
@@ -652,9 +675,11 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
-                    <Badge variant={isAnnouncementDeadlinePassed ? "destructive" : "secondary"}>
-                      {nextDeadlineActionTypeLabel}
-                    </Badge>
+                    {shouldShowTypeBadge ? (
+                      <Badge variant={isAnnouncementDeadlinePassed ? "destructive" : "secondary"}>
+                        {actionTypeLabel}
+                      </Badge>
+                    ) : null}
                   </div>
                   {nextDeadlineSummary ? (
                     <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
@@ -663,10 +688,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
                 <div className="space-y-3">
                   <div className="rounded-lg border p-3">
-                    <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {creatorName ? `Announcement by ${creatorName}` : "Announcement details"}
-                    </p>
+                    {nextDeadlineActionTitle ? (
+                      <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
+                    ) : null}
+                    {creatorName ? (
+                      <p className="mt-1 text-xs text-muted-foreground">Announcement by {creatorName}</p>
+                    ) : null}
                     {secondaryCardText ? (
                       <p className="mt-1 text-xs text-muted-foreground">{secondaryCardText}</p>
                     ) : null}
