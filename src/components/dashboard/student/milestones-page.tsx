@@ -16,6 +16,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -153,7 +154,7 @@ export function StudentMilestonesPage() {
       .map((template) => ({
         id: template.templateId,
         name: template.name,
-        dueDate: template.createdAt,
+        dueDate: getTemplateDueDate(template),
         status: "pending" as const,
       }))
 

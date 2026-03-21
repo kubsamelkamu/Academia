@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import {
   BarChart3,
   Calendar,
@@ -205,7 +206,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         id: template.templateId,
         name: template.name,
         status: "pending" as const,
-        dueDate: template.createdAt,
+        dueDate: getTemplateDueDate(template),
       }))
 
     const projectMilestonesByName = new Map(
