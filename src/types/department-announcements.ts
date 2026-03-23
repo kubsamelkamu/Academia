@@ -37,3 +37,24 @@ export type DepartmentAnnouncementsListData = {
     pages: number
   }
 }
+
+export type DepartmentAnnouncementDetails = DepartmentAnnouncementItem
+
+export type CreateDepartmentAnnouncementDto = {
+  title: string
+  message: string
+  actionType: DepartmentAnnouncementActionType
+  actionLabel?: string | null
+  actionUrl?: string | null
+  deadlineAt?: string
+}
+
+export type UpdateDepartmentAnnouncementDto = Partial<
+  Pick<CreateDepartmentAnnouncementDto, "title" | "message" | "actionType" | "deadlineAt">
+> & {
+  clearDeadline?: boolean
+}
+
+export type DeleteDepartmentAnnouncementResult = {
+  id: string
+}
