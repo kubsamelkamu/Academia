@@ -8,20 +8,27 @@ import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { getAnnouncementById, formatAnnouncementDate } from "@/lib/mock/announcements"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useAuthStore } from "@/store/auth-store"
+import {
+  useDeleteDepartmentAnnouncement,
+  useDepartmentAnnouncementById,
+} from "@/lib/hooks/use-department-announcements"
 
-const audienceLabel: Record<string, string> = {
-  all: "All",
-  students: "Students",
-  advisors: "Advisors",
-}
+function mapDeleteError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Failed to delete announcement"
+  const normalized = message.toLowerCase()
 
-const priorityBadgeClass: Record<string, string> = {
-  high: "bg-red-500/90 text-white",
-  medium: "bg-amber-500/90 text-white",
-  low: "bg-muted text-muted-foreground",
+  if (normalized.includes("access denied to department")) {
+    return "You do not have access to this department."
+  }
+
+  if (normalized.includes("announcement not found")) {
+    return "Announcement no longer exists"
+  }
+
+  return message
 }
 
 interface AnnouncementDeletePageProps {
@@ -30,9 +37,31 @@ interface AnnouncementDeletePageProps {
 
 export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePageProps) {
   const router = useRouter()
-  const announcement = getAnnouncementById(announcementId)
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
 
-  if (!announcement) {
+  const announcementQuery = useDepartmentAnnouncementById({
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    departmentId,
+    announcementId,
+  })
+  const deleteMutation = useDeleteDepartmentAnnouncement()
+
+  const announcement = announcementQuery.data ?? null
+
+  if (announcementQuery.isLoading) {
+    return (
+      <div className="space-y-6">
+        <DashboardPageHeader
+          title="Delete Announcement"
+          description="Loading announcement details..."
+        />
+      </div>
+    )
+  }
+
+  if (announcementQuery.isError || !announcement) {
     return (
       <div className="space-y-6">
         <DashboardPageHeader
@@ -46,11 +75,25 @@ export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePag
     )
   }
 
-  const handleDelete = () => {
-    toast.success("Announcement deleted", {
-      description: `"${announcement.title}" has been permanently deleted.`,
-    })
-    router.push("/dashboard/department-head/announcements")
+  const handleDelete = async () => {
+    if (!departmentId) {
+      toast.error("Department context is missing")
+      return
+    }
+
+    try {
+      await deleteMutation.mutateAsync({
+        departmentId,
+        announcementId: announcement.id,
+      })
+
+      toast.success("Announcement deleted", {
+        description: `"${announcement.title}" has been permanently deleted.`,
+      })
+      router.push("/dashboard/department-head/announcements")
+    } catch (error) {
+      toast.error(mapDeleteError(error))
+    }
   }
 
   return (
@@ -84,24 +127,28 @@ export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePag
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                 <p><span className="text-muted-foreground">Title:</span> {announcement.title}</p>
                 <p>
-                  <span className="text-muted-foreground">Audience:</span>{" "}
-                  <Badge variant="secondary">
-                    {audienceLabel[announcement.audience] ?? announcement.audience}
-                  </Badge>
+                  <span className="text-muted-foreground">Action Type:</span>{" "}
+                  <Badge variant="secondary">{announcement.actionType}</Badge>
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Priority:</span>{" "}
-                  <Badge className={priorityBadgeClass[announcement.priority]}>
-                    {announcement.priority}
+                  <span className="text-muted-foreground">Status:</span>{" "}
+                  <Badge variant={announcement.isExpired ? "destructive" : "outline"}>
+                    {announcement.isExpired ? "Expired" : "Active"}
                   </Badge>
                 </p>
                 <p>
                   <span className="text-muted-foreground">Created At:</span>{" "}
-                  {formatAnnouncementDate(announcement.createdAt)}
+                  {new Date(announcement.createdAt).toLocaleString()}
                 </p>
+                {announcement.deadlineAt ? (
+                  <p>
+                    <span className="text-muted-foreground">Deadline:</span>{" "}
+                    {new Date(announcement.deadlineAt).toLocaleString()}
+                  </p>
+                ) : null}
                 <p>
-                  <span className="text-muted-foreground">Content:</span>{" "}
-                  {announcement.content}
+                  <span className="text-muted-foreground">Message:</span>{" "}
+                  {announcement.message}
                 </p>
               </div>
               <div className="flex justify-end gap-2">
@@ -112,9 +159,10 @@ export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePag
                   variant="destructive"
                   className="gap-2"
                   onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete Announcement
+                  {deleteMutation.isPending ? "Deleting..." : "Delete Announcement"}
                 </Button>
               </div>
             </div>
