@@ -370,6 +370,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUiSecondsRemaining(nextDeadlineAnnouncement?.secondsRemaining ?? null)
   }, [nextDeadlineAnnouncement?.id, nextDeadlineAnnouncement?.secondsRemaining])
 
