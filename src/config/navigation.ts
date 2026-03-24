@@ -14,6 +14,8 @@ import {
   Clock,
   Bell,
   Megaphone,
+  MessageSquare,
+  Edit,
   type LucideIcon,
 } from "lucide-react"
 
@@ -115,6 +117,16 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Evaluations",
       href: "/dashboard/coordinator/evaluations",
       icon: ClipboardList,
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/coordinator/messages",
+      icon: MessageSquare,
+    },
+    {
+      title: "Title Management",
+      href: "/dashboard/coordinator/title-management",
+      icon: Edit,
     },
     {
       title: "Reports",
