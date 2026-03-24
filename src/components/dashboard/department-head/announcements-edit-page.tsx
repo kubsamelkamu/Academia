@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Save } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
@@ -82,30 +82,25 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
 
   const announcement = announcementQuery.data ?? null
 
-  const [title, setTitle] = useState("")
-  const [message, setMessage] = useState("")
-  const [actionType, setActionType] = useState<DepartmentAnnouncementActionType>("FORM_PROJECT_GROUP")
-  const [actionLabel, setActionLabel] = useState("")
-  const [actionUrl, setActionUrl] = useState("")
-  const [deadlineAtLocal, setDeadlineAtLocal] = useState("")
-  const [initialDeadlineAtIso, setInitialDeadlineAtIso] = useState<string | null>(null)
+  const [draft, setDraft] = useState<{
+    title?: string
+    message?: string
+    actionType?: DepartmentAnnouncementActionType
+    actionLabel?: string
+    actionUrl?: string
+    deadlineAtLocal?: string
+  } | null>(null)
   const [deadlineError, setDeadlineError] = useState<string | null>(null)
   const [actionLabelError, setActionLabelError] = useState<string | null>(null)
   const [actionUrlError, setActionUrlError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!announcement) return
-    setTitle(announcement.title)
-    setMessage(announcement.message)
-    setActionType(announcement.actionType)
-    setActionLabel(announcement.actionLabel ?? "")
-    setActionUrl(announcement.actionUrl ?? "")
-    setDeadlineAtLocal(toLocalInputValue(announcement.deadlineAt))
-    setInitialDeadlineAtIso(announcement.deadlineAt)
-    setDeadlineError(null)
-    setActionLabelError(null)
-    setActionUrlError(null)
-  }, [announcement])
+  const title = draft?.title ?? announcement?.title ?? ""
+  const message = draft?.message ?? announcement?.message ?? ""
+  const actionType = draft?.actionType ?? announcement?.actionType ?? "FORM_PROJECT_GROUP"
+  const actionLabel = draft?.actionLabel ?? announcement?.actionLabel ?? ""
+  const actionUrl = draft?.actionUrl ?? announcement?.actionUrl ?? ""
+  const deadlineAtLocal = draft?.deadlineAtLocal ?? toLocalInputValue(announcement?.deadlineAt ?? null)
+  const initialDeadlineAtIso = announcement?.deadlineAt ?? null
 
   const createdByLabel = useMemo(() => {
     if (!announcement) return "Unknown"
@@ -237,6 +232,7 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
       })
 
       toast.success("Changes saved")
+      setDraft(null)
       await announcementQuery.refetch()
     } catch (error) {
       const mapped = mapEditError(error)
@@ -302,19 +298,25 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
           deadlineError={deadlineError}
           actionLabelError={actionLabelError}
           actionUrlError={actionUrlError}
-          onTitleChange={setTitle}
-          onMessageChange={setMessage}
-          onActionTypeChange={setActionType}
+          onTitleChange={(value) => {
+            setDraft((previous) => ({ ...(previous ?? {}), title: value }))
+          }}
+          onMessageChange={(value) => {
+            setDraft((previous) => ({ ...(previous ?? {}), message: value }))
+          }}
+          onActionTypeChange={(value) => {
+            setDraft((previous) => ({ ...(previous ?? {}), actionType: value }))
+          }}
           onActionLabelChange={(value) => {
-            setActionLabel(value)
+            setDraft((previous) => ({ ...(previous ?? {}), actionLabel: value }))
             setActionLabelError(null)
           }}
           onActionUrlChange={(value) => {
-            setActionUrl(value)
+            setDraft((previous) => ({ ...(previous ?? {}), actionUrl: value }))
             setActionUrlError(null)
           }}
           onDeadlineAtChange={(value) => {
-            setDeadlineAtLocal(value)
+            setDraft((previous) => ({ ...(previous ?? {}), deadlineAtLocal: value }))
             setDeadlineError(null)
           }}
         />

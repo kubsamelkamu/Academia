@@ -5,6 +5,7 @@ import Link from "next/link"
 import StatCard from "@/components/shared/StatCard"
 import DataTable, { type Column } from "@/components/shared/DataTable"
 import StatusBadge from "@/components/shared/StatusBadge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,9 +33,12 @@ type DepartmentUserRow = {
   id: string
   name: string
   email: string
+  avatarUrl: string | null
   role: string
   status: string
 }
+
+const DASHBOARD_USERS_PAGE_SIZE = 10
 
 function mapDashboardRoleLabel(roleName?: string): string {
   const normalized = (roleName ?? "").toLowerCase()
@@ -60,6 +64,7 @@ export function DepartmentHeadDashboard() {
   const [userSearchQuery, setUserSearchQuery] = React.useState("")
   const [userRoleFilter, setUserRoleFilter] = React.useState("all")
   const [userStatusFilter, setUserStatusFilter] = React.useState("all")
+  const [usersPage, setUsersPage] = React.useState(1)
   const {
     data: tenantUsers = [],
     isLoading: isUsersLoading,
@@ -97,6 +102,7 @@ export function DepartmentHeadDashboard() {
           id: user.id,
           name: fullName.length > 0 ? fullName : user.email,
           email: user.email,
+          avatarUrl: user.avatarUrl ?? null,
           role: mapDashboardRoleLabel(roleName),
           status: (user.status ?? "UNKNOWN").toLowerCase(),
         }
@@ -137,6 +143,12 @@ export function DepartmentHeadDashboard() {
 
   const activeProjectsCount = projectGroupsPage?.pagination.total ?? 0
   const pendingApprovalsCount = pendingInvitations.length
+  const usersTotalPages = Math.max(1, Math.ceil(filteredDashboardUsers.length / DASHBOARD_USERS_PAGE_SIZE))
+  const safeUsersPage = Math.min(usersPage, usersTotalPages)
+  const pagedDashboardUsers = filteredDashboardUsers.slice(
+    (safeUsersPage - 1) * DASHBOARD_USERS_PAGE_SIZE,
+    safeUsersPage * DASHBOARD_USERS_PAGE_SIZE
+  )
 
   const handleApproveGrades = () => {
     toast.success("Grades approved for publication", {
@@ -169,9 +181,12 @@ export function DepartmentHeadDashboard() {
       header: "Name",
       render: (u) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-            {u.name.charAt(0)}
-          </div>
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={u.avatarUrl ?? undefined} alt={u.name} />
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+              {u.name.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
           <div>
             <p className="text-sm font-medium leading-tight">{u.name}</p>
             <p className="text-xs text-muted-foreground">{u.email}</p>
@@ -343,13 +358,19 @@ export function DepartmentHeadDashboard() {
                   <Input
                     placeholder="Search by name or email..."
                     value={userSearchQuery}
-                    onChange={(event) => setUserSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setUserSearchQuery(event.target.value)
+                      setUsersPage(1)
+                    }}
                   />
                 </div>
                 <div className="flex gap-2">
                   <select
                     value={userRoleFilter}
-                    onChange={(event) => setUserRoleFilter(event.target.value)}
+                    onChange={(event) => {
+                      setUserRoleFilter(event.target.value)
+                      setUsersPage(1)
+                    }}
                     className="flex h-9 w-[150px] items-center rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="all">All Roles</option>
@@ -360,7 +381,10 @@ export function DepartmentHeadDashboard() {
                   </select>
                   <select
                     value={userStatusFilter}
-                    onChange={(event) => setUserStatusFilter(event.target.value)}
+                    onChange={(event) => {
+                      setUserStatusFilter(event.target.value)
+                      setUsersPage(1)
+                    }}
                     className="flex h-9 w-[130px] items-center rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="all">All Status</option>
@@ -392,7 +416,32 @@ export function DepartmentHeadDashboard() {
                   No users match your current filters.
                 </div>
               ) : (
-                <DataTable data={filteredDashboardUsers.slice(0, 8)} columns={userColumns} />
+                <>
+                  <DataTable data={pagedDashboardUsers} columns={userColumns} />
+                  <div className="flex items-center justify-between border-t px-4 py-3">
+                    <p className="text-muted-foreground text-sm">
+                      Page {safeUsersPage} of {usersTotalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage((previous) => Math.max(1, previous - 1))}
+                        disabled={safeUsersPage <= 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUsersPage((previous) => Math.min(usersTotalPages, previous + 1))}
+                        disabled={safeUsersPage >= usersTotalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
