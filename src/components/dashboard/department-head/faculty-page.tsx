@@ -11,7 +11,6 @@ import {
   Edit,
   Eye,
   FileText,
-  Key,
   Mail,
   Plus,
   RefreshCw,
@@ -26,7 +25,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -35,33 +33,77 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { mockFaculty, type Faculty } from "@/lib/mock/faculty"
+import { useTenantUsers } from "@/lib/hooks/use-users"
 
-const generateTempPassword = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
-  let password = ""
-  for (let i = 0; i < 10; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
+type FacultyRole = "advisor" | "coordinator" | "student"
+
+type FacultyUser = {
+  id: string
+  name: string
+  email: string
+  role: FacultyRole
+  roleLabel: "Advisor" | "Coordinator" | "Student"
+  status: "active"
+  emailVerified: boolean
+  lastLoginAt: string | null
+}
+
+const ALLOWED_ROLE_MAP: Record<string, { role: FacultyRole; label: FacultyUser["roleLabel"] }> = {
+  advisor: { role: "advisor", label: "Advisor" },
+  coordinator: { role: "coordinator", label: "Coordinator" },
+  student: { role: "student", label: "Student" },
+}
+
+function formatLastLogin(value: string | null) {
+  if (!value) {
+    return "Never"
   }
-  return password
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
 }
 
 export function DepartmentHeadFacultyPage() {
   const router = useRouter()
+  const { data: tenantUsers = [], isLoading, isError, error } = useTenantUsers()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRole, setSelectedRole] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [viewMode, setViewMode] = useState<"grid" | "table">("table")
 
-  const handleResetPassword = (faculty: Faculty) => {
-    const newPassword = generateTempPassword()
-    toast.success("Temporary Password Generated", {
-      description: `New temporary password for ${faculty.name}: ${newPassword}. Faculty member must change on first login.`,
-      duration: 5000,
-    })
-  }
+  const facultyUsers: FacultyUser[] = tenantUsers
+    .map((user) => {
+      const roleName = user.roles?.[0]?.role?.name ?? ""
+      const normalizedRole = roleName.toLowerCase()
+      const mappedRole = ALLOWED_ROLE_MAP[normalizedRole]
 
-  const handleSendInvite = (faculty: Faculty) => {
+      if (!mappedRole || (user.status ?? "").toUpperCase() !== "ACTIVE") {
+        return null
+      }
+
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim()
+
+      return {
+        id: user.id,
+        name: fullName.length > 0 ? fullName : user.email,
+        email: user.email,
+        role: mappedRole.role,
+        roleLabel: mappedRole.label,
+        status: "active",
+        emailVerified: Boolean(user.emailVerified),
+        lastLoginAt: user.lastLoginAt ?? null,
+      }
+    })
+    .filter((user): user is FacultyUser => user !== null)
+
+  const handleSendInvite = (faculty: FacultyUser) => {
     toast.success("Invitation Sent", {
       description: `Login instructions have been sent to ${faculty.email}`,
     })
@@ -73,11 +115,10 @@ export function DepartmentHeadFacultyPage() {
     })
   }
 
-  const filteredFaculty = mockFaculty.filter((f) => {
+  const filteredFaculty = facultyUsers.filter((f) => {
     const matchesSearch =
       f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
+      f.email.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesRole = selectedRole === "all" || f.role === selectedRole
     const matchesStatus = selectedStatus === "all" || f.status === selectedStatus
@@ -88,28 +129,28 @@ export function DepartmentHeadFacultyPage() {
   const stats = [
     {
       label: "Total Faculty",
-      value: mockFaculty.length,
+      value: facultyUsers.length,
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-100 dark:bg-blue-900/20",
     },
     {
       label: "Active Advisors",
-      value: mockFaculty.filter((f) => f.role === "advisor" && f.status === "active").length,
+      value: facultyUsers.filter((f) => f.role === "advisor" && f.status === "active").length,
       icon: UserCheck,
       color: "text-green-600",
       bgColor: "bg-green-100 dark:bg-green-900/20",
     },
     {
-      label: "Total Courses",
-      value: mockFaculty.reduce((acc, f) => acc + (f.courses ?? 0), 0),
-      icon: BookOpen,
+      label: "Active Coordinators",
+      value: facultyUsers.filter((f) => f.role === "coordinator" && f.status === "active").length,
+      icon: Users,
       color: "text-purple-600",
       bgColor: "bg-purple-100 dark:bg-purple-900/20",
     },
     {
-      label: "Students Supervised",
-      value: mockFaculty.reduce((acc, f) => acc + (f.students ?? 0), 0),
+      label: "Active Students",
+      value: facultyUsers.filter((f) => f.role === "student" && f.status === "active").length,
       icon: Users,
       color: "text-amber-600",
       bgColor: "bg-amber-100 dark:bg-amber-900/20",
@@ -165,7 +206,7 @@ export function DepartmentHeadFacultyPage() {
             <div className="relative flex-1">
               <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <Input
-                placeholder="Search faculty by name, email, or specialization..."
+                placeholder="Search faculty by name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -179,9 +220,8 @@ export function DepartmentHeadFacultyPage() {
               >
                 <option value="all">All Roles</option>
                 <option value="advisor">Advisor</option>
-                <option value="evaluator">Evaluator</option>
-                <option value="group_manager">Group Manager</option>
-                <option value="dc_committee">DC Committee</option>
+                <option value="coordinator">Coordinator</option>
+                <option value="student">Student</option>
               </select>
 
               <select
@@ -237,14 +277,20 @@ export function DepartmentHeadFacultyPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {viewMode === "table" ? (
+          {isLoading ? (
+            <div className="text-muted-foreground p-6 text-sm">Loading active users...</div>
+          ) : isError ? (
+            <div className="p-6 text-sm text-destructive">
+              Failed to load users{error?.message ? `: ${error.message}` : ""}
+            </div>
+          ) : viewMode === "table" ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Faculty Member</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Specialization</TableHead>
-                  <TableHead>Workload</TableHead>
+                  <TableHead>Email Verification</TableHead>
+                  <TableHead>Last Login</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -273,27 +319,17 @@ export function DepartmentHeadFacultyPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {f.role.replace("_", " ")}
+                      <Badge variant="outline">
+                        {f.roleLabel}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="text-sm font-medium">{f.specialization ?? "General"}</p>
-                        <p className="text-muted-foreground text-xs">{f.office}</p>
-                      </div>
+                      <Badge variant={f.emailVerified ? "default" : "secondary"}>
+                        {f.emailVerified ? "Verified" : "Not verified"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <BookOpen className="text-muted-foreground h-3 w-3" />
-                          <span>{f.courses} Courses</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Users className="text-muted-foreground h-3 w-3" />
-                          <span>{f.students} Students</span>
-                        </div>
-                      </div>
+                      <span className="text-sm">{formatLastLogin(f.lastLoginAt)}</span>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -324,14 +360,6 @@ export function DepartmentHeadFacultyPage() {
                           <Link href={`/dashboard/department-head/faculty/edit/${f.id}`}>
                             <Edit className="h-4 w-4" />
                           </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleResetPassword(f)}
-                          title="Generate Temporary Password"
-                        >
-                          <Key className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -388,27 +416,21 @@ export function DepartmentHeadFacultyPage() {
 
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="outline" className="capitalize">
-                          {faculty.role.replace("_", " ")}
+                        <Badge variant="outline">
+                          {faculty.roleLabel}
                         </Badge>
-                        <span className="text-muted-foreground">•</span>
-                        <span className="text-muted-foreground text-sm">
-                          {faculty.specialization}
-                        </span>
                       </div>
 
                       <div className="flex items-center gap-4 text-muted-foreground text-sm">
                         <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {faculty.courses} courses
+                          <UserCheck className="h-3 w-3" />
+                          {faculty.emailVerified ? "Email verified" : "Email not verified"}
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
-                          {faculty.students} students
+                          Last login: {formatLastLogin(faculty.lastLoginAt)}
                         </span>
                       </div>
-
-                      <div className="text-muted-foreground text-sm">{faculty.office}</div>
                     </div>
 
                     <div className="mt-4 flex justify-end gap-2 border-t pt-4">
@@ -421,9 +443,6 @@ export function DepartmentHeadFacultyPage() {
                         <Link href={`/dashboard/department-head/faculty/edit/${faculty.id}`}>
                           <Edit className="h-4 w-4" />
                         </Link>
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleResetPassword(faculty)}>
-                        <Key className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleSendInvite(faculty)}>
                         <Mail className="h-4 w-4" />

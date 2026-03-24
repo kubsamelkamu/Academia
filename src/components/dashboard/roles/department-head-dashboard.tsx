@@ -2,12 +2,12 @@
 
 import React from "react"
 import Link from "next/link"
-import Image from "next/image"
 import StatCard from "@/components/shared/StatCard"
 import DataTable, { type Column } from "@/components/shared/DataTable"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Users,
@@ -15,20 +15,66 @@ import {
   ClipboardCheck,
   UserCheck,
   Download,
+  Eye,
   RefreshCw,
 } from "lucide-react"
 import {
-  mockUsers,
-  mockProjects,
   mockGrades,
-  type User,
   type Grade,
 } from "@/data/mockData"
+import { useTenantUsers } from "@/lib/hooks/use-users"
+import { useBrowseProjectGroups } from "@/lib/hooks/use-project-groups"
+import { useTenantInvitationsList } from "@/lib/hooks/use-invitations"
 import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
 
+type DepartmentUserRow = {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+}
+
+function mapDashboardRoleLabel(roleName?: string): string {
+  const normalized = (roleName ?? "").toLowerCase()
+
+  if (normalized === "departmenthead") {
+    return "Department Head"
+  }
+  if (normalized === "coordinator") {
+    return "Coordinator"
+  }
+  if (normalized === "advisor") {
+    return "Advisor"
+  }
+  if (normalized === "student") {
+    return "Student"
+  }
+
+  return roleName ?? "Unknown"
+}
+
 export function DepartmentHeadDashboard() {
   const authUser = useAuthStore((s) => s.user)
+  const [userSearchQuery, setUserSearchQuery] = React.useState("")
+  const [userRoleFilter, setUserRoleFilter] = React.useState("all")
+  const [userStatusFilter, setUserStatusFilter] = React.useState("all")
+  const {
+    data: tenantUsers = [],
+    isLoading: isUsersLoading,
+    isError: isUsersError,
+    error: usersError,
+    refetch: refetchUsers,
+    isFetching: isUsersFetching,
+  } = useTenantUsers()
+  const { data: projectGroupsPage, isLoading: isProjectsLoading } = useBrowseProjectGroups({
+    enabled: true,
+    page: 1,
+    limit: 1,
+  })
+  const { data: pendingInvitations = [], isLoading: isPendingInvitationsLoading } =
+    useTenantInvitationsList({ status: "PENDING" })
 
   const departmentName =
     authUser?.departmentName ?? authUser?.department?.name ?? "Software Engineering"
@@ -39,27 +85,63 @@ export function DepartmentHeadDashboard() {
 
   const universityName = authUser?.tenant?.name ?? "Haramaya University"
 
-  const departmentUsers = mockUsers.filter((u) => u.departmentId === "dept1")
-  const students = departmentUsers.filter(
-    (u) => u.role === "student" || u.role === "group_manager",
-  )
-  const advisors = departmentUsers.filter((u) => u.role === "advisor")
-
   const pendingProjectGrades = mockGrades.filter((g) => g.status === "provisional")
+
+  const dashboardUsers = React.useMemo<DepartmentUserRow[]>(
+    () =>
+      tenantUsers.map((user) => {
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim()
+        const roleName = user.roles?.[0]?.role?.name
+
+        return {
+          id: user.id,
+          name: fullName.length > 0 ? fullName : user.email,
+          email: user.email,
+          role: mapDashboardRoleLabel(roleName),
+          status: (user.status ?? "UNKNOWN").toLowerCase(),
+        }
+      }),
+    [tenantUsers]
+  )
+
+  const filteredDashboardUsers = React.useMemo(
+    () =>
+      dashboardUsers.filter((user) => {
+        const search = userSearchQuery.trim().toLowerCase()
+        const matchesSearch =
+          search.length === 0 ||
+          user.name.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search)
+
+        const matchesRole =
+          userRoleFilter === "all" || user.role.toLowerCase().replace(/\s+/g, "_") === userRoleFilter
+
+        const matchesStatus = userStatusFilter === "all" || user.status === userStatusFilter
+
+        return matchesSearch && matchesRole && matchesStatus
+      }),
+    [dashboardUsers, userRoleFilter, userSearchQuery, userStatusFilter]
+  )
+
+  const activeStudentsCount = tenantUsers.filter((u) => {
+    const role = (u.roles?.[0]?.role?.name ?? "").toLowerCase()
+    const isActive = (u.status ?? "").toUpperCase() === "ACTIVE"
+    return isActive && role === "student"
+  }).length
+
+  const activeAdvisorsCount = tenantUsers.filter((u) => {
+    const role = (u.roles?.[0]?.role?.name ?? "").toLowerCase()
+    const isActive = (u.status ?? "").toUpperCase() === "ACTIVE"
+    return isActive && role === "advisor"
+  }).length
+
+  const activeProjectsCount = projectGroupsPage?.pagination.total ?? 0
+  const pendingApprovalsCount = pendingInvitations.length
 
   const handleApproveGrades = () => {
     toast.success("Grades approved for publication", {
       description:
         "All provisional grades have been marked as approved and queued for final publication.",
-    })
-  }
-
-  const handleResetPassword = (userId: string) => {
-    const user = departmentUsers.find((u) => u.id === userId)
-    toast.message("Password reset link sent", {
-      description: user
-        ? `A reset link has been sent to ${user.email}.`
-        : "A reset link has been sent to the selected user.",
     })
   }
 
@@ -81,7 +163,7 @@ export function DepartmentHeadDashboard() {
     })
   }
 
-  const userColumns: Column<User>[] = [
+  const userColumns: Column<DepartmentUserRow>[] = [
     {
       key: "name",
       header: "Name",
@@ -100,11 +182,7 @@ export function DepartmentHeadDashboard() {
     {
       key: "role",
       header: "Role",
-      render: (u) => (
-        <span className="text-sm capitalize">
-          {u.role.replace(/_/g, " ").replace(/dc committee/i, "DC Committee")}
-        </span>
-      ),
+      render: (u) => <span className="text-sm">{u.role}</span>,
     },
     {
       key: "status",
@@ -116,14 +194,16 @@ export function DepartmentHeadDashboard() {
       header: "Actions",
       render: (u) => (
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            onClick={() => handleResetPassword(u.id)}
-          >
-            <RefreshCw className="h-3 w-3" />
-            <span className="text-xs">Reset</span>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/dashboard/department-head/faculty/${u.id}`} className="gap-1">
+              <Eye className="h-3 w-3" />
+              <span className="text-xs">View</span>
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/dashboard/department-head/faculty/deactivate/${u.id}`} className="gap-1">
+              <span className="text-xs">Status</span>
+            </Link>
           </Button>
         </div>
       ),
@@ -179,54 +259,46 @@ export function DepartmentHeadDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
         <div className="relative z-10 space-y-1">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary-foreground/80">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             Department overview
           </p>
           <h2 className="text-xl font-semibold tracking-tight">
             {departmentTitle}
           </h2>
-          <p className="text-sm text-primary-foreground/80">
+          <p className="text-sm text-muted-foreground">
             Academic year 2024–2025 • {universityName}
           </p>
         </div>
-        <Image
-          src="/favicon.png"
-          alt="Graduation cap"
-          width={80}
-          height={80}
-          className="absolute right-6 top-1/2 h-20 w-20 -translate-y-1/2 object-contain opacity-20 mix-blend-multiply dark:mix-blend-screen pointer-events-none select-none"
-          priority={false}
-        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Students"
-          value={students.length * 40}
+          value={isUsersLoading ? "—" : activeStudentsCount}
           subtitle="Active in department"
           icon={Users}
           iconClassName="bg-primary/10 text-primary"
         />
         <StatCard
           title="Advisors"
-          value={advisors.length * 5}
+          value={isUsersLoading ? "—" : activeAdvisorsCount}
           subtitle="Faculty members"
           icon={UserCheck}
           iconClassName="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-300"
         />
         <StatCard
           title="Active Projects"
-          value={mockProjects.length * 15}
+          value={isProjectsLoading ? "—" : activeProjectsCount}
           subtitle="In progress"
           icon={FolderOpen}
           iconClassName="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
         />
         <StatCard
           title="Pending Approvals"
-          value={pendingProjectGrades.length}
-          subtitle="Grades to review"
+          value={isPendingInvitationsLoading ? "—" : pendingApprovalsCount}
+          subtitle="Invitations pending"
           icon={ClipboardCheck}
           iconClassName="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300"
         />
@@ -266,10 +338,62 @@ export function DepartmentHeadDashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <DataTable
-                data={departmentUsers.slice(0, 5)}
-                columns={userColumns}
-              />
+              <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex w-full flex-col gap-2 md:max-w-md">
+                  <Input
+                    placeholder="Search by name or email..."
+                    value={userSearchQuery}
+                    onChange={(event) => setUserSearchQuery(event.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={userRoleFilter}
+                    onChange={(event) => setUserRoleFilter(event.target.value)}
+                    className="flex h-9 w-[150px] items-center rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="advisor">Advisor</option>
+                    <option value="coordinator">Coordinator</option>
+                    <option value="student">Student</option>
+                    <option value="department_head">Department Head</option>
+                  </select>
+                  <select
+                    value={userStatusFilter}
+                    onChange={(event) => setUserStatusFilter(event.target.value)}
+                    className="flex h-9 w-[130px] items-center rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      void refetchUsers()
+                    }}
+                    disabled={isUsersFetching}
+                    title="Refresh users"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isUsersFetching ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+
+              {isUsersLoading ? (
+                <div className="p-6 text-sm text-muted-foreground">Loading department users...</div>
+              ) : isUsersError ? (
+                <div className="p-6 text-sm text-destructive">
+                  Failed to load users{usersError?.message ? `: ${usersError.message}` : ""}
+                </div>
+              ) : filteredDashboardUsers.length === 0 ? (
+                <div className="p-6 text-sm text-muted-foreground">
+                  No users match your current filters.
+                </div>
+              ) : (
+                <DataTable data={filteredDashboardUsers.slice(0, 8)} columns={userColumns} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
