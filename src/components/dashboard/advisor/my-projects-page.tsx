@@ -28,7 +28,6 @@ import {
   AlertTriangle,
   ListChecks,
   Activity,
-  type LucideIcon,
   XCircle,
   HelpCircle,
   ChevronDown,
@@ -174,7 +173,7 @@ interface AdvisorProject {
 }
 
 // ==================== Constants & Utilities ====================
-const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon: LucideIcon }> = {
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon: any }> = {
   'active': { label: 'Active', color: 'blue', icon: Activity },
   'in-progress': { label: 'In Progress', color: 'indigo', icon: TrendingUp },
   'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
@@ -183,7 +182,7 @@ const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon:
   'cleared': { label: 'Cleared', color: 'emerald', icon: CheckCheck }
 }
 
-const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: LucideIcon }> = {
+const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: any }> = {
   'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
   'approved': { label: 'Approved', color: 'green', icon: ThumbsUp },
   'in-progress': { label: 'In Progress', color: 'blue', icon: TrendingUp },
@@ -192,7 +191,7 @@ const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: s
   'submitted': { label: 'Submitted', color: 'purple', icon: Upload }
 }
 
-const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; icon: LucideIcon }> = {
+const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; icon: any }> = {
   'high': { label: 'High', color: 'red', icon: Flag },
   'medium': { label: 'Medium', color: 'amber', icon: AlertCircle },
   'low': { label: 'Low', color: 'green', icon: CheckCircle }
@@ -364,7 +363,7 @@ const MOCK_PROJECTS: AdvisorProject[] = [
 interface StatCardProps {
   title: string
   value: number
-  icon: LucideIcon
+  icon: any
   trend?: number
   color?: string
 }
