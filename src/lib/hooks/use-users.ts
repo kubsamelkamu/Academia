@@ -10,12 +10,16 @@ import {
 import {
   deactivateTenantUser,
   getTenantUser,
+  listTenantUsers,
   listTenantUsersPaged,
+  reactivateTenantUser,
   updateTenantUser,
 } from "@/lib/api/users"
 import type {
   ListTenantUsersPagedParams,
+  TenantUserListItem,
   TenantUserDetail,
+  TenantUserStatusChange,
   TenantUsersPagedData,
   UpdateTenantUserDto,
 } from "@/types/tenant-users"
@@ -51,11 +55,25 @@ const roleCountDefinitions: Array<{
 export function tenantUserKeys() {
   return {
     root: ["tenant-users"] as const,
+    list: () => [...tenantUserKeys().root, "list"] as const,
     paged: (params: ListTenantUsersPagedParams) =>
       [...tenantUserKeys().root, "paged", params] as const,
     roleCount: (key: TenantUserRoleCountKey) => [...tenantUserKeys().root, "role-count", key] as const,
     detail: (userId: string) => [...tenantUserKeys().root, "detail", userId] as const,
   }
+}
+
+export function useTenantUsers(
+  options?: Omit<
+    UseQueryOptions<TenantUserListItem[], Error, TenantUserListItem[]>,
+    "queryKey" | "queryFn"
+  >
+) {
+  return useQuery({
+    queryKey: tenantUserKeys().list(),
+    queryFn: () => listTenantUsers(),
+    ...options,
+  })
 }
 
 export function useTenantUsersPaged(
@@ -133,6 +151,17 @@ export function useDeactivateTenantUser() {
 
   return useMutation<void, Error, string>({
     mutationFn: (userId) => deactivateTenantUser(userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: tenantUserKeys().root })
+    },
+  })
+}
+
+export function useReactivateTenantUser() {
+  const queryClient = useQueryClient()
+
+  return useMutation<TenantUserStatusChange, Error, string>({
+    mutationFn: (userId) => reactivateTenantUser(userId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: tenantUserKeys().root })
     },

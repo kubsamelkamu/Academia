@@ -47,6 +47,12 @@ export type UpdateTenantUserDto = Partial<{
   email: string
 }>
 
+export type TenantUserStatusChange = {
+  id: string
+  status: "ACTIVE" | "INACTIVE" | string
+  deletedAt?: string | null
+}
+
 export type ListTenantUsersPagedParams = {
   search?: string
   roleNames?: TenantUserRoleName[]

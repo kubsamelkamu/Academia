@@ -1,10 +1,17 @@
 import apiClient from "@/lib/api/client"
 import type {
   ListTenantUsersPagedParams,
+  TenantUserListItem,
   TenantUserDetail,
+  TenantUserStatusChange,
   TenantUsersPagedData,
   UpdateTenantUserDto,
 } from "@/types/tenant-users"
+
+export async function listTenantUsers(): Promise<TenantUserListItem[]> {
+  const response = await apiClient.get<TenantUserListItem[]>("/tenant/users")
+  return response.data
+}
 
 function normalizeListParams(params: ListTenantUsersPagedParams): Record<string, unknown> {
   const normalized: Record<string, unknown> = {
@@ -51,4 +58,9 @@ export async function updateTenantUser(
 
 export async function deactivateTenantUser(userId: string): Promise<void> {
   await apiClient.delete(`/tenant/users/${userId}`)
+}
+
+export async function reactivateTenantUser(userId: string): Promise<TenantUserStatusChange> {
+  const response = await apiClient.patch<TenantUserStatusChange>(`/tenant/users/${userId}/reactivate`)
+  return response.data
 }
