@@ -23,6 +23,7 @@ export type TenantUserListItem = {
   email: string
   firstName?: string | null
   lastName?: string | null
+  avatarUrl?: string | null
   status?: string | null
   emailVerified?: boolean | null
   lastLoginAt?: string | null

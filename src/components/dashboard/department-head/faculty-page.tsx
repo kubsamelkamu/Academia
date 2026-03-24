@@ -2,15 +2,12 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
   BarChart3,
-  BookOpen,
   Download,
   Edit,
   Eye,
-  FileText,
   Mail,
   Plus,
   RefreshCw,
@@ -20,19 +17,11 @@ import {
   Users,
 } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { useTenantUsers } from "@/lib/hooks/use-users"
 
 type FacultyRole = "advisor" | "coordinator" | "student"
@@ -41,12 +30,15 @@ type FacultyUser = {
   id: string
   name: string
   email: string
+  avatarUrl: string | null
   role: FacultyRole
   roleLabel: "Advisor" | "Coordinator" | "Student"
   status: "active"
   emailVerified: boolean
   lastLoginAt: string | null
 }
+
+const FACULTY_PAGE_SIZE = 10
 
 const ALLOWED_ROLE_MAP: Record<string, { role: FacultyRole; label: FacultyUser["roleLabel"] }> = {
   advisor: { role: "advisor", label: "Advisor" },
@@ -71,12 +63,11 @@ function formatLastLogin(value: string | null) {
 }
 
 export function DepartmentHeadFacultyPage() {
-  const router = useRouter()
   const { data: tenantUsers = [], isLoading, isError, error } = useTenantUsers()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRole, setSelectedRole] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table")
+  const [currentPage, setCurrentPage] = useState(1)
 
   const facultyUsers: FacultyUser[] = tenantUsers
     .map((user) => {
@@ -94,6 +85,7 @@ export function DepartmentHeadFacultyPage() {
         id: user.id,
         name: fullName.length > 0 ? fullName : user.email,
         email: user.email,
+        avatarUrl: user.avatarUrl ?? null,
         role: mappedRole.role,
         roleLabel: mappedRole.label,
         status: "active",
@@ -125,6 +117,13 @@ export function DepartmentHeadFacultyPage() {
 
     return matchesSearch && matchesRole && matchesStatus
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredFaculty.length / FACULTY_PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const pagedFaculty = filteredFaculty.slice(
+    (safePage - 1) * FACULTY_PAGE_SIZE,
+    safePage * FACULTY_PAGE_SIZE
+  )
 
   const stats = [
     {
@@ -208,14 +207,20 @@ export function DepartmentHeadFacultyPage() {
               <Input
                 placeholder="Search faculty by name or email..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setCurrentPage(1)
+                }}
                 className="pl-9"
               />
             </div>
             <div className="flex gap-2">
               <select
                 value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
+                onChange={(e) => {
+                  setSelectedRole(e.target.value)
+                  setCurrentPage(1)
+                }}
                 className="flex h-9 w-[150px] items-center gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="all">All Roles</option>
@@ -226,7 +231,10 @@ export function DepartmentHeadFacultyPage() {
 
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value)
+                  setCurrentPage(1)
+                }}
                 className="flex h-9 w-[150px] items-center gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="all">All Status</option>
@@ -241,6 +249,7 @@ export function DepartmentHeadFacultyPage() {
                   setSearchQuery("")
                   setSelectedRole("all")
                   setSelectedStatus("all")
+                  setCurrentPage(1)
                 }}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -257,24 +266,6 @@ export function DepartmentHeadFacultyPage() {
             <CardTitle>Faculty Members</CardTitle>
             <CardDescription>{filteredFaculty.length} faculty members found</CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={viewMode === "table" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("table")}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Table
-            </Button>
-            <Button
-              variant={viewMode === "grid" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Grid
-            </Button>
-          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -283,117 +274,16 @@ export function DepartmentHeadFacultyPage() {
             <div className="p-6 text-sm text-destructive">
               Failed to load users{error?.message ? `: ${error.message}` : ""}
             </div>
-          ) : viewMode === "table" ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Faculty Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email Verification</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFaculty.map((f) => (
-                  <TableRow
-                    key={f.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/dashboard/department-head/faculty/${f.id}`)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            {f.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{f.name}</p>
-                          <p className="text-muted-foreground text-sm">{f.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {f.roleLabel}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={f.emailVerified ? "default" : "secondary"}>
-                        {f.emailVerified ? "Verified" : "Not verified"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{formatLastLogin(f.lastLoginAt)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={f.status === "active" ? "default" : "secondary"}
-                        className="capitalize"
-                      >
-                        {f.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="View detail"
-                          asChild
-                        >
-                          <Link href={`/dashboard/department-head/faculty/${f.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Edit Faculty"
-                          asChild
-                        >
-                          <Link href={`/dashboard/department-head/faculty/edit/${f.id}`}>
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSendInvite(f)}
-                          title="Send Login Invite"
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          title="Deactivate"
-                          asChild
-                        >
-                          <Link href={`/dashboard/department-head/faculty/deactivate/${f.id}`}>
-                            <UserX className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           ) : (
-            <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredFaculty.map((faculty) => (
+            <>
+              <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-3">
+                {pagedFaculty.map((faculty) => (
                 <Card key={faculty.id} className="transition-shadow hover:shadow-lg">
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
+                          <AvatarImage src={faculty.avatarUrl ?? undefined} alt={faculty.name} />
                           <AvatarFallback className="bg-primary/10 text-primary text-lg">
                             {faculty.name
                               .split(" ")
@@ -447,11 +337,47 @@ export function DepartmentHeadFacultyPage() {
                       <Button variant="ghost" size="sm" onClick={() => handleSendInvite(faculty)}>
                         <Mail className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        title="Deactivate"
+                        asChild
+                      >
+                        <Link href={`/dashboard/department-head/faculty/deactivate/${faculty.id}`}>
+                          <UserX className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between border-t px-6 py-4">
+                <p className="text-muted-foreground text-sm">
+                  Page {safePage} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
+                    disabled={safePage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((previous) => Math.min(totalPages, previous + 1))}
+                    disabled={safePage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
