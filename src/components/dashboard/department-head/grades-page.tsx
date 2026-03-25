@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input"
 import {
   mockGrades,
   type Grade,
-  mockGroupManagerApplications,
-  type GroupManagerApplication,
   mockStudentGroups,
 } from "@/data/mockData"
+import { usePendingGroupLeaderRequests, useApproveGroupLeaderRequest, useRejectGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog"
+
 import { toast } from "sonner"
 import Link from "next/link"
 import { 
@@ -184,9 +185,79 @@ const MemberBadge = ({ name, role, isManager }: { name: string; role: string; is
 export function DepartmentHeadGradesPage() {
   const [activeSection, setActiveSection] = useState<"overview" | "grades" | "applications">("overview")
   const [searchQuery, setSearchQuery] = useState("")
-  
+
   const pendingGrades = mockGrades.filter((g) => g.status === "provisional")
-  const pendingApplications = mockGroupManagerApplications.filter((app) => app.status === "pending")
+
+  // Real group leader requests API
+
+  const {
+    data: groupLeaderData,
+    isLoading: isLoadingGroupLeaders,
+    isError: isErrorGroupLeaders,
+    error: groupLeaderError,
+    refetch: refetchGroupLeaders,
+  } = usePendingGroupLeaderRequests({ page: 1, search: searchQuery })
+
+  // Approve/Reject mutations and dialog state
+  const approveMutation = useApproveGroupLeaderRequest()
+  const rejectMutation = useRejectGroupLeaderRequest()
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null)
+
+  const handleApprove = (id: string) => {
+    setConfirmApproveId(id)
+  }
+
+  const confirmApprove = (id: string) => {
+    setApprovingId(id)
+    approveMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast.success("Request approved")
+          setApprovingId(null)
+          setConfirmApproveId(null)
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || "Failed to approve request")
+          setApprovingId(null)
+          setConfirmApproveId(null)
+        },
+      }
+    )
+  }
+
+  const handleReject = (id: string) => {
+    setRejectingId(id)
+    setRejectReason("")
+    setRejectDialogOpen(true)
+  }
+
+  const submitReject = () => {
+    if (!rejectingId || !rejectReason.trim()) return
+    rejectMutation.mutate(
+      { id: rejectingId, reason: rejectReason },
+      {
+        onSuccess: () => {
+          toast.success("Request rejected")
+          setRejectDialogOpen(false)
+          setRejectingId(null)
+          setRejectReason("")
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || "Failed to reject request")
+          setRejectDialogOpen(false)
+          setRejectingId(null)
+          setRejectReason("")
+        },
+      }
+    )
+  }
+
+  const pendingApplications = (groupLeaderData as any)?.data?.items || []
   
   const stats = {
     totalGroups: mockStudentGroups.length,
@@ -298,17 +369,18 @@ export function DepartmentHeadGradesPage() {
     },
   ]
 
-  const filteredApplications = pendingApplications.filter((a) => {
+  // Filter by search (API already filters, but fallback for mock)
+  const filteredApplications = pendingApplications.filter((a: any) => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     return (
-      a.studentName.toLowerCase().includes(q) ||
-      (a.proposedGroupName ?? "").toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q)
+      (a.firstName?.toLowerCase().includes(q) || "") ||
+      (a.lastName?.toLowerCase().includes(q) || "") ||
+      (a.email?.toLowerCase().includes(q) || "")
     )
   })
 
-  const applicationColumns: Column<GroupManagerApplication>[] = [
+  const applicationColumns: Column<any>[] = [
     {
       key: "applicant",
       header: "Applicant",
@@ -319,51 +391,143 @@ export function DepartmentHeadGradesPage() {
             colors.warning.bg,
             colors.warning.text
           )}>
-            {a.studentName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+            {`${a.firstName?.[0] || ""}${a.lastName?.[0] || ""}`.toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-sm">{a.studentName}</p>
+            <p className="font-medium text-sm">{a.firstName} {a.lastName}</p>
             <p className="text-xs text-muted-foreground">{a.email}</p>
           </div>
         </div>
       ),
     },
     {
-      key: "group",
-      header: "Proposed Group",
+      key: "department",
+      header: "Department",
       render: (a) => (
         <div>
-          <p className="font-medium text-sm">{a.proposedGroupName || "Not specified"}</p>
-          <p className="text-xs text-muted-foreground">Requested {a.requestedAt}</p>
+          <p className="font-medium text-sm">{a.departmentName || "—"}</p>
         </div>
       ),
     },
     {
-      key: "motivation",
-      header: "Motivation",
+      key: "status",
+      header: "Status",
+      render: (a) => <StatusBadge status={a.status} />,
+    },
+    {
+      key: "createdAt",
+      header: "Requested At",
       render: (a) => (
-        <p className="line-clamp-2 text-sm text-muted-foreground max-w-[200px]">
-          {a.motivation}
-        </p>
+        <span className="text-xs text-muted-foreground">
+          {a.createdAt ? new Date(a.createdAt).toLocaleString() : "—"}
+        </span>
       ),
     },
     {
       key: "actions",
       header: "Actions",
-      render: (a) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-            <Link href={`/dashboard/department-head/grades/${a.id}`}>
-              <Eye className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      ),
+      render: (a) => {
+        const isRowApproving = approvingId === a.id && approveMutation.status === "pending"
+        const isRowRejecting = rejectingId === a.id && rejectMutation.status === "pending"
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Approve"
+              disabled={isRowApproving || isRowRejecting}
+              onClick={() => handleApprove(a.id)}
+            >
+              {isRowApproving ? (
+                <span className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              ) : (
+                <CheckCircle className={cn("h-4 w-4", colors.success.text)} />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Reject"
+              disabled={isRowApproving || isRowRejecting}
+              onClick={() => handleReject(a.id)}
+            >
+              {isRowRejecting ? (
+                <span className="animate-spin h-4 w-4 border-2 border-rose-500 border-t-transparent rounded-full" />
+              ) : (
+                <XCircle className={cn("h-4 w-4", colors.danger.text)} />
+              )}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+              <Link href={`/dashboard/department-head/grades/${a.id}`}>
+                <Eye className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 
+  // Dialogs should be rendered at the root, not inside columns
+  const rejectReasonDialog = (
+    <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reject Application</DialogTitle>
+          <DialogDescription>
+            Please provide a reason for rejecting this group leader request. This will be visible to the applicant.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          autoFocus
+          placeholder="Enter rejection reason..."
+          value={rejectReason}
+          onChange={e => setRejectReason(e.target.value)}
+          disabled={rejectMutation.status === "pending"}
+          onKeyDown={e => {
+            if (e.key === "Enter" && rejectReason.trim()) submitReject()
+          }}
+        />
+        <DialogFooter showCloseButton>
+          <Button
+            variant="destructive"
+            onClick={submitReject}
+            disabled={!rejectReason.trim() || rejectMutation.status === "pending"}
+          >
+            {rejectMutation.status === "pending" ? "Rejecting..." : "Reject"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+  const approveConfirmDialog = (
+    <Dialog open={!!confirmApproveId} onOpenChange={open => !open && setConfirmApproveId(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Approve Application</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to approve this group leader request?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter showCloseButton>
+          <Button
+            variant="default"
+            className={colors.success.bg + " " + colors.success.text}
+            onClick={() => confirmApprove(confirmApproveId!)}
+            disabled={approveMutation.status === "pending"}
+          >
+            {approveMutation.status === "pending" ? "Approving..." : "Approve"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      {rejectReasonDialog}
+      {approveConfirmDialog}
       <div className="container mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -634,7 +798,25 @@ export function DepartmentHeadGradesPage() {
                 </p>
               </CardHeader>
               <CardContent className="p-0">
-                {pendingApplications.length === 0 ? (
+                {isLoadingGroupLeaders ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className={cn("rounded-full p-4", colors.info.bg)}>
+                      <UserPlus className={cn("h-8 w-8", colors.info.text)} />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">Loading applications…</h3>
+                  </div>
+                ) : isErrorGroupLeaders ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className={cn("rounded-full p-4", colors.danger.bg)}>
+                      <XCircle className={cn("h-8 w-8", colors.danger.text)} />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">Failed to load applications</h3>
+                    <p className="text-sm text-muted-foreground text-center max-w-sm">
+                      {groupLeaderError?.message || "An error occurred."}
+                    </p>
+                    <Button className="mt-4" onClick={() => refetchGroupLeaders()}>Retry</Button>
+                  </div>
+                ) : filteredApplications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 px-4">
                     <div className={cn("rounded-full p-4", colors.info.bg)}>
                       <UserPlus className={cn("h-8 w-8", colors.info.text)} />

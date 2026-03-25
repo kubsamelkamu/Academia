@@ -34,6 +34,7 @@ import {
   BarChart3,
   CalendarDays,
   Layers,
+  FolderKanban,
   Milestone,
   Timer,
   Search
@@ -56,6 +57,10 @@ import { useStudentProjects, useProjectMilestones } from "@/lib/hooks/use-studen
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import { useAuthStore } from "@/store/auth-store"
+import { ProjectGroupTasksBoard } from "@/components/dashboard/student/project-group-tasks-board"
+import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyProjectGroupTasks } from "@/lib/hooks/use-project-group-tasks"
+import type { ProjectGroupTaskStatus } from "@/types/project-group-tasks"
 
 type TimelineItemType = 'milestone' | 'task' | 'event' | 'deadline' | 'review'
 type TimelineItemStatus = 'completed' | 'in-progress' | 'pending' | 'blocked' | 'overdue'
@@ -134,6 +139,8 @@ const DEFAULT_PROJECT_INFO = {
 export function StudentTimelinePage() {
   const user = useAuthStore((state) => state.user)
   const [, setViewMode] = useState<'timeline' | 'calendar' | 'list' | 'gantt'>('timeline')
+  const [activeTab, setActiveTab] = useState<'timeline' | 'phases' | 'calendar' | 'list' | 'tasks'>('timeline')
+  const [focusedTaskStatus, setFocusedTaskStatus] = useState<ProjectGroupTaskStatus | null>(null)
   const [selectedItem, setSelectedItem] = useState<TimelineItem | null>(null)
   const [showItemDialog, setShowItemDialog] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -163,6 +170,10 @@ export function StudentTimelinePage() {
     page: 1,
     limit: 100,
   })
+
+  const { data: myGroup } = useMyProjectGroup(Boolean(user?.id))
+  const isGroupApproved = Boolean(myGroup?.status && myGroup.status.toUpperCase() === "APPROVED")
+  const { data: myTasksData } = useMyProjectGroupTasks(Boolean(myGroup?.id) && isGroupApproved)
 
   const activeProject = useMemo(() => {
     const items = projectsData?.items ?? []
@@ -304,15 +315,42 @@ export function StudentTimelinePage() {
     }
   }, [activeProject, mergedMilestones, currentTime, defaultProjectInfo])
 
-  const tasksProgress =
-    projectInfo.totalTasks > 0
-      ? (projectInfo.completedTasks / projectInfo.totalTasks) * 100
-      : 0
-
   const milestonesProgress =
     projectInfo.milestones > 0
       ? (projectInfo.completedMilestones / projectInfo.milestones) * 100
       : 0
+
+  const taskMetrics = useMemo(() => {
+    const tasks = myTasksData?.items ?? []
+
+    const counts: Record<ProjectGroupTaskStatus, number> = {
+      TODO: 0,
+      IN_PROGRESS: 0,
+      DONE: 0,
+    }
+
+    for (const task of tasks) {
+      counts[task.status] += 1
+    }
+
+    const total = tasks.length
+    const done = counts.DONE
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0
+
+    return {
+      total,
+      todo: counts.TODO,
+      inProgress: counts.IN_PROGRESS,
+      done,
+      percent,
+    }
+  }, [myTasksData?.items])
+
+  useEffect(() => {
+    if (activeTab !== "tasks" && focusedTaskStatus) {
+      setFocusedTaskStatus(null)
+    }
+  }, [activeTab, focusedTaskStatus])
 
   const phases: Phase[] = [
     {
@@ -690,13 +728,16 @@ export function StudentTimelinePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Overall Progress</p>
-                <p className="text-2xl font-bold">{projectInfo.progress}%</p>
+                <p className="text-2xl font-bold">{taskMetrics.percent}%</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                 <BarChart3 className="h-6 w-6 text-primary" />
               </div>
             </div>
-            <Progress value={projectInfo.progress} className="mt-4" />
+            <Progress value={taskMetrics.percent} className="mt-4" />
+            <p className="text-xs text-muted-foreground mt-2">
+              {taskMetrics.done}/{taskMetrics.total} tasks completed
+            </p>
           </CardContent>
         </Card>
 
@@ -717,18 +758,87 @@ export function StudentTimelinePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer hover:bg-muted/30"
+          onClick={() => {
+            setFocusedTaskStatus(null)
+            setActiveTab("tasks")
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setFocusedTaskStatus(null)
+              setActiveTab("tasks")
+            }
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Tasks Completed</p>
-                <p className="text-2xl font-bold">{projectInfo.completedTasks}/{projectInfo.totalTasks}</p>
+                <p className="text-sm font-medium text-muted-foreground">Tasks</p>
+                <p className="text-2xl font-bold">{taskMetrics.done}/{taskMetrics.total}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCheck className="h-6 w-6 text-green-600" />
               </div>
             </div>
-            <Progress value={tasksProgress} className="mt-4" />
+
+            <Progress value={taskMetrics.percent} className="mt-4" />
+
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <button
+                type="button"
+                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setFocusedTaskStatus("TODO")
+                  setActiveTab("tasks")
+                }}
+                disabled={!isGroupApproved}
+                title={!isGroupApproved ? "Your group must be approved" : "View TODO tasks"}
+              >
+                <div className="text-muted-foreground">TODO</div>
+                <div className="font-semibold">{taskMetrics.todo}</div>
+              </button>
+
+              <button
+                type="button"
+                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setFocusedTaskStatus("IN_PROGRESS")
+                  setActiveTab("tasks")
+                }}
+                disabled={!isGroupApproved}
+                title={!isGroupApproved ? "Your group must be approved" : "View in-progress tasks"}
+              >
+                <div className="text-muted-foreground">In Progress</div>
+                <div className="font-semibold">{taskMetrics.inProgress}</div>
+              </button>
+
+              <button
+                type="button"
+                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setFocusedTaskStatus("DONE")
+                  setActiveTab("tasks")
+                }}
+                disabled={!isGroupApproved}
+                title={!isGroupApproved ? "Your group must be approved" : "View completed tasks"}
+              >
+                <div className="text-muted-foreground">Completed</div>
+                <div className="font-semibold">{taskMetrics.done}</div>
+              </button>
+            </div>
+
+            {!isGroupApproved ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Your project group must be approved to manage tasks.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -749,24 +859,42 @@ export function StudentTimelinePage() {
       </div>
 
       {/* View Mode Tabs */}
-      <Tabs defaultValue="timeline" className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const next = value as typeof activeTab
+          setActiveTab(next)
+
+          if (next !== "tasks") setFocusedTaskStatus(null)
+
+          if (next === "timeline") setViewMode('timeline')
+          if (next === "phases") setViewMode('gantt')
+          if (next === "calendar") setViewMode('calendar')
+          if (next === "list") setViewMode('list')
+        }}
+        className="space-y-4"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList>
-            <TabsTrigger value="timeline" onClick={() => setViewMode('timeline')} className="gap-2">
+            <TabsTrigger value="timeline" className="gap-2">
               <GitBranch className="h-4 w-4" />
               <span className="hidden sm:inline">Timeline</span>
             </TabsTrigger>
-            <TabsTrigger value="phases" onClick={() => setViewMode('gantt')} className="gap-2">
+            <TabsTrigger value="phases" className="gap-2">
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Phases</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" onClick={() => setViewMode('calendar')} className="gap-2">
+            <TabsTrigger value="calendar" className="gap-2">
               <CalendarDays className="h-4 w-4" />
               <span className="hidden sm:inline">Calendar</span>
             </TabsTrigger>
-            <TabsTrigger value="list" onClick={() => setViewMode('list')} className="gap-2">
+            <TabsTrigger value="list" className="gap-2">
               <ListChecks className="h-4 w-4" />
               <span className="hidden sm:inline">List</span>
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <FolderKanban className="h-4 w-4" />
+              <span className="hidden sm:inline">Tasks</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1107,6 +1235,14 @@ export function StudentTimelinePage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tasks / Kanban View */}
+        <TabsContent value="tasks" className="space-y-4">
+          <ProjectGroupTasksBoard
+            enabled={Boolean(user?.id) && activeTab === "tasks"}
+            focusedStatus={focusedTaskStatus}
+          />
         </TabsContent>
       </Tabs>
 
