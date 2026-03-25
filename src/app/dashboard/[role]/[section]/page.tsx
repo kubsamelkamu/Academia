@@ -47,6 +47,8 @@ interface RoleSectionDashboardPageProps {
 
 type SectionComponent = ComponentType
 
+import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
+
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
     invitations: DepartmentHeadInvitationsPage,
@@ -57,6 +59,7 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     announcements: DepartmentHeadAnnouncementsPage,
     messages: DepartmentHeadMessagesPage,
     settings: DepartmentHeadSettingsPage,
+    "group-leader-requests": DepartmentHeadGroupLeaderRequestsPage,
   },
   coordinator: {
     projects: CoordinatorProjectsPlaceholderPage,
@@ -110,7 +113,7 @@ function getCanonicalSectionForRole(role: UserRole, section: string): string {
 }
 
 const allowedSectionsByRole: Record<UserRole, string[]> = {
-  department_head: ["invitations", "faculty", "grades", "projects", "reports", "announcements", "messages", "settings"],
+  department_head: ["invitations", "faculty", "grades", "projects", "reports", "announcements", "messages", "settings", "group-leader-requests"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
   advisor: ["my-projects", "students", "evaluations", "schedule", "announcements", "messages"],
   student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],

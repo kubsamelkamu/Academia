@@ -38,7 +38,7 @@ type FacultyUser = {
   lastLoginAt: string | null
 }
 
-const FACULTY_PAGE_SIZE = 10
+const FACULTY_PAGE_SIZE = 9
 
 const ALLOWED_ROLE_MAP: Record<string, { role: FacultyRole; label: FacultyUser["roleLabel"] }> = {
   advisor: { role: "advisor", label: "Advisor" },
