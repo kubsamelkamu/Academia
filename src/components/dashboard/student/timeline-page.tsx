@@ -5,22 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import {
-  Calendar,
   CheckCircle2,
   Circle,
-  Flag,
   Plus,
   Filter,
   Hourglass,
   CheckCheck,
   ListChecks,
-  BarChart3,
   CalendarDays,
   FolderKanban,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -28,9 +26,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useStudentProjects, useProjectMilestones } from "@/lib/hooks/use-student-milestones"
-import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
-import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import { useAuthStore } from "@/store/auth-store"
 import { ProjectGroupTasksBoard } from "@/components/dashboard/student/project-group-tasks-board"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
@@ -39,107 +34,22 @@ import type { ProjectGroupTaskStatus } from "@/types/project-group-tasks"
 
 type TaskListStatus = "completed" | "in-progress" | "pending"
 
-function normalizeMilestoneName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ")
-}
-
 export function StudentTimelinePage() {
   const user = useAuthStore((state) => state.user)
   const [activeTab, setActiveTab] = useState<"calendar" | "list" | "tasks">("list")
   const [focusedTaskStatus, setFocusedTaskStatus] = useState<ProjectGroupTaskStatus | null>(null)
   const [filterStatus, setFilterStatus] = useState<"all" | ProjectGroupTaskStatus>("all")
   const [searchQuery, setSearchQuery] = useState('')
-
-  const departmentId = user?.departmentId ?? user?.department?.id ?? null
-  const studentId = user?.id ?? null
-
-  const { data: projectsData } = useStudentProjects({
-    departmentId,
-    studentId,
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
   })
-
-  const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
-    page: 1,
-    limit: 100,
-  })
+  const [expandedCalendarDay, setExpandedCalendarDay] = useState<number | null>(null)
 
   const { data: myGroup } = useMyProjectGroup(Boolean(user?.id))
   const isGroupApproved = Boolean(myGroup?.status && myGroup.status.toUpperCase() === "APPROVED")
-  const { data: myTasksData } = useMyProjectGroupTasks(Boolean(myGroup?.id) && isGroupApproved)
-
-  const activeProject = useMemo(() => {
-    const items = projectsData?.items ?? []
-    if (!items.length) return null
-
-    return (
-      items.find((project) => project.status.toLowerCase() === "in-progress") ??
-      items.find((project) => project.status.toLowerCase() === "active") ??
-      items[0]
-    )
-  }, [projectsData?.items])
-
-  const { data: milestonesData } = useProjectMilestones({
-    projectId: activeProject?.id,
-    enabled: Boolean(activeProject?.id),
-  })
-
-  const mergedMilestones = useMemo(() => {
-    const templateMilestones = (templatesData?.templates ?? [])
-      .slice()
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .map((template) => ({
-        id: template.templateId,
-        title: template.name,
-        dueDate: getTemplateDueDate(template),
-        status: "pending",
-      }))
-
-    const projectMilestonesByName = new Map(
-      (milestonesData?.items ?? []).map((milestone) => [
-        normalizeMilestoneName(milestone.title),
-        milestone,
-      ])
-    )
-
-    if (templateMilestones.length) {
-      return templateMilestones.map((templateMilestone) => {
-        const matchedProjectMilestone = projectMilestonesByName.get(
-          normalizeMilestoneName(templateMilestone.title)
-        )
-
-        if (!matchedProjectMilestone) return templateMilestone
-
-        return {
-          id: matchedProjectMilestone.id,
-          title: templateMilestone.title,
-          dueDate: matchedProjectMilestone.dueDate,
-          status: matchedProjectMilestone.status,
-          submittedAt: matchedProjectMilestone.submittedAt,
-        }
-      })
-    }
-
-    return (milestonesData?.items ?? []).map((milestone) => ({
-      id: milestone.id,
-      title: milestone.title,
-      dueDate: milestone.dueDate,
-      status: milestone.status,
-      submittedAt: milestone.submittedAt,
-    }))
-  }, [milestonesData?.items, templatesData?.templates])
-
-  // Mock data - would come from API in production
-  const defaultProjectInfo = {
-    name: "AI Research Project",
-    startDate: "2024-01-15",
-    endDate: "2024-05-30",
-    progress: 65,
-    daysRemaining: 45,
-    totalTasks: 24,
-    completedTasks: 16,
-    milestones: 8,
-    completedMilestones: 5
-  }
+  const myTasksQuery = useMyProjectGroupTasks(Boolean(myGroup?.id) && isGroupApproved)
+  const myTasksData = myTasksQuery.data
 
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
@@ -151,66 +61,9 @@ export function StudentTimelinePage() {
     return () => clearInterval(interval)
   }, [])
 
-  const projectInfo = useMemo(() => {
-    if (!activeProject) {
-      return defaultProjectInfo
-    }
-
-    const milestones = mergedMilestones
-    const totalMilestones = milestones.length
-    const completedMilestones = milestones.filter((milestone) => {
-      const status = milestone.status.toLowerCase()
-      return (
-        status === "approved" ||
-        status === "submitted" ||
-        status === "completed"
-      )
-    }).length
-
-    const progress =
-      totalMilestones > 0
-        ? Math.round((completedMilestones / totalMilestones) * 100)
-        : 0
-
-    const milestoneDates = milestones
-      .map((milestone) => new Date(milestone.dueDate))
-      .filter((date) => !Number.isNaN(date.getTime()))
-
-    const earliestMilestoneDate = milestoneDates.length
-      ? new Date(Math.min(...milestoneDates.map((date) => date.getTime())))
-      : null
-
-    const latestDueDate = milestoneDates.length
-      ? new Date(Math.max(...milestoneDates.map((date) => date.getTime())))
-      : null
-
-    const endDate = latestDueDate
-      ? latestDueDate.toISOString()
-      : defaultProjectInfo.endDate
-
-    const daysRemaining = latestDueDate
-      ? Math.max(0, Math.ceil((latestDueDate.getTime() - currentTime) / (1000 * 60 * 60 * 24)))
-      : defaultProjectInfo.daysRemaining
-
-    return {
-      name: activeProject.title || defaultProjectInfo.name,
-      startDate: earliestMilestoneDate
-        ? earliestMilestoneDate.toISOString()
-        : defaultProjectInfo.startDate,
-      endDate,
-      progress,
-      daysRemaining,
-      totalTasks: defaultProjectInfo.totalTasks,
-      completedTasks: defaultProjectInfo.completedTasks,
-      milestones: totalMilestones,
-      completedMilestones,
-    }
-  }, [activeProject, mergedMilestones, currentTime, defaultProjectInfo])
-
-  const milestonesProgress =
-    projectInfo.milestones > 0
-      ? (projectInfo.completedMilestones / projectInfo.milestones) * 100
-      : 0
+  useEffect(() => {
+    setExpandedCalendarDay(null)
+  }, [calendarMonth])
 
   const taskMetrics = useMemo(() => {
     const tasks = myTasksData?.items ?? []
@@ -292,6 +145,9 @@ export function StudentTimelinePage() {
     })
   }, [filterStatus, myTasksData?.items, searchQuery])
 
+  const totalTasksCount = myTasksData?.items?.length ?? 0
+  const hasActiveFilters = filterStatus !== "all" || Boolean(searchQuery.trim())
+
   const getMemberNameById = (userId: string | null) => {
     if (!userId) return "Unassigned"
 
@@ -310,9 +166,8 @@ export function StudentTimelinePage() {
   }
 
   const calendarCells = useMemo(() => {
-    const now = new Date(currentTime)
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    const year = calendarMonth.getFullYear()
+    const month = calendarMonth.getMonth()
 
     const firstDayOfMonth = new Date(year, month, 1)
     const leadingEmptyCells = firstDayOfMonth.getDay()
@@ -347,7 +202,27 @@ export function StudentTimelinePage() {
         tasks: (tasksByDay.get(dayNumber) ?? []).slice(),
       }
     })
-  }, [currentTime, myTasksData?.items])
+  }, [calendarMonth, myTasksData?.items])
+
+  const calendarMonthLabel = useMemo(() => {
+    return calendarMonth.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    })
+  }, [calendarMonth])
+
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date(currentTime)
+    return (
+      now.getFullYear() === calendarMonth.getFullYear() &&
+      now.getMonth() === calendarMonth.getMonth()
+    )
+  }, [calendarMonth, currentTime])
+
+  const todayStart = useMemo(() => {
+    const now = new Date(currentTime)
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }, [currentTime])
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -358,7 +233,7 @@ export function StudentTimelinePage() {
             Project Timeline
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track milestones, tasks, and progress throughout your project
+            Track tasks and progress throughout your project
           </p>
         </div>
         <div className="flex gap-2">
@@ -390,55 +265,28 @@ export function StudentTimelinePage() {
         </div>
       </div>
 
-      {/* Project Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Overall Progress</p>
-                <p className="text-2xl font-bold">{taskMetrics.percent}%</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-            <Progress value={taskMetrics.percent} className="mt-4" />
-            <p className="text-xs text-muted-foreground mt-2">
-              {taskMetrics.done}/{taskMetrics.total} tasks completed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Days Remaining</p>
-                <p className="text-2xl font-bold">{projectInfo.daysRemaining}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
-                <Hourglass className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Target: {formatDate(projectInfo.endDate)}
-            </p>
-          </CardContent>
-        </Card>
-
+      {/* Task Status Cards */}
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer hover:bg-muted/30"
+          role={isGroupApproved ? "button" : undefined}
+          tabIndex={isGroupApproved ? 0 : -1}
+          aria-disabled={!isGroupApproved}
+          title={!isGroupApproved ? "Your project group must be approved" : "View TODO tasks"}
+          className={
+            isGroupApproved
+              ? "cursor-pointer hover:bg-muted/30"
+              : "opacity-60 cursor-not-allowed"
+          }
           onClick={() => {
-            setFocusedTaskStatus(null)
+            if (!isGroupApproved) return
+            setFocusedTaskStatus("TODO")
             setActiveTab("tasks")
           }}
           onKeyDown={(e) => {
+            if (!isGroupApproved) return
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault()
-              setFocusedTaskStatus(null)
+              setFocusedTaskStatus("TODO")
               setActiveTab("tasks")
             }
           }}
@@ -446,88 +294,100 @@ export function StudentTimelinePage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Tasks</p>
-                <p className="text-2xl font-bold">{taskMetrics.done}/{taskMetrics.total}</p>
+                <p className="text-sm font-medium text-muted-foreground">TODO</p>
+                <p className="text-2xl font-bold">{taskMetrics.todo}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCheck className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <Circle className="h-6 w-6 text-muted-foreground" />
               </div>
             </div>
-
-            <Progress value={taskMetrics.percent} className="mt-4" />
-
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <button
-                type="button"
-                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setFocusedTaskStatus("TODO")
-                  setActiveTab("tasks")
-                }}
-                disabled={!isGroupApproved}
-                title={!isGroupApproved ? "Your group must be approved" : "View TODO tasks"}
-              >
-                <div className="text-muted-foreground">TODO</div>
-                <div className="font-semibold">{taskMetrics.todo}</div>
-              </button>
-
-              <button
-                type="button"
-                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setFocusedTaskStatus("IN_PROGRESS")
-                  setActiveTab("tasks")
-                }}
-                disabled={!isGroupApproved}
-                title={!isGroupApproved ? "Your group must be approved" : "View in-progress tasks"}
-              >
-                <div className="text-muted-foreground">In Progress</div>
-                <div className="font-semibold">{taskMetrics.inProgress}</div>
-              </button>
-
-              <button
-                type="button"
-                className="rounded-md border bg-background px-2 py-1 text-left hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setFocusedTaskStatus("DONE")
-                  setActiveTab("tasks")
-                }}
-                disabled={!isGroupApproved}
-                title={!isGroupApproved ? "Your group must be approved" : "View completed tasks"}
-              >
-                <div className="text-muted-foreground">Completed</div>
-                <div className="font-semibold">{taskMetrics.done}</div>
-              </button>
-            </div>
-
-            {!isGroupApproved ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Your project group must be approved to manage tasks.
-              </p>
-            ) : null}
+            <p className="text-xs text-muted-foreground mt-2">
+              {taskMetrics.total > 0 ? `${taskMetrics.todo} of ${taskMetrics.total}` : "No tasks yet"}
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          role={isGroupApproved ? "button" : undefined}
+          tabIndex={isGroupApproved ? 0 : -1}
+          aria-disabled={!isGroupApproved}
+          title={!isGroupApproved ? "Your project group must be approved" : "View in-progress tasks"}
+          className={
+            isGroupApproved
+              ? "cursor-pointer hover:bg-muted/30"
+              : "opacity-60 cursor-not-allowed"
+          }
+          onClick={() => {
+            if (!isGroupApproved) return
+            setFocusedTaskStatus("IN_PROGRESS")
+            setActiveTab("tasks")
+          }}
+          onKeyDown={(e) => {
+            if (!isGroupApproved) return
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setFocusedTaskStatus("IN_PROGRESS")
+              setActiveTab("tasks")
+            }
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Milestones</p>
-                <p className="text-2xl font-bold">{projectInfo.completedMilestones}/{projectInfo.milestones}</p>
+                <p className="text-sm font-medium text-muted-foreground">In Progress</p>
+                <p className="text-2xl font-bold">{taskMetrics.inProgress}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <Flag className="h-6 w-6 text-purple-600" />
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Hourglass className="h-6 w-6 text-primary" />
               </div>
             </div>
-            <Progress value={milestonesProgress} className="mt-4" />
+            <p className="text-xs text-muted-foreground mt-2">
+              {taskMetrics.total > 0 ? `${taskMetrics.inProgress} of ${taskMetrics.total}` : "No tasks yet"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          role={isGroupApproved ? "button" : undefined}
+          tabIndex={isGroupApproved ? 0 : -1}
+          aria-disabled={!isGroupApproved}
+          title={!isGroupApproved ? "Your project group must be approved" : "View completed tasks"}
+          className={
+            isGroupApproved
+              ? "cursor-pointer hover:bg-muted/30"
+              : "opacity-60 cursor-not-allowed"
+          }
+          onClick={() => {
+            if (!isGroupApproved) return
+            setFocusedTaskStatus("DONE")
+            setActiveTab("tasks")
+          }}
+          onKeyDown={(e) => {
+            if (!isGroupApproved) return
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setFocusedTaskStatus("DONE")
+              setActiveTab("tasks")
+            }
+          }}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">{taskMetrics.done}</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <CheckCheck className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {taskMetrics.total > 0 ? `${taskMetrics.done} of ${taskMetrics.total}` : "No tasks yet"}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* View Mode Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={(value) => {
@@ -561,6 +421,12 @@ export function StudentTimelinePage() {
               className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && searchQuery) {
+                  e.preventDefault()
+                  setSearchQuery("")
+                }
+              }}
             />
           </div>
         </div>
@@ -569,10 +435,57 @@ export function StudentTimelinePage() {
         <TabsContent value="calendar" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                Calendar View
-              </CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                  Calendar View
+                </CardTitle>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+                    }}
+                    aria-label="Previous month"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="min-w-[140px] text-center text-sm font-medium">
+                    {calendarMonthLabel}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date()
+                      setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1))
+                    }}
+                    disabled={isCurrentMonth}
+                    aria-label="Go to current month"
+                    title={isCurrentMonth ? "Already viewing current month" : "Go to current month"}
+                  >
+                    Today
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+                    }}
+                    aria-label="Next month"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               <CardDescription>
                 View your tasks by due date
               </CardDescription>
@@ -587,18 +500,63 @@ export function StudentTimelinePage() {
                 
                 {/* Calendar days */}
                 {calendarCells.map((cell, i) => {
+                  const dayNumber = cell.dayNumber
+                  const isToday =
+                    Boolean(dayNumber) &&
+                    isCurrentMonth &&
+                    dayNumber === todayStart.getDate()
+
+                  const showAll = Boolean(dayNumber) && expandedCalendarDay === dayNumber
+                  const visibleTasks = showAll ? cell.tasks : cell.tasks.slice(0, 3)
+                  const hiddenCount = cell.tasks.length - visibleTasks.length
+
                   return (
-                    <div key={i} className="bg-background p-2 min-h-[100px] border-t">
-                      <span className="text-sm text-muted-foreground">{cell.dayNumber ?? ""}</span>
-                      {cell.dayNumber && cell.tasks.length > 0 ? (
+                    <div
+                      key={i}
+                      className={
+                        "bg-background p-2 min-h-[100px] border-t " +
+                        (isToday ? "ring-1 ring-primary/40 bg-primary/5" : "")
+                      }
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={
+                            "text-sm " +
+                            (dayNumber
+                              ? isToday
+                                ? "font-semibold text-foreground"
+                                : "text-muted-foreground"
+                              : "text-muted-foreground")
+                          }
+                        >
+                          {dayNumber ?? ""}
+                        </span>
+                      </div>
+
+                      {dayNumber && cell.tasks.length > 0 ? (
                         <div className="mt-1 space-y-1">
-                          {cell.tasks.slice(0, 3).map((task) => {
-                            const styles =
-                              task.status === "DONE"
+                          {visibleTasks.map((task) => {
+                            const due = task.dueDate ? new Date(task.dueDate) : null
+                            const dueStart =
+                              due && !Number.isNaN(due.getTime())
+                                ? new Date(due.getFullYear(), due.getMonth(), due.getDate())
+                                : null
+                            const isOverdue =
+                              Boolean(dueStart) &&
+                              task.status !== "DONE" &&
+                              (dueStart as Date).getTime() < todayStart.getTime()
+
+                            const styles = isOverdue
+                              ? "bg-destructive/10 text-destructive"
+                              : task.status === "DONE"
                                 ? "bg-green-100 text-green-800"
                                 : task.status === "IN_PROGRESS"
                                   ? "bg-blue-100 text-blue-800"
                                   : "bg-gray-100 text-gray-800"
+
+                            const titleParts = [task.title]
+                            if (isOverdue) titleParts.push("Overdue")
+                            if (task.description) titleParts.push(task.description)
 
                             return (
                               <button
@@ -609,16 +567,33 @@ export function StudentTimelinePage() {
                                   setFocusedTaskStatus(task.status)
                                   setActiveTab("tasks")
                                 }}
-                                title={task.title}
+                                title={titleParts.join(" • ")}
                               >
                                 {task.title}
                               </button>
                             )
                           })}
-                          {cell.tasks.length > 3 ? (
-                            <div className="text-[10px] text-muted-foreground">
-                              +{cell.tasks.length - 3} more
-                            </div>
+
+                          {hiddenCount > 0 ? (
+                            <button
+                              type="button"
+                              className="text-[10px] text-muted-foreground hover:underline"
+                              onClick={() => {
+                                setExpandedCalendarDay(dayNumber)
+                              }}
+                            >
+                              +{hiddenCount} more
+                            </button>
+                          ) : null}
+
+                          {showAll && cell.tasks.length > 3 ? (
+                            <button
+                              type="button"
+                              className="text-[10px] text-muted-foreground hover:underline"
+                              onClick={() => setExpandedCalendarDay(null)}
+                            >
+                              Show less
+                            </button>
                           ) : null}
                         </div>
                       ) : null}
@@ -643,36 +618,204 @@ export function StudentTimelinePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-muted-foreground">
+                  {isGroupApproved ? (
+                    myTasksQuery.isLoading ? (
+                      "Loading tasks…"
+                    ) : myTasksQuery.isError ? (
+                      "Couldn’t load tasks"
+                    ) : (
+                      <span>
+                        Showing <span className="font-medium text-foreground">{filteredTasks.length}</span> of{" "}
+                        <span className="font-medium text-foreground">{totalTasksCount}</span>
+                      </span>
+                    )
+                  ) : (
+                    ""
+                  )}
+                </div>
+
+                {isGroupApproved && !myTasksQuery.isLoading && !myTasksQuery.isError ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {filterStatus !== "all" ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Status: {filterStatus.replaceAll("_", " ")}
+                      </Badge>
+                    ) : null}
+                    {searchQuery.trim() ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Search: “{searchQuery.trim()}”
+                      </Badge>
+                    ) : null}
+                    {hasActiveFilters ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery("")
+                          setFilterStatus("all")
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
               <div className="space-y-2">
-                {filteredTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      setFocusedTaskStatus(task.status)
-                      setActiveTab("tasks")
-                    }}
-                  >
+                {!isGroupApproved ? (
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                     <div className="flex items-center gap-3">
-                      {getStatusIcon(mapTaskStatusToListStatus(task.status))}
+                      <Circle className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{task.title}</span>
-                          <Badge variant="outline" className="text-xs">
-                            task
-                          </Badge>
+                          <span className="font-medium">Tasks unavailable</span>
                         </div>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-                          <span>Due: {task.dueDate ? formatDate(task.dueDate) : "No due date"}</span>
-                          <span>Assignee: {getMemberNameById(task.assignedToUserId)}</span>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Your project group must be approved to view tasks.
                         </div>
                       </div>
                     </div>
-                    <Badge className={getStatusBadge(mapTaskStatusToListStatus(task.status))}>
-                      {task.status.replaceAll("_", " ")}
-                    </Badge>
                   </div>
-                ))}
+                ) : myTasksQuery.isLoading ? (
+                  Array.from({ length: 3 }).map((_, idx) => (
+                    <div
+                      key={`task-skeleton-${idx}`}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                      aria-busy="true"
+                      aria-label="Loading tasks"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-4 rounded bg-muted animate-pulse" />
+                        <div>
+                          <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+                          <div className="mt-2 h-3 w-64 rounded bg-muted animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="h-6 w-20 rounded bg-muted animate-pulse" />
+                    </div>
+                  ))
+                ) : myTasksQuery.isError ? (
+                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Couldn’t load tasks</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {myTasksQuery.error?.message ?? "Please try again."}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => myTasksQuery.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : filteredTasks.length === 0 ? (
+                  (myTasksData?.items ?? []).length === 0 ? (
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+                      <div className="flex items-center gap-3">
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">No tasks yet</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Create your first task from the Tasks tab.
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFocusedTaskStatus(null)
+                          setActiveTab("tasks")
+                        }}
+                      >
+                        Go to Tasks
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+                      <div className="flex items-center gap-3">
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">No matching tasks</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Try clearing the search or status filter.
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery("")
+                          setFilterStatus("all")
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  )
+                ) : (
+                  filteredTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setFocusedTaskStatus(task.status)
+                        setActiveTab("tasks")
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          setFocusedTaskStatus(task.status)
+                          setActiveTab("tasks")
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(mapTaskStatusToListStatus(task.status))}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{task.title}</span>
+                            <Badge variant="outline" className="text-xs">
+                              task
+                            </Badge>
+                          </div>
+                          {task.description ? (
+                            <div
+                              className="text-xs text-muted-foreground mt-1 line-clamp-1"
+                              title={task.description}
+                            >
+                              {task.description}
+                            </div>
+                          ) : null}
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+                            <span>Due: {task.dueDate ? formatDate(task.dueDate) : "No due date"}</span>
+                            <span>Assignee: {getMemberNameById(task.assignedToUserId)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge className={getStatusBadge(mapTaskStatusToListStatus(task.status))}>
+                        {task.status.replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
