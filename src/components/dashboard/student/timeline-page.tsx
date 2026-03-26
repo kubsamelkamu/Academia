@@ -302,7 +302,9 @@ export function StudentTimelinePage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {taskMetrics.total > 0 ? `${taskMetrics.todo} of ${taskMetrics.total}` : "No tasks yet"}
+              {taskMetrics.total > 0
+                ? `${taskMetrics.todo} of ${taskMetrics.total} • ${Math.round((taskMetrics.todo / taskMetrics.total) * 100)}%`
+                : "No tasks yet"}
             </p>
           </CardContent>
         </Card>
@@ -342,7 +344,9 @@ export function StudentTimelinePage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {taskMetrics.total > 0 ? `${taskMetrics.inProgress} of ${taskMetrics.total}` : "No tasks yet"}
+              {taskMetrics.total > 0
+                ? `${taskMetrics.inProgress} of ${taskMetrics.total} • ${Math.round((taskMetrics.inProgress / taskMetrics.total) * 100)}%`
+                : "No tasks yet"}
             </p>
           </CardContent>
         </Card>
@@ -382,7 +386,9 @@ export function StudentTimelinePage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {taskMetrics.total > 0 ? `${taskMetrics.done} of ${taskMetrics.total}` : "No tasks yet"}
+              {taskMetrics.total > 0
+                ? `${taskMetrics.done} of ${taskMetrics.total} • ${taskMetrics.percent}% overall complete`
+                : "No tasks yet"}
             </p>
           </CardContent>
         </Card>
