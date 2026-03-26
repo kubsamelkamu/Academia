@@ -16,7 +16,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
-import { getTemplateDueDate } from "@/lib/milestone-template-dates"
+import type { MilestoneTemplate } from "@/types/milestone-templates"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -26,6 +26,7 @@ interface Milestone {
   dueDate: string
   status: MilestoneStatus
   submittedAt?: string
+  sequence?: number
 }
 
 const myProject = {
@@ -108,6 +109,19 @@ function mapBackendStatus(status: string): MilestoneStatus {
   return "pending"
 }
 
+function addDays(baseDate: string, daysToAdd: number): string {
+  const date = new Date(baseDate)
+  if (Number.isNaN(date.getTime())) return baseDate
+  const next = new Date(date)
+  next.setDate(next.getDate() + Math.max(0, daysToAdd))
+  return next.toISOString().split("T")[0]
+}
+
+function getActiveMilestoneTemplate(templates: MilestoneTemplate[]): MilestoneTemplate | null {
+  if (!templates.length) return null
+  return templates.find((t) => t.isActive) ?? templates[0]
+}
+
 export function StudentMilestonesPage() {
   const router = useRouter()
   const [progressDialogOpen, setProgressDialogOpen] = useState(false)
@@ -125,6 +139,11 @@ export function StudentMilestonesPage() {
     page: 1,
     limit: 100,
   })
+
+  const activeTemplate = useMemo(() => {
+    const templates = templatesData?.templates ?? []
+    return getActiveMilestoneTemplate(templates)
+  }, [templatesData?.templates])
 
   const { data: projectsData } = useStudentProjects({
     departmentId,
@@ -148,15 +167,28 @@ export function StudentMilestonesPage() {
   })
 
   const milestones = useMemo<Milestone[]>(() => {
-    const templateMilestones = (templatesData?.templates ?? [])
-      .slice()
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .map((template) => ({
-        id: template.templateId,
-        name: template.name,
-        dueDate: getTemplateDueDate(template),
-        status: "pending" as const,
-      }))
+    const templates = templatesData?.templates ?? []
+    const activeTemplate = getActiveMilestoneTemplate(templates)
+
+    const templateMilestones: Milestone[] = (() => {
+      if (!activeTemplate?.milestones?.length) return []
+      const baseDate = activeTemplate.createdAt
+
+      let cumulativeDays = 0
+      return activeTemplate.milestones
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((milestone) => {
+          cumulativeDays += Math.max(0, milestone.defaultDurationDays ?? 0)
+          return {
+            id: `${activeTemplate.templateId}:${milestone.sequence}`,
+            name: milestone.title,
+            dueDate: addDays(baseDate, cumulativeDays),
+            status: "pending" as const,
+            sequence: milestone.sequence,
+          }
+        })
+    })()
 
     const projectMilestonesByName = new Map(
       (projectMilestonesData?.items ?? []).map((milestone) => [
@@ -179,6 +211,7 @@ export function StudentMilestonesPage() {
           dueDate: matchedProjectMilestone.dueDate,
           status: mapBackendStatus(matchedProjectMilestone.status),
           submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
+          sequence: templateMilestone.sequence,
         }
       })
     }
@@ -186,9 +219,9 @@ export function StudentMilestonesPage() {
     return myProject.milestones
   }, [projectMilestonesData?.items, templatesData?.templates])
 
-  const completedMilestones = myProject.milestones.filter((m) => m.status === "approved").length
-  const totalMilestones = myProject.milestones.length
-  const progressPercent = (completedMilestones / totalMilestones) * 100
+  const completedMilestones = milestones.filter((m) => m.status === "approved").length
+  const totalMilestones = milestones.length
+  const progressPercent = totalMilestones ? (completedMilestones / totalMilestones) * 100 : 0
   const projectDisplayName = myProjectGroupQuery.data?.name?.trim() || myProject.title
 
   const handleSubmitMilestone = (milestone: Milestone) => {
@@ -290,7 +323,19 @@ export function StudentMilestonesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Project Milestones</CardTitle>
-          <CardDescription>Submit pending milestones through the upload flow.</CardDescription>
+          <CardDescription>
+            Submit pending milestones through the upload flow.
+            {activeTemplate ? (
+              <span className="block mt-1">
+                Template: {activeTemplate.name} • {activeTemplate.isActive ? "Active" : "Inactive"} • Created {formatDate(activeTemplate.createdAt)}
+              </span>
+            ) : null}
+            {milestones.length ? (
+              <span className="block mt-1">
+                Sequences: {milestones.map((m, idx) => m.sequence ?? idx + 1).join(" • ")}
+              </span>
+            ) : null}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {milestones.map((milestone, index) => (
@@ -308,7 +353,11 @@ export function StudentMilestonesPage() {
                         : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {milestone.status === "approved" ? <CheckCircle2 className="h-5 w-5" /> : index + 1}
+                  {milestone.status === "approved" ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    milestone.sequence ?? index + 1
+                  )}
                 </div>
                 <div>
                   <p className="font-medium">{milestone.name}</p>

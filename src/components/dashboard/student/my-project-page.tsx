@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -9,19 +9,17 @@ import {
   Calendar,
   Users,
   CheckCircle,
-  Upload,
   Clock,
   FileText,
   AlertCircle,
   ChevronRight,
 } from "lucide-react"
-import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
-import { getTemplateDueDate } from "@/lib/milestone-template-dates"
+import type { MilestoneTemplate } from "@/types/milestone-templates"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -33,6 +31,7 @@ interface Milestone {
   status: "pending" | "submitted" | "approved" | "rejected"
   submittedAt?: string
   description?: string
+  sequence?: number
 }
 
 interface ProjectData {
@@ -111,6 +110,19 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 const normalizeMilestoneName = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, " ")
+
+function addDays(baseDate: string, daysToAdd: number): string {
+  const date = new Date(baseDate)
+  if (Number.isNaN(date.getTime())) return baseDate
+  const next = new Date(date)
+  next.setDate(next.getDate() + Math.max(0, daysToAdd))
+  return next.toISOString().split("T")[0]
+}
+
+function getActiveMilestoneTemplate(templates: MilestoneTemplate[]): MilestoneTemplate | null {
+  if (!templates.length) return null
+  return templates.find((t) => t.isActive) ?? templates[0]
+}
 
 const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
   const normalized = status.trim().toLowerCase()
@@ -224,10 +236,7 @@ function MyProjectHeader() {
 }
 
 export function StudentMyProjectPage() {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [projectState, setProjectState] = useState<ProjectData>(initialProjectData)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const user = useAuthStore((state) => state.user)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
@@ -238,6 +247,11 @@ export function StudentMyProjectPage() {
     page: 1,
     limit: 100,
   })
+
+  const activeTemplate = useMemo(() => {
+    const templates = templatesData?.templates ?? []
+    return getActiveMilestoneTemplate(templates)
+  }, [templatesData?.templates])
 
   const { data: projectsData } = useStudentProjects({
     departmentId,
@@ -262,22 +276,27 @@ export function StudentMyProjectPage() {
 
   const templateMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
-    if (!templates.length) return []
+    const activeTemplate = getActiveMilestoneTemplate(templates)
+    if (!activeTemplate?.milestones?.length) return []
 
-    return templates
+    const baseDate = projectState.startDate?.trim() ? projectState.startDate : activeTemplate.createdAt
+
+    let cumulativeDays = 0
+    return activeTemplate.milestones
       .slice()
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .map((template) => ({
-        id: template.templateId,
-        name: template.name,
-        dueDate: getTemplateDueDate(template),
-        status: "pending" as const,
-        description:
-          template.milestones?.[0]?.description ??
-          template.description ??
-          undefined,
-      }))
-  }, [templatesData?.templates])
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((milestone) => {
+        cumulativeDays += Math.max(0, milestone.defaultDurationDays ?? 0)
+        return {
+          id: `${activeTemplate.templateId}:${milestone.sequence}`,
+          name: milestone.title,
+          dueDate: addDays(baseDate, cumulativeDays),
+          status: "pending" as const,
+          description: milestone.description ?? undefined,
+          sequence: milestone.sequence,
+        }
+      })
+  }, [projectState.startDate, templatesData?.templates])
 
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
     if (!templateMilestones.length) return []
@@ -362,85 +381,6 @@ export function StudentMyProjectPage() {
         </Card>
       </div>
     )
-  }
-
-  const handleFileSelect = (milestoneId: string) => {
-    setSelectedMilestoneId(milestoneId)
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !selectedMilestoneId) {
-      return
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/zip",
-    ]
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type", {
-        description: "Please upload a PDF, Word document, or ZIP file.",
-      })
-      e.target.value = ""
-      return
-    }
-
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    if (file.size > maxSize) {
-      toast.error("File too large", {
-        description: "Please upload a file smaller than 10MB.",
-      })
-      e.target.value = ""
-      return
-    }
-
-    setIsSubmitting(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Update UI state
-    setProjectState((prevProject) => {
-      const updatedMilestones = prevProject.milestones.map((m) =>
-        m.id === selectedMilestoneId
-          ? {
-              ...m,
-              status: "submitted" as const,
-              submittedAt: new Date().toISOString().split("T")[0],
-            }
-          : m
-      )
-
-      // Calculate new progress
-      const completedMilestones = updatedMilestones.filter(
-        (m) => m.status === "approved" || m.status === "submitted"
-      ).length
-      const newProgress = Math.round(
-        (completedMilestones / updatedMilestones.length) * 100
-      )
-
-      return {
-        ...prevProject,
-        milestones: updatedMilestones,
-        progress: newProgress,
-      }
-    })
-
-    const milestoneName = myProject.milestones.find((m) => m.id === selectedMilestoneId)?.name
-
-    toast.success("Milestone Submitted", {
-      description: `File "${file.name}" has been successfully submitted for ${milestoneName}.`,
-    })
-
-    setSelectedMilestoneId(null)
-    setIsSubmitting(false)
-    e.target.value = ""
   }
 
   const completedMilestones = myProject.milestones.filter(
@@ -530,6 +470,21 @@ export function StudentMyProjectPage() {
               <CardTitle className="font-display text-xl">Project Milestones</CardTitle>
               <CardDescription className="mt-1">
                 Track your progress and submit deliverables for each milestone
+                {activeTemplate ? (
+                  <span className="block mt-1">
+                    Template: {activeTemplate.name} • {activeTemplate.isActive ? "Active" : "Inactive"} • Created {formatDate(activeTemplate.createdAt)}
+                  </span>
+                ) : null}
+                {myProject.milestones.length ? (
+                  <span className="block mt-1">
+                    Sequences:{" "}
+                    {myProject.milestones
+                      .slice()
+                      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                      .map((m, idx) => m.sequence ?? idx + 1)
+                      .join(" • ")}
+                  </span>
+                ) : null}
               </CardDescription>
             </div>
           </div>
@@ -567,7 +522,7 @@ export function StudentMyProjectPage() {
                     {milestone.status === "approved" ? (
                       <CheckCircle className="h-6 w-6" />
                     ) : (
-                      <span className="font-semibold text-base">{index + 1}</span>
+                      <span className="font-semibold text-base">{milestone.sequence ?? index + 1}</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -607,18 +562,6 @@ export function StudentMyProjectPage() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <StatusBadge status={milestone.status} />
-                    {milestone.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant={isOverdue ? "destructive" : "default"}
-                        onClick={() => handleFileSelect(milestone.id)}
-                        disabled={isSubmitting}
-                        className="gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        Submit
-                      </Button>
-                    )}
                     {milestone.status === "submitted" && (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
@@ -627,15 +570,6 @@ export function StudentMyProjectPage() {
               )
             })}
           </div>
-
-          {/* Hidden File Input */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept=".pdf,.doc,.docx,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip"
-          />
         </CardContent>
       </Card>
     </div>
