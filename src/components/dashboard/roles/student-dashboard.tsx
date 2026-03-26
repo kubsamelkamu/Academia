@@ -13,7 +13,7 @@ import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
-import { getTemplateDueDate } from "@/lib/milestone-template-dates"
+import type { MilestoneTemplate } from "@/types/milestone-templates"
 import {
   BarChart3,
   Calendar,
@@ -28,6 +28,7 @@ interface Milestone {
   name: string
   status: "pending" | "submitted" | "approved" | "overdue"
   dueDate: string
+  sequence?: number
 }
 
 interface GradeSummary {
@@ -91,6 +92,19 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
 
 function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function addDays(baseDate: string, daysToAdd: number): string {
+  const date = new Date(baseDate)
+  if (Number.isNaN(date.getTime())) return baseDate
+  const next = new Date(date)
+  next.setDate(next.getDate() + Math.max(0, daysToAdd))
+  return next.toISOString().split("T")[0]
+}
+
+function getActiveMilestoneTemplate(templates: MilestoneTemplate[]): MilestoneTemplate | null {
+  if (!templates.length) return null
+  return templates.find((t) => t.isActive) ?? templates[0]
 }
 
 function getAnnouncementActionLabel(
@@ -267,15 +281,28 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   })
 
   const backendMilestones = useMemo<Milestone[]>(() => {
-    const templateMilestones = (templatesData?.templates ?? [])
-      .slice()
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      .map((template) => ({
-        id: template.templateId,
-        name: template.name,
-        status: "pending" as const,
-        dueDate: getTemplateDueDate(template),
-      }))
+    const templates = templatesData?.templates ?? []
+    const activeTemplate = getActiveMilestoneTemplate(templates)
+
+    const templateMilestones: Milestone[] = (() => {
+      if (!activeTemplate?.milestones?.length) return []
+
+      const baseDate = activeTemplate.createdAt
+      let cumulativeDays = 0
+      return activeTemplate.milestones
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((milestone) => {
+          cumulativeDays += Math.max(0, milestone.defaultDurationDays ?? 0)
+          return {
+            id: `${activeTemplate.templateId}:${milestone.sequence}`,
+            name: milestone.title,
+            status: "pending" as const,
+            dueDate: addDays(baseDate, cumulativeDays),
+            sequence: milestone.sequence,
+          }
+        })
+    })()
 
     const projectMilestonesByName = new Map(
       (milestonesData?.items ?? []).map((milestone) => [
@@ -297,6 +324,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           name: templateMilestone.name,
           status: mapMilestoneStatus(matchedProjectMilestone.status),
           dueDate: matchedProjectMilestone.dueDate,
+          sequence: templateMilestone.sequence,
         }
       })
     }
@@ -307,6 +335,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         name: milestone.title,
         status: mapMilestoneStatus(milestone.status),
         dueDate: milestone.dueDate,
+        sequence: undefined,
       }))
       .filter((milestone) => {
         const dueDate = new Date(milestone.dueDate)
@@ -622,7 +651,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                   className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm"
                 >
                   <div className="space-y-1">
-                    <p className="font-medium leading-tight">{m.name}</p>
+                    <p className="font-medium leading-tight">
+                      {typeof m.sequence === "number" ? `${m.sequence}. ${m.name}` : m.name}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Due: {formatDate(m.dueDate)}
                     </p>
