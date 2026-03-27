@@ -82,6 +82,7 @@ export function StudentUploadDocumentsPage() {
   const searchParams = useSearchParams()
   const departmentId = useAuthStore((s) => s.user?.departmentId)
   const accessToken = useAuthStore((s) => s.accessToken)
+  const studentId = useAuthStore((s) => s.user?.id)
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
   const projectTitle = myProjectGroupQuery.data?.name?.trim() || ""
   const [title, setTitle] = useState("")
@@ -208,6 +209,43 @@ export function StudentUploadDocumentsPage() {
       const updated = await submitProposalMutation.mutateAsync({ proposalId: proposal.id })
       setProposal(updated)
       toast.success("Proposal submitted for review")
+
+      try {
+        const host = typeof window !== "undefined" ? window.location.host : ""
+        const ids = [
+          studentId ?? null,
+          (typeof updated.submittedBy === "string" ? updated.submittedBy : null) ?? null,
+          (typeof updated.submitter?.id === "string" ? updated.submitter.id : null) ?? null,
+        ].filter((value): value is string => Boolean(value && value.trim()))
+
+        const uniqueIds = Array.from(new Set(ids.map((value) => value.trim())))
+        const markerScopes = Array.from(new Set([...uniqueIds, "any", ""]))
+        const storageKeys = markerScopes.map((scope) =>
+          ["academia:proposal:lastSubmitted", host, scope].join(":")
+        )
+
+        const proposalStatus = String(updated.status ?? "").toUpperCase()
+        const milestoneStatus = proposalStatus === "APPROVED" ? "approved" : "submitted"
+        const submittedAt =
+          updated.submittedAt ??
+          updated.updatedAt ??
+          updated.createdAt ??
+          new Date().toISOString()
+
+        const payload = JSON.stringify({
+          proposalId: updated.id,
+          status: milestoneStatus,
+          submittedAt,
+        })
+
+        for (const storageKey of storageKeys) {
+          localStorage.setItem(storageKey, payload)
+        }
+      } catch {
+        // ignore localStorage failures
+      }
+
+      router.push("/dashboard/student/milestones")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Submit failed"
       toast.error(message)

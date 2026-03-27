@@ -166,71 +166,17 @@ function getMeaningfulText(value: string | null | undefined): string {
   return trimmed
 }
 
-function buildMockDashboardData(): StudentDashboardData {
-  const now = new Date()
-  const inDays = (d: number) => {
-    const dt = new Date(now)
-    dt.setDate(dt.getDate() + d)
-    return dt.toISOString().split("T")[0]
-  }
-
-  const milestones: Milestone[] = [
-    {
-      id: "m1",
-      name: "Project Proposal Approved",
-      status: "approved",
-      dueDate: inDays(-30),
-    },
-    {
-      id: "m2",
-      name: "Software Requirements Specification (SRS)",
-      status: "approved",
-      dueDate: inDays(-7),
-    },
-    {
-      id: "m3",
-      name: "System Design Document (SDD)",
-      status: "submitted",
-      dueDate: inDays(3),
-    },
-    {
-      id: "m4",
-      name: "Implementation & Testing Report",
-      status: "pending",
-      dueDate: inDays(18),
-    },
-    {
-      id: "m5",
-      name: "Final Defense Presentation",
-      status: "pending",
-      dueDate: inDays(35),
-    },
-  ]
-
-  const upcoming =
-    milestones.find((m) => m.status === "pending" || m.status === "submitted") ?? milestones[milestones.length - 1]
-
-  const daysToDeadline = Math.max(
-    0,
-    Math.ceil((new Date(upcoming.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  )
-
+function buildEmptyDashboardData(): StudentDashboardData {
   return {
     project: {
-      title: "AI‑Driven Academic Assistant for Project Management",
-      advisorName: "Dr. Alan Turing",
-      progress: 58,
-      milestones,
-      nextDeadlineLabel: upcoming.name,
-      nextDeadlineDays: daysToDeadline,
+      title: "",
+      advisorName: "",
+      progress: 0,
+      milestones: [],
+      nextDeadlineLabel: "",
+      nextDeadlineDays: 0,
     },
-    grade: {
-      advisorScore: 34,
-      evaluatorScores: [32, 35, 33],
-      finalScore: 86,
-      grade: "A-",
-      status: "provisional",
-    },
+    grade: null,
   }
 }
 
@@ -345,8 +291,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   }, [milestonesData?.items, templatesData?.templates])
 
   const data = useMemo(() => {
-    const mockData = buildMockDashboardData()
-    if (!backendMilestones.length) return mockData
+    const emptyData = buildEmptyDashboardData()
+    if (!backendMilestones.length) return emptyData
 
     const now = new Date()
     const completedCount = backendMilestones.filter(
@@ -364,9 +310,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     )
 
     return {
-      ...mockData,
+      ...emptyData,
       project: {
-        ...mockData.project,
+        ...emptyData.project,
         progress,
         milestones: backendMilestones,
         nextDeadlineLabel: upcomingMilestone.name,
@@ -375,9 +321,24 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     }
   }, [backendMilestones])
 
+  const activeTemplate = useMemo(() => {
+    const templates = templatesData?.templates ?? []
+    return getActiveMilestoneTemplate(templates)
+  }, [templatesData?.templates])
+
+  const nextMilestone = useMemo(() => {
+    const items = backendMilestones
+    if (!items.length) return null
+    return (
+      items.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
+      items[items.length - 1] ??
+      null
+    )
+  }, [backendMilestones])
+
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
-  const projectDisplayName = myGroup?.name?.trim() || data.project.title
+  const projectDisplayName = myGroup?.name?.trim() || activeProject?.title?.trim() || "My Project"
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
     const withDeadline = items.filter((item) => item.deadlineAt)
@@ -521,10 +482,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         const status = milestone.status.toLowerCase()
         return status === "approved" || status === "submitted"
       }).length
-    : data.project.milestones.filter(
-        (m) => m.status === "approved" || m.status === "submitted"
-      ).length
-  const totalMilestones = existingProjectMilestones.length || data.project.milestones.length
+    : backendMilestones.filter((m) => m.status === "approved" || m.status === "submitted").length
+  const totalMilestones = existingProjectMilestones.length || backendMilestones.length
 
   const evaluatorAverage =
     data.grade && data.grade.evaluatorScores.length > 0
@@ -571,7 +530,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             <FolderKanban className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold truncate">In Progress</p>
+            <p className="text-2xl font-bold truncate">
+              {activeProject ? "In Progress" : "No Project"}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground truncate">
               {projectDisplayName}
             </p>
@@ -584,7 +545,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             <Clock3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{data.project.progress}%</p>
+            <p className="text-2xl font-bold">{backendMilestones.length ? `${data.project.progress}%` : "—"}</p>
             <p className="mt-1 text-xs text-muted-foreground">Overall completion</p>
           </CardContent>
         </Card>
@@ -628,24 +589,65 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 {projectDisplayName}
               </CardTitle>
               <CardDescription>
-                Advisor: <span className="font-medium">{data.project.advisorName}</span>
+                Advisor: <span className="font-medium">—</span>
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleViewProject}>
-              View full project
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/student/milestones">View milestones</Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleViewProject}>
+                View full project
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Active template</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {activeTemplate ? activeTemplate.name : "No template"}
+                </p>
+                {activeTemplate ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {activeTemplate.isActive ? "Active" : "Inactive"} • Created {formatDate(activeTemplate.createdAt)}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your department has not published milestone templates yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Next milestone</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {nextMilestone ? nextMilestone.name : "No milestones"}
+                </p>
+                {nextMilestone ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Due {formatDate(nextMilestone.dueDate)} • Status {nextMilestone.status}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Create a project to see milestone deadlines.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div>
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span>Overall progress</span>
-                <span className="font-medium">{data.project.progress}%</span>
+                <span className="font-medium">
+                  {backendMilestones.length ? `${data.project.progress}%` : "—"}
+                </span>
               </div>
               <Progress value={data.project.progress} className="h-2" />
             </div>
 
             <div className="space-y-2">
-              {data.project.milestones.map((m) => (
+              {backendMilestones.length ? backendMilestones.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm"
@@ -673,7 +675,14 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                     {m.status}
                   </Badge>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-lg border border-dashed p-4 text-center">
+                  <p className="text-sm font-medium">No milestones yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Once your project and department template are set, milestones will appear here.
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
