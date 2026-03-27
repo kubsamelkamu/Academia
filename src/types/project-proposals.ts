@@ -19,8 +19,18 @@ export interface ProjectProposal {
   id: string
   status: ProposalStatus
   titles?: string[]
+  proposedTitles?: string[]
+  title?: string
   description?: string | null
   documents: ProposalDocument[]
+  submittedBy?: string | null
+  submitter?: {
+    id: string
+    firstName?: string
+    lastName?: string
+    email?: string
+  } | null
+  submittedAt?: string | null
   createdAt?: string
   updatedAt?: string
 }
