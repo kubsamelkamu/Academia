@@ -176,7 +176,7 @@ function AdvisorCreateGroupForm() {
   })
   const [selectedMembers, setSelectedMembers] = React.useState<string[]>([])
   const [searchTerm, setSearchTerm] = React.useState("")
-  const [isCreating, setIsCreating] = React.useState(false)
+  const [isCreating] = React.useState(false)
 
   const mockProjects = [
     { id: "1", name: "Smart Campus System", group: "Team Alpha" },

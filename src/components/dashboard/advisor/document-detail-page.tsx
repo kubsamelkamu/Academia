@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Archive,
   ArrowLeft,
-  CheckCircle,
   Clock,
   Download,
   Eye,
@@ -159,11 +159,12 @@ function renderViewer(document: AdvisorDocument) {
 
   if (document.type === "image") {
     return (
-      <div className="border rounded-lg overflow-hidden flex justify-center">
-        <img
+      <div className="relative border rounded-lg overflow-hidden flex justify-center">
+        <Image
           src={`/mock-images/${document.name}`}
           alt={document.name}
-          className="max-w-full max-h-[600px] object-contain"
+          fill
+          className="object-contain"
         />
       </div>
     )

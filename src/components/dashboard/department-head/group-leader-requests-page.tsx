@@ -33,8 +33,17 @@ export function DepartmentHeadGroupLeaderRequestsPage() {
     );
   }
 
+  type PendingGroupLeaderRequest = {
+    firstName: string
+    lastName: string
+    email: string
+    departmentName: string
+    status: string
+    createdAt: string
+  }
+
   // Define columns for DataTable
-  const columns: Column<any>[] = [
+  const columns: Column<PendingGroupLeaderRequest>[] = [
     { key: "name", header: "Name", render: (row) => `${row.firstName} ${row.lastName}` },
     { key: "email", header: "Email", render: (row) => row.email },
     { key: "department", header: "Department", render: (row) => row.departmentName },
@@ -43,8 +52,8 @@ export function DepartmentHeadGroupLeaderRequestsPage() {
   ];
 
   // Type assertion to work around TS type error due to API envelope
-  const items = (data as any)?.data?.items || [];
-  const pagination = (data as any)?.data?.pagination;
+  const items = (data as { data?: { items?: PendingGroupLeaderRequest[]; pagination?: { pages?: number } } } | undefined)?.data?.items || [];
+  const pagination = (data as { data?: { items?: PendingGroupLeaderRequest[]; pagination?: { pages?: number } } } | undefined)?.data?.pagination;
   const totalPages = pagination?.pages || 1;
 
   return (

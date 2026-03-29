@@ -7,7 +7,7 @@ import { Plus } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -102,7 +102,7 @@ export function AdvisorAnnouncementsPage() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl w-[95vw]">
-              <AnnouncementCreateForm open={open} onClose={() => setOpen(false)} />
+              <AnnouncementCreateForm onClose={() => setOpen(false)} />
             </DialogContent>
           </Dialog>
         }
@@ -132,7 +132,7 @@ export function AdvisorAnnouncementsPage() {
   )
 }
 
-function AnnouncementCreateForm({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AnnouncementCreateForm({ onClose }: { onClose: () => void }) {
   const [formData, setFormData] = React.useState({
     title: '',
     priority: 'MEDIUM' as PriorityType,

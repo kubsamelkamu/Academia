@@ -15,7 +15,6 @@ import { DepartmentHeadGradesPage } from "@/components/dashboard/department-head
 import { DepartmentHeadInvitationsPage } from "@/components/dashboard/department-head/invitations-page"
 import DepartmentHeadProjectsPage from "@/components/dashboard/department-head/ProjectsOverview"
 import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Reports"
-import { DepartmentHeadAnnouncementsPage } from "@/components/dashboard/department-head/announcements-page"
 import { DepartmentHeadMessagesPage } from "@/components/dashboard/department-head/messages-page"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import StudentDefensePage from "@/components/dashboard/student/defense-page"
@@ -56,7 +55,6 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     grades: DepartmentHeadGradesPage,
     projects: DepartmentHeadProjectsPage,
     reports: DepartmentHeadReportsPage,
-    announcements: DepartmentHeadAnnouncementsPage,
     messages: DepartmentHeadMessagesPage,
     settings: DepartmentHeadSettingsPage,
     "group-leader-requests": DepartmentHeadGroupLeaderRequestsPage,

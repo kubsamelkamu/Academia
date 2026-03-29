@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -2489,10 +2490,12 @@ export function StudentMessagesPage() {
                                               rel="noreferrer"
                                             >
                                               {att.mimeType?.startsWith("image/") ? (
-                                                <img
+                                                <Image
                                                   src={att.url}
                                                   alt={att.name}
-                                                  className="h-8 w-8 rounded border object-cover"
+                                                  width={32}
+                                                  height={32}
+                                                  className="rounded border object-cover"
                                                 />
                                               ) : (
                                                 <Paperclip className="h-3 w-3" />
@@ -2675,12 +2678,12 @@ export function StudentMessagesPage() {
                             {queuedAttachment.name}{" "}<span className="opacity-70">({formatBytes(queuedAttachment.size)})</span>
                           </p>
                           {queuedAttachment.mimeType?.startsWith("image/") ? (
-                            <div className="mt-2">
-                              <img
+                            <div className="relative mt-2 cursor-pointer" onClick={() => window.open(queuedAttachment.url, "_blank", "noopener,noreferrer")}>
+                              <Image
                                 src={queuedAttachment.url}
                                 alt={queuedAttachment.name}
-                                className="max-h-40 max-w-[240px] rounded-md border object-contain"
-                                onClick={() => window.open(queuedAttachment.url, "_blank", "noopener,noreferrer")}
+                                fill
+                                className="object-contain rounded-md border"
                               />
                             </div>
                           ) : null}
@@ -2939,10 +2942,12 @@ export function StudentMessagesPage() {
                                       rel="noreferrer"
                                     >
                                       {att.mimeType?.startsWith("image/") ? (
-                                        <img
+                                        <Image
                                           src={att.url}
                                           alt={att.name}
-                                          className="h-8 w-8 rounded border object-cover"
+                                          width={32}
+                                          height={32}
+                                          className="rounded border object-cover"
                                         />
                                       ) : (
                                         <Paperclip className="h-3 w-3" />

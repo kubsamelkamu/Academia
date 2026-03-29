@@ -8,6 +8,14 @@ import {
 } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Calendar, Download, FileBarChart2, FileText } from "lucide-react"
 
 type ReportPeriod = "Weekly" | "Monthly" | "Semester"
@@ -18,6 +26,10 @@ interface ReportTemplate {
   category: "Academic" | "Governance" | "Performance"
   period: ReportPeriod
   lastRun: string
+  description: string
+  format: "PDF" | "CSV" | "Dashboard"
+  metrics: string[]
+  status: "Active" | "Paused"
 }
 
 const initialTemplates: ReportTemplate[] = [
@@ -27,6 +39,10 @@ const initialTemplates: ReportTemplate[] = [
     category: "Academic",
     period: "Weekly",
     lastRun: "2 days ago",
+    description: "Weekly summary of faculty workload, hour allocation, and project assignments.",
+    format: "PDF",
+    metrics: ["Work hours", "Course load", "Project participation"],
+    status: "Active",
   },
   {
     id: "r2",
@@ -34,6 +50,10 @@ const initialTemplates: ReportTemplate[] = [
     category: "Performance",
     period: "Weekly",
     lastRun: "1 day ago",
+    description: "Risk levels and emerging issues across campus project groups.",
+    format: "CSV",
+    metrics: ["Risk score", "Open issues", "Mitigation progress"],
+    status: "Active",
   },
   {
     id: "r3",
@@ -41,6 +61,10 @@ const initialTemplates: ReportTemplate[] = [
     category: "Governance",
     period: "Monthly",
     lastRun: "5 days ago",
+    description: "Compliance and policy checklist status for department governance.",
+    format: "Dashboard",
+    metrics: ["Audit status", "Policy adoption", "Flagged items"],
+    status: "Paused",
   },
 ]
 
@@ -53,6 +77,7 @@ const scheduledRuns = [
 export default function ReportsPage() {
   const [activePeriod, setActivePeriod] = useState<ReportPeriod>("Weekly")
   const [templates, setTemplates] = useState<ReportTemplate[]>(initialTemplates)
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null)
 
   const visibleTemplates = useMemo(
     () => templates.filter((item) => item.period === activePeriod),
@@ -124,11 +149,16 @@ export default function ReportsPage() {
                     <p className="text-sm font-medium">{template.title}</p>
                     <Badge variant="outline">{template.category}</Badge>
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
+                  <div className="mt-2 flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">Last run: {template.lastRun}</p>
-                    <Button size="sm" variant="outline" onClick={() => handleRunReport(template.id)}>
-                      Run Now
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedTemplate(template)}>
+                        View
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleRunReport(template.id)}>
+                        Run Now
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -153,6 +183,74 @@ export default function ReportsPage() {
           </div>
         </DashboardSectionCard>
       </div>
+
+      <Dialog open={selectedTemplate !== null} onOpenChange={() => setSelectedTemplate(null)}>
+        <DialogContent className="max-w-3xl w-[95vw]">
+          <DialogHeader>
+            <DialogTitle>{selectedTemplate?.title ?? "Report details"}</DialogTitle>
+            <DialogDescription>
+              {selectedTemplate ? selectedTemplate.description : "Select a report to view details"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTemplate ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Category</p>
+                  <p className="font-medium">{selectedTemplate.category}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Period</p>
+                  <p className="font-medium">{selectedTemplate.period}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last generated</p>
+                  <p className="font-medium">{selectedTemplate.lastRun}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Format</p>
+                  <p className="font-medium">{selectedTemplate.format}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Metrics included</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTemplate.metrics.map((metric) => (
+                    <Badge key={metric} variant="secondary">
+                      {metric}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Status</p>
+                <Badge variant={selectedTemplate.status === "Active" ? "secondary" : "outline"}>
+                  {selectedTemplate.status}
+                </Badge>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="mt-3 gap-2">
+            <Button variant="outline" onClick={() => setSelectedTemplate(null)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedTemplate) {
+                  handleRunReport(selectedTemplate.id)
+                  setSelectedTemplate(null)
+                }
+              }}
+            >
+              Run Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

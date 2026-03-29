@@ -51,7 +51,7 @@ const itemVariants = {
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isLoading, error, clearError, tenantDomain, user } = useAuthStore();
+  const { login, isLoading, error, clearError, tenantDomain, user, logout } = useAuthStore();
   const isInviteFlow = (searchParams.get('from') ?? '') === 'invite';
   const inviteEmailPrefill = useMemo(() => {
     if (!isInviteFlow) return '';
@@ -108,15 +108,13 @@ function LoginPageContent() {
   }, [router]);
 
   useEffect(() => {
-    if (user) {
-      if (user.mustChangePassword) {
-        router.push(isInviteFlow ? "/change-password?from=invite" : "/change-password")
-        return
-      }
-
-      redirectToDashboard(user.roles);
-      return;
+    if (user && user.mustChangePassword) {
+      router.push(isInviteFlow ? "/change-password?from=invite" : "/change-password")
+      return
     }
+
+    // Allow authenticated users to see the login page
+    // redirectToDashboard(user.roles);
   }, [isInviteFlow, router, user, redirectToDashboard]);
 
   const onSubmit = async (data: LoginFormData) => {
@@ -312,6 +310,19 @@ function LoginPageContent() {
                   {tenantDomain && (
                     <div className="mt-2 text-sm text-gray-600">
                       Institution: <span className="font-medium text-purple-600">{tenantDomain}</span>
+                    </div>
+                  )}
+                  {user && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      Signed in as: <span className="font-medium text-purple-600">{user.firstName} {user.lastName}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => logout()}
+                        className="ml-2 text-xs"
+                      >
+                        Logout
+                      </Button>
                     </div>
                   )}
                 </CardDescription>

@@ -13,7 +13,6 @@ import {
 } from "@/lib/hooks/use-department-announcements"
 import type { DepartmentAnnouncementActionType } from "@/types/department-announcements"
 import { DepartmentAnnouncementFormCard } from "@/components/dashboard/department-head/department-announcement-form-card"
-import { DepartmentAnnouncementPreviewCard } from "@/components/dashboard/department-head/department-announcement-preview-card"
 
 function toLocalInputValue(isoDate: string | null): string {
   if (!isoDate) return ""
@@ -286,7 +285,7 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
       <form
         id="announcement-edit-form"
         onSubmit={handleSubmit}
-        className="grid gap-6 lg:grid-cols-[1fr,320px]"
+        className="space-y-6"
       >
         <DepartmentAnnouncementFormCard
           title={title}
@@ -319,18 +318,6 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
             setDraft((previous) => ({ ...(previous ?? {}), deadlineAtLocal: value }))
             setDeadlineError(null)
           }}
-        />
-
-        <DepartmentAnnouncementPreviewCard
-          title={title}
-          message={message}
-          actionType={actionType}
-          actionLabel={actionLabel}
-          actionUrl={actionUrl}
-          deadlineLabel={deadlineAtLocal ? deadlineAtLocal.replace("T", " ") : undefined}
-          createdByLabel={createdByLabel}
-          statusLabel={statusLabel}
-          createdAtLabel={createdAtLabel}
         />
       </form>
 
