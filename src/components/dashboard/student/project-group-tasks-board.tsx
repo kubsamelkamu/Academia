@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -135,6 +135,7 @@ export function ProjectGroupTasksBoard({
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<ProjectGroupTaskStatus | null>(null)
 
+   
   const memberOptions = useMemo(() => {
     const options: Array<{ id: string; label: string; avatarUrl: string | null }> = []
 
@@ -155,7 +156,7 @@ export function ProjectGroupTasksBoard({
     }
 
     return Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))
-  }, [group?.leader, group?.members])
+  }, [group])
 
   const {
     data: tasksData,
@@ -173,7 +174,7 @@ export function ProjectGroupTasksBoard({
   const [createDueDate, setCreateDueDate] = useState("")
   const [createAssignee, setCreateAssignee] = useState<string>("")
 
-  const tasks = tasksData?.items ?? []
+  const tasks = useMemo(() => tasksData?.items ?? [], [tasksData?.items])
 
   const trimmedSearch = searchQuery.trim()
 
@@ -729,15 +730,16 @@ function TaskCard({
   const [editDescription, setEditDescription] = useState("")
   const [editDueDate, setEditDueDate] = useState(task.dueDate ? toDateOnly(task.dueDate) : "")
 
-  useEffect(() => {
-    if (!showEdit) return
-    if (descriptionTouched) return
+  const displayDescription = descriptionTouched ? editDescription : (taskDetailData?.task?.description ?? "")
 
-    const description = taskDetailData?.task?.description
-    if (typeof description === "string") {
-      setEditDescription(description)
+  useEffect(() => {
+    if (showEdit) {
+      Promise.resolve().then(() => {
+        setEditDescription(taskDetailData?.task?.description ?? "");
+        setDescriptionTouched(false);
+      });
     }
-  }, [showEdit, descriptionTouched, taskDetailData?.task?.description])
+  }, [showEdit]);
 
   const assigneeLabel = useMemo(() => {
     if (!task.assignedToUserId) return "Unassigned"
@@ -932,10 +934,10 @@ function TaskCard({
               <Label htmlFor={`edit-desc-${task.id}`}>Description</Label>
               <Textarea
                 id={`edit-desc-${task.id}`}
-                value={editDescription}
+                value={displayDescription}
                 onChange={(e) => {
-                  setDescriptionTouched(true)
                   setEditDescription(e.target.value)
+                  setDescriptionTouched(true)
                 }}
                 placeholder="Optional…"
               />

@@ -168,13 +168,13 @@ export function AdvisorDocumentsPage() {
     router.push(`/dashboard/advisor/documents/${doc.id}`)
   }
 
-  function handleApprove(_id: string) {
+  function handleApprove() {
     toast.success("Document approved", {
       description: "Document has been approved and is now available for download.",
     })
   }
 
-  function handleRequestRevision(_id: string, projectId: string) {
+  function handleRequestRevision(projectId: string) {
     toast.message("Revision flow opened", {
       description: "Taking you to the revision feedback page.",
     })
@@ -311,7 +311,7 @@ export function AdvisorDocumentsPage() {
                             variant="outline"
                             size="sm"
                             className="text-success hover:text-success"
-                            onClick={() => handleApprove(doc.id)}
+                            onClick={() => handleApprove()}
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>
@@ -319,7 +319,7 @@ export function AdvisorDocumentsPage() {
                             variant="outline"
                             size="sm"
                             className="text-destructive hover:text-destructive"
-                            onClick={() => handleRequestRevision(doc.id, doc.project === "Smart Campus System" ? "p1" : "p2")}
+                            onClick={() => handleRequestRevision(doc.project === "Smart Campus System" ? "p1" : "p2")}
                           >
                             Revision
                           </Button>

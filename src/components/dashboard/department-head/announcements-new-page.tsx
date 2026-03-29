@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Save } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
@@ -147,68 +148,62 @@ export function AnnouncementNewPage() {
 
   return (
     <div className="space-y-6">
-      <DashboardPageHeader
-        title="New Announcement"
-        description="Create a new department announcement"
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/announcements" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Announcements
-            </Link>
-          </Button>
-        }
-      />
+      <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1fr,320px]">
-        <div className="space-y-4">
-          <DepartmentAnnouncementFormCard
-            title={title}
-            message={message}
-            actionType={actionType}
-            actionLabel={actionLabel}
-            actionUrl={actionUrl}
-            deadlineAtLocal={deadlineAtLocal}
-            deadlineError={deadlineError}
-            actionLabelError={actionLabelError}
-            actionUrlError={actionUrlError}
-            onTitleChange={setTitle}
-            onMessageChange={setMessage}
-            onActionTypeChange={setActionType}
-            onActionLabelChange={(value) => {
-              setActionLabel(value)
-              setActionLabelError(null)
-            }}
-            onActionUrlChange={(value) => {
-              setActionUrl(value)
-              setActionUrlError(null)
-            }}
-            onDeadlineAtChange={(value) => {
-              setDeadlineAtLocal(value)
-              setDeadlineError(null)
-            }}
-          />
+      <Card className="border-0 shadow-none">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Create Announcement</CardTitle>
+          <CardDescription>Set up a new department announcement.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <DepartmentAnnouncementFormCard
+              title={title}
+              message={message}
+              actionType={actionType}
+              actionLabel={actionLabel}
+              actionUrl={actionUrl}
+              deadlineAtLocal={deadlineAtLocal}
+              deadlineError={deadlineError}
+              actionLabelError={actionLabelError}
+              actionUrlError={actionUrlError}
+              onTitleChange={setTitle}
+              onMessageChange={setMessage}
+              onActionTypeChange={setActionType}
+              onActionLabelChange={(value) => {
+                setActionLabel(value)
+                setActionLabelError(null)
+              }}
+              onActionUrlChange={(value) => {
+                setActionUrl(value)
+                setActionUrlError(null)
+              }}
+              onDeadlineAtChange={(value) => {
+                setDeadlineAtLocal(value)
+                setDeadlineError(null)
+              }}
+              showCard={false}
+            />
 
-          <div className="flex gap-2">
-            <Button type="submit" className="gap-2" disabled={createMutation.isPending}>
-              <Save className="h-4 w-4" />
-              {createMutation.isPending ? "Creating..." : "Create Announcement"}
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href="/dashboard/department-head/announcements">Cancel</Link>
-            </Button>
-          </div>
-        </div>
-
-        <DepartmentAnnouncementPreviewCard
-          title={title}
-          message={message}
-          actionType={actionType}
-          actionLabel={actionLabel}
-          actionUrl={actionUrl}
-          deadlineLabel={deadlineAtLocal ? deadlineAtLocal.replace("T", " ") : undefined}
-        />
-      </form>
+            <div className="flex justify-end gap-2 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={createMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="gap-2" disabled={createMutation.isPending}>
+                <Save className="h-4 w-4" />
+                {createMutation.isPending ? "Creating..." : "Create Announcement"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

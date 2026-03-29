@@ -16,6 +16,9 @@ import {
   Megaphone,
   MessageSquare,
   Edit,
+  AlertTriangle,
+  BarChart,
+  Calculator,
   type LucideIcon,
 } from "lucide-react"
 
@@ -94,29 +97,24 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
-      title: "Projects",
+      title: "Assignments",
       href: "/dashboard/coordinator/projects",
       icon: FolderKanban,
     },
     {
-      title: "Students",
-      href: "/dashboard/coordinator/students",
-      icon: GraduationCap,
+      title: "Complaints",
+      href: "/dashboard/coordinator/complaints",
+      icon: AlertTriangle,
     },
     {
-      title: "Advisors",
-      href: "/dashboard/coordinator/advisors",
-      icon: UserCheck,
+      title: "Advisor Progress",
+      href: "/dashboard/coordinator/advisor-progress",
+      icon: BarChart,
     },
     {
-      title: "Defenses",
-      href: "/dashboard/coordinator/defenses",
-      icon: Calendar,
-    },
-    {
-      title: "Evaluations",
-      href: "/dashboard/coordinator/evaluations",
-      icon: ClipboardList,
+      title: "Grade Management",
+      href: "/dashboard/coordinator/grade-management",
+      icon: Calculator,
     },
     {
       title: "Messages",

@@ -2,13 +2,12 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { toast } from "sonner"
 
-import { ArrowLeft, Calendar, Send, Users, Paperclip, Upload, CheckCircle2, Loader2, Edit3 } from "lucide-react"
+import { ArrowLeft, Send, Users, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -54,7 +53,6 @@ export function AdvisorAnnouncementNewPage() {
     status: "published",
   })
   const [isSubmitting, setIsSubmitting] = React.useState(false)
-  const [isOpen, setIsOpen] = React.useState(true) // Simulate dialog always open for page
 
   const handleFieldChange = <K extends keyof AnnouncementFormData>(field: K, value: AnnouncementFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }))

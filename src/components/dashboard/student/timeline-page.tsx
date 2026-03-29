@@ -124,18 +124,6 @@ function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-const DEFAULT_PROJECT_INFO = {
-  name: "AI Research Project",
-  startDate: "2024-01-15",
-  endDate: "2024-05-30",
-  progress: 65,
-  daysRemaining: 45,
-  totalTasks: 24,
-  completedTasks: 16,
-  milestones: 8,
-  completedMilestones: 5,
-}
-
 export function StudentTimelinePage() {
   const user = useAuthStore((state) => state.user)
   const [, setViewMode] = useState<'timeline' | 'calendar' | 'list' | 'gantt'>('timeline')
@@ -236,19 +224,6 @@ export function StudentTimelinePage() {
     }))
   }, [milestonesData?.items, templatesData?.templates])
 
-  // Mock data - would come from API in production
-  const defaultProjectInfo = {
-    name: "AI Research Project",
-    startDate: "2024-01-15",
-    endDate: "2024-05-30",
-    progress: 65,
-    daysRemaining: 45,
-    totalTasks: 24,
-    completedTasks: 16,
-    milestones: 8,
-    completedMilestones: 5
-  }
-
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   useEffect(() => {
@@ -260,6 +235,18 @@ export function StudentTimelinePage() {
   }, [])
 
   const projectInfo = useMemo(() => {
+    const defaultProjectInfo = {
+      name: "AI Research Project",
+      startDate: "2024-01-15",
+      endDate: "2024-05-30",
+      progress: 65,
+      daysRemaining: 45,
+      totalTasks: 24,
+      completedTasks: 16,
+      milestones: 8,
+      completedMilestones: 5
+    }
+
     if (!activeProject) {
       return defaultProjectInfo
     }
@@ -313,7 +300,7 @@ export function StudentTimelinePage() {
       milestones: totalMilestones,
       completedMilestones,
     }
-  }, [activeProject, mergedMilestones, currentTime, defaultProjectInfo])
+  }, [activeProject, mergedMilestones, currentTime])
 
   const milestonesProgress =
     projectInfo.milestones > 0
@@ -345,12 +332,6 @@ export function StudentTimelinePage() {
       percent,
     }
   }, [myTasksData?.items])
-
-  useEffect(() => {
-    if (activeTab !== "tasks" && focusedTaskStatus) {
-      setFocusedTaskStatus(null)
-    }
-  }, [activeTab, focusedTaskStatus])
 
   const phases: Phase[] = [
     {
