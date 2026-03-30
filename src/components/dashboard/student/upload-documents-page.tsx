@@ -32,6 +32,7 @@ function milestoneParamToKey(param: string | null): string {
   const normalized = normalizeMilestoneParam(param)
   if (!normalized) return ""
   if (normalized.includes("proposal")) return "proposal"
+  if (normalized.includes("project title")) return "proposal"
   if (normalized.includes("requirement") || normalized.includes("srs")) return "requirements"
   if (normalized.includes("design") || normalized.includes("sdd")) return "design"
   if (normalized.includes("implementation")) return "implementation"

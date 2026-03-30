@@ -16,7 +16,9 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -103,7 +105,40 @@ function normalizeMilestoneName(name: string): string {
 }
 
 function isProposalMilestoneName(name: string): boolean {
-  return normalizeMilestoneName(name).includes("proposal")
+  const normalized = normalizeMilestoneName(name)
+  return normalized.includes("proposal") || normalized.includes("project title")
+}
+
+function toProposalMilestoneState(proposals: ProjectProposal[] | null | undefined): {
+  status: MilestoneStatus
+  submittedAt?: string
+} | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  const latest = sorted[0]
+  const latestStatus = normalizeStatus(latest?.status)
+  const latestSubmittedAt = latest?.submittedAt ?? latest?.updatedAt ?? latest?.createdAt ?? undefined
+
+  if (latestStatus === "APPROVED") {
+    return { status: "approved", submittedAt: latestSubmittedAt }
+  }
+
+  if (latestStatus === "SUBMITTED") {
+    return { status: "submitted", submittedAt: latestSubmittedAt }
+  }
+
+  return { status: "pending" }
 }
 
 function mapBackendStatus(status: string): MilestoneStatus {
@@ -193,6 +228,7 @@ export function StudentMilestonesPage() {
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
 
   const [progressDialogOpen, setProgressDialogOpen] = useState(false)
   const [weekEnding, setWeekEnding] = useState("")
@@ -209,6 +245,11 @@ export function StudentMilestonesPage() {
     const nextOverride = readProposalOverrideFromStorage(studentId)
     if (nextOverride) setProposalOverride(nextOverride)
   }, [studentId])
+
+  const proposalMilestoneState = useMemo(() => {
+    const fromBackend = toProposalMilestoneState(myGroupProposalsQuery.data)
+    return fromBackend ?? proposalOverride
+  }, [myGroupProposalsQuery.data, proposalOverride])
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -279,17 +320,16 @@ export function StudentMilestonesPage() {
         )
 
         const maybeOverride =
-          proposalOverride &&
-          isProposalMilestoneName(templateMilestone.name) &&
-          templateMilestone.status === "pending"
+          proposalMilestoneState &&
+          isProposalMilestoneName(templateMilestone.name)
 
         if (!matchedProjectMilestone) {
           if (!maybeOverride) return templateMilestone
 
           return {
             ...templateMilestone,
-            status: proposalOverride.status,
-            submittedAt: proposalOverride.submittedAt,
+            status: proposalMilestoneState.status,
+            submittedAt: proposalMilestoneState.submittedAt,
           }
         }
 
@@ -302,11 +342,11 @@ export function StudentMilestonesPage() {
           sequence: templateMilestone.sequence,
         }
 
-        if (proposalOverride && isProposalMilestoneName(templateMilestone.name) && mapped.status === "pending") {
+        if (proposalMilestoneState && isProposalMilestoneName(templateMilestone.name)) {
           return {
             ...mapped,
-            status: proposalOverride.status,
-            submittedAt: proposalOverride.submittedAt ?? mapped.submittedAt,
+            status: proposalMilestoneState.status,
+            submittedAt: proposalMilestoneState.submittedAt ?? mapped.submittedAt,
           }
         }
 
@@ -315,7 +355,7 @@ export function StudentMilestonesPage() {
     }
 
     return myProject.milestones
-  }, [projectMilestonesData?.items, templatesData?.templates])
+  }, [projectMilestonesData?.items, proposalMilestoneState, templatesData?.templates])
 
   const completedMilestones = milestones.filter((m) => m.status === "approved").length
   const totalMilestones = milestones.length
@@ -323,7 +363,8 @@ export function StudentMilestonesPage() {
   const projectDisplayName = myProjectGroupQuery.data?.name?.trim() || myProject.title
 
   const handleSubmitMilestone = (milestone: Milestone) => {
-    router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestone.name)}`)
+    const milestoneParam = isProposalMilestoneName(milestone.name) ? "proposal" : milestone.name
+    router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestoneParam)}`)
   }
 
   const handleSubmitProgress = () => {

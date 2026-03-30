@@ -19,7 +19,9 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -110,6 +112,37 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 const normalizeMilestoneName = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, " ")
+
+function isProposalMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  return normalized.includes("proposal") || normalized.includes("project title")
+}
+
+function toProposalMilestoneStatus(proposals: ProjectProposal[] | null | undefined):
+  | "pending"
+  | "submitted"
+  | "approved"
+  | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  const latest = sorted[0]
+  const status = normalizeStatus(latest?.status)
+
+  if (status === "APPROVED") return "approved"
+  if (status === "SUBMITTED") return "submitted"
+  return "pending"
+}
 
 function addDays(baseDate: string, daysToAdd: number): string {
   const date = new Date(baseDate)
@@ -239,9 +272,11 @@ export function StudentMyProjectPage() {
   const [projectState, setProjectState] = useState<ProjectData>(initialProjectData)
 
   const user = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
   const { data: myGroupData } = useMyProjectGroup(Boolean(user))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -301,6 +336,8 @@ export function StudentMyProjectPage() {
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
     if (!templateMilestones.length) return []
 
+    const proposalStatus = toProposalMilestoneStatus(myGroupProposalsQuery.data)
+
     const projectMilestonesByName = new Map(
       (projectMilestonesData?.items ?? []).map((milestone) => [
         normalizeMilestoneName(milestone.title),
@@ -308,7 +345,7 @@ export function StudentMyProjectPage() {
       ])
     )
 
-    return templateMilestones.map((templateMilestone) => {
+    const merged = templateMilestones.map((templateMilestone) => {
       const matchedProjectMilestone = projectMilestonesByName.get(
         normalizeMilestoneName(templateMilestone.name)
       )
@@ -323,7 +360,13 @@ export function StudentMyProjectPage() {
         submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
       }
     })
-  }, [templateMilestones, projectMilestonesData?.items])
+
+    if (!proposalStatus) return merged
+    return merged.map((milestone) => {
+      if (!isProposalMilestoneName(milestone.name)) return milestone
+      return { ...milestone, status: proposalStatus }
+    })
+  }, [myGroupProposalsQuery.data, projectMilestonesData?.items, templateMilestones])
 
   const computedMyProject = useMemo<ProjectData>(() => {
     let nextProject = projectState
@@ -345,7 +388,7 @@ export function StudentMyProjectPage() {
       })
 
       const completedMilestonesCount = mergedMilestones.filter(
-        (milestone) => milestone.status === "approved" || milestone.status === "submitted"
+        (milestone) => milestone.status === "approved"
       ).length
       const progress = Math.round((completedMilestonesCount / mergedMilestones.length) * 100)
 
@@ -384,7 +427,7 @@ export function StudentMyProjectPage() {
   }
 
   const completedMilestones = myProject.milestones.filter(
-    (m) => m.status === "approved" || m.status === "submitted"
+    (m) => m.status === "approved"
   ).length
   const totalMilestones = myProject.milestones.length
 

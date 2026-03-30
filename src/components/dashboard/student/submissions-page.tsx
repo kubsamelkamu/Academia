@@ -20,14 +20,15 @@ import {
   Filter,
   MessageCircle,
   Search,
-  Trash2,
   Upload,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { useDocumentTemplate, useDocumentTemplatesList } from "@/lib/hooks/use-document-templates"
+import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useAuthStore } from "@/store/auth-store"
 import type { DocumentTemplateType } from "@/types/document-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
 type SubmissionStatus = "approved" | "reviewed" | "pending"
 
@@ -47,69 +48,8 @@ interface StudentSubmission {
   milestone: string
   status: SubmissionStatus
   comments: FeedbackComment[]
+  url?: string
 }
-
-const submissions: StudentSubmission[] = [
-  {
-    id: "1",
-    name: "Project Proposal v2.pdf",
-    size: "2.4 MB",
-    uploadedAt: "2024-07-15",
-    milestone: "Proposal",
-    status: "reviewed",
-    comments: [
-      {
-        id: "c1",
-        author: "Dr. Smith",
-        text: "Good proposal, but add more detail in methodology.",
-        date: "2024-07-16",
-        resolved: false,
-      },
-      {
-        id: "c2",
-        author: "Dr. Smith",
-        text: "Timeline section needs revision.",
-        date: "2024-07-16",
-        resolved: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Requirements Specification.pdf",
-    size: "1.8 MB",
-    uploadedAt: "2024-07-20",
-    milestone: "Requirements",
-    status: "pending",
-    comments: [],
-  },
-  {
-    id: "3",
-    name: "System Architecture Design.pdf",
-    size: "3.2 MB",
-    uploadedAt: "2024-07-22",
-    milestone: "Design",
-    status: "reviewed",
-    comments: [
-      {
-        id: "c3",
-        author: "Dr. Smith",
-        text: "Consider adding more details about data flow.",
-        date: "2024-07-23",
-        resolved: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    name: "Implementation Report.pdf",
-    size: "4.9 MB",
-    uploadedAt: "2024-07-25",
-    milestone: "Implementation",
-    status: "approved",
-    comments: [],
-  },
-]
 
 const templateTypes: Array<{ label: string; value: DocumentTemplateType | null }> = [
   { label: "All", value: null },
@@ -168,9 +108,48 @@ function formatFileSize(sizeBytes: number | null | undefined) {
   return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
+function normalizeStatus(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase()
+}
+
+function proposalToSubmissionStatus(status: unknown): SubmissionStatus {
+  const normalized = normalizeStatus(status)
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "reviewed"
+  return "pending"
+}
+
+function getProposalPdfDocument(proposal: ProjectProposal): ProjectProposal["documents"][number] | null {
+  const docs = proposal.documents ?? []
+  const match = docs.find((doc) => String(doc.key ?? "").toLowerCase() === "proposal.pdf")
+  return match ?? docs[0] ?? null
+}
+
+function toProposalFeedbackComments(proposal: ProjectProposal): FeedbackComment[] {
+  const text = typeof proposal.feedback === "string" ? proposal.feedback.trim() : ""
+  if (!text) return []
+
+  const advisor = proposal.advisor
+  const author =
+    `${advisor?.firstName ?? ""} ${advisor?.lastName ?? ""}`.trim() ||
+    advisor?.email ||
+    "Advisor"
+
+  return [
+    {
+      id: `feedback:${proposal.id}`,
+      author,
+      text,
+      date: formatDate(proposal.updatedAt ?? proposal.createdAt ?? null),
+      resolved: false,
+    },
+  ]
+}
+
 export function StudentSubmissionsPage() {
   const router = useRouter()
   const departmentId = useAuthStore((s) => s.user?.departmentId)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [templateSearch, setTemplateSearch] = useState("")
@@ -178,6 +157,36 @@ export function StudentSubmissionsPage() {
   const [selectedDoc, setSelectedDoc] = useState<StudentSubmission | null>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [reply, setReply] = useState("")
+
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
+
+  const submissions = useMemo<StudentSubmission[]>(() => {
+    const items = myGroupProposalsQuery.data ?? []
+
+    return items
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+        const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })
+      .map((proposal) => {
+        const doc = getProposalPdfDocument(proposal)
+        const uploadedAt = doc?.uploadedAt ?? proposal.updatedAt ?? proposal.createdAt ?? new Date().toISOString()
+        const fileName = doc?.originalName?.trim() || proposal.title?.trim() || "Project Proposal"
+
+        return {
+          id: proposal.id,
+          name: fileName,
+          size: formatFileSize(doc?.sizeBytes ?? null),
+          uploadedAt,
+          milestone: "Proposal",
+          status: proposalToSubmissionStatus(proposal.status),
+          comments: toProposalFeedbackComments(proposal),
+          url: doc?.url,
+        }
+      })
+  }, [myGroupProposalsQuery.data])
   const templatesQuery = useDocumentTemplatesList(departmentId, {
     page: 1,
     limit: 10,
@@ -197,7 +206,7 @@ export function StudentSubmissionsPage() {
       const matchesFilter = statusFilter === "all" || doc.status === statusFilter
       return matchesSearch && matchesFilter
     })
-  }, [searchTerm, statusFilter])
+  }, [searchTerm, statusFilter, submissions])
 
   const stats = useMemo(
     () => ({
@@ -206,7 +215,7 @@ export function StudentSubmissionsPage() {
       pending: submissions.filter((d) => d.status === "pending").length,
       approved: submissions.filter((d) => d.status === "approved").length,
     }),
-    []
+    [submissions]
   )
 
   return (
@@ -331,14 +340,25 @@ export function StudentSubmissionsPage() {
                         <MessageCircle className="h-4 w-4 mr-1" />
                         Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
                       </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.info("Preview coming soon")}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.success("Download started")}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          if (doc.url) {
+                            const anchor = document.createElement("a")
+                            anchor.href = doc.url
+                            anchor.target = "_blank"
+                            anchor.rel = "noreferrer"
+                            anchor.download = ""
+                            document.body.appendChild(anchor)
+                            anchor.click()
+                            anchor.remove()
+                            return
+                          }
+                          toast.info("Download is not available for this item")
+                        }}
+                      >
                         <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.error("Delete action is disabled in demo")}>
-                        <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
                     </div>
                   </div>

@@ -13,7 +13,9 @@ import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
+import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 import {
   BarChart3,
   Calendar,
@@ -92,6 +94,37 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
 
 function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function isProposalMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  return normalized.includes("proposal") || normalized.includes("project title")
+}
+
+function toProposalMilestoneStatus(proposals: ProjectProposal[] | null | undefined):
+  | "pending"
+  | "submitted"
+  | "approved"
+  | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  const latest = sorted[0]
+  const status = normalizeStatus(latest?.status)
+
+  if (status === "APPROVED") return "approved"
+  if (status === "SUBMITTED") return "submitted"
+  return "pending"
 }
 
 function addDays(baseDate: string, daysToAdd: number): string {
@@ -188,6 +221,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
 
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
@@ -229,6 +263,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const backendMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
     const activeTemplate = getActiveMilestoneTemplate(templates)
+    const proposalStatus = toProposalMilestoneStatus(myGroupProposalsQuery.data)
 
     const templateMilestones: Milestone[] = (() => {
       if (!activeTemplate?.milestones?.length) return []
@@ -263,19 +298,23 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           normalizeMilestoneName(templateMilestone.name)
         )
 
-        if (!matchedProjectMilestone) return templateMilestone
+        const merged: Milestone = matchedProjectMilestone
+          ? {
+              id: matchedProjectMilestone.id,
+              name: templateMilestone.name,
+              status: mapMilestoneStatus(matchedProjectMilestone.status),
+              dueDate: matchedProjectMilestone.dueDate,
+              sequence: templateMilestone.sequence,
+            }
+          : templateMilestone
 
-        return {
-          id: matchedProjectMilestone.id,
-          name: templateMilestone.name,
-          status: mapMilestoneStatus(matchedProjectMilestone.status),
-          dueDate: matchedProjectMilestone.dueDate,
-          sequence: templateMilestone.sequence,
-        }
+        if (!proposalStatus) return merged
+        if (!isProposalMilestoneName(merged.name)) return merged
+        return { ...merged, status: proposalStatus }
       })
     }
 
-    return (milestonesData?.items ?? [])
+    const rawMilestones = (milestonesData?.items ?? [])
       .map((milestone) => ({
         id: milestone.id,
         name: milestone.title,
@@ -288,7 +327,13 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         return milestone.name.trim().length > 0 && !Number.isNaN(dueDate.getTime())
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-  }, [milestonesData?.items, templatesData?.templates])
+
+    if (!proposalStatus) return rawMilestones
+    return rawMilestones.map((milestone) => {
+      if (!isProposalMilestoneName(milestone.name)) return milestone
+      return { ...milestone, status: proposalStatus }
+    })
+  }, [milestonesData?.items, myGroupProposalsQuery.data, templatesData?.templates])
 
   const data = useMemo(() => {
     const emptyData = buildEmptyDashboardData()
@@ -296,7 +341,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
     const now = new Date()
     const completedCount = backendMilestones.filter(
-      (milestone) => milestone.status === "approved" || milestone.status === "submitted"
+      (milestone) => milestone.status === "approved"
     ).length
     const progress = Math.round((completedCount / backendMilestones.length) * 100)
 
@@ -341,14 +386,32 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const projectDisplayName = myGroup?.name?.trim() || activeProject?.title?.trim() || "My Project"
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
-    const withDeadline = items.filter((item) => item.deadlineAt)
-    if (!withDeadline.length) return null
+    const nowMs = Date.now()
 
-    return withDeadline
+    const activeWithDeadline = items.filter((item) => {
+      if (!item.deadlineAt) return false
+      if (item.isExpired) return false
+      if (typeof item.secondsRemaining === "number") return item.secondsRemaining > 0
+
+      const deadlineMs = new Date(item.deadlineAt).getTime()
+      if (Number.isNaN(deadlineMs)) return false
+      return deadlineMs > nowMs
+    })
+
+    if (!activeWithDeadline.length) return null
+
+    return activeWithDeadline
       .slice()
       .sort((a, b) => {
-        const aSeconds = typeof a.secondsRemaining === "number" ? a.secondsRemaining : Number.POSITIVE_INFINITY
-        const bSeconds = typeof b.secondsRemaining === "number" ? b.secondsRemaining : Number.POSITIVE_INFINITY
+        const aSeconds =
+          typeof a.secondsRemaining === "number"
+            ? a.secondsRemaining
+            : new Date(a.deadlineAt ?? "").getTime() - nowMs
+        const bSeconds =
+          typeof b.secondsRemaining === "number"
+            ? b.secondsRemaining
+            : new Date(b.deadlineAt ?? "").getTime() - nowMs
+
         if (aSeconds !== bSeconds) return aSeconds - bSeconds
 
         const aDeadline = new Date(a.deadlineAt ?? "").getTime()
@@ -383,6 +446,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     Boolean(nextDeadlineAnnouncement?.isExpired) ||
     (uiSecondsRemaining !== null && uiSecondsRemaining <= 0)
 
+  const hasActiveDeadlineAnnouncement = Boolean(nextDeadlineAnnouncement) && !isAnnouncementDeadlinePassed
+  const activeDeadlineAnnouncement = hasActiveDeadlineAnnouncement ? nextDeadlineAnnouncement : null
+
   const isAnnouncementDisabled =
     Boolean(nextDeadlineAnnouncement?.isDisabled) || isAnnouncementDeadlinePassed
 
@@ -399,49 +465,50 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         ? "border-yellow-500/30 bg-yellow-500/10"
         : "border-primary/20 bg-primary/5"
 
-  const announcementTitle = getMeaningfulText(nextDeadlineAnnouncement?.title)
-  const actionTypeLabel = nextDeadlineAnnouncement
-    ? formatActionTypeLabel(nextDeadlineAnnouncement.actionType)
+  const announcementTitle = getMeaningfulText(activeDeadlineAnnouncement?.title)
+  const actionTypeLabel = activeDeadlineAnnouncement
+    ? formatActionTypeLabel(activeDeadlineAnnouncement.actionType)
     : ""
 
-  const nextDeadlineTitle = announcementTitle || actionTypeLabel || "No active deadline"
-  const nextDeadlineDueText = nextDeadlineAnnouncement
-    ? isAnnouncementDeadlinePassed
-      ? "Deadline passed"
-      : countdownParts
-        ? `${formatCountdown(countdownParts)} remaining`
-        : "No deadline"
+  const nextDeadlineTitle = hasActiveDeadlineAnnouncement
+    ? announcementTitle || actionTypeLabel || "Next deadline"
+    : "No active deadline"
+
+  const nextDeadlineDueText = hasActiveDeadlineAnnouncement
+    ? countdownParts
+      ? `${formatCountdown(countdownParts)} remaining`
+      : "No deadline"
     : "No deadline"
 
-  const nextDeadlineSummary = getMeaningfulText(nextDeadlineAnnouncement?.message)
+  const nextDeadlineSummary = getMeaningfulText(activeDeadlineAnnouncement?.message)
 
-  const nextDeadlineActionTitle = nextDeadlineAnnouncement
+  const nextDeadlineActionTitle = activeDeadlineAnnouncement
     ? getMeaningfulText(
         getAnnouncementActionLabel(
-          nextDeadlineAnnouncement.actionType,
-          nextDeadlineAnnouncement.actionLabel
+          activeDeadlineAnnouncement.actionType,
+          activeDeadlineAnnouncement.actionLabel
         )
       ) ||
       getAnnouncementActionLabel(
-        nextDeadlineAnnouncement.actionType,
-        nextDeadlineAnnouncement.actionLabel
+        activeDeadlineAnnouncement.actionType,
+        activeDeadlineAnnouncement.actionLabel
       )
     : ""
 
-  const shouldShowTypeBadge = Boolean(
+  const shouldShowTypeBadge = hasActiveDeadlineAnnouncement && Boolean(
     actionTypeLabel && actionTypeLabel.toLowerCase() !== nextDeadlineTitle.toLowerCase()
   )
 
-  const announcementCreator = nextDeadlineAnnouncement?.createdBy
+  const announcementCreator = activeDeadlineAnnouncement?.createdBy
   const creatorName =
     `${announcementCreator?.firstName ?? ""} ${announcementCreator?.lastName ?? ""}`.trim() ||
     ""
 
-  const secondaryCardText = nextDeadlineAnnouncement?.deadlineAt
-    ? `Deadline set for ${formatDate(nextDeadlineAnnouncement.deadlineAt)}.`
+  const secondaryCardText = activeDeadlineAnnouncement?.deadlineAt
+    ? `Deadline set for ${formatDate(activeDeadlineAnnouncement.deadlineAt)}.`
     : ""
 
-  const hasActionUrl = Boolean(nextDeadlineAnnouncement?.actionUrl?.trim())
+  const hasActionUrl = Boolean(activeDeadlineAnnouncement?.actionUrl?.trim())
 
   const myTeamMembers: TeamMember[] = myGroup
     ? [
@@ -482,9 +549,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const completedMilestones = existingProjectMilestones.length
     ? existingProjectMilestones.filter((milestone) => {
         const status = milestone.status.toLowerCase()
-        return status === "approved" || status === "submitted"
+        return status === "approved"
       }).length
-    : backendMilestones.filter((m) => m.status === "approved" || m.status === "submitted").length
+    : backendMilestones.filter((m) => m.status === "approved").length
   const totalMilestones = existingProjectMilestones.length || backendMilestones.length
 
   const evaluatorAverage =
@@ -705,7 +772,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm text-muted-foreground">Loading deadline...</p>
               </div>
-            ) : !nextDeadlineAnnouncement ? (
+            ) : !activeDeadlineAnnouncement ? (
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm font-medium">No active deadline</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -747,7 +814,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                       className="w-full"
                       disabled={isAnnouncementDisabled}
                       onClick={() => {
-                        const target = nextDeadlineAnnouncement.actionUrl
+                        const target = activeDeadlineAnnouncement.actionUrl
                         if (!target) return
                         window.open(target, "_blank", "noopener,noreferrer")
                       }}
