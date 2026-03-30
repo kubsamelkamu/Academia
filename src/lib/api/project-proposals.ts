@@ -1,6 +1,16 @@
 import apiClient from "@/lib/api/client"
 import type { CreateProjectProposalDraftDto, ProjectProposal } from "@/types/project-proposals"
 
+export async function listMyProjectProposals(): Promise<ProjectProposal[]> {
+  const response = await apiClient.get<ProjectProposal[]>("/projects/proposals/me")
+  return response.data
+}
+
+export async function listMyGroupProjectProposals(): Promise<ProjectProposal[]> {
+  const response = await apiClient.get<ProjectProposal[]>("/projects/proposals/group")
+  return response.data
+}
+
 export async function createProposalDraft(dto: CreateProjectProposalDraftDto): Promise<ProjectProposal> {
   const titles = dto.titles
   const cleanedTitles = titles.map((title) => title.trim()) as [string, string, string]

@@ -58,7 +58,7 @@ function useStudentWidgetData() {
   const myGroup = myProjectGroupQuery.data ?? null
 
   const projectsQuery = useStudentProjects({ departmentId, studentId })
-  const templatesQuery = useMilestoneTemplatesList(departmentId, { page: 1, limit: 100 })
+  const templatesQuery = useMilestoneTemplatesList(departmentId, { page: 1, limit: 20, isActive: true })
 
   const activeProject = useMemo(() => {
     const items = projectsQuery.data?.items ?? []

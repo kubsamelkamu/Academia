@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
+import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
+import { useProject } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 import {
   BarChart3,
   Calendar,
@@ -26,7 +30,7 @@ import {
 interface Milestone {
   id: string
   name: string
-  status: "pending" | "submitted" | "approved" | "overdue"
+  status: "pending" | "submitted" | "approved" | "overdue" | "rejected"
   dueDate: string
   sequence?: number
 }
@@ -86,12 +90,54 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
   if (normalized === "submitted") return "submitted"
-  if (normalized === "overdue" || normalized === "rejected") return "overdue"
+  if (normalized === "rejected") return "rejected"
+  if (normalized === "overdue") return "overdue"
   return "pending"
 }
 
 function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function isProposalRelatedMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  if (normalized.includes("proposal")) return true
+  if (normalized === "project title" || normalized.includes("project title")) return true
+  return false
+}
+
+function getLatestProposal(proposals: ProjectProposal[] | undefined): ProjectProposal | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  return (
+    items
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? "")
+        const bTime = Date.parse(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? "")
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })[0] ?? null
+  )
+}
+
+function mapProposalStatusToDashboardMilestoneStatus(status: unknown): Milestone["status"] {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "SUBMITTED") return "submitted"
+  if (normalized === "REJECTED") return "rejected"
+  return "pending"
+}
+
+function mergeProposalDashboardMilestoneStatus(
+  backendStatus: Milestone["status"],
+  proposalStatus: Milestone["status"]
+): Milestone["status"] {
+  if (proposalStatus === "pending") return backendStatus
+  if (backendStatus === "pending") return proposalStatus
+  if (proposalStatus === "approved" && backendStatus === "submitted") return "approved"
+  if (proposalStatus === "rejected" && backendStatus !== "approved") return "rejected"
+  return backendStatus
 }
 
 function addDays(baseDate: string, daysToAdd: number): string {
@@ -166,6 +212,19 @@ function getMeaningfulText(value: string | null | undefined): string {
   return trimmed
 }
 
+function formatProjectStatusLabel(status: string | null | undefined): string {
+  const raw = String(status ?? "").trim()
+  if (!raw) return "No Project"
+
+  const normalized = raw.toUpperCase().replace(/\s+/g, "_")
+  if (normalized === "ACTIVE") return "Active"
+  if (normalized === "IN_PROGRESS" || normalized === "IN-PROGRESS") return "In Progress"
+  if (normalized === "COMPLETED") return "Completed"
+  if (normalized === "PENDING") return "Pending"
+  if (normalized === "DRAFT") return "Draft"
+  return raw
+}
+
 function buildEmptyDashboardData(): StudentDashboardData {
   return {
     project: {
@@ -189,6 +248,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const user = useAuthStore((s) => s.user)
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
 
+  const groupProposalsQuery = useMyGroupProjectProposals(Boolean(accessToken))
+  const latestGroupProposal = useMemo(
+    () => getLatestProposal(groupProposalsQuery.data),
+    [groupProposalsQuery.data]
+  )
+
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
 
@@ -199,7 +264,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
-    limit: 100,
+    limit: 20,
+    isActive: true,
   })
 
   const activeProject = useMemo(() => {
@@ -212,6 +278,11 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       items[0]
     )
   }, [projectsData?.items])
+
+  const projectDetailsQuery = useProject(
+    activeProject?.id ?? null,
+    Boolean(accessToken) && Boolean(activeProject?.id)
+  )
 
   const { data: milestonesData } = useProjectMilestones({
     projectId: activeProject?.id,
@@ -229,6 +300,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const backendMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
     const activeTemplate = getActiveMilestoneTemplate(templates)
+
+    const proposalMilestoneStatus = mapProposalStatusToDashboardMilestoneStatus(latestGroupProposal?.status)
 
     const templateMilestones: Milestone[] = (() => {
       if (!activeTemplate?.milestones?.length) return []
@@ -263,12 +336,26 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           normalizeMilestoneName(templateMilestone.name)
         )
 
-        if (!matchedProjectMilestone) return templateMilestone
+        const isProposalRelated = isProposalRelatedMilestoneName(templateMilestone.name)
+
+        if (!matchedProjectMilestone) {
+          if (!isProposalRelated || proposalMilestoneStatus === "pending") return templateMilestone
+          return {
+            ...templateMilestone,
+            status: proposalMilestoneStatus,
+          }
+        }
+
+        const backendStatus = mapMilestoneStatus(matchedProjectMilestone.status)
+        const resolvedStatus =
+          isProposalRelated
+            ? mergeProposalDashboardMilestoneStatus(backendStatus, proposalMilestoneStatus)
+            : backendStatus
 
         return {
           id: matchedProjectMilestone.id,
           name: templateMilestone.name,
-          status: mapMilestoneStatus(matchedProjectMilestone.status),
+          status: resolvedStatus,
           dueDate: matchedProjectMilestone.dueDate,
           sequence: templateMilestone.sequence,
         }
@@ -288,19 +375,18 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         return milestone.name.trim().length > 0 && !Number.isNaN(dueDate.getTime())
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-  }, [milestonesData?.items, templatesData?.templates])
+  }, [latestGroupProposal?.status, milestonesData?.items, templatesData?.templates])
 
   const data = useMemo(() => {
     const emptyData = buildEmptyDashboardData()
     if (!backendMilestones.length) return emptyData
 
     const now = new Date()
-    const completedCount = backendMilestones.filter(
-      (milestone) => milestone.status === "approved" || milestone.status === "submitted"
-    ).length
+    const completedCount = backendMilestones.filter((milestone) => milestone.status === "approved").length
     const progress = Math.round((completedCount / backendMilestones.length) * 100)
 
     const upcomingMilestone =
+      backendMilestones.find((milestone) => milestone.status === "rejected") ??
       backendMilestones.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
       backendMilestones[backendMilestones.length - 1]
 
@@ -329,19 +415,56 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const nextMilestone = useMemo(() => {
     const items = backendMilestones
     if (!items.length) return null
+
+    const sorted = items.slice().sort((a, b) => {
+      const aSeq = typeof a.sequence === "number" ? a.sequence : Number.POSITIVE_INFINITY
+      const bSeq = typeof b.sequence === "number" ? b.sequence : Number.POSITIVE_INFINITY
+      if (aSeq !== bSeq) return aSeq - bSeq
+
+      const aDue = Date.parse(a.dueDate ?? "")
+      const bDue = Date.parse(b.dueDate ?? "")
+      const aDueMs = Number.isFinite(aDue) ? aDue : Number.POSITIVE_INFINITY
+      const bDueMs = Number.isFinite(bDue) ? bDue : Number.POSITIVE_INFINITY
+      if (aDueMs !== bDueMs) return aDueMs - bDueMs
+
+      return a.name.localeCompare(b.name)
+    })
+
     return (
-      items.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
-      items[items.length - 1] ??
+      sorted.find((milestone) => milestone.status === "rejected") ??
+      sorted.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
+      sorted[sorted.length - 1] ??
       null
     )
   }, [backendMilestones])
 
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
-  const projectDisplayName = myGroup?.name?.trim() || activeProject?.title?.trim() || "My Project"
+  const groupDisplayName = myGroup?.name?.trim() || ""
+  const projectTitle = activeProject?.title?.trim() || "My Project"
+  const projectStatusLabel = activeProject ? formatProjectStatusLabel(activeProject.status) : "No Project"
+
+  const advisorProfile = projectDetailsQuery.data?.advisor ?? null
+  const advisorDisplayName = advisorProfile
+    ? `${advisorProfile.firstName ?? ""} ${advisorProfile.lastName ?? ""}`.trim() || advisorProfile.email || ""
+    : ""
+  const advisorEmail = advisorProfile?.email ?? ""
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
-    const withDeadline = items.filter((item) => item.deadlineAt)
+    const nowMs = Date.now()
+    const withDeadline = items
+      .filter((item) => item.deadlineAt)
+      .filter((item) => {
+        if (item.isExpired) return false
+
+        if (typeof item.secondsRemaining === "number") {
+          return item.secondsRemaining > 0
+        }
+
+        const deadlineMs = Date.parse(item.deadlineAt ?? "")
+        if (!Number.isFinite(deadlineMs)) return false
+        return deadlineMs > nowMs
+      })
     if (!withDeadline.length) return null
 
     return withDeadline
@@ -381,8 +504,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     Boolean(nextDeadlineAnnouncement?.isExpired) ||
     (uiSecondsRemaining !== null && uiSecondsRemaining <= 0)
 
+  const activeDeadlineAnnouncement = isAnnouncementDeadlinePassed
+    ? null
+    : nextDeadlineAnnouncement
+
   const isAnnouncementDisabled =
-    Boolean(nextDeadlineAnnouncement?.isDisabled) || isAnnouncementDeadlinePassed
+    Boolean(activeDeadlineAnnouncement?.isDisabled)
 
   const isCriticalWindow =
     uiSecondsRemaining !== null && uiSecondsRemaining > 0 && uiSecondsRemaining <= 3_600
@@ -397,32 +524,30 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         ? "border-yellow-500/30 bg-yellow-500/10"
         : "border-primary/20 bg-primary/5"
 
-  const announcementTitle = getMeaningfulText(nextDeadlineAnnouncement?.title)
-  const actionTypeLabel = nextDeadlineAnnouncement
-    ? formatActionTypeLabel(nextDeadlineAnnouncement.actionType)
+  const announcementTitle = getMeaningfulText(activeDeadlineAnnouncement?.title)
+  const actionTypeLabel = activeDeadlineAnnouncement
+    ? formatActionTypeLabel(activeDeadlineAnnouncement.actionType)
     : ""
 
   const nextDeadlineTitle = announcementTitle || actionTypeLabel || "No active deadline"
-  const nextDeadlineDueText = nextDeadlineAnnouncement
-    ? isAnnouncementDeadlinePassed
-      ? "Deadline passed"
-      : countdownParts
-        ? `${formatCountdown(countdownParts)} remaining`
-        : "No deadline"
+  const nextDeadlineDueText = activeDeadlineAnnouncement
+    ? countdownParts
+      ? `${formatCountdown(countdownParts)} remaining`
+      : "No deadline"
     : "No deadline"
 
-  const nextDeadlineSummary = getMeaningfulText(nextDeadlineAnnouncement?.message)
+  const nextDeadlineSummary = getMeaningfulText(activeDeadlineAnnouncement?.message)
 
-  const nextDeadlineActionTitle = nextDeadlineAnnouncement
+  const nextDeadlineActionTitle = activeDeadlineAnnouncement
     ? getMeaningfulText(
         getAnnouncementActionLabel(
-          nextDeadlineAnnouncement.actionType,
-          nextDeadlineAnnouncement.actionLabel
+          activeDeadlineAnnouncement.actionType,
+          activeDeadlineAnnouncement.actionLabel
         )
       ) ||
       getAnnouncementActionLabel(
-        nextDeadlineAnnouncement.actionType,
-        nextDeadlineAnnouncement.actionLabel
+        activeDeadlineAnnouncement.actionType,
+        activeDeadlineAnnouncement.actionLabel
       )
     : ""
 
@@ -430,16 +555,16 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     actionTypeLabel && actionTypeLabel.toLowerCase() !== nextDeadlineTitle.toLowerCase()
   )
 
-  const announcementCreator = nextDeadlineAnnouncement?.createdBy
+  const announcementCreator = activeDeadlineAnnouncement?.createdBy
   const creatorName =
     `${announcementCreator?.firstName ?? ""} ${announcementCreator?.lastName ?? ""}`.trim() ||
     ""
 
-  const secondaryCardText = nextDeadlineAnnouncement?.deadlineAt
-    ? `Deadline set for ${formatDate(nextDeadlineAnnouncement.deadlineAt)}.`
+  const secondaryCardText = activeDeadlineAnnouncement?.deadlineAt
+    ? `Deadline set for ${formatDate(activeDeadlineAnnouncement.deadlineAt)}.`
     : ""
 
-  const hasActionUrl = Boolean(nextDeadlineAnnouncement?.actionUrl?.trim())
+  const hasActionUrl = Boolean(activeDeadlineAnnouncement?.actionUrl?.trim())
 
   const myTeamMembers: TeamMember[] = myGroup
     ? [
@@ -480,9 +605,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const completedMilestones = existingProjectMilestones.length
     ? existingProjectMilestones.filter((milestone) => {
         const status = milestone.status.toLowerCase()
-        return status === "approved" || status === "submitted"
+        return status === "approved"
       }).length
-    : backendMilestones.filter((m) => m.status === "approved" || m.status === "submitted").length
+    : backendMilestones.filter((m) => m.status === "approved").length
   const totalMilestones = existingProjectMilestones.length || backendMilestones.length
 
   const evaluatorAverage =
@@ -531,10 +656,10 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold truncate">
-              {activeProject ? "In Progress" : "No Project"}
+              {projectStatusLabel}
             </p>
             <p className="mt-1 text-xs text-muted-foreground truncate">
-              {projectDisplayName}
+              {projectTitle}
             </p>
           </CardContent>
         </Card>
@@ -586,10 +711,18 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg font-semibold">
-                {projectDisplayName}
+                {projectTitle}
               </CardTitle>
               <CardDescription>
-                Advisor: <span className="font-medium">—</span>
+                {groupDisplayName ? (
+                  <span>
+                    Group: <span className="font-medium">{groupDisplayName}</span>
+                  </span>
+                ) : (
+                  <span>
+                    Advisor: <span className="font-medium">—</span>
+                  </span>
+                )}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -602,6 +735,57 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Advisor</p>
+              {projectDetailsQuery.isLoading ? (
+                <p className="mt-1 text-sm text-muted-foreground">Loading advisor…</p>
+              ) : projectDetailsQuery.isError ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Unable to load advisor details.
+                </p>
+              ) : advisorProfile ? (
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-10 w-10">
+                      {advisorProfile.avatarUrl ? (
+                        <AvatarImage
+                          src={advisorProfile.avatarUrl}
+                          alt={advisorDisplayName || advisorEmail || "Advisor"}
+                        />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                        {(advisorDisplayName || advisorEmail || "A").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {advisorDisplayName || "Advisor"}
+                      </p>
+                      {advisorEmail ? (
+                        <a
+                          href={`mailto:${advisorEmail}`}
+                          className="text-xs text-muted-foreground hover:underline underline-offset-4 transition-colors"
+                        >
+                          {advisorEmail}
+                        </a>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Email not available</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {advisorEmail ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={`mailto:${advisorEmail}`}>Email</a>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Advisor not assigned yet.</p>
+              )}
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border bg-muted/20 p-3">
                 <p className="text-xs font-medium text-muted-foreground">Active template</p>
@@ -650,7 +834,17 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               {backendMilestones.length ? backendMilestones.map((m) => (
                 <div
                   key={m.id}
-                  className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm"
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors",
+                    "hover:bg-muted/40",
+                    m.status === "approved"
+                      ? "bg-primary/5 border-primary/20"
+                      : m.status === "submitted"
+                        ? "bg-secondary/30 border-secondary/40"
+                        : m.status === "rejected" || m.status === "overdue"
+                          ? "bg-destructive/5 border-destructive/30"
+                          : "bg-muted/20 border-border hover:border-primary/30"
+                  )}
                 >
                   <div className="space-y-1">
                     <p className="font-medium leading-tight">
@@ -666,13 +860,22 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                         ? "default"
                         : m.status === "submitted"
                           ? "secondary"
-                          : m.status === "overdue"
+                          : m.status === "overdue" || m.status === "rejected"
                             ? "destructive"
                             : "outline"
                     }
-                    className="capitalize"
+                    className={
+                      `capitalize cursor-default select-none transition-colors ` +
+                      (m.status === "approved"
+                        ? "hover:bg-primary/90"
+                        : m.status === "submitted"
+                          ? "hover:bg-secondary/90"
+                          : m.status === "overdue" || m.status === "rejected"
+                            ? "hover:bg-destructive/90"
+                            : "hover:bg-accent hover:text-accent-foreground")
+                    }
                   >
-                    {m.status}
+                    {m.status === "rejected" ? "Rejected" : m.status}
                   </Badge>
                 </div>
               )) : (
@@ -703,7 +906,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm text-muted-foreground">Loading deadline...</p>
               </div>
-            ) : !nextDeadlineAnnouncement ? (
+            ) : !activeDeadlineAnnouncement ? (
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm font-medium">No active deadline</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -745,7 +948,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                       className="w-full"
                       disabled={isAnnouncementDisabled}
                       onClick={() => {
-                        const target = nextDeadlineAnnouncement.actionUrl
+                        const target = activeDeadlineAnnouncement.actionUrl
                         if (!target) return
                         window.open(target, "_blank", "noopener,noreferrer")
                       }}

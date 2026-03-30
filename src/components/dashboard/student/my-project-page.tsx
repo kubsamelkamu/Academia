@@ -13,13 +13,18 @@ import {
   FileText,
   AlertCircle,
   ChevronRight,
+  Upload,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
+import { useProject } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -37,7 +42,7 @@ interface Milestone {
 interface ProjectData {
   title: string
   groupName: string
-  status: "in-progress" | "completed" | "pending"
+  status: "in-progress" | "completed" | "pending" | "submitted" | "approved" | "rejected"
   advisorName: string
   progress: number
   startDate: string
@@ -101,8 +106,23 @@ const getStatusBadgeVariant = (
 
 const StatusBadge = ({ status }: { status: string }) => {
   const displayStatus = status.replace(/-/g, " ")
+  const variant = getStatusBadgeVariant(status)
+  const hoverClassName =
+    variant === "default"
+      ? "hover:bg-primary/90"
+      : variant === "secondary"
+        ? "hover:bg-secondary/90"
+        : variant === "destructive"
+          ? "hover:bg-destructive/90"
+          : "hover:bg-accent hover:text-accent-foreground"
   return (
-    <Badge variant={getStatusBadgeVariant(status)} className="capitalize">
+    <Badge
+      variant={variant}
+      className={cn(
+        "capitalize cursor-default select-none transition-colors",
+        hoverClassName
+      )}
+    >
       {displayStatus}
     </Badge>
   )
@@ -128,8 +148,97 @@ const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
   if (normalized === "submitted") return "submitted"
-  if (normalized === "rejected") return "rejected"
   return "pending"
+}
+
+const isProposalRelatedMilestoneName = (name: string): boolean => {
+  const normalized = normalizeMilestoneName(name)
+  if (normalized.includes("proposal")) return true
+  if (normalized === "project title" || normalized.includes("project title")) return true
+  return false
+}
+
+function getLatestProposal(proposals: ProjectProposal[] | undefined): ProjectProposal | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  return (
+    items
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? "")
+        const bTime = Date.parse(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? "")
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })[0] ?? null
+  )
+}
+
+function getApprovedProposalTitle(proposal: ProjectProposal | null): string | null {
+  if (!proposal) return null
+  const normalized = String(proposal.status ?? "").trim().toUpperCase()
+  if (normalized !== "APPROVED") return null
+
+  const fromReviewSummary = proposal.reviewSummary?.selectedTitle?.trim()
+  if (fromReviewSummary) return fromReviewSummary
+
+  const fromTitle = proposal.title?.trim()
+  if (fromTitle) return fromTitle
+
+  const idx = typeof proposal.selectedTitleIndex === "number" ? proposal.selectedTitleIndex : null
+  const fromProposed = idx !== null ? proposal.proposedTitles?.[idx]?.trim() : null
+  if (fromProposed) return fromProposed
+
+  return null
+}
+
+function getProposalUploadedAt(proposal: ProjectProposal | null): string | null {
+  if (!proposal) return null
+  const documents = proposal.documents ?? []
+  if (!documents.length) return null
+
+  const preferred =
+    documents.find((doc) => String(doc.key ?? "").toLowerCase() === "proposal.pdf") ?? documents[0]
+
+  const uploadedAt = preferred?.uploadedAt?.trim()
+  if (uploadedAt) return uploadedAt
+
+  const anyUploadedAt = documents.find((doc) => doc.uploadedAt?.trim())?.uploadedAt?.trim()
+  return anyUploadedAt ?? null
+}
+
+const mapProposalStatusToProjectStatus = (
+  status: unknown
+): ProjectData["status"] => {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "rejected"
+  if (normalized === "SUBMITTED") return "submitted"
+  if (normalized === "DRAFT") return "pending"
+  return "pending"
+}
+
+const mapProposalStatusToMilestoneStatus = (
+  status: unknown
+): Milestone["status"] => {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "rejected"
+  if (normalized === "SUBMITTED") return "submitted"
+  return "pending"
+}
+
+const mergeProposalMilestoneStatus = (
+  backendStatus: Milestone["status"],
+  proposalStatus: Milestone["status"]
+): Milestone["status"] => {
+  // Proposal-derived statuses should only override when backend is still pending,
+  // or when proposal is a stronger terminal state.
+  if (proposalStatus === "pending") return backendStatus
+
+  if (backendStatus === "pending") return proposalStatus
+  if (proposalStatus === "approved" && backendStatus === "submitted") return "approved"
+  if (proposalStatus === "rejected" && backendStatus !== "approved") return "rejected"
+  return backendStatus
 }
 
 // ----------------------------------------------------------------------
@@ -236,12 +345,20 @@ function MyProjectHeader() {
 }
 
 export function StudentMyProjectPage() {
+  const router = useRouter()
   const [projectState, setProjectState] = useState<ProjectData>(initialProjectData)
 
   const user = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
   const { data: myGroupData } = useMyProjectGroup(Boolean(user))
+
+  const groupProposalsQuery = useMyGroupProjectProposals(Boolean(accessToken))
+  const latestGroupProposal = useMemo(
+    () => getLatestProposal(groupProposalsQuery.data),
+    [groupProposalsQuery.data]
+  )
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -268,6 +385,11 @@ export function StudentMyProjectPage() {
       items[0]
     )
   }, [projectsData?.items])
+
+  const projectDetailsQuery = useProject(
+    activeProject?.id ?? null,
+    Boolean(accessToken) && Boolean(activeProject?.id)
+  )
 
   const { data: projectMilestonesData } = useProjectMilestones({
     projectId: activeProject?.id,
@@ -301,6 +423,9 @@ export function StudentMyProjectPage() {
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
     if (!templateMilestones.length) return []
 
+    const proposalMilestoneStatus = mapProposalStatusToMilestoneStatus(latestGroupProposal?.status)
+    const proposalSubmittedAt = latestGroupProposal?.submittedAt ?? latestGroupProposal?.updatedAt ?? undefined
+
     const projectMilestonesByName = new Map(
       (projectMilestonesData?.items ?? []).map((milestone) => [
         normalizeMilestoneName(milestone.title),
@@ -313,17 +438,35 @@ export function StudentMyProjectPage() {
         normalizeMilestoneName(templateMilestone.name)
       )
 
-      if (!matchedProjectMilestone) return templateMilestone
+      const isProposalRelated = isProposalRelatedMilestoneName(templateMilestone.name)
+
+      if (!matchedProjectMilestone) {
+        if (!isProposalRelated || proposalMilestoneStatus === "pending") return templateMilestone
+
+        return {
+          ...templateMilestone,
+          status: proposalMilestoneStatus,
+          submittedAt: proposalSubmittedAt,
+        }
+      }
+
+      const backendStatus = mapStudentMilestoneStatus(matchedProjectMilestone.status)
+      const resolvedStatus =
+        isProposalRelated
+          ? mergeProposalMilestoneStatus(backendStatus, proposalMilestoneStatus)
+          : backendStatus
 
       return {
         ...templateMilestone,
         id: matchedProjectMilestone.id,
         dueDate: matchedProjectMilestone.dueDate,
-        status: mapStudentMilestoneStatus(matchedProjectMilestone.status),
-        submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
+        status: resolvedStatus,
+        submittedAt:
+          matchedProjectMilestone.submittedAt ??
+          (resolvedStatus !== "pending" ? proposalSubmittedAt : undefined),
       }
     })
-  }, [templateMilestones, projectMilestonesData?.items])
+  }, [latestGroupProposal?.status, latestGroupProposal?.submittedAt, latestGroupProposal?.updatedAt, projectMilestonesData?.items, templateMilestones])
 
   const computedMyProject = useMemo<ProjectData>(() => {
     let nextProject = projectState
@@ -345,7 +488,7 @@ export function StudentMyProjectPage() {
       })
 
       const completedMilestonesCount = mergedMilestones.filter(
-        (milestone) => milestone.status === "approved" || milestone.status === "submitted"
+        (milestone) => milestone.status === "approved"
       ).length
       const progress = Math.round((completedMilestonesCount / mergedMilestones.length) * 100)
 
@@ -364,8 +507,54 @@ export function StudentMyProjectPage() {
       }
     }
 
+    // If the proposal milestone is submitted/approved/rejected, reflect it on the
+    // project status badge so students can see the current review state.
+    if (latestGroupProposal) {
+      const proposalStatus = mapProposalStatusToProjectStatus(latestGroupProposal.status)
+      const hasProposalMilestone = nextProject.milestones.some((m) => isProposalRelatedMilestoneName(m.name))
+      if (hasProposalMilestone && proposalStatus !== nextProject.status) {
+        nextProject = {
+          ...nextProject,
+          status: proposalStatus,
+        }
+      }
+
+      const approvedTitle = getApprovedProposalTitle(latestGroupProposal)
+      if (approvedTitle && approvedTitle !== nextProject.title) {
+        nextProject = {
+          ...nextProject,
+          title: approvedTitle,
+        }
+      }
+
+      const uploadedAt = getProposalUploadedAt(latestGroupProposal)
+      const startedAt =
+        uploadedAt ??
+        latestGroupProposal.submittedAt ??
+        latestGroupProposal.updatedAt ??
+        latestGroupProposal.createdAt ??
+        null
+      if (startedAt && startedAt !== nextProject.startDate) {
+        nextProject = {
+          ...nextProject,
+          startDate: startedAt,
+        }
+      }
+    }
+
+    const advisor = projectDetailsQuery.data?.advisor
+    const advisorName = advisor
+      ? `${advisor.firstName ?? ""} ${advisor.lastName ?? ""}`.trim() || advisor.email || ""
+      : ""
+    if (advisorName && advisorName !== nextProject.advisorName) {
+      nextProject = {
+        ...nextProject,
+        advisorName,
+      }
+    }
+
     return nextProject
-  }, [projectState, mergedBackendMilestones, myGroupData?.name])
+  }, [latestGroupProposal, mergedBackendMilestones, myGroupData?.name, projectDetailsQuery.data?.advisor, projectState])
 
   const myProject = computedMyProject
 
@@ -383,9 +572,7 @@ export function StudentMyProjectPage() {
     )
   }
 
-  const completedMilestones = myProject.milestones.filter(
-    (m) => m.status === "approved" || m.status === "submitted"
-  ).length
+  const completedMilestones = myProject.milestones.filter((m) => m.status === "approved").length
   const totalMilestones = myProject.milestones.length
 
   return (
@@ -425,13 +612,6 @@ export function StudentMyProjectPage() {
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2 text-base">Project Overview</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {myProject.description ||
-                    "This project focuses on developing an innovative solution using cutting-edge technology to address real-world challenges in the academic environment."}
-                </p>
-              </div>
               <div className="space-y-2">
                 <div>
                   <p className="text-sm font-medium mb-1">Advisor</p>
@@ -451,10 +631,6 @@ export function StudentMyProjectPage() {
                 <div className="p-3 bg-muted/30 rounded-lg border">
                   <p className="text-xs text-muted-foreground mb-1">Started</p>
                   <p className="font-medium text-sm">{formatDate(myProject.startDate)}</p>
-                </div>
-                <div className="p-3 bg-muted/30 rounded-lg border">
-                  <p className="text-xs text-muted-foreground mb-1">Deadline</p>
-                  <p className="font-medium text-sm">{formatDate(myProject.dueDate)}</p>
                 </div>
               </div>
             </div>
@@ -495,6 +671,12 @@ export function StudentMyProjectPage() {
               const daysUntilDue = getDaysUntilDue(milestone.dueDate)
               const isOverdue = daysUntilDue < 0 && milestone.status === "pending"
               const isDueSoon = daysUntilDue <= 7 && daysUntilDue >= 0 && milestone.status === "pending"
+              const isProposalRelated = isProposalRelatedMilestoneName(milestone.name)
+              const canResubmitProposal = isProposalRelated && milestone.status === "rejected"
+              const handleResubmit = () => {
+                const milestoneParam = "Project Proposal"
+                router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestoneParam)}`)
+              }
 
               return (
                 <div
@@ -565,6 +747,12 @@ export function StudentMyProjectPage() {
                     {milestone.status === "submitted" && (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
+                    {canResubmitProposal ? (
+                      <Button size="sm" variant="destructive" onClick={handleResubmit}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Resubmit
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               )

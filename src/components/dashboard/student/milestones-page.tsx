@@ -16,9 +16,11 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
-type MilestoneStatus = "pending" | "submitted" | "approved"
+type MilestoneStatus = "pending" | "submitted" | "approved" | "rejected"
 
 interface Milestone {
   id: string
@@ -27,44 +29,6 @@ interface Milestone {
   status: MilestoneStatus
   submittedAt?: string
   sequence?: number
-}
-
-const myProject = {
-  title: "AI-Driven Academic Assistant",
-  milestones: [
-    {
-      id: "m1",
-      name: "Project Proposal",
-      dueDate: "2026-01-18",
-      status: "approved",
-      submittedAt: "2026-01-15",
-    },
-    {
-      id: "m2",
-      name: "Software Requirements Specification (SRS)",
-      dueDate: "2026-02-05",
-      status: "submitted",
-      submittedAt: "2026-02-03",
-    },
-    {
-      id: "m3",
-      name: "System Design Document (SDD)",
-      dueDate: "2026-03-20",
-      status: "pending",
-    },
-    {
-      id: "m4",
-      name: "Implementation",
-      dueDate: "2026-04-30",
-      status: "pending",
-    },
-    {
-      id: "m5",
-      name: "Final Presentation",
-      dueDate: "2026-05-30",
-      status: "pending",
-    },
-  ] satisfies Milestone[],
 }
 
 function formatDate(date: string): string {
@@ -76,22 +40,33 @@ function formatDate(date: string): string {
 function milestoneStatusBadge(status: MilestoneStatus) {
   if (status === "approved") {
     return (
-      <Badge className="bg-green-100 text-green-800 border-green-200">
+      <Badge className="bg-green-100 text-green-800 border-green-200 cursor-default select-none transition-colors hover:opacity-90">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Approved
       </Badge>
     )
   }
+  if (status === "rejected") {
+    return (
+      <Badge className="bg-red-100 text-red-800 border-red-200 cursor-default select-none transition-colors hover:opacity-90">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Rejected
+      </Badge>
+    )
+  }
   if (status === "submitted") {
     return (
-      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+      <Badge className="bg-blue-100 text-blue-800 border-blue-200 cursor-default select-none transition-colors hover:opacity-90">
         <Clock3 className="h-3 w-3 mr-1" />
         Submitted
       </Badge>
     )
   }
   return (
-    <Badge variant="outline">
+    <Badge
+      variant="outline"
+      className="cursor-default select-none transition-colors hover:bg-accent hover:text-accent-foreground"
+    >
       <Clock3 className="h-3 w-3 mr-1" />
       Pending
     </Badge>
@@ -102,14 +77,42 @@ function normalizeMilestoneName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-function isProposalMilestoneName(name: string): boolean {
-  return normalizeMilestoneName(name).includes("proposal")
+function isProposalRelatedMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  if (normalized.includes("proposal")) return true
+  // Some departments name the first milestone as "Project Title".
+  if (normalized === "project title" || normalized.includes("project title")) return true
+  return false
+}
+
+function mapProposalStatusToMilestoneStatus(status: unknown): MilestoneStatus {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "rejected"
+  if (normalized === "SUBMITTED") return "submitted"
+  return "pending"
+}
+
+function getLatestProposal(proposals: ProjectProposal[] | undefined): ProjectProposal | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  return (
+    items
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? "")
+        const bTime = Date.parse(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? "")
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })[0] ?? null
+  )
 }
 
 function mapBackendStatus(status: string): MilestoneStatus {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
   if (normalized === "submitted") return "submitted"
+  if (normalized === "rejected") return "rejected"
   return "pending"
 }
 
@@ -126,66 +129,6 @@ function getActiveMilestoneTemplate(templates: MilestoneTemplate[]): MilestoneTe
   return templates.find((t) => t.isActive) ?? templates[0]
 }
 
-function readProposalOverrideFromStorage(studentId: string | null): {
-  status: MilestoneStatus
-  submittedAt?: string
-} | null {
-  if (typeof window === "undefined") return null
-
-  const host = window.location.host
-  const candidateIds = [studentId?.trim() || "", "any", ""]
-
-  for (const candidateId of candidateIds) {
-    try {
-      const storageKey = ["academia:proposal:lastSubmitted", host, candidateId].join(":")
-      const raw = localStorage.getItem(storageKey)
-      if (!raw) continue
-
-      const parsed = JSON.parse(raw) as { status?: unknown; submittedAt?: unknown }
-      const status = typeof parsed.status === "string" ? parsed.status : null
-      const submittedAt = typeof parsed.submittedAt === "string" ? parsed.submittedAt : undefined
-      if (status === "submitted" || status === "approved") {
-        return { status, submittedAt }
-      }
-    } catch {
-      // keep trying
-    }
-  }
-
-  try {
-    const prefix = `academia:proposal:lastSubmitted:${host}:`
-    let best: { status: MilestoneStatus; submittedAt?: string; time: number } | null = null
-
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key || !key.startsWith(prefix)) continue
-
-      const raw = localStorage.getItem(key)
-      if (!raw) continue
-
-      try {
-        const parsed = JSON.parse(raw) as { status?: unknown; submittedAt?: unknown }
-        const status = typeof parsed.status === "string" ? parsed.status : null
-        const submittedAt = typeof parsed.submittedAt === "string" ? parsed.submittedAt : undefined
-        if (status !== "submitted" && status !== "approved") continue
-
-        const time = submittedAt ? Date.parse(submittedAt) : Number.NEGATIVE_INFINITY
-        if (!best || (Number.isFinite(time) && time > best.time)) {
-          best = { status, submittedAt, time: Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY }
-        }
-      } catch {
-        // ignore malformed items
-      }
-    }
-
-    if (best) return { status: best.status, submittedAt: best.submittedAt }
-  } catch {
-    // ignore localStorage scan failures
-  }
-
-  return null
-}
-
 export function StudentMilestonesPage() {
   const router = useRouter()
   const user = useAuthStore((state) => state.user)
@@ -198,21 +141,10 @@ export function StudentMilestonesPage() {
   const [weekEnding, setWeekEnding] = useState("")
   const [summary, setSummary] = useState("")
   const [blockers, setBlockers] = useState("")
-  const [proposalOverride, setProposalOverride] = useState<{
-    status: MilestoneStatus
-    submittedAt?: string
-  } | null>(() => {
-    return readProposalOverrideFromStorage(studentId)
-  })
-
-  useEffect(() => {
-    const nextOverride = readProposalOverrideFromStorage(studentId)
-    if (nextOverride) setProposalOverride(nextOverride)
-  }, [studentId])
-
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
-    limit: 100,
+    limit: 20,
+    isActive: true,
   })
 
   const activeTemplate = useMemo(() => {
@@ -224,6 +156,9 @@ export function StudentMilestonesPage() {
     departmentId,
     studentId,
   })
+
+  const proposalsQuery = useMyGroupProjectProposals(Boolean(accessToken))
+  const latestProposal = useMemo(() => getLatestProposal(proposalsQuery.data), [proposalsQuery.data])
 
   const activeProject = useMemo(() => {
     const items = projectsData?.items ?? []
@@ -278,52 +213,66 @@ export function StudentMilestonesPage() {
           normalizeMilestoneName(templateMilestone.name)
         )
 
-        const maybeOverride =
-          proposalOverride &&
-          isProposalMilestoneName(templateMilestone.name) &&
-          templateMilestone.status === "pending"
+        const isProposalRelated = isProposalRelatedMilestoneName(templateMilestone.name)
+        const proposalStatus = mapProposalStatusToMilestoneStatus(latestProposal?.status)
+        const proposalSubmittedAt = latestProposal?.submittedAt ?? latestProposal?.updatedAt ?? undefined
+
+        const statusRank: Record<MilestoneStatus, number> = {
+          pending: 0,
+          submitted: 1,
+          rejected: 2,
+          approved: 3,
+        }
+
+        const mergeStatus = (backend: MilestoneStatus, proposal: MilestoneStatus): MilestoneStatus =>
+          statusRank[proposal] > statusRank[backend] ? proposal : backend
 
         if (!matchedProjectMilestone) {
-          if (!maybeOverride) return templateMilestone
+          if (!isProposalRelated || proposalStatus === "pending") return templateMilestone
 
           return {
             ...templateMilestone,
-            status: proposalOverride.status,
-            submittedAt: proposalOverride.submittedAt,
+            status: proposalStatus,
+            submittedAt: proposalSubmittedAt,
           }
         }
+
+        const backendStatus = mapBackendStatus(matchedProjectMilestone.status)
+        const resolvedStatus =
+          isProposalRelated && proposalStatus !== "pending"
+            ? mergeStatus(backendStatus, proposalStatus)
+            : backendStatus
+
+        const resolvedSubmittedAt =
+          matchedProjectMilestone.submittedAt ??
+          (resolvedStatus !== "pending" ? proposalSubmittedAt : undefined)
 
         const mapped: Milestone = {
           id: matchedProjectMilestone.id,
           name: templateMilestone.name,
           dueDate: matchedProjectMilestone.dueDate,
-          status: mapBackendStatus(matchedProjectMilestone.status),
-          submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
+          status: resolvedStatus,
+          submittedAt: resolvedSubmittedAt,
           sequence: templateMilestone.sequence,
-        }
-
-        if (proposalOverride && isProposalMilestoneName(templateMilestone.name) && mapped.status === "pending") {
-          return {
-            ...mapped,
-            status: proposalOverride.status,
-            submittedAt: proposalOverride.submittedAt ?? mapped.submittedAt,
-          }
         }
 
         return mapped
       })
     }
 
-    return myProject.milestones
-  }, [projectMilestonesData?.items, templatesData?.templates])
+    return []
+  }, [latestProposal?.status, latestProposal?.submittedAt, latestProposal?.updatedAt, projectMilestonesData?.items, templatesData?.templates])
 
   const completedMilestones = milestones.filter((m) => m.status === "approved").length
   const totalMilestones = milestones.length
   const progressPercent = totalMilestones ? (completedMilestones / totalMilestones) * 100 : 0
-  const projectDisplayName = myProjectGroupQuery.data?.name?.trim() || myProject.title
+  const projectDisplayName = myProjectGroupQuery.data?.name?.trim() || activeProject?.title?.trim() || "My Project"
 
   const handleSubmitMilestone = (milestone: Milestone) => {
-    router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestone.name)}`)
+    const milestoneParam = isProposalRelatedMilestoneName(milestone.name)
+      ? "Project Proposal"
+      : milestone.name
+    router.push(`/dashboard/student/upload-documents?milestone=${encodeURIComponent(milestoneParam)}`)
   }
 
   const handleSubmitProgress = () => {
@@ -436,61 +385,78 @@ export function StudentMilestonesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {milestones.map((milestone, index) => (
-            <div
-              key={milestone.id}
-              className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    milestone.status === "approved"
-                      ? "bg-green-100 text-green-700"
-                      : milestone.status === "submitted"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {milestone.status === "approved" ? (
-                    <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                    milestone.sequence ?? index + 1
-                  )}
-                </div>
-                <div>
-                  <p className="font-medium">{milestone.name}</p>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Due: {formatDate(milestone.dueDate)}
-                    </span>
-                    {milestone.submittedAt && (
-                      <span className="flex items-center gap-1">
-                        <Clock3 className="h-3 w-3" />
-                        Submitted: {formatDate(milestone.submittedAt)}
-                      </span>
-                    )}
-                    {milestone.status === "pending" && (
-                      <span className="flex items-center gap-1 text-amber-600">
-                        <AlertCircle className="h-3 w-3" />
-                        Awaiting submission
-                      </span>
+          {milestones.length ? (
+            milestones.map((milestone, index) => (
+              <div
+                key={milestone.id}
+                className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                      milestone.status === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : milestone.status === "submitted"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {milestone.status === "approved" ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      milestone.sequence ?? index + 1
                     )}
                   </div>
+                  <div>
+                    <p className="font-medium">{milestone.name}</p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Due: {formatDate(milestone.dueDate)}
+                      </span>
+                      {milestone.submittedAt && (
+                        <span className="flex items-center gap-1">
+                          <Clock3 className="h-3 w-3" />
+                          Submitted: {formatDate(milestone.submittedAt)}
+                        </span>
+                      )}
+                      {(milestone.status === "pending" || milestone.status === "rejected") && (
+                        <span className="flex items-center gap-1 text-amber-600">
+                          <AlertCircle className="h-3 w-3" />
+                          {milestone.status === "rejected" ? "Changes requested" : "Awaiting submission"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {milestoneStatusBadge(milestone.status)}
+                  {milestone.status === "pending" ? (
+                    <Button size="sm" onClick={() => handleSubmitMilestone(milestone)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Submit
+                    </Button>
+                  ) : null}
+                  {milestone.status === "rejected" ? (
+                    <Button size="sm" variant="destructive" onClick={() => handleSubmitMilestone(milestone)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Resubmit
+                    </Button>
+                  ) : null}
                 </div>
               </div>
-
-              <div className="flex items-center gap-3">
-                {milestoneStatusBadge(milestone.status)}
-                {milestone.status === "pending" && (
-                  <Button size="sm" onClick={() => handleSubmitMilestone(milestone)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Submit
-                  </Button>
-                )}
-              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm font-medium">No milestones available</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activeProject
+                  ? "Milestones will appear once your department template is active."
+                  : "Create or join a project to view milestones."}
+              </p>
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
     </div>

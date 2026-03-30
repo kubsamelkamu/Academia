@@ -105,6 +105,8 @@ export async function listStudentProjects(params: {
   const response = await apiClient.get<unknown>("/projects", {
     params: {
       departmentId,
+      studentUserId: studentId,
+      // Some backends accept `studentId`; keep it for compatibility.
       studentId,
     },
   })

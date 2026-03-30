@@ -20,14 +20,15 @@ import {
   Filter,
   MessageCircle,
   Search,
-  Trash2,
   Upload,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { useDocumentTemplate, useDocumentTemplatesList } from "@/lib/hooks/use-document-templates"
 import { useAuthStore } from "@/store/auth-store"
+import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
 import type { DocumentTemplateType } from "@/types/document-templates"
+import type { ProjectProposal, ProposalDocument } from "@/types/project-proposals"
 
 type SubmissionStatus = "approved" | "reviewed" | "pending"
 
@@ -47,69 +48,8 @@ interface StudentSubmission {
   milestone: string
   status: SubmissionStatus
   comments: FeedbackComment[]
+  url?: string | null
 }
-
-const submissions: StudentSubmission[] = [
-  {
-    id: "1",
-    name: "Project Proposal v2.pdf",
-    size: "2.4 MB",
-    uploadedAt: "2024-07-15",
-    milestone: "Proposal",
-    status: "reviewed",
-    comments: [
-      {
-        id: "c1",
-        author: "Dr. Smith",
-        text: "Good proposal, but add more detail in methodology.",
-        date: "2024-07-16",
-        resolved: false,
-      },
-      {
-        id: "c2",
-        author: "Dr. Smith",
-        text: "Timeline section needs revision.",
-        date: "2024-07-16",
-        resolved: true,
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Requirements Specification.pdf",
-    size: "1.8 MB",
-    uploadedAt: "2024-07-20",
-    milestone: "Requirements",
-    status: "pending",
-    comments: [],
-  },
-  {
-    id: "3",
-    name: "System Architecture Design.pdf",
-    size: "3.2 MB",
-    uploadedAt: "2024-07-22",
-    milestone: "Design",
-    status: "reviewed",
-    comments: [
-      {
-        id: "c3",
-        author: "Dr. Smith",
-        text: "Consider adding more details about data flow.",
-        date: "2024-07-23",
-        resolved: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    name: "Implementation Report.pdf",
-    size: "4.9 MB",
-    uploadedAt: "2024-07-25",
-    milestone: "Implementation",
-    status: "approved",
-    comments: [],
-  },
-]
 
 const templateTypes: Array<{ label: string; value: DocumentTemplateType | null }> = [
   { label: "All", value: null },
@@ -168,9 +108,52 @@ function formatFileSize(sizeBytes: number | null | undefined) {
   return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
+function mapProposalStatusToSubmissionStatus(status: unknown): SubmissionStatus {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "reviewed"
+  if (normalized === "SUBMITTED") return "pending"
+  return "pending"
+}
+
+function getLatestTimestamp(proposal: ProjectProposal): string {
+  return (
+    proposal.updatedAt ??
+    proposal.submittedAt ??
+    proposal.createdAt ??
+    ""
+  )
+}
+
+function buildFeedbackComments(proposal: ProjectProposal): FeedbackComment[] {
+  const text = proposal.feedback?.trim() ?? proposal.reviewSummary?.feedback?.trim() ?? ""
+  if (!text) return []
+
+  const dateIso = proposal.reviewSummary?.updatedAt ?? proposal.updatedAt ?? proposal.submittedAt ?? proposal.createdAt ?? null
+
+  return [
+    {
+      id: `feedback:${proposal.id}`,
+      author: "Reviewer",
+      text,
+      date: dateIso ? new Date(dateIso).toLocaleDateString() : "-",
+      resolved: false,
+    },
+  ]
+}
+
+function proposalTitleLabel(proposal: ProjectProposal): string {
+  const normalized = String(proposal.status ?? "").trim().toUpperCase()
+  if (normalized === "APPROVED") return "Project Title (Approved)"
+  if (normalized === "REJECTED") return "Project Title (Needs Revision)"
+  if (normalized === "SUBMITTED") return "Project Title (Pending Review)"
+  return "Project Title"
+}
+
 export function StudentSubmissionsPage() {
   const router = useRouter()
   const departmentId = useAuthStore((s) => s.user?.departmentId)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [templateSearch, setTemplateSearch] = useState("")
@@ -178,6 +161,57 @@ export function StudentSubmissionsPage() {
   const [selectedDoc, setSelectedDoc] = useState<StudentSubmission | null>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [reply, setReply] = useState("")
+
+  const groupProposalsQuery = useMyGroupProjectProposals(Boolean(accessToken))
+
+  const submissions = useMemo<StudentSubmission[]>(() => {
+    const proposals = groupProposalsQuery.data ?? []
+    const sorted = proposals
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(getLatestTimestamp(a))
+        const bTime = Date.parse(getLatestTimestamp(b))
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })
+
+    const items: StudentSubmission[] = []
+    for (const proposal of sorted) {
+      const comments = buildFeedbackComments(proposal)
+      const status = mapProposalStatusToSubmissionStatus(proposal.status)
+      const milestone = proposalTitleLabel(proposal)
+
+      for (const doc of proposal.documents ?? []) {
+        const uploadedAt = doc.uploadedAt ?? proposal.submittedAt ?? proposal.updatedAt ?? proposal.createdAt ?? ""
+        items.push({
+          id: `${proposal.id}:${doc.publicId ?? doc.key}`,
+          name: doc.originalName ?? doc.key,
+          size: formatFileSize(doc.sizeBytes),
+          uploadedAt,
+          milestone,
+          status,
+          comments,
+          url: doc.url,
+        })
+      }
+
+      // If a proposal exists but no documents are attached, still show a placeholder row.
+      if (!(proposal.documents?.length ?? 0)) {
+        const uploadedAt = proposal.submittedAt ?? proposal.updatedAt ?? proposal.createdAt ?? ""
+        items.push({
+          id: `${proposal.id}:no-document`,
+          name: proposal.title ?? "Project Proposal",
+          size: "-",
+          uploadedAt,
+          milestone,
+          status,
+          comments,
+          url: null,
+        })
+      }
+    }
+
+    return items
+  }, [groupProposalsQuery.data])
   const templatesQuery = useDocumentTemplatesList(departmentId, {
     page: 1,
     limit: 10,
@@ -197,17 +231,37 @@ export function StudentSubmissionsPage() {
       const matchesFilter = statusFilter === "all" || doc.status === statusFilter
       return matchesSearch && matchesFilter
     })
-  }, [searchTerm, statusFilter])
+  }, [searchTerm, statusFilter, submissions])
 
-  const stats = useMemo(
-    () => ({
-      total: submissions.length,
-      withFeedback: submissions.filter((d) => d.comments.length > 0).length,
-      pending: submissions.filter((d) => d.status === "pending").length,
-      approved: submissions.filter((d) => d.status === "approved").length,
-    }),
-    []
-  )
+  const stats = useMemo(() => {
+    const proposals = groupProposalsQuery.data ?? []
+
+    let total = 0
+    let withFeedback = 0
+    let pending = 0
+    let approved = 0
+
+    for (const proposal of proposals) {
+      const docCount = proposal.documents?.length ?? 0
+      if (!docCount) continue
+
+      total += docCount
+
+      const status = mapProposalStatusToSubmissionStatus(proposal.status)
+      if (status === "pending") pending += docCount
+      if (status === "approved") approved += docCount
+
+      const feedbackText = proposal.feedback?.trim() ?? proposal.reviewSummary?.feedback?.trim() ?? ""
+      if (feedbackText) withFeedback += docCount
+    }
+
+    return {
+      total,
+      withFeedback,
+      pending,
+      approved,
+    }
+  }, [groupProposalsQuery.data])
 
   return (
     <div className="space-y-6">
@@ -304,46 +358,65 @@ export function StudentSubmissionsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filtered.map((doc) => {
-                const unresolved = doc.comments.filter((c) => !c.resolved).length
-                return (
-                  <div
-                    key={doc.id}
-                    className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium truncate">{doc.name}</p>
-                          {statusBadge(doc.status)}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {doc.size} • {doc.milestone} • {new Date(doc.uploadedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
+              {groupProposalsQuery.isLoading ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  Loading your submissions...
+                </div>
+              ) : groupProposalsQuery.isError ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-destructive">
+                  {groupProposalsQuery.error.message}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  No submissions match your filters.
+                </div>
+              ) : (
+                filtered.map((doc) => {
+                  const unresolved = doc.comments.filter((c) => !c.resolved).length
+                  const uploadedAtLabel = formatDate(doc.uploadedAt)
 
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)}>
-                        <MessageCircle className="h-4 w-4 mr-1" />
-                        Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.info("Preview coming soon")}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.success("Download started")}>
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => toast.error("Delete action is disabled in demo")}>
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
+                  return (
+                    <div
+                      key={doc.id}
+                      className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium truncate">{doc.name}</p>
+                            {statusBadge(doc.status)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {doc.size} • {doc.milestone} • {uploadedAtLabel}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)}>
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            if (!doc.url) return
+                            window.open(doc.url, "_blank", "noopener,noreferrer")
+                          }}
+                          disabled={!doc.url}
+                          aria-disabled={!doc.url}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>
