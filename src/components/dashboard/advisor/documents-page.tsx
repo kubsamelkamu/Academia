@@ -77,11 +77,25 @@ export function AdvisorDocumentsPage() {
     }
   }
 
+<<<<<<< HEAD
   const stats = documentsQuery.data?.stats ?? {
     totalDocuments: 0,
     approvedCount: 0,
     pendingReviewCount: 0,
     revisionRequiredCount: 0,
+=======
+  function handleApprove() {
+    toast.success("Document approved", {
+      description: "Document has been approved and is now available for download.",
+    })
+  }
+
+  function handleRequestRevision(projectId: string) {
+    toast.message("Revision flow opened", {
+      description: "Taking you to the revision feedback page.",
+    })
+    router.push(`/dashboard/advisor/reviews/${projectId}`)
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
   }
 
   return (
@@ -172,6 +186,7 @@ export function AdvisorDocumentsPage() {
                         <p className="font-medium">{document.name}</p>
                         <p className="text-sm text-muted-foreground">{document.description || document.type}</p>
                       </div>
+<<<<<<< HEAD
                     </TableCell>
                     <TableCell>
                       <div>
@@ -204,6 +219,72 @@ export function AdvisorDocumentsPage() {
                     </TableCell>
                   </TableRow>
                 ))
+=======
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{doc.project}</p>
+                      <p className="text-sm text-muted-foreground">{doc.group}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src="" alt={doc.uploadedBy} />
+                        <AvatarFallback className="text-xs">
+                          {doc.uploadedBy
+                            .split(" ")
+                            .filter(Boolean)
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{doc.uploadedBy}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{statusBadge(doc.status)}</TableCell>
+                  <TableCell>{doc.size}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatDate(doc.uploadedAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleView(doc)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(doc)}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {doc.status === "pending_review" && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-success hover:text-success"
+                            onClick={() => handleApprove()}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleRequestRevision(doc.project === "Smart Campus System" ? "p1" : "p2")}
+                          >
+                            Revision
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredDocuments.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
+                    No documents found.
+                  </TableCell>
+                </TableRow>
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
               )}
             </TableBody>
           </Table>

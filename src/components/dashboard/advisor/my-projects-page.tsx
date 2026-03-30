@@ -1,7 +1,107 @@
 "use client"
 
+<<<<<<< HEAD
 import * as React from "react"
 import Link from "next/link"
+=======
+import React, { useState, useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
+import {
+  FolderOpen,
+  ClipboardCheck,
+  MessageSquare,
+  Users,
+  Calendar,
+  FileText,
+  Eye,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+  Search,
+  Download,
+  Plus,
+  Star,
+  Flag,
+  AlertTriangle,
+  ListChecks,
+  Activity,
+  XCircle,
+  HelpCircle,
+  ChevronDown,
+  Send,
+  Paperclip,
+  Settings,
+  Menu,
+  Filter,
+  LayoutGrid,
+  List,
+  UserCheck,
+  Award,
+  BookOpen,
+  Video,
+  Link2,
+  Github,
+  ExternalLink,
+  ThumbsUp,
+  CalendarDays,
+  CheckCheck,
+  MoreHorizontal,
+  Phone,
+  Mail,
+  Briefcase,
+  GraduationCap,
+  Sparkles,
+  Shield,
+  Zap,
+  Target,
+  Compass,
+  BarChart3,
+  PieChart,
+  Layers,
+  Users2,
+  ArrowUpRight,
+  CircleDot,
+  Upload,
+  Pin,
+  Bookmark,
+  Share2,
+  LucideIcon,
+} from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -18,11 +118,112 @@ import {
 } from "@/lib/hooks/useAdvisor"
 import { FolderOpen, Search } from "lucide-react"
 
+<<<<<<< HEAD
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
+=======
+interface ProjectMilestone {
+  id: string
+  name: string
+  description: string
+  dueDate: string
+  status: MilestoneStatus
+  completedDate?: string
+  priority: PriorityLevel
+  deliverables: string[]
+}
+
+interface ProjectMember {
+  id: string
+  name: string
+  email: string
+  role: string
+  avatar?: string
+  joinedAt: string
+  contributions?: number
+  lastActive?: string
+}
+
+interface AdvisorProject {
+  id: string
+  title: string
+  description: string
+  groupName: string
+  groupId: string
+  advisorId: string
+  startDate: string
+  dueDate: string
+  status: ProjectStatus
+  progress: number
+  members: ProjectMember[]
+  milestones: ProjectMilestone[]
+  documents: {
+    id: string
+    name: string
+    type: string
+    size: string
+    uploadedAt: string
+    uploadedBy: string
+  }[]
+  meetings: {
+    id: string
+    title: string
+    date: string
+    time: string
+    attendees: string[]
+  }[]
+  messages: {
+    id: string
+    sender: string
+    content: string
+    timestamp: string
+    read: boolean
+  }[]
+  evaluation?: {
+    criteria: string
+    score: number
+    maxScore: number
+    comments: string
+  }[]
+  category: string
+  tags: string[]
+  technologies: string[]
+}
+
+// ==================== Constants & Utilities ====================
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon: LucideIcon }> = {
+  'active': { label: 'Active', color: 'blue', icon: Activity },
+  'in-progress': { label: 'In Progress', color: 'indigo', icon: TrendingUp },
+  'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
+  'on-hold': { label: 'On Hold', color: 'amber', icon: AlertCircle },
+  'pending-review': { label: 'Pending Review', color: 'purple', icon: ClipboardCheck },
+  'cleared': { label: 'Cleared', color: 'emerald', icon: CheckCheck }
+}
+
+const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: LucideIcon }> = {
+  'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
+  'approved': { label: 'Approved', color: 'green', icon: ThumbsUp },
+  'in-progress': { label: 'In Progress', color: 'blue', icon: TrendingUp },
+  'pending': { label: 'Pending', color: 'gray', icon: Clock },
+  'overdue': { label: 'Overdue', color: 'red', icon: AlertTriangle },
+  'submitted': { label: 'Submitted', color: 'purple', icon: Upload }
+}
+
+const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; icon: LucideIcon }> = {
+  'high': { label: 'High', color: 'red', icon: Flag },
+  'medium': { label: 'Medium', color: 'amber', icon: AlertCircle },
+  'low': { label: 'Low', color: 'green', icon: CheckCircle }
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
   })
 }
 
@@ -84,7 +285,56 @@ export function AdvisorMyProjectsPage() {
     completedProjects: 0,
   }
 
+<<<<<<< HEAD
   const selectedProject = projectDetailQuery.data
+=======
+interface StatCardProps {
+  title: string
+  value: number
+  icon: LucideIcon
+  trend?: number
+  color?: string
+}
+
+const StatCard = ({ title, value, icon: Icon, trend, color = 'blue' }: StatCardProps) => (
+  <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/30">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-bold tracking-tight">{value}</p>
+            {trend !== undefined && (
+              <span className={cn(
+                "text-xs font-medium px-1.5 py-0.5 rounded-full",
+                trend > 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : 
+                            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              )}>
+                {trend > 0 ? "+" : ""}{trend}%
+              </span>
+            )}
+          </div>
+        </div>
+        <div className={cn(
+          "h-12 w-12 rounded-xl flex items-center justify-center transition-all group-hover:scale-110",
+          `bg-${color}-100 text-${color}-600 dark:bg-${color}-900/30 dark:text-${color}-400`
+        )}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+interface MilestoneItemProps {
+  milestone: ProjectMilestone
+}
+
+const MilestoneItem = ({ milestone }: MilestoneItemProps) => {
+  const config = MILESTONE_STATUS_CONFIG[milestone.status]
+  const StatusIcon = config?.icon || Clock
+  const PriorityIcon = PRIORITY_CONFIG[milestone.priority]?.icon || Flag
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 
   return (
     <div className="space-y-6 animate-fade-in">

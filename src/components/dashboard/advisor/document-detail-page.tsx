@@ -3,6 +3,29 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+<<<<<<< HEAD
+=======
+import Image from "next/image"
+
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Archive,
+  ArrowLeft,
+  Clock,
+  Download,
+  Eye,
+  File as FileIcon,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  User,
+  Video as VideoIcon,
+} from "lucide-react"
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -45,6 +68,46 @@ function Preview({ fileUrl, mimeType, title }: { fileUrl: string; mimeType?: str
       </video>
     )
   }
+<<<<<<< HEAD
+=======
+
+  if (document.type === "image") {
+    return (
+      <div className="relative border rounded-lg overflow-hidden flex justify-center">
+        <Image
+          src={`/mock-images/${document.name}`}
+          alt={document.name}
+          fill
+          className="object-contain"
+        />
+      </div>
+    )
+  }
+
+  if (document.type === "video") {
+    return (
+      <div className="border rounded-lg overflow-hidden">
+        <video controls className="w-full h-[600px]">
+          <source src={`/mock-videos/${document.name}`} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    )
+  }
+
+  if (document.type === "docx" || document.type === "zip") {
+    return (
+      <Alert className="bg-muted/50">
+        <FileIcon className="h-4 w-4" />
+        <AlertDescription>
+          {document.type === "docx" ? "Word documents" : "Archive files"} can only be downloaded and viewed
+          externally. Please use the download button to access the file.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
   return (
     <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
       Preview is not available for this file type. Use the external open or download actions instead.

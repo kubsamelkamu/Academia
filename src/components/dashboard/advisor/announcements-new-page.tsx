@@ -1,12 +1,22 @@
 "use client"
 
 import * as React from "react"
+<<<<<<< HEAD
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+=======
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+
+import { ArrowLeft, Send, Users, Loader2 } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,8 +26,22 @@ import { ArrowLeft, Loader2, Send } from "lucide-react"
 
 export function AdvisorAnnouncementNewPage() {
   const router = useRouter()
+<<<<<<< HEAD
   const projectsQuery = useAdvisorProjects()
   const createAnnouncementMutation = useCreateAnnouncementMutation()
+=======
+  const [formData, setFormData] = React.useState<AnnouncementFormData>({
+    title: "",
+    priority: "MEDIUM",
+    content: "",
+    selectedGroupIds: [],
+    deadline: "",
+    resourceLink: "",
+    resourceFile: null,
+    status: "published",
+  })
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 
   const [title, setTitle] = React.useState("")
   const [content, setContent] = React.useState("")

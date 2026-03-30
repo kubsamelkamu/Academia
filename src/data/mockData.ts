@@ -1,3 +1,86 @@
+export interface Complaint {
+  id: string
+  studentName: string
+  studentId: string
+  targetType: 'grade' | 'evaluation' | 'assignment' | 'defense'
+  targetName: string
+  targetId: string
+  reason: string
+  status: 'open' | 'under_review' | 'resolved' | 'rejected'
+  submittedAt: string
+  updatedAt: string
+}
+
+export interface ProjectTitle {
+  id: string
+  title: string
+  description: string
+  groupId: string
+  submittedAt: string
+  status: 'pending' | 'approved' | 'rejected'
+}
+
+export interface Evaluation {
+  id: string
+  projectId: string
+  evaluatorId: string
+  evaluatorName: string
+  status: 'pending' | 'submitted' | 'reviewed'
+  submittedAt?: string
+  score?: number
+  comments?: string
+}
+
+export const mockComplaints: Complaint[] = [
+  {
+    id: 'c1',
+    studentName: 'Alex Johnson',
+    studentId: 'u7',
+    targetType: 'grade',
+    targetName: 'Final Project Grade',
+    targetId: 'g1',
+    reason: 'I believe the grading criteria was not applied consistently compared to other groups. My group completed all required deliverables but received lower marks in innovation category.',
+    status: 'open',
+    submittedAt: '2024-01-15T10:30:00Z',
+    updatedAt: '2024-01-15T10:30:00Z',
+  },
+  {
+    id: 'c2',
+    studentName: 'Maria Garcia',
+    studentId: 'u8',
+    targetType: 'evaluation',
+    targetName: 'Midterm Evaluation',
+    targetId: 'e1',
+    reason: 'The evaluator feedback contradicts the rubric scores given. Technical implementation was marked low despite positive comments about code quality.',
+    status: 'under_review',
+    submittedAt: '2024-01-12T14:20:00Z',
+    updatedAt: '2024-01-14T09:15:00Z',
+  },
+  {
+    id: 'c3',
+    studentName: 'David Kim',
+    studentId: 's2',
+    targetType: 'defense',
+    targetName: 'Defense Schedule',
+    targetId: 'd1',
+    reason: 'Defense time conflicts with another scheduled exam. Requesting rescheduling to accommodate both academic commitments.',
+    status: 'resolved',
+    submittedAt: '2024-01-10T16:45:00Z',
+    updatedAt: '2024-01-11T11:30:00Z',
+  },
+  {
+    id: 'c4',
+    studentName: 'Samuel Lee',
+    studentId: 'u10',
+    targetType: 'assignment',
+    targetName: 'Advisor Assignment',
+    targetId: 'p2',
+    reason: 'Current advisor has conflict of interest as they supervised competing group last semester. Request different advisor assignment.',
+    status: 'open',
+    submittedAt: '2024-01-08T09:15:00Z',
+    updatedAt: '2024-01-08T09:15:00Z',
+  },
+]
 export type UserRoleMock =
   | "department_admin"
   | "project_coordinator"
@@ -26,6 +109,9 @@ export interface Grade {
   status: "provisional" | "final" | "rejected"
   type: "project" | "internship"
   updatedAt: string
+  evaluatorScores?: number[]
+  advisorScore?: number
+  documentationScore?: number
 }
 
 export type InternshipGrade = Grade
@@ -67,7 +153,14 @@ export interface ProjectSummary {
   title: string
   status: string
   advisorName: string
+  groupName?: string
+  advisorId?: string
+  evaluatorIds?: string[]
+  progress?: number
 }
+
+// Alias ProjectSummary as Project for backward compatibility
+export type Project = ProjectSummary
 
 export function formatDate(isoDate: string): string {
   const date = new Date(isoDate)
@@ -159,20 +252,42 @@ export const mockProjects: ProjectSummary[] = [
   {
     id: "p1",
     title: "AI‑Driven Academic Assistant",
-    status: "active",
+    status: "in_progress",
     advisorName: "Prof. Lisa Anderson",
+    groupName: "AI Research Group",
+    advisorId: "u5",
+    evaluatorIds: ["u6", "u7", "u8"],
+    progress: 75,
   },
   {
     id: "p2",
     title: "Real‑Time Campus Analytics",
-    status: "active",
+    status: "in_progress",
     advisorName: "Dr. Michael Brown",
+    groupName: "Data Analytics Team",
+    advisorId: "u2",
+    evaluatorIds: ["u6", "u9"],
+    progress: 60,
   },
   {
     id: "p3",
     title: "Secure Research Data Platform",
-    status: "active",
+    status: "in_progress",
     advisorName: "Prof. Emily Davis",
+    groupName: "Security Systems",
+    advisorId: "u3",
+    evaluatorIds: ["u6", "u10"],
+    progress: 45,
+  },
+  {
+    id: "p4",
+    title: "Smart Campus Navigation",
+    status: "completed",
+    advisorName: "Dr. Robert Taylor",
+    groupName: "Mobile Dev Team",
+    advisorId: "u4",
+    evaluatorIds: ["u6", "u11"],
+    progress: 100,
   },
 ]
 
@@ -206,9 +321,65 @@ export const mockGrades: Grade[] = [
   },
 ]
 
-export const mockInternshipGrades: InternshipGrade[] = mockGrades.filter(
-  (g) => g.type === "internship",
-)
+export const mockProjectTitles: ProjectTitle[] = [
+  {
+    id: "t1",
+    title: "AI-Based Student Experience Analyzer",
+    description: "Title proposal for a predictive student engagement system using NLP and behavior streams.",
+    groupId: "g1",
+    submittedAt: "2025-03-10",
+    status: "pending",
+  },
+  {
+    id: "t2",
+    title: "Campus Energy Monitoring Dashboard",
+    description: "A real-time dashboard to visualize campus energy consumption and drive sustainability.",
+    groupId: "g2",
+    submittedAt: "2025-03-09",
+    status: "approved",
+  },
+  {
+    id: "t3",
+    title: "Secure Research Discussion Portal",
+    description: "A collaborative platform for research teams with secure access controls and versioning.",
+    groupId: "g3",
+    submittedAt: "2025-03-08",
+    status: "rejected",
+  },
+]
+
+export const mockEvaluations: Evaluation[] = [
+  {
+    id: "e1",
+    projectId: "p1",
+    evaluatorId: "u6",
+    evaluatorName: "Dr. David Martinez",
+    status: "pending",
+    submittedAt: undefined,
+    score: undefined,
+    comments: undefined,
+  },
+  {
+    id: "e2",
+    projectId: "p2",
+    evaluatorId: "u6",
+    evaluatorName: "Dr. David Martinez",
+    status: "submitted",
+    submittedAt: "2024-01-15T10:00:00Z",
+    score: 85,
+    comments: "Good technical implementation with room for improvement in documentation.",
+  },
+  {
+    id: "e3",
+    projectId: "p3",
+    evaluatorId: "u9",
+    evaluatorName: "Prof. Anna Williams",
+    status: "reviewed",
+    submittedAt: "2024-01-12T14:00:00Z",
+    score: 78,
+    comments: "Solid foundation but needs more security features.",
+  },
+]
 
 export const mockGroupManagerApplications: GroupManagerApplication[] = [
   {

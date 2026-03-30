@@ -28,6 +28,7 @@ function formatTime(timestamp: string) {
   })
 }
 
+<<<<<<< HEAD
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -36,6 +37,139 @@ function getInitials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+=======
+function AdvisorCreateGroupForm() {
+  const [formData, setFormData] = React.useState({
+    name: "",
+    description: "",
+    projectId: "",
+    privacy: "private" as "private" | "project",
+  })
+  const [selectedMembers, setSelectedMembers] = React.useState<string[]>([])
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [isCreating] = React.useState(false)
+
+  const mockProjects = [
+    { id: "1", name: "Smart Campus System", group: "Team Alpha" },
+    { id: "2", name: "AI Chatbot", group: "Team Beta" },
+    { id: "3", name: "E-Learning Platform", group: "Team Gamma" },
+  ]
+
+  const mockStudents = [
+    { id: "1", name: "John Doe", project: "Smart Campus System" },
+    { id: "2", name: "Jane Smith", project: "Smart Campus System" },
+    { id: "3", name: "Mike Johnson", project: "AI Chatbot" },
+  ]
+
+  const selectedProject = mockProjects.find((p) => p.id === formData.projectId)
+
+  const filteredStudents = mockStudents.filter((student) => {
+    const matchesProject = selectedProject ? student.project === selectedProject.name : true
+    const lower = searchTerm.toLowerCase()
+    return matchesProject && student.name.toLowerCase().includes(lower)
+  })
+
+  const handleInputChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleMemberToggle = (memberId: string) => {
+    setSelectedMembers((prev) =>
+      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
+    )
+  }
+
+  const handleSelectAll = () => {
+    setSelectedMembers(filteredStudents.map((s) => s.id))
+  }
+
+  const handleCreate = () => {
+    if (!formData.name || !formData.projectId || selectedMembers.length === 0) {
+      toast.error("Incomplete")
+      return
+    }
+    toast.success("Group created!")
+  }
+
+  return (
+    <div className="space-y-6 p-1">
+
+      <DialogHeader>
+        <DialogTitle>Create New Group</DialogTitle>
+      </DialogHeader>
+      
+      {/* Fields */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label>Group Name *</Label>
+            <Input value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Project *</Label>
+            <Select value={formData.projectId} onValueChange={(v) => handleInputChange("projectId", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {mockProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Privacy</Label>
+            <Select value={formData.privacy} onValueChange={(v) => handleInputChange("privacy", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="project">Project Members</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea 
+              value={formData.description} 
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              rows={3} 
+            />
+          </div>
+
+          {/* Students */}
+          <div className="space-y-2">
+            <Label>Members ({selectedMembers.length})</Label>
+            <div className="flex gap-2 mb-2">
+              <Button size="sm" variant="outline" onClick={handleSelectAll}>Select All</Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>Clear</Button>
+            </div>
+            <div className="border p-3 rounded-md max-h-32 overflow-auto">
+              <Input placeholder="Search students..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
+              <div className="space-y-2">
+                {filteredStudents.map((student) => (
+                  <div key={student.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                    <Checkbox 
+                      checked={selectedMembers.includes(student.id)}
+                      onCheckedChange={() => handleMemberToggle(student.id)}
+                    />
+                    <span className="text-sm">{student.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">({student.project})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+      <Button onClick={handleCreate} className="w-full" disabled={isCreating}>
+        Create Group
+      </Button>
+    </div>
+  )
+>>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 }
 
 export function AdvisorMessagesPage() {
