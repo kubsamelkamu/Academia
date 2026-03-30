@@ -1,10 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, CheckCircle2, ClipboardList, FolderKanban, GraduationCap } from "lucide-react"
+import { useMemo, useState } from "react"
 
 type FocusFilter = "All" | "Feedback" | "Review"
 
@@ -22,7 +22,7 @@ const followups: FollowupItem[] = [
   { id: "f3", team: "Team Orion", task: "Final chapter comments", focus: "Feedback", due: "Due Mon" },
 ]
 
-function AdvisorSummaryWidget() {
+function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, unknown>; stats?: any }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card>
@@ -31,7 +31,7 @@ function AdvisorSummaryWidget() {
           <FolderKanban className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">8</p>
+          <p className="text-2xl font-bold">{stats?.totalAssignedStudents ?? stats?.activeProjects ?? 0}</p>
           <p className="text-xs text-muted-foreground">Current department cycle</p>
         </CardContent>
       </Card>
@@ -42,7 +42,7 @@ function AdvisorSummaryWidget() {
           <GraduationCap className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">27</p>
+          <p className="text-2xl font-bold">{stats?.studentsCount ?? 0}</p>
           <p className="text-xs text-muted-foreground">Across project teams</p>
         </CardContent>
       </Card>
@@ -53,7 +53,7 @@ function AdvisorSummaryWidget() {
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">4</p>
+          <p className="text-2xl font-bold">{stats?.pendingReviews ?? 0}</p>
           <p className="text-xs text-muted-foreground">Need completion this week</p>
         </CardContent>
       </Card>
@@ -64,7 +64,7 @@ function AdvisorSummaryWidget() {
           <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">82%</p>
+          <p className="text-2xl font-bold">{stats?.completionRate ?? "--"}</p>
           <p className="text-xs text-muted-foreground">On-time response rate</p>
         </CardContent>
       </Card>
@@ -104,7 +104,7 @@ function AdvisorFollowupsWidget() {
             <div key={item.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium">
-                  {item.team} • {item.task}
+                  {item.team} â€¢ {item.task}
                 </p>
                 <Badge variant={item.focus === "Feedback" ? "secondary" : "outline"}>{item.focus}</Badge>
               </div>
@@ -136,7 +136,7 @@ function AdvisorScheduleWidget() {
             </div>
           </div>
           <div className="rounded-lg border p-3">
-            <p className="text-sm font-medium">Team Orion • Draft walkthrough</p>
+            <p className="text-sm font-medium">Team Orion â€¢ Draft walkthrough</p>
             <div className="mt-2 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Mon, 9:30 AM</span>
