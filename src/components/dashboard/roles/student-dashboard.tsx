@@ -15,7 +15,6 @@ import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-studen
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
-import { useProject } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
 import type { ProjectProposal } from "@/types/project-proposals"
 import {
@@ -279,11 +278,6 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     )
   }, [projectsData?.items])
 
-  const projectDetailsQuery = useProject(
-    activeProject?.id ?? null,
-    Boolean(accessToken) && Boolean(activeProject?.id)
-  )
-
   const { data: milestonesData } = useProjectMilestones({
     projectId: activeProject?.id,
     enabled: Boolean(activeProject?.id),
@@ -415,40 +409,18 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const nextMilestone = useMemo(() => {
     const items = backendMilestones
     if (!items.length) return null
-
-    const sorted = items.slice().sort((a, b) => {
-      const aSeq = typeof a.sequence === "number" ? a.sequence : Number.POSITIVE_INFINITY
-      const bSeq = typeof b.sequence === "number" ? b.sequence : Number.POSITIVE_INFINITY
-      if (aSeq !== bSeq) return aSeq - bSeq
-
-      const aDue = Date.parse(a.dueDate ?? "")
-      const bDue = Date.parse(b.dueDate ?? "")
-      const aDueMs = Number.isFinite(aDue) ? aDue : Number.POSITIVE_INFINITY
-      const bDueMs = Number.isFinite(bDue) ? bDue : Number.POSITIVE_INFINITY
-      if (aDueMs !== bDueMs) return aDueMs - bDueMs
-
-      return a.name.localeCompare(b.name)
-    })
-
     return (
-      sorted.find((milestone) => milestone.status === "rejected") ??
-      sorted.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
-      sorted[sorted.length - 1] ??
+      items.find((milestone) => milestone.status === "rejected") ??
+      items.find((milestone) => milestone.status === "pending" || milestone.status === "submitted") ??
+      items[items.length - 1] ??
       null
     )
   }, [backendMilestones])
 
   const myUserId = user?.id ? String(user.id) : null
   const myGroup = myProjectGroupQuery.data ?? null
-  const groupDisplayName = myGroup?.name?.trim() || ""
-  const projectTitle = activeProject?.title?.trim() || "My Project"
+  const projectDisplayName = myGroup?.name?.trim() || activeProject?.title?.trim() || "My Project"
   const projectStatusLabel = activeProject ? formatProjectStatusLabel(activeProject.status) : "No Project"
-
-  const advisorProfile = projectDetailsQuery.data?.advisor ?? null
-  const advisorDisplayName = advisorProfile
-    ? `${advisorProfile.firstName ?? ""} ${advisorProfile.lastName ?? ""}`.trim() || advisorProfile.email || ""
-    : ""
-  const advisorEmail = advisorProfile?.email ?? ""
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
     const nowMs = Date.now()
@@ -659,7 +631,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               {projectStatusLabel}
             </p>
             <p className="mt-1 text-xs text-muted-foreground truncate">
-              {projectTitle}
+              {projectDisplayName}
             </p>
           </CardContent>
         </Card>
@@ -711,18 +683,10 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg font-semibold">
-                {projectTitle}
+                {projectDisplayName}
               </CardTitle>
               <CardDescription>
-                {groupDisplayName ? (
-                  <span>
-                    Group: <span className="font-medium">{groupDisplayName}</span>
-                  </span>
-                ) : (
-                  <span>
-                    Advisor: <span className="font-medium">—</span>
-                  </span>
-                )}
+                Advisor: <span className="font-medium">—</span>
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -735,57 +699,6 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <p className="text-xs font-medium text-muted-foreground">Advisor</p>
-              {projectDetailsQuery.isLoading ? (
-                <p className="mt-1 text-sm text-muted-foreground">Loading advisor…</p>
-              ) : projectDetailsQuery.isError ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Unable to load advisor details.
-                </p>
-              ) : advisorProfile ? (
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar className="h-10 w-10">
-                      {advisorProfile.avatarUrl ? (
-                        <AvatarImage
-                          src={advisorProfile.avatarUrl}
-                          alt={advisorDisplayName || advisorEmail || "Advisor"}
-                        />
-                      ) : null}
-                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                        {(advisorDisplayName || advisorEmail || "A").charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">
-                        {advisorDisplayName || "Advisor"}
-                      </p>
-                      {advisorEmail ? (
-                        <a
-                          href={`mailto:${advisorEmail}`}
-                          className="text-xs text-muted-foreground hover:underline underline-offset-4 transition-colors"
-                        >
-                          {advisorEmail}
-                        </a>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Email not available</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {advisorEmail ? (
-                    <Button asChild variant="outline" size="sm">
-                      <a href={`mailto:${advisorEmail}`}>Email</a>
-                    </Button>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-muted-foreground">Advisor not assigned yet.</p>
-              )}
-            </div>
-
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border bg-muted/20 p-3">
                 <p className="text-xs font-medium text-muted-foreground">Active template</p>

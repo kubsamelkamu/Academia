@@ -22,7 +22,6 @@ import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useMyGroupProjectProposals } from "@/lib/hooks/use-project-proposals"
-import { useProject } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
 import type { ProjectProposal } from "@/types/project-proposals"
 
@@ -148,6 +147,7 @@ const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
   if (normalized === "submitted") return "submitted"
+  if (normalized === "rejected") return "rejected"
   return "pending"
 }
 
@@ -386,11 +386,6 @@ export function StudentMyProjectPage() {
     )
   }, [projectsData?.items])
 
-  const projectDetailsQuery = useProject(
-    activeProject?.id ?? null,
-    Boolean(accessToken) && Boolean(activeProject?.id)
-  )
-
   const { data: projectMilestonesData } = useProjectMilestones({
     projectId: activeProject?.id,
     enabled: Boolean(activeProject?.id),
@@ -542,19 +537,8 @@ export function StudentMyProjectPage() {
       }
     }
 
-    const advisor = projectDetailsQuery.data?.advisor
-    const advisorName = advisor
-      ? `${advisor.firstName ?? ""} ${advisor.lastName ?? ""}`.trim() || advisor.email || ""
-      : ""
-    if (advisorName && advisorName !== nextProject.advisorName) {
-      nextProject = {
-        ...nextProject,
-        advisorName,
-      }
-    }
-
     return nextProject
-  }, [latestGroupProposal, mergedBackendMilestones, myGroupData?.name, projectDetailsQuery.data?.advisor, projectState])
+  }, [latestGroupProposal, mergedBackendMilestones, myGroupData?.name, projectState])
 
   const myProject = computedMyProject
 
