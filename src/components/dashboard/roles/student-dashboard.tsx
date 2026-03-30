@@ -14,6 +14,7 @@ import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-studen
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
+import { useProjectDetails } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
 import type { ProjectProposal } from "@/types/project-proposals"
 import {
@@ -127,6 +128,21 @@ function toProposalMilestoneStatus(proposals: ProjectProposal[] | null | undefin
   return "pending"
 }
 
+function getLatestProposal(proposals: ProjectProposal[] | null | undefined): ProjectProposal | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  return sorted[0] ?? null
+}
+
 function addDays(baseDate: string, daysToAdd: number): string {
   const date = new Date(baseDate)
   if (Number.isNaN(date.getTime())) return baseDate
@@ -199,6 +215,32 @@ function getMeaningfulText(value: string | null | undefined): string {
   return trimmed
 }
 
+function toDisplayName(parts: Array<string | null | undefined>): string {
+  const joined = parts.map((p) => (p ?? "").trim()).filter(Boolean).join(" ")
+  return joined
+}
+
+function formatProjectStatusLabel(status: string | null | undefined): string {
+  const normalized = String(status ?? "").trim().toLowerCase()
+  if (!normalized) return "In Progress"
+  if (normalized === "active" || normalized === "in-progress" || normalized === "in progress") {
+    return "In Progress"
+  }
+  if (normalized === "draft") return "Draft"
+  if (normalized === "submitted") return "Submitted"
+  if (normalized === "approved") return "Approved"
+  if (normalized === "rejected") return "Rejected"
+  if (normalized === "completed" || normalized === "done" || normalized === "finished") {
+    return "Completed"
+  }
+  if (normalized === "pending") return "Pending"
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 function buildEmptyDashboardData(): StudentDashboardData {
   return {
     project: {
@@ -220,14 +262,19 @@ interface StudentDashboardProps {
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
-  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
-  const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(user))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(user))
+
+  const myGroup = myProjectGroupQuery.data ?? null
 
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
 
+  const departmentIdForProjects =
+    departmentId ?? myGroup?.departmentId ?? null
+
   const { data: projectsData } = useStudentProjects({
-    departmentId,
+    departmentId: departmentIdForProjects,
     studentId,
   })
 
@@ -247,9 +294,16 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     )
   }, [projectsData?.items])
 
+  const resolvedProjectId = activeProject?.id ?? myGroup?.projectId ?? null
+
   const { data: milestonesData } = useProjectMilestones({
-    projectId: activeProject?.id,
-    enabled: Boolean(activeProject?.id),
+    projectId: resolvedProjectId,
+    enabled: Boolean(resolvedProjectId),
+  })
+
+  const projectDetailsQuery = useProjectDetails({
+    projectId: resolvedProjectId,
+    enabled: Boolean(resolvedProjectId),
   })
 
   const departmentAnnouncementsQuery = useDepartmentAnnouncements({
@@ -382,8 +436,38 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   }, [backendMilestones])
 
   const myUserId = user?.id ? String(user.id) : null
-  const myGroup = myProjectGroupQuery.data ?? null
-  const projectDisplayName = myGroup?.name?.trim() || activeProject?.title?.trim() || "My Project"
+  const projectDisplayName =
+    projectDetailsQuery.data?.title?.trim() ||
+    activeProject?.title?.trim() ||
+    myGroup?.name?.trim() ||
+    "My Project"
+
+  const advisorDisplayName = useMemo(() => {
+    const advisor = projectDetailsQuery.data?.advisor
+    if (advisor) {
+      const fullName = toDisplayName([advisor.firstName, advisor.lastName])
+      return fullName || advisor.email?.trim() || "—"
+    }
+
+    const latestProposal = getLatestProposal(myGroupProposalsQuery.data)
+    const proposalAdvisor = latestProposal?.advisor
+    if (!proposalAdvisor) return "—"
+
+    const proposalAdvisorName = toDisplayName([
+      proposalAdvisor.firstName,
+      proposalAdvisor.lastName,
+    ])
+    return proposalAdvisorName || proposalAdvisor.email?.trim() || "—"
+  }, [myGroupProposalsQuery.data, projectDetailsQuery.data?.advisor])
+
+  const projectStatusLabel = useMemo(() => {
+    if (!activeProject) {
+      if (myGroup?.status) return formatProjectStatusLabel(myGroup.status)
+      return "No Project"
+    }
+    const backendStatus = projectDetailsQuery.data?.status
+    return formatProjectStatusLabel(backendStatus || activeProject.status)
+  }, [activeProject, activeProject?.status, myGroup?.status, projectDetailsQuery.data?.status])
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
     const nowMs = Date.now()
@@ -600,7 +684,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold truncate">
-              {activeProject ? "In Progress" : "No Project"}
+              {projectStatusLabel}
             </p>
             <p className="mt-1 text-xs text-muted-foreground truncate">
               {projectDisplayName}
@@ -658,7 +742,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 {projectDisplayName}
               </CardTitle>
               <CardDescription>
-                Advisor: <span className="font-medium">—</span>
+                Advisor: <span className="font-medium">{advisorDisplayName}</span>
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
