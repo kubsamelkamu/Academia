@@ -259,10 +259,12 @@ interface StudentDashboardProps {
   userName?: string
 }
 
+type StudentDeadlineAnnouncement = import("@/types/department-announcements").DepartmentAnnouncementItem
+
 function StudentNextDeadlineAnnouncementBody({
   announcement,
 }: {
-  announcement: DepartmentAnnouncementItem
+  announcement: StudentDeadlineAnnouncement
 }) {
   const [elapsed, setElapsed] = useState(0)
 
