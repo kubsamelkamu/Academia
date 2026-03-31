@@ -23,6 +23,7 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
+  XCircle,
   Search,
   Download,
   AlertTriangle,
