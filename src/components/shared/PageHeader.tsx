@@ -15,7 +15,7 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className={cn("space-y-1", className)}>
-      <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+      <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent md:text-4xl">
         {title}
       </h1>
       {description && (

@@ -209,12 +209,25 @@ const formatDate = (dateString: string) => {
   })
 }
 
-const formatDateTime = (dateTimeString: string) => {
-  return new Date(dateTimeString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
+import {
+  useAdvisorProject,
+  useAdvisorProjects,
+  useClearProjectMutation,
+  useRequestRevisionMutation,
+} from "@/lib/hooks/useAdvisor"
+import { FolderOpen, Search } from "lucide-react"
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   })
 }
 
@@ -687,25 +700,32 @@ export function AdvisorMyProjectsPage() {
     setShowProjectDialog(true)
   }
 
-  const handleClearance = (project: AdvisorProject) => {
-    setSelectedProject(project)
-    setShowClearanceDialog(true)
+  async function handleRevision(projectId: string, title: string) {
+    const feedback = window.prompt(`Revision feedback for ${title}`, "")
+    if (feedback === null) return
+    if (!feedback.trim()) {
+      toast.error("Revision feedback is required.")
+      return
+    }
+    try {
+      await requestRevisionMutation.mutateAsync({
+        projectId,
+        dto: { subject: `Revision required for ${title}`, feedback: feedback.trim() },
+      })
+      toast.success(`${title}: revision requested.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to request revision")
+    }
   }
 
-  const handleMessage = (project: AdvisorProject) => {
-    toast.info(`Opening chat with ${project.groupName}`)
+  const stats = projectsQuery.data?.stats ?? {
+    totalProjects: 0,
+    activeProjects: 0,
+    clearedProjects: 0,
+    completedProjects: 0,
   }
 
-  const handleScheduleMeeting = () => {
-    setShowMeetingDialog(true)
-  }
-
-  const handleConfirmClearance = () => {
-    setShowClearanceDialog(false)
-    toast.success("Project cleared for evaluation", {
-      description: "The team has been notified.",
-    })
-  }
+  const selectedProject = projectDetailQuery.data
 
   return (
     <TooltipProvider>
@@ -747,59 +767,24 @@ export function AdvisorMyProjectsPage() {
             <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" />
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search project title, group, or description..."
                 className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    {filterStatus === 'all' ? 'All Status' : STATUS_CONFIG[filterStatus as ProjectStatus]?.label}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFilterStatus('all')}>
-                    All Status
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                    <DropdownMenuItem key={key} onClick={() => setFilterStatus(key)}>
-                      {config.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="flex border rounded-md overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Input
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              placeholder="all, active, in-progress..."
+            />
           </div>
 
           {/* Projects Grid */}
@@ -852,24 +837,39 @@ export function AdvisorMyProjectsPage() {
                 <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
                   <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">No projects found</h3>
-                <p className="text-muted-foreground mb-6">
-                  {searchQuery || filterStatus !== 'all' 
-                    ? 'Try adjusting your search or filters'
-                    : 'No projects assigned to you yet.'}
-                </p>
-                {(searchQuery || filterStatus !== 'all') && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSearchQuery('')
-                      setFilterStatus('all')
-                    }}
-                  >
-                    Clear Filters
+                <div className="grid gap-3 sm:grid-cols-2 text-sm text-muted-foreground">
+                  <p>Members: {project.members.length}</p>
+                  <p>Milestones: {project.milestones.length}</p>
+                  <p>Documents: {project.documents.length}</p>
+                  <p>Due: {formatDate(project.dueDate)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedProjectId(project.id)}>
+                    View Details
                   </Button>
-                )}
-              </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleRevision(project.id, project.title)}
+                    disabled={requestRevisionMutation.isPending}
+                  >
+                    Request Revision
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => void handleClear(project.id, project.title)}
+                    disabled={clearProjectMutation.isPending}
+                  >
+                    Clear for Evaluation
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/dashboard/advisor/documents">Documents</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/dashboard/advisor/schedule">Schedule</Link>
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           )}
 
@@ -1105,81 +1105,55 @@ export function AdvisorMyProjectsPage() {
                     ))}
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="comments">Additional Comments</Label>
-                  <Textarea id="comments" placeholder="Add any final notes..." rows={3} />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowClearanceDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleConfirmClearance}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirm Clearance
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Schedule Meeting Dialog */}
-          <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Schedule Meeting</DialogTitle>
-                <DialogDescription>
-                  Set up a new meeting with your project teams.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="meeting-title">Meeting Title</Label>
-                  <Input id="meeting-title" placeholder="e.g., Progress Review" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="project-select">Project</Label>
-                  <select 
-                    id="project-select"
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  >
-                    <option value="">Select a project</option>
-                    {advisorProjects.map(project => (
-                      <option key={project.id} value={project.id}>{project.title}</option>
+                <div>
+                  <p className="text-sm font-medium">Recent Documents</p>
+                  <div className="mt-2 space-y-2">
+                    {selectedProject.documents.map((document) => (
+                      <div key={document.id} className="rounded-lg border p-3 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{document.name}</span>
+                          <span className="text-muted-foreground">{document.size}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">Uploaded by {document.uploadedBy}</p>
+                      </div>
                     ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-date">Date</Label>
-                    <Input id="meeting-date" type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-time">Time</Label>
-                    <Input id="meeting-time" type="time" />
                   </div>
                 </div>
               </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => {
-                  setShowMeetingDialog(false)
-                  toast.success("Meeting scheduled successfully")
-                }}>
-                  Schedule Meeting
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-    </TooltipProvider>
+              <div className="space-y-4 rounded-lg border p-4">
+                <div>
+                  <p className="text-sm font-medium">Team Members</p>
+                  <div className="mt-2 space-y-2">
+                    {selectedProject.members.map((member) => (
+                      <div key={member.id} className="rounded-lg bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">{member.name}</p>
+                        <p className="text-muted-foreground">{member.email}</p>
+                        <p className="text-xs text-muted-foreground">{member.role}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {selectedProject.revisionRequests?.length ? (
+                  <div>
+                    <p className="text-sm font-medium">Revision History</p>
+                    <div className="mt-2 space-y-2">
+                      {selectedProject.revisionRequests.map((request) => (
+                        <div key={request.id} className="rounded-lg bg-muted/40 p-3 text-sm">
+                          <p className="font-medium">{request.subject}</p>
+                          <p className="mt-1 text-muted-foreground">{request.feedback}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatDate(request.createdAt)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
+
+export default AdvisorMyProjectsPage
