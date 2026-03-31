@@ -6,6 +6,9 @@ import { toast } from "sonner"
 import { useMemo, useCallback, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth-store"
+import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
+import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
+import type { ApiAdvisorProject, ApiMilestoneDetail } from "@/lib/api/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -14,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockStudentGroups } from "@/data/mockData"
+
 import {
   CheckCircle,
   Clock,
@@ -353,6 +356,49 @@ const ProjectCard = React.memo(({
 
 ProjectCard.displayName = "ProjectCard"
 
+// ── API → dashboard shape mappers ───────────────────────────────────────────
+
+const DASH_PROJECT_STATUS: Record<string, ProjectStatus> = {
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  CANCELLED: "on-hold",
+  IN_PROGRESS: "active",
+  PENDING_REVIEW: "pending-review",
+  CLEARED: "cleared",
+}
+
+const DASH_MILESTONE_STATUS: Record<string, MilestoneStatus> = {
+  APPROVED: "approved",
+  COMPLETED: "approved",
+  SUBMITTED: "submitted",
+  PENDING: "pending",
+  REJECTED: "revision",
+  IN_PROGRESS: "pending",
+}
+
+function mapDetailToMilestone(m: ApiMilestoneDetail): ProjectMilestone {
+  return {
+    id: m.id,
+    name: m.title,
+    dueDate: m.dueDate,
+    status: DASH_MILESTONE_STATUS[m.status] ?? "pending",
+    submittedAt: m.submittedAt ?? undefined,
+  }
+}
+
+function mapApiToDashboardProject(p: ApiAdvisorProject): AdvisorProject {
+  return {
+    id: p.id,
+    title: p.title,
+    groupName: p.group.name,
+    advisorId: "",
+    status: DASH_PROJECT_STATUS[p.status] ?? "active",
+    progress: p.milestones.progressPercent,
+    lastUpdated: p.startedAt,
+    milestones: (p.milestones.details ?? []).map(mapDetailToMilestone),
+  }
+}
+
 // Main component
 interface AdvisorDashboardProps {
   userName?: string
@@ -371,10 +417,14 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
   const formattedDate = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
   const formattedTime = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 
-  // Data fetching (would typically be in a useEffect)
-  const myProjects = useMemo(() => 
-    mockAdvisorProjects.filter((p) => p.advisorId === advisorId), 
-    [advisorId]
+  const { data: summaryData } = useAdvisorSummary()
+  const { data: projectsData } = useAdvisorProjects()
+
+  const myProjects = useMemo(() =>
+    projectsData
+      ? projectsData.map(mapApiToDashboardProject)
+      : mockAdvisorProjects.filter((p) => p.advisorId === advisorId),
+    [projectsData, advisorId]
   )
   
   const pendingMilestones = useMemo(() => 
@@ -387,17 +437,13 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
   )
 
   const stats = useMemo(() => {
-    const studentsCount = mockStudentGroups.flatMap((g) => g.members).length
-    const clearedCount = myProjects.filter((p) => p.status === "cleared").length
-    const activeProjects = myProjects.filter((p) => p.status === "active").length
-    
-    return {
-      studentsCount,
-      clearedCount,
-      activeProjects,
-      pendingReviews: pendingMilestones.length
-    }
-  }, [myProjects, pendingMilestones.length])
+    const activeProjects = summaryData?.metrics.projectStatusCounts.ACTIVE ?? 0
+    const totalGroups = summaryData?.metrics.totalGroupsAdvising ?? 0
+    const studentsCount = summaryData?.metrics.totalStudentsAdvising ?? 0
+    const clearedCount = summaryData?.metrics.projectStatusCounts.COMPLETED ?? 0
+
+    return { activeProjects, totalGroups, studentsCount, clearedCount }
+  }, [summaryData, projectsData])
 
   // Event handlers
   const handleApproveMilestone = useCallback((project: AdvisorProject, milestone: ProjectMilestone) => {
@@ -437,7 +483,7 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Welcome back, {displayName || "Advisor"}!</h1>
           <p className="text-muted-foreground">
-            You have {stats.activeProjects} active project{stats.activeProjects !== 1 ? 's' : ''} and {stats.pendingReviews} pending review{stats.pendingReviews !== 1 ? 's' : ''}.
+            You have {stats.activeProjects} active project{stats.activeProjects !== 1 ? 's' : ''} and {stats.totalGroups} project group{stats.totalGroups !== 1 ? 's' : ''} under your supervision.
           </p>
         </div>
 
@@ -458,10 +504,10 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
           iconClassName="bg-primary/10 text-primary"
         />
         <StatCard
-          title="Pending Reviews"
-          value={stats.pendingReviews}
-          subtitle="Milestones to review"
-          icon={Clock}
+          title="Project Groups"
+          value={stats.totalGroups}
+          subtitle="Total groups assigned"
+          icon={Users}
           iconClassName="bg-warning/10 text-warning"
         />
         <StatCard
