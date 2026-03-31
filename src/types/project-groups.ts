@@ -43,6 +43,8 @@ export interface ProjectGroupMe {
   tenantId: string
   departmentId: string
   leaderUserId: string
+  /** Some backends include the created project id once the proposal/group is approved. */
+  projectId?: string | null
   name: string
   objectives: string
   technologies: string[]
