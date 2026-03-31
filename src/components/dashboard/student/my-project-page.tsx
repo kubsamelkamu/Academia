@@ -43,7 +43,6 @@ interface ProjectData {
   advisorName: string
   progress: number
   startDate: string
-  dueDate: string
   milestones: Milestone[]
   description?: string
 }
@@ -52,6 +51,7 @@ interface ProjectData {
 // Helper Functions
 // ----------------------------------------------------------------------
 const formatDate = (dateString: string): string => {
+  if (!dateString?.trim()) return "—"
   try {
     const date = new Date(dateString)
     if (isNaN(date.getTime())) {
@@ -273,19 +273,22 @@ export function StudentMyProjectPage() {
     enabled: Boolean(resolvedProjectId),
   })
 
-  const projectStartDate = useMemo(() => {
-    const fromDetails = projectDetailsQuery.data?.createdAt?.trim() ?? ""
-    if (fromDetails) return fromDetails
+  const projectCreatedAt = useMemo(() => {
+    return projectDetailsQuery.data?.createdAt?.trim() ?? ""
+  }, [projectDetailsQuery.data?.createdAt])
+
+  const milestoneBaseDate = useMemo(() => {
+    if (projectCreatedAt) return projectCreatedAt
     if (activeTemplate?.createdAt) return activeTemplate.createdAt
     return new Date().toISOString()
-  }, [activeTemplate?.createdAt, projectDetailsQuery.data?.createdAt])
+  }, [activeTemplate?.createdAt, projectCreatedAt])
 
   const templateMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
     const activeTemplate = getActiveMilestoneTemplate(templates)
     if (!activeTemplate?.milestones?.length) return []
 
-    const baseDate = projectStartDate
+    const baseDate = milestoneBaseDate
 
     let cumulativeDays = 0
     return activeTemplate.milestones
@@ -302,7 +305,7 @@ export function StudentMyProjectPage() {
           sequence: milestone.sequence,
         }
       })
-  }, [projectStartDate, templatesData?.templates])
+  }, [milestoneBaseDate, templatesData?.templates])
 
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
     const proposalStatus = toProposalMilestoneStatus(myGroupProposalsQuery.data)
@@ -380,13 +383,6 @@ export function StudentMyProjectPage() {
       ? Math.round((completedMilestonesCount / milestones.length) * 100)
       : 0
 
-    const dueDate = milestones.length
-      ? milestones
-          .slice()
-          .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())[0]
-          .dueDate
-      : projectStartDate
-
     const backendGroupName = myGroupData?.name?.trim() ?? ""
 
     return {
@@ -401,8 +397,7 @@ export function StudentMyProjectPage() {
       status: mapProjectStatus(projectDetailsQuery.data?.status || activeProject?.status),
       advisorName,
       progress,
-      startDate: projectStartDate,
-      dueDate,
+      startDate: projectCreatedAt || milestoneBaseDate,
       milestones,
       description: projectDetailsQuery.data?.description ?? undefined,
     }
@@ -417,7 +412,8 @@ export function StudentMyProjectPage() {
     projectDetailsQuery.data?.description,
     projectDetailsQuery.data?.status,
     projectDetailsQuery.data?.title,
-    projectStartDate,
+    milestoneBaseDate,
+    projectCreatedAt,
   ])
 
   const headerTitle = myProject.title?.trim() ? myProject.title : "My Project"
@@ -458,12 +454,6 @@ export function StudentMyProjectPage() {
                     <span className="font-medium">{myProject.groupName}</span>
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      Due: <span className="font-medium">{formatDate(myProject.dueDate)}</span>
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
                     <FileText className="h-4 w-4" />
                     <span>
                       {completedMilestones}/{totalMilestones} milestones completed
@@ -493,14 +483,10 @@ export function StudentMyProjectPage() {
                 </div>
                 <Progress value={myProject.progress} className="h-3" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="p-3 bg-muted/30 rounded-lg border">
                   <p className="text-xs text-muted-foreground mb-1">Started</p>
                   <p className="font-medium text-sm">{formatDate(myProject.startDate)}</p>
-                </div>
-                <div className="p-3 bg-muted/30 rounded-lg border">
-                  <p className="text-xs text-muted-foreground mb-1">Deadline</p>
-                  <p className="font-medium text-sm">{formatDate(myProject.dueDate)}</p>
                 </div>
               </div>
             </div>
