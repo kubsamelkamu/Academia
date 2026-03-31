@@ -1,7 +1,10 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAdvisorSummary } from '@/lib/hooks/use-advisor-summary'
+import { useAdvisorProjects } from '@/lib/hooks/use-advisor-projects'
+import type { ApiAdvisorProject, ApiMilestoneDetail } from '@/lib/api/advisor'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -144,7 +147,7 @@ const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon:
   'active': { label: 'Active', color: 'blue', icon: Activity },
   'in-progress': { label: 'In Progress', color: 'indigo', icon: TrendingUp },
   'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
-  'on-hold': { label: 'On Hold', color: 'amber', icon: AlertCircle },
+  'on-hold': { label: 'Cancelled', color: 'red', icon: XCircle },
   'pending-review': { label: 'Pending Review', color: 'purple', icon: ClipboardCheck },
   'cleared': { label: 'Cleared', color: 'emerald', icon: CheckCheck }
 }
@@ -198,6 +201,83 @@ const getStatusColor = (color: string) => {
     gray: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700',
   }
   return colors[color] || colors.gray
+}
+
+// ==================== API → UI Mapper ====================
+
+const API_STATUS_MAP: Record<string, ProjectStatus> = {
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'on-hold',
+  IN_PROGRESS: 'in-progress',
+  PENDING_REVIEW: 'pending-review',
+  CLEARED: 'cleared',
+}
+
+const MILESTONE_API_STATUS_MAP: Record<string, MilestoneStatus> = {
+  APPROVED: 'approved',
+  COMPLETED: 'completed',
+  SUBMITTED: 'submitted',
+  PENDING: 'pending',
+  REJECTED: 'overdue',
+  IN_PROGRESS: 'in-progress',
+}
+
+function mapApiMilestone(m: ApiMilestoneDetail, index: number): ProjectMilestone {
+  return {
+    id: m.id,
+    name: m.title,
+    description: m.description,
+    dueDate: m.dueDate,
+    status: MILESTONE_API_STATUS_MAP[m.status] ?? 'pending',
+    completedDate: m.submittedAt ?? undefined,
+    priority: 'medium',
+    deliverables: [],
+  }
+}
+
+function mapApiProject(p: ApiAdvisorProject): AdvisorProject {
+  const allMembers: ProjectMember[] = [
+    {
+      id: p.group.leader.id,
+      name: `${p.group.leader.firstName} ${p.group.leader.lastName}`,
+      email: p.group.leader.email,
+      role: 'Team Lead',
+      avatar: p.group.leader.avatarUrl ?? undefined,
+      joinedAt: p.startedAt,
+    },
+    ...p.group.members.map((m) => ({
+      id: m.id,
+      name: `${m.firstName} ${m.lastName}`,
+      email: m.email,
+      role: 'Member',
+      avatar: m.avatarUrl ?? undefined,
+      joinedAt: p.startedAt,
+    })),
+  ]
+
+  const milestones = (p.milestones.details ?? []).map(mapApiMilestone)
+
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.group.objectives,
+    groupName: p.group.name,
+    groupId: p.group.id,
+    advisorId: '',
+    startDate: p.startedAt,
+    dueDate: p.startedAt,
+    status: API_STATUS_MAP[p.status] ?? 'active',
+    progress: p.milestones.progressPercent,
+    members: allMembers,
+    milestones,
+    documents: [],
+    meetings: [],
+    messages: [],
+    category: '',
+    tags: [],
+    technologies: p.group.technologies,
+  }
 }
 
 // ==================== Mock Data ====================
@@ -367,12 +447,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: ProjectCardProps) => {
-  const daysRemaining = getDaysRemaining(project.dueDate)
   const completedMilestones = project.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length
   const statusConfig = STATUS_CONFIG[project.status]
   const StatusIcon = statusConfig?.icon || FolderOpen
-  const isDueSoon = daysRemaining <= 14 && daysRemaining > 0
-  const isOverdue = daysRemaining < 0
 
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20">
@@ -395,11 +472,6 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
               <div className="flex items-center gap-1">
                 <Users className="h-3.5 w-3.5" />
                 <span>{project.groupName}</span>
-              </div>
-              <Separator orientation="vertical" className="h-4" />
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Due {formatDate(project.dueDate)}</span>
               </div>
             </div>
           </div>
@@ -441,7 +513,7 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
           <Progress value={project.progress} className="h-2" />
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="text-center p-2 rounded-lg bg-muted/30">
             <div className="flex items-center justify-center gap-1 text-sm font-medium">
               <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -455,17 +527,6 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
               <span>{completedMilestones}/{project.milestones.length}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">Milestones</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className={cn(
-                isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : ""
-              )}>
-                {isOverdue ? 'Overdue' : `${daysRemaining}d`}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
           </div>
         </div>
 
@@ -516,7 +577,13 @@ export function AdvisorMyProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  const advisorProjects = MOCK_PROJECTS
+  const { data: summaryData } = useAdvisorSummary()
+  const { data: rawProjects, isLoading: projectsLoading } = useAdvisorProjects()
+
+  const advisorProjects: AdvisorProject[] = useMemo(
+    () => (rawProjects ?? []).map(mapApiProject),
+    [rawProjects]
+  )
 
   const filteredProjects = useMemo(() => {
     return advisorProjects.filter(project => {
@@ -527,12 +594,23 @@ export function AdvisorMyProjectsPage() {
     })
   }, [advisorProjects, searchQuery, filterStatus])
 
-  const stats = useMemo(() => ({
-    total: advisorProjects.length,
-    active: advisorProjects.filter(p => p.status === 'active' || p.status === 'in-progress').length,
-    pendingReview: advisorProjects.filter(p => p.status === 'pending-review').length,
-    completed: advisorProjects.filter(p => p.status === 'completed' || p.status === 'cleared').length,
-  }), [advisorProjects])
+  const stats = useMemo(() => {
+    if (summaryData?.metrics) {
+      const { totalProjectsAdvising, projectStatusCounts } = summaryData.metrics
+      return {
+        total: totalProjectsAdvising,
+        active: projectStatusCounts.ACTIVE,
+        cancelled: projectStatusCounts.CANCELLED,
+        completed: projectStatusCounts.COMPLETED,
+      }
+    }
+    return {
+      total: advisorProjects.length,
+      active: advisorProjects.filter(p => p.status === 'active' || p.status === 'in-progress').length,
+      cancelled: advisorProjects.filter(p => p.status === 'on-hold').length,
+      completed: advisorProjects.filter(p => p.status === 'completed' || p.status === 'cleared').length,
+    }
+  }, [summaryData, advisorProjects])
 
   const handleViewDetails = (project: AdvisorProject) => {
     setSelectedProject(project)
@@ -584,17 +662,9 @@ export function AdvisorMyProjectsPage() {
                 Schedule Meeting
               </Button>
               
-              <Button className="gap-2 relative">
+              <Button className="gap-2">
                 <ClipboardCheck className="h-4 w-4" />
                 Review Requests
-                {stats.pendingReview > 0 && (
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-                  >
-                    {stats.pendingReview}
-                  </Badge>
-                )}
               </Button>
             </div>
           </div>
@@ -602,9 +672,9 @@ export function AdvisorMyProjectsPage() {
           {/* Stats */}
           <div className="grid gap-4 md:grid-cols-4 mb-8">
             <StatCard title="Total Projects" value={stats.total} icon={FolderOpen} color="blue" />
-            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" trend={12} />
-            <StatCard title="Pending Review" value={stats.pendingReview} icon={ClipboardCheck} color="purple" />
-            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" trend={8} />
+            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" />
+            <StatCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" />
+            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" />
           </div>
 
           {/* Filters */}
@@ -663,7 +733,35 @@ export function AdvisorMyProjectsPage() {
           </div>
 
           {/* Projects Grid */}
-          {filteredProjects.length > 0 ? (
+          {projectsLoading ? (
+            <div className={cn(
+              "grid gap-6",
+              viewMode === 'grid' ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+            )}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="border-0 bg-gradient-to-br from-background to-muted/20">
+                  <CardHeader className="pb-3">
+                    <div className="h-5 w-3/4 rounded bg-muted animate-pulse" />
+                    <div className="h-4 w-1/2 rounded bg-muted animate-pulse mt-2" />
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="h-4 w-full rounded bg-muted animate-pulse" />
+                    <div className="h-2 w-full rounded bg-muted animate-pulse" />
+                    <div className="grid grid-cols-3 gap-2">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <div key={j} className="h-12 rounded-lg bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <div key={j} className="h-9 flex-1 rounded bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredProjects.length > 0 ? (
             <div className={cn(
               "grid gap-6",
               viewMode === 'grid' ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
@@ -728,23 +826,12 @@ export function AdvisorMyProjectsPage() {
                   <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
                     <div className="space-y-6 py-4">
                       {/* Stats */}
-                      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                      <div className="grid gap-4 grid-cols-3">
                         <Card>
                           <CardContent className="pt-6 text-center">
                             <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
                             <p className="text-sm text-muted-foreground">Progress</p>
                             <Progress value={selectedProject.progress} className="mt-2 h-1.5" />
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className={cn(
-                              "text-2xl font-bold",
-                              getDaysRemaining(selectedProject.dueDate) < 0 ? "text-red-600" : ""
-                            )}>
-                              {getDaysRemaining(selectedProject.dueDate)}d
-                            </p>
-                            <p className="text-sm text-muted-foreground">Days Left</p>
                           </CardContent>
                         </Card>
                         <Card>
@@ -839,19 +926,17 @@ export function AdvisorMyProjectsPage() {
                                             {config?.label}
                                           </Badge>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                          <span className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" />
-                                            Due: {formatDate(milestone.dueDate)}
-                                          </span>
-                                          {milestone.completedDate && (
+                                        {milestone.description && (
+                                          <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                                        )}
+                                        {milestone.completedDate && (
+                                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1 text-green-600">
                                               <CheckCircle className="h-3 w-3" />
                                               Completed: {formatDate(milestone.completedDate)}
                                             </span>
-                                          )}
-                                        </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -868,34 +953,14 @@ export function AdvisorMyProjectsPage() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                               {selectedProject.members.map((member) => (
-                                <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-medium">{member.name}</p>
-                                      <p className="text-sm text-muted-foreground">{member.role}</p>
-                                      <p className="text-xs text-muted-foreground">{member.email}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <Mail className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send email</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <MessageSquare className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send message</TooltipContent>
-                                    </Tooltip>
+                                <div key={member.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarImage src={member.avatar} alt={member.name} />
+                                    <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{member.name}</p>
+                                    <p className="text-sm text-muted-foreground">{member.role}</p>
                                   </div>
                                 </div>
                               ))}
