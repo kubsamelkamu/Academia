@@ -64,6 +64,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
       advisor: "Advisor",
       student: "Student",
       department_committee: "Committee Member",
+      evaluator: "Evaluator",
     }
     return labels[role]
   }

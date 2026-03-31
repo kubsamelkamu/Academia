@@ -1,22 +1,12 @@
 "use client"
 
 import * as React from "react"
-<<<<<<< HEAD
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-=======
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-
-import { ArrowLeft, Send, Users, Loader2 } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -26,22 +16,8 @@ import { ArrowLeft, Loader2, Send } from "lucide-react"
 
 export function AdvisorAnnouncementNewPage() {
   const router = useRouter()
-<<<<<<< HEAD
   const projectsQuery = useAdvisorProjects()
   const createAnnouncementMutation = useCreateAnnouncementMutation()
-=======
-  const [formData, setFormData] = React.useState<AnnouncementFormData>({
-    title: "",
-    priority: "MEDIUM",
-    content: "",
-    selectedGroupIds: [],
-    deadline: "",
-    resourceLink: "",
-    resourceFile: null,
-    status: "published",
-  })
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 
   const [title, setTitle] = React.useState("")
   const [content, setContent] = React.useState("")
@@ -85,7 +61,7 @@ export function AdvisorAnnouncementNewPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create Announcement</h1>
-          <p className="text-sm text-muted-foreground">Publish a real advisor announcement backed by the API.</p>
+          <p className="text-sm text-muted-foreground">Publish an advisor announcement to your assigned groups.</p>
         </div>
         <Button asChild variant="outline">
           <Link href="/dashboard/advisor/announcements">
@@ -103,11 +79,19 @@ export function AdvisorAnnouncementNewPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Final review deadline" />
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Final review deadline"
+              />
             </div>
             <div className="space-y-2">
               <Label>Target Project</Label>
-              <Select value={targetProjectId || "__all__"} onValueChange={(value) => setTargetProjectId(value === "__all__" ? "" : value)}>
+              <Select
+                value={targetProjectId || "__all__"}
+                onValueChange={(value) => setTargetProjectId(value === "__all__" ? "" : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All my projects" />
                 </SelectTrigger>
@@ -126,7 +110,7 @@ export function AdvisorAnnouncementNewPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select value={priority} onValueChange={(value: "LOW" | "MEDIUM" | "HIGH" | "URGENT") => setPriority(value)}>
+              <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="LOW">Low</SelectItem>
@@ -138,7 +122,7 @@ export function AdvisorAnnouncementNewPage() {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(value: "DRAFT" | "PUBLISHED" | "ARCHIVED") => setStatus(value)}>
+              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DRAFT">Draft</SelectItem>
@@ -149,7 +133,7 @@ export function AdvisorAnnouncementNewPage() {
             </div>
             <div className="space-y-2">
               <Label>Audience</Label>
-              <Select value={audience} onValueChange={(value: "ALL" | "STUDENTS" | "ADVISORS") => setAudience(value)}>
+              <Select value={audience} onValueChange={(v) => setAudience(v as typeof audience)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All</SelectItem>
@@ -162,26 +146,47 @@ export function AdvisorAnnouncementNewPage() {
 
           <div className="space-y-2">
             <Label htmlFor="deadline">Deadline (optional)</Label>
-            <Input id="deadline" type="datetime-local" value={deadlineAt} onChange={(event) => setDeadlineAt(event.target.value)} />
+            <Input
+              id="deadline"
+              type="datetime-local"
+              value={deadlineAt}
+              onChange={(e) => setDeadlineAt(e.target.value)}
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="content">Message</Label>
-            <Textarea id="content" rows={6} value={content} onChange={(event) => setContent(event.target.value)} placeholder="Write your announcement..." />
+            <Textarea
+              id="content"
+              rows={6}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Write your announcement..."
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="file">Attachment (optional)</Label>
-            <Input id="file" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} accept=".pdf,.docx,.jpg,.jpeg,.png,.webp" />
-            {file ? <p className="text-xs text-muted-foreground">Selected: {file.name}</p> : null}
+            <Input
+              id="file"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              accept=".pdf,.docx,.jpg,.jpeg,.png,.webp"
+            />
+            {file && <p className="text-xs text-muted-foreground">Selected: {file.name}</p>}
           </div>
 
           <div className="flex justify-end gap-2">
             <Button asChild variant="outline">
               <Link href="/dashboard/advisor/announcements">Cancel</Link>
             </Button>
-            <Button onClick={handleSubmit} disabled={createAnnouncementMutation.isPending || projectsQuery.isLoading}>
-              {createAnnouncementMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            <Button
+              onClick={handleSubmit}
+              disabled={createAnnouncementMutation.isPending || projectsQuery.isLoading}
+            >
+              {createAnnouncementMutation.isPending
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Send className="mr-2 h-4 w-4" />}
               Publish Announcement
             </Button>
           </div>

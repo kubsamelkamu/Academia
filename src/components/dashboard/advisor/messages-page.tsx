@@ -28,7 +28,6 @@ function formatTime(timestamp: string) {
   })
 }
 
-<<<<<<< HEAD
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -37,139 +36,6 @@ function getInitials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase()
-=======
-function AdvisorCreateGroupForm() {
-  const [formData, setFormData] = React.useState({
-    name: "",
-    description: "",
-    projectId: "",
-    privacy: "private" as "private" | "project",
-  })
-  const [selectedMembers, setSelectedMembers] = React.useState<string[]>([])
-  const [searchTerm, setSearchTerm] = React.useState("")
-  const [isCreating] = React.useState(false)
-
-  const mockProjects = [
-    { id: "1", name: "Smart Campus System", group: "Team Alpha" },
-    { id: "2", name: "AI Chatbot", group: "Team Beta" },
-    { id: "3", name: "E-Learning Platform", group: "Team Gamma" },
-  ]
-
-  const mockStudents = [
-    { id: "1", name: "John Doe", project: "Smart Campus System" },
-    { id: "2", name: "Jane Smith", project: "Smart Campus System" },
-    { id: "3", name: "Mike Johnson", project: "AI Chatbot" },
-  ]
-
-  const selectedProject = mockProjects.find((p) => p.id === formData.projectId)
-
-  const filteredStudents = mockStudents.filter((student) => {
-    const matchesProject = selectedProject ? student.project === selectedProject.name : true
-    const lower = searchTerm.toLowerCase()
-    return matchesProject && student.name.toLowerCase().includes(lower)
-  })
-
-  const handleInputChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleMemberToggle = (memberId: string) => {
-    setSelectedMembers((prev) =>
-      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
-    )
-  }
-
-  const handleSelectAll = () => {
-    setSelectedMembers(filteredStudents.map((s) => s.id))
-  }
-
-  const handleCreate = () => {
-    if (!formData.name || !formData.projectId || selectedMembers.length === 0) {
-      toast.error("Incomplete")
-      return
-    }
-    toast.success("Group created!")
-  }
-
-  return (
-    <div className="space-y-6 p-1">
-
-      <DialogHeader>
-        <DialogTitle>Create New Group</DialogTitle>
-      </DialogHeader>
-      
-      {/* Fields */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Label>Group Name *</Label>
-            <Input value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Project *</Label>
-            <Select value={formData.projectId} onValueChange={(v) => handleInputChange("projectId", v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {mockProjects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Privacy</Label>
-            <Select value={formData.privacy} onValueChange={(v) => handleInputChange("privacy", v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="project">Project Members</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea 
-              value={formData.description} 
-              onChange={(e) => handleInputChange("description", e.target.value)}
-              rows={3} 
-            />
-          </div>
-
-          {/* Students */}
-          <div className="space-y-2">
-            <Label>Members ({selectedMembers.length})</Label>
-            <div className="flex gap-2 mb-2">
-              <Button size="sm" variant="outline" onClick={handleSelectAll}>Select All</Button>
-              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>Clear</Button>
-            </div>
-            <div className="border p-3 rounded-md max-h-32 overflow-auto">
-              <Input placeholder="Search students..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="mb-2" />
-              <div className="space-y-2">
-                {filteredStudents.map((student) => (
-                  <div key={student.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
-                    <Checkbox 
-                      checked={selectedMembers.includes(student.id)}
-                      onCheckedChange={() => handleMemberToggle(student.id)}
-                    />
-                    <span className="text-sm">{student.name}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">({student.project})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-      <Button onClick={handleCreate} className="w-full" disabled={isCreating}>
-        Create Group
-      </Button>
-    </div>
-  )
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 }
 
 export function AdvisorMessagesPage() {
@@ -195,7 +61,9 @@ export function AdvisorMessagesPage() {
   const effectiveSelectedGroupId = selectedGroupId || groups[0]?.id || ""
   const groupMessagesQuery = useAdvisorGroupMessages(effectiveSelectedGroupId || undefined)
   const selectedGroup =
-    groupMessagesQuery.data?.group ?? groups.find((group) => group.id === effectiveSelectedGroupId) ?? null
+    groupMessagesQuery.data?.group ??
+    groups.find((group) => group.id === effectiveSelectedGroupId) ??
+    null
   const messages = groupMessagesQuery.data?.items ?? []
 
   const sendGroupMessageMutation = useSendGroupMessageMutation()
@@ -209,7 +77,6 @@ export function AdvisorMessagesPage() {
       toast.error("Message is required.")
       return
     }
-
     try {
       await sendGroupMessageMutation.mutateAsync({
         groupId: effectiveSelectedGroupId,
@@ -238,6 +105,7 @@ export function AdvisorMessagesPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+        {/* Group list */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Groups</CardTitle>
@@ -245,7 +113,7 @@ export function AdvisorMessagesPage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search groups..."
                 className="pl-9"
               />
@@ -255,7 +123,7 @@ export function AdvisorMessagesPage() {
             <ScrollArea className="h-[560px]">
               <div className="space-y-2 p-4">
                 {groupsQuery.isLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading groups...</p>
+                  <p className="text-sm text-muted-foreground">Loading groups…</p>
                 ) : groups.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-6 text-center">
                     <MessageSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -281,14 +149,15 @@ export function AdvisorMessagesPage() {
                           <p className="font-medium">{group.name}</p>
                           <p className="text-sm text-muted-foreground">{group.project}</p>
                         </div>
-                        {group.lastMessage.unread ? <Badge>New</Badge> : null}
+                        {group.lastMessage.unread && <Badge>New</Badge>}
                       </div>
                       <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                         <span>{group.members.length} members</span>
                         <span>{formatTime(group.lastMessage.timestamp)}</span>
                       </div>
                       <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{group.lastMessage.sender}:</span> {group.lastMessage.content}
+                        <span className="font-medium text-foreground">{group.lastMessage.sender}:</span>{" "}
+                        {group.lastMessage.content}
                       </p>
                     </button>
                   ))
@@ -298,6 +167,7 @@ export function AdvisorMessagesPage() {
           </CardContent>
         </Card>
 
+        {/* Chat panel */}
         <Card>
           <CardHeader>
             {selectedGroup ? (
@@ -311,7 +181,10 @@ export function AdvisorMessagesPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {selectedGroup.members.map((member) => (
-                    <div key={member.id} className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs">
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs"
+                    >
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={member.avatar} alt={member.name} />
                         <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
@@ -333,23 +206,34 @@ export function AdvisorMessagesPage() {
             <ScrollArea className="h-[420px] rounded-lg border p-4">
               <div className="space-y-3">
                 {groupMessagesQuery.isLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading messages...</p>
+                  <p className="text-sm text-muted-foreground">Loading messages…</p>
                 ) : !selectedGroup ? (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
                     <p className="font-medium">Choose a group</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Your advisor conversations will appear here.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Your advisor conversations will appear here.
+                    </p>
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <MessageSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
                     <p className="font-medium">No messages yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Send the first message to kick off the conversation.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Send the first message to kick off the conversation.
+                    </p>
                   </div>
                 ) : (
                   messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${message.isOwn ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                    <div
+                      key={message.id}
+                      className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+                          message.isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
+                        }`}
+                      >
                         <div className="mb-1 flex items-center justify-between gap-3 text-xs opacity-80">
                           <span>{message.sender}</span>
                           <span>{formatTime(message.timestamp)}</span>
@@ -358,7 +242,10 @@ export function AdvisorMessagesPage() {
                         {message.attachments?.length ? (
                           <div className="mt-3 space-y-2 border-t border-black/10 pt-2 text-xs">
                             {message.attachments.map((attachment) => (
-                              <div key={`${message.id}:${attachment.name}`} className="rounded bg-black/10 px-2 py-1">
+                              <div
+                                key={`${message.id}:${attachment.name}`}
+                                className="rounded bg-black/10 px-2 py-1"
+                              >
                                 {attachment.name}
                                 {attachment.size ? ` (${attachment.size})` : ""}
                               </div>
@@ -376,12 +263,19 @@ export function AdvisorMessagesPage() {
               <Textarea
                 rows={4}
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={selectedGroup ? `Write a message to ${selectedGroup.name}...` : "Select a group first"}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={
+                  selectedGroup
+                    ? `Write a message to ${selectedGroup.name}…`
+                    : "Select a group first"
+                }
                 disabled={!selectedGroup || sendGroupMessageMutation.isPending}
               />
               <div className="flex justify-end">
-                <Button onClick={handleSendMessage} disabled={!selectedGroup || sendGroupMessageMutation.isPending}>
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!selectedGroup || sendGroupMessageMutation.isPending}
+                >
                   {sendGroupMessageMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (

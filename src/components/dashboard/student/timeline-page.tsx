@@ -62,6 +62,7 @@ export function StudentTimelinePage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedCalendarDay(null)
   }, [calendarMonth])
 
@@ -93,6 +94,7 @@ export function StudentTimelinePage() {
 
   useEffect(() => {
     if (activeTab !== "tasks" && focusedTaskStatus) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusedTaskStatus(null)
     }
   }, [activeTab, focusedTaskStatus])

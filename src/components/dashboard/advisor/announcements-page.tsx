@@ -1,13 +1,10 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-<<<<<<< HEAD
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-=======
-import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -16,368 +13,482 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useAdvisorAnnouncements } from "@/lib/hooks/useAdvisor"
-import { Bell, Plus, Search } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import {
+  useAdvisorAnnouncements,
+  useAdvisorMessageGroups,
+  useCreateAnnouncementMutation,
+} from "@/lib/hooks/useAdvisor"
+import type { AdvisorCreateAnnouncementDto } from "@/lib/types/advisor"
+import { Bell, MoreVertical, Paperclip, Plus, Search } from "lucide-react"
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(value).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   })
 }
 
+const PRIORITY_CONFIG: Record<string, { label: string; bgClass: string; iconClass: string; badgeClass: string }> = {
+  HIGH:   { label: "High",   bgClass: "bg-red-100",    iconClass: "text-red-600",    badgeClass: "bg-red-100 text-red-800 border-red-200" },
+  URGENT: { label: "Urgent", bgClass: "bg-red-100",    iconClass: "text-red-600",    badgeClass: "bg-red-100 text-red-800 border-red-200" },
+  MEDIUM: { label: "Medium", bgClass: "bg-yellow-100", iconClass: "text-yellow-600", badgeClass: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+  LOW:    { label: "Low",    bgClass: "bg-blue-100",   iconClass: "text-blue-600",   badgeClass: "bg-blue-100 text-blue-800 border-blue-200" },
+}
+
+function getPriorityConfig(priority: string) {
+  return PRIORITY_CONFIG[priority.toUpperCase()] ?? PRIORITY_CONFIG.MEDIUM
+}
+
+// ─── main page ────────────────────────────────────────────────────────────────
+
 export function AdvisorAnnouncementsPage() {
+  const [createOpen, setCreateOpen] = React.useState(false)
   const [searchTerm, setSearchTerm] = React.useState("")
-  const [status, setStatus] = React.useState("all")
-  const [audience, setAudience] = React.useState("any")
+  const [statusFilter, setStatusFilter] = React.useState("all")
+  const [audienceFilter, setAudienceFilter] = React.useState("any")
 
   const announcementsQuery = useAdvisorAnnouncements({
-    status: status === "all" ? undefined : status,
-    audience: audience === "any" ? undefined : audience,
+    status:   statusFilter   === "all" ? undefined : statusFilter,
+    audience: audienceFilter === "any" ? undefined : audienceFilter,
   })
 
   const announcements = React.useMemo(() => {
     const items = announcementsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
     if (!term) return items
-    return items.filter((announcement) =>
-      [announcement.title, announcement.content].some((value) => value.toLowerCase().includes(term)),
+    return items.filter((a) =>
+      [a.title, a.content].some((v) => v.toLowerCase().includes(term))
     )
   }, [announcementsQuery.data?.items, searchTerm])
 
   return (
-<<<<<<< HEAD
     <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Announcements</h1>
-          <p className="text-sm text-muted-foreground">Manage advisor announcements published to your assigned groups.</p>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Bell className="h-6 w-6 text-primary" />
+            Announcements
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage announcements published to your project groups.
+          </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/advisor/announcements/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Announcement
-          </Link>
-        </Button>
-      </div>
-=======
-    <div className="space-y-6">
-      <DashboardPageHeader
-        title="Announcements"
-        description="Create and manage announcements for your project groups"
-        actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Announcement
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl w-[95vw]">
-              <AnnouncementCreateForm onClose={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
-        }
-      />
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Announcement
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl w-[95vw]">
+            <CreateAnnouncementForm onClose={() => setCreateOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px_180px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_160px]">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search announcements..." className="pl-9" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search announcements…"
+                className="pl-9"
+              />
             </div>
-            <Select value={status} onValueChange={setStatus}>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="PUBLISHED">Published</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="ARCHIVED">Archived</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={audience} onValueChange={setAudience}>
+
+            <Select value={audienceFilter} onValueChange={setAudienceFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">Any audience</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="students">Students</SelectItem>
-                <SelectItem value="advisors">Advisors</SelectItem>
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="STUDENTS">Students</SelectItem>
+                <SelectItem value="ADVISORS">Advisors</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
+      {/* List */}
       {announcementsQuery.isLoading ? (
-        <Card><CardContent className="py-12 text-center">Loading announcements...</CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            Loading announcements…
+          </CardContent>
+        </Card>
       ) : announcements.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Bell className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+              <Bell className="h-6 w-6 text-muted-foreground" />
+            </div>
             <p className="font-medium">No announcements yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">Create one to notify your students and project groups.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create one to notify your students and project groups.
+            </p>
+            <Button className="mt-4 gap-2" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Create Announcement
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {announcements.map((announcement) => (
-            <Card key={announcement.id}>
-              <CardHeader>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{announcement.title}</CardTitle>
-                    <p className="mt-1 text-sm text-muted-foreground">{announcement.content}</p>
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <p>{announcement.priority}</p>
-                    <p>{announcement.status}</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-medium text-muted-foreground">
+              {announcements.length} announcement{announcements.length !== 1 ? "s" : ""}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-0">
+            {announcements.map((announcement) => {
+              const cfg = getPriorityConfig(announcement.priority)
+              return (
+                <div
+                  key={announcement.id}
+                  className="flex items-start border-l-4 border-l-transparent hover:border-l-primary transition-all rounded-sm"
+                >
+                  <div className="flex-1 p-3">
+                    <div className="flex items-start justify-between gap-4">
+                      {/* icon + text */}
+                      <div className="flex items-start gap-3">
+                        <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${cfg.bgClass}`}>
+                          <Bell className={`h-5 w-5 ${cfg.iconClass}`} />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-sm leading-tight">
+                              {announcement.title}
+                            </span>
+                            <Badge variant="outline" className={cfg.badgeClass}>
+                              {cfg.label} priority
+                            </Badge>
+                            <Badge variant="secondary" className="uppercase tracking-wide text-xs">
+                              {announcement.status}
+                            </Badge>
+                          </div>
+
+                          <p className="text-sm text-muted-foreground leading-snug line-clamp-2">
+                            {announcement.content}
+                          </p>
+
+                          {announcement.attachmentUrl && (
+                            <a
+                              href={announcement.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4"
+                            >
+                              <Paperclip className="h-3 w-3" />
+                              {announcement.attachmentFileName ?? "Open attachment"}
+                            </a>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-0.5">
+                            <span>Audience: {announcement.audience}</span>
+                            <span>•</span>
+                            <time dateTime={announcement.createdAt}>
+                              {formatDate(announcement.createdAt)}
+                            </time>
+                            {announcement.deadlineAt && (
+                              <>
+                                <span>•</span>
+                                <span>Deadline: {formatDate(announcement.deadlineAt)}</span>
+                              </>
+                            )}
+                            {announcement.targetProjectIds.length > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{announcement.targetProjectIds.length} project{announcement.targetProjectIds.length !== 1 ? "s" : ""} targeted</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* actions */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            aria-label="Announcement actions"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => toast.info("Edit coming soon")}>
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => toast.info("Delete coming soon")}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Audience: {announcement.audience}</p>
-                <p>Created: {formatDate(announcement.createdAt)}</p>
-                {announcement.deadlineAt ? <p>Deadline: {formatDate(announcement.deadlineAt)}</p> : null}
-                {announcement.targetProjectIds.length ? <p>Targeted projects: {announcement.targetProjectIds.length}</p> : <p>Targeted projects: all</p>}
-                {announcement.attachmentUrl ? (
-                  <p>
-                    Attachment: <a href={announcement.attachmentUrl} className="text-primary underline" target="_blank" rel="noreferrer">Open attachment</a>
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              )
+            })}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
 }
 
-<<<<<<< HEAD
-export default AdvisorAnnouncementsPage
-=======
-function AnnouncementCreateForm({ onClose }: { onClose: () => void }) {
-  const [formData, setFormData] = React.useState({
-    title: '',
-    priority: 'MEDIUM' as PriorityType,
-    deadline: '',
-    content: '',
-    groups: [] as string[],
-  })
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
+// ─── create form ──────────────────────────────────────────────────────────────
 
-  const handleSubmit = () => {
-    if (!formData.title.trim() || !formData.content.trim()) {
-      toast.error('Please fill title and message')
-      return
-    }
-    setIsSubmitting(true)
-    setTimeout(() => {
-      toast.success('Announcement created!')
-      setFormData({ title: '', priority: 'MEDIUM', deadline: '', content: '', groups: [] })
-      onClose()
-      setIsSubmitting(false)
-    }, 1000)
+function CreateAnnouncementForm({ onClose }: { onClose: () => void }) {
+  const groupsQuery = useAdvisorMessageGroups()
+  const groups = groupsQuery.data?.items ?? []
+
+  const createMutation = useCreateAnnouncementMutation()
+
+  const [title, setTitle] = React.useState("")
+  const [content, setContent] = React.useState("")
+  const [priority, setPriority] = React.useState<AdvisorCreateAnnouncementDto["priority"]>("MEDIUM")
+  const [status, setStatus] = React.useState<AdvisorCreateAnnouncementDto["status"]>("DRAFT")
+  const [audience, setAudience] = React.useState<AdvisorCreateAnnouncementDto["audience"]>("ALL")
+  const [deadline, setDeadline] = React.useState("")
+  const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([])
+  const [attachmentUrl, setAttachmentUrl] = React.useState("")
+  const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null)
+
+  const toggleProject = (id: string) => {
+    setSelectedProjectIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    )
   }
 
-  const toggleGroup = (groupId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      groups: prev.groups.includes(groupId)
-        ? prev.groups.filter(g => g !== groupId)
-        : [...prev.groups, groupId],
-    }))
+  const handleSubmit = async () => {
+    if (!title.trim() || !content.trim()) {
+      toast.error("Title and message are required")
+      return
+    }
+    if (attachmentFile && attachmentUrl.trim()) {
+      toast.error("Provide either a file or a link — not both")
+      return
+    }
+
+    const dto: AdvisorCreateAnnouncementDto = {
+      title: title.trim(),
+      content: content.trim(),
+      priority,
+      status,
+      audience,
+      deadlineAt:      deadline || undefined,
+      targetProjectIds: selectedProjectIds.length > 0 ? selectedProjectIds : undefined,
+      attachmentUrl:   attachmentUrl.trim() || undefined,
+    }
+
+    try {
+      await createMutation.mutateAsync({ dto, file: attachmentFile })
+      toast.success("Announcement created!")
+      onClose()
+    } catch {
+      toast.error("Failed to create announcement")
+    }
   }
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>Create Announcement</DialogTitle>
-        <DialogDescription>Set up a new announcement for your project team.</DialogDescription>
+        <DialogDescription>
+          Post an announcement to your assigned project groups.
+        </DialogDescription>
       </DialogHeader>
+
       <div className="grid gap-4 py-2">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Title + Priority */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="ann-title">Title *</Label>
             <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              placeholder="e.g., Upcoming deadline"
+              id="ann-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Upcoming deadline"
             />
           </div>
           <div className="space-y-2">
             <Label>Priority</Label>
-            <Select value={formData.priority} onValueChange={(v) => setFormData({...formData, priority: v as PriorityType})}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Select
+              value={priority}
+              onValueChange={(v) => setPriority(v as AdvisorCreateAnnouncementDto["priority"])}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="LOW">Low</SelectItem>
                 <SelectItem value="MEDIUM">Medium</SelectItem>
                 <SelectItem value="HIGH">High</SelectItem>
+                <SelectItem value="URGENT">Urgent</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="deadline">Deadline</Label>
-          <Input
-            id="deadline"
-            type="date"
-            value={formData.deadline}
-            onChange={(e) => setFormData({...formData, deadline: e.target.value})}
-            min={new Date().toISOString().slice(0,10)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Groups ({formData.groups.length})</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {['g1', 'g2', 'g3', 'g4'].map(id => (
-              <Button
-                key={id}
-                variant={formData.groups.includes(id) ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => toggleGroup(id)}
-              >
-                Group {id.slice(1)}
-              </Button>
-            ))}
+        {/* Status + Audience */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select
+              value={status}
+              onValueChange={(v) => setStatus(v as AdvisorCreateAnnouncementDto["status"])}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="PUBLISHED">Published</SelectItem>
+                <SelectItem value="ARCHIVED">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Audience</Label>
+            <Select
+              value={audience}
+              onValueChange={(v) => setAudience(v as AdvisorCreateAnnouncementDto["audience"])}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="STUDENTS">Students</SelectItem>
+                <SelectItem value="ADVISORS">Advisors</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
+        {/* Deadline */}
         <div className="space-y-2">
-          <Label>Resource (Optional)</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input 
-              placeholder="Paste link URL" 
-              className="max-w-md"
+          <Label htmlFor="ann-deadline">Deadline (optional)</Label>
+          <Input
+            id="ann-deadline"
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            min={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
+
+        {/* Target groups */}
+        {groups.length > 0 && (
+          <div className="space-y-2">
+            <Label>
+              Target Groups{" "}
+              <span className="font-normal text-muted-foreground">
+                ({selectedProjectIds.length} selected — leave empty for all)
+              </span>
+            </Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {groups.map((g) => (
+                <Button
+                  key={g.id}
+                  type="button"
+                  variant={selectedProjectIds.includes(g.id) ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleProject(g.id)}
+                  className="justify-start truncate"
+                >
+                  {g.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Attachment: URL or file */}
+        <div className="space-y-2">
+          <Label>Attachment (optional)</Label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              placeholder="Paste a link URL"
+              value={attachmentUrl}
+              onChange={(e) => setAttachmentUrl(e.target.value)}
             />
-            <div className="relative">
+            <div>
               <input
                 type="file"
-                id="resource-file"
+                id="ann-file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.jpg,.png"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
               />
               <Label
-                htmlFor="resource-file"
-                className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-muted rounded-md cursor-pointer hover:border-primary transition-colors h-full w-full"
+                htmlFor="ann-file"
+                className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted text-sm hover:border-primary transition-colors px-3"
               >
-                Choose File
+                {attachmentFile ? attachmentFile.name : "Choose file"}
               </Label>
             </div>
           </div>
         </div>
 
+        {/* Message */}
         <div className="space-y-2">
-          <Label htmlFor="content">Message *</Label>
+          <Label htmlFor="ann-content">Message *</Label>
           <Textarea
-            id="content"
-            value={formData.content}
-            onChange={(e) => setFormData({...formData, content: e.target.value})}
-            rows={3}
-            placeholder="Your message..."
+            id="ann-content"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={4}
+            placeholder="Write your announcement…"
           />
         </div>
-
       </div>
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={createMutation.isPending}
+        >
           Cancel
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Announcement'}
+        <Button onClick={handleSubmit} disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Creating…" : "Create Announcement"}
         </Button>
       </div>
     </>
   )
 }
 
-function AnnouncementCard({ announcement }: AnnouncementCardProps) {
-  const priorityConfig = PRIORITY_CONFIG[announcement.priority]
-  
-  return (
-    <article 
-      className="group relative overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
-      aria-labelledby={`announcement-title-${announcement.id}`}
-    >
-      <div className="border-l-4 border-l-transparent group-hover:border-l-primary transition-colors">
-        <div className="p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 
-                  id={`announcement-title-${announcement.id}`}
-                  className="text-base font-semibold leading-tight"
-                >
-                  <Link 
-                    href={`/dashboard/advisor/announcements/${announcement.id}`}
-                    className="hover:underline focus:outline-none"
-                  >
-                    {announcement.title}
-                  </Link>
-                </h3>
-                
-                <Badge 
-                  className={getPriorityBadgeClass(announcement.priority)} 
-                  variant="outline"
-                >
-                  {priorityConfig.label}
-                </Badge>
-              </div>
-
-              <p className="text-muted-foreground text-sm">
-                <time dateTime={announcement.createdAt}>
-                  Posted: {formatAnnouncementDate(announcement.createdAt)}
-                </time>
-                {" • "}
-                <span>Audience: {getAudienceLabel(announcement.audience)}</span>
-              </p>
-
-              <p className="text-sm leading-snug line-clamp-2">
-                {announcement.content}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="uppercase tracking-wide">
-                {getStatusLabel(announcement.status)}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function EmptyAnnouncementsState() {
-  return (
-    <Card className="rounded-xl border border-border bg-background shadow-sm">
-      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        <h3 className="text-lg font-semibold">No announcements yet</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Get started by creating your first announcement.
-        </p>
-        <Button asChild className="mt-6">
-          <Link href="/dashboard/advisor/announcements/new" className="gap-2">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Create Announcement
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
+export default AdvisorAnnouncementsPage

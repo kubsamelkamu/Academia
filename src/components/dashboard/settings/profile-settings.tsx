@@ -170,7 +170,6 @@ export function ProfileSettings() {
       firstName: user?.firstName ?? "",
       lastName: user?.lastName ?? "",
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.firstName, user?.lastName])
 
   React.useEffect(() => {
@@ -219,7 +218,6 @@ export function ProfileSettings() {
       active = false
       if (previousUrl) URL.revokeObjectURL(previousUrl)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImage, croppedAreaPixels])
 
   async function handleSaveProfile(values: AccountFormValues) {
@@ -602,7 +600,6 @@ export function ProfileSettings() {
                         <div className="mt-2 flex items-center gap-3">
                           <div className="relative h-20 w-20 overflow-hidden rounded-full bg-muted">
                             {cropPreviewUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
                               <img src={cropPreviewUrl} alt="Avatar preview" className="h-full w-full object-cover" />
                             ) : (
                               <div className="h-full w-full" />

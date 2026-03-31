@@ -329,13 +329,13 @@ function AnnouncementEditForm({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(announcement.title)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setMessage(announcement.message)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setActionType(announcement.actionType)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setActionLabel(announcement.actionLabel ?? "")
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setActionUrl(announcement.actionUrl ?? "")
     setDeadlineAtLocal(toLocalInputValue(announcement.deadlineAt ?? null))
     setDeadlineError(null)

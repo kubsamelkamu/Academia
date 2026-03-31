@@ -1,18 +1,31 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
-import PageHeader from '@/components/shared/PageHeader'
-import DataTable, { Column } from '@/components/shared/DataTable'
-import StatusBadge from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
-import { Input } from '@/components/ui/input'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Calculator,
   FileCheck,
@@ -21,562 +34,970 @@ import {
   Award,
   Target,
   Clock,
-  Users
+  Users,
+  ArrowLeft,
+  Search,
+  Filter,
+  ChevronRight,
+  BarChart3,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  Star,
+  BookOpen,
+  GraduationCap,
+  SlidersHorizontal,
+  RefreshCw,
+  FileText,
+  Eye,
+  XCircle,
+  MessageSquare,
+  Calendar,
+  ClipboardCheck,
 } from 'lucide-react'
-import { mockGrades, mockProjects, Grade } from '@/data/mockData'
-import { useToast } from '@/hooks/use-toast'
+import Link from 'next/link'
+import { toast } from 'sonner'
+import { mockGrades, mockProjects, Grade, mockComplaints, type Complaint } from '@/data/mockData'
 
-interface GradeBreakdown {
-  studentName: string
-  projectTitle: string
-  evaluatorScores: number[]
-  advisorScore: number
-  documentationScore: number
-  finalScore: number
-  grade: string
-  status: 'provisional' | 'final' | 'rejected'
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+function scoreToGrade(s: number): string {
+  if (s >= 90) return 'A+'
+  if (s >= 85) return 'A'
+  if (s >= 80) return 'A-'
+  if (s >= 75) return 'B+'
+  if (s >= 70) return 'B'
+  if (s >= 65) return 'B-'
+  if (s >= 60) return 'C+'
+  if (s >= 55) return 'C'
+  if (s >= 50) return 'C-'
+  return 'F'
 }
 
-export default function GradeManagementPage() {
-  const { toast } = useToast()
-  const [localGrades, setLocalGrades] = useState<Grade[]>(mockGrades)
-  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
-  const [complaintDays, setComplaintDays] = useState('7')
-  const [activeTab, setActiveTab] = useState('overview')
-  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null)
-  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
-  const [adjustmentReason, setAdjustmentReason] = useState('')
-  const [newScore, setNewScore] = useState('')
+function gradeColor(g: string) {
+  if (['A+', 'A', 'A-'].includes(g)) return 'bg-primary/10 text-primary border-primary/20'
+  if (['B+', 'B', 'B-'].includes(g)) return 'bg-muted text-foreground border-border'
+  if (['C+', 'C', 'C-'].includes(g)) return 'bg-primary/[0.05] text-primary/70 border-primary/10'
+  return 'bg-destructive/10 text-destructive border-destructive/20'
+}
 
-  const gradeBreakdowns: GradeBreakdown[] = useMemo(() => {
-    return localGrades.map(grade => {
-      // Mock breakdown data - in real app this would come from the database
-      const evaluatorScores = grade.evaluatorScores || [35, 38, 32]
-      const advisorScore = grade.advisorScore || 28
-      const documentationScore = grade.documentationScore || 25
+function statusConfig(status: Grade['status']) {
+  switch (status) {
+    case 'provisional': return { label: 'Provisional', cls: 'bg-primary/10 text-primary border-primary/20' }
+    case 'final':       return { label: 'Final',       cls: 'bg-muted text-foreground border-border' }
+    case 'rejected':    return { label: 'Rejected',    cls: 'bg-destructive/10 text-destructive border-destructive/20' }
+  }
+}
 
-      return {
-        studentName: grade.studentName,
-        projectTitle: mockProjects.find(p => p.id === grade.studentName.toLowerCase().replace(' ', ''))?.title || 'Unknown Project',
-        evaluatorScores,
-        advisorScore,
-        documentationScore,
-        finalScore: grade.finalScore,
-        grade: grade.grade,
-        status: grade.status
-      }
-    })
-  }, [localGrades])
+/* ─── Grade Detail Sheet ──────────────────────────────────────────────── */
+function GradeSheet({
+  grade,
+  open,
+  onClose,
+  onAdjust,
+}: {
+  grade: Grade | null
+  open: boolean
+  onClose: () => void
+  onAdjust: (id: string, score: number, reason: string) => void
+}) {
+  const [newScore, setNewScore]     = useState('')
+  const [reason, setReason]         = useState('')
+  const [saving, setSaving]         = useState(false)
 
-  const handleCalculateAll = () => {
-    setLocalGrades(prevGrades =>
-      prevGrades.map(grade => {
-        // Mock calculation logic
-        const evaluatorScores = grade.evaluatorScores || [35, 38, 32]
-        const evaluatorAvg = evaluatorScores.reduce((a, b) => a + b, 0) / evaluatorScores.length
-        const advisorScore = grade.advisorScore || 28
-        const documentationScore = grade.documentationScore || 25
+  React.useEffect(() => { if (grade) { setNewScore(''); setReason('') } }, [grade?.id])
 
-        const newFinalScore = (evaluatorAvg * 0.4) + (advisorScore * 0.3) + (documentationScore * 0.3)
+  if (!grade) return null
 
-        // Convert to letter grade
-        let newGrade = 'F'
-        if (newFinalScore >= 90) newGrade = 'A+'
-        else if (newFinalScore >= 85) newGrade = 'A'
-        else if (newFinalScore >= 80) newGrade = 'A-'
-        else if (newFinalScore >= 75) newGrade = 'B+'
-        else if (newFinalScore >= 70) newGrade = 'B'
-        else if (newFinalScore >= 65) newGrade = 'B-'
-        else if (newFinalScore >= 60) newGrade = 'C+'
-        else if (newFinalScore >= 55) newGrade = 'C'
-        else if (newFinalScore >= 50) newGrade = 'C-'
+  const sc  = statusConfig(grade.status)
+  const gc  = gradeColor(grade.grade)
+  const eScores = grade.evaluatorScores ?? [35, 38, 32]
+  const aScore  = grade.advisorScore      ?? 28
+  const dScore  = grade.documentationScore ?? 25
+  const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
 
-        return {
-          ...grade,
-          finalScore: Math.round(newFinalScore * 10) / 10,
-          grade: newGrade,
-          evaluatorScores,
-          advisorScore,
-          documentationScore
-        }
-      })
-    )
+  const computed = Math.round(((eAvg * 0.4) + (aScore * 0.3) + (dScore * 0.3)) * 10) / 10
+  const project  = mockProjects.find(p => p.id === grade.studentName.toLowerCase().replace(' ', ''))
 
-    toast.success('All final scores have been recalculated and grades assigned.')
+  const handleApply = async () => {
+    const s = parseFloat(newScore)
+    if (isNaN(s) || s < 0 || s > 100) { toast.error('Enter a valid score 0–100'); return }
+    if (!reason.trim()) { toast.error('Please provide an adjustment reason'); return }
+    setSaving(true)
+    await new Promise(r => setTimeout(r, 600))
+    setSaving(false)
+    onAdjust(grade.id, s, reason)
+    toast.success('Grade Adjusted', { description: `${grade.studentName} updated to ${s}%` })
+    onClose()
   }
 
-  const handlePublishGrades = () => {
-    setLocalGrades(prevGrades =>
-      prevGrades.map(grade =>
-        grade.status === 'provisional'
-          ? { ...grade, status: 'final' as const }
-          : grade
-      )
-    )
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0 gap-0">
 
-    toast.success(`Provisional grades have been published as final. Complaint window open for ${complaintDays} days.`)
-
-    setPublishDialogOpen(false)
-  }
-
-  const handleGradeAdjustment = () => {
-    if (!selectedGrade || !newScore || !adjustmentReason) return
-
-    const score = parseFloat(newScore)
-    if (isNaN(score) || score < 0 || score > 100) {
-      toast.error('Please enter a valid score between 0 and 100.')
-      return
-    }
-
-    setLocalGrades(prevGrades =>
-      prevGrades.map(grade =>
-        grade.id === selectedGrade.id
-          ? { ...grade, finalScore: score, status: 'provisional' as const }
-          : grade
-      )
-    )
-
-    toast.success(`Grade for ${selectedGrade.studentName} has been adjusted to ${score}%.`)
-
-    setAdjustmentDialogOpen(false)
-    setSelectedGrade(null)
-    setNewScore('')
-    setAdjustmentReason('')
-  }
-
-  const handleExportGrades = () => {
-    toast('Grade report export in PDF, Word, and CSV formats has been started.')
-  }
-
-  const handleBulkImport = () => {
-    toast('Bulk grade import functionality would be implemented here.')
-  }
-
-  const gradeColumns: Column<GradeBreakdown>[] = [
-    {
-      key: 'student',
-      header: 'Student',
-      render: (g) => (
-        <div>
-          <p className="font-medium">{g.studentName}</p>
-          <p className="text-sm text-muted-foreground">{g.projectTitle}</p>
+        {/* Header */}
+        <SheetHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 shrink-0">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                {grade.studentName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="text-base truncate">{grade.studentName}</SheetTitle>
+              <SheetDescription className="text-xs capitalize">{grade.type} grade</SheetDescription>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <Badge className={`text-xs ${gc}`}>{grade.grade}</Badge>
+              <Badge variant="outline" className={`text-xs ${sc.cls}`}>{sc.label}</Badge>
+            </div>
         </div>
-      ),
-    },
-    {
-      key: 'breakdown',
-      header: 'Score Breakdown',
-      render: (g) => (
-        <div className="space-y-1 text-sm">
-          <div className="flex justify-between">
-            <span>Evaluators (40%):</span>
-            <span>{(g.evaluatorScores.reduce((a, b) => a + b, 0) / g.evaluatorScores.length).toFixed(1)}/40</span>
+        </SheetHeader>
+
+        <div className="p-6 space-y-5">
+
+          {/* Score hero */}
+          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-center">
+            <p className="text-4xl font-bold tracking-tight text-primary">{grade.finalScore}%</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Final Score</p>
+            <p className="text-xs text-muted-foreground mt-1">Last updated: {grade.updatedAt}</p>
           </div>
-          <div className="flex justify-between">
-            <span>Advisor (30%):</span>
-            <span>{g.advisorScore}/30</span>
+
+          {/* Score breakdown */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" /> Score Breakdown
+            </p>
+            {[
+              { label: 'Evaluators (40%)', value: eAvg.toFixed(1), max: 40, pct: (eAvg / 40) * 100 },
+              { label: 'Advisor (30%)',    value: aScore,           max: 30, pct: (aScore / 30) * 100 },
+              { label: 'Documentation (30%)', value: dScore,        max: 30, pct: (dScore / 30) * 100 },
+            ].map(row => (
+              <div key={row.label} className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="font-semibold">{row.value}/{row.max}</span>
+                </div>
+                <Progress value={row.pct} className="h-1.5" />
+              </div>
+            ))}
+            <div className="flex justify-between text-xs pt-1 border-t">
+              <span className="font-medium">Computed Total</span>
+              <span className="font-bold text-primary">{computed}%</span>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span>Docs (30%):</span>
-            <span>{g.documentationScore}/30</span>
+
+          {/* Evaluator scores */}
+          {eScores.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Individual Evaluator Scores
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {eScores.map((s, i) => (
+                  <div key={i} className="rounded-lg bg-muted/40 px-3 py-1.5 text-center">
+                    <p className="text-xs text-muted-foreground">Eval {i + 1}</p>
+                    <p className="text-sm font-bold">{s}/40</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {project && (
+            <>
+              <Separator />
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5" /> Project
+                </p>
+                <div className="rounded-lg bg-muted/30 px-3 py-2">
+                  <p className="text-sm font-medium">{project.title}</p>
+                  {project.groupName && <p className="text-xs text-muted-foreground">{project.groupName}</p>}
+                </div>
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Adjustment form */}
+          {grade.status !== 'final' ? (
+            <div className="space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <SlidersHorizontal className="h-3.5 w-3.5" /> Manual Adjustment
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">New Score (0–100)</Label>
+                <Input
+                  type="number"
+                  placeholder={`Current: ${grade.finalScore}`}
+                  value={newScore}
+                  onChange={e => setNewScore(e.target.value)}
+                  min={0} max={100} step={0.1}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reason for Adjustment</Label>
+                <Textarea
+                  placeholder="Explain the reason…"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="resize-none text-sm min-h-[80px]"
+                />
+              </div>
+              <Button
+                className="w-full gap-2 text-sm"
+                disabled={saving || !newScore || !reason.trim()}
+                onClick={handleApply}
+              >
+                {saving
+                  ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  : <SlidersHorizontal className="h-4 w-4" />
+                }
+                Apply Adjustment
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-muted/40 border border-border px-4 py-3 text-sm text-muted-foreground text-center">
+              This grade is <span className="font-semibold text-foreground">finalised</span> and cannot be adjusted.
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/* ─── Grade Card ──────────────────────────────────────────────────────── */
+function GradeCard({
+  grade,
+  onAdjust,
+}: {
+  grade: Grade
+  onAdjust: (g: Grade) => void
+}) {
+  const gc = gradeColor(grade.grade)
+  const sc = statusConfig(grade.status)
+  const eScores = grade.evaluatorScores ?? [35, 38, 32]
+  const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
+  const aScore  = grade.advisorScore      ?? 28
+  const dScore  = grade.documentationScore ?? 25
+
+  return (
+    <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20 space-y-4">
+
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-10 w-10 shrink-0">
+            <AvatarFallback className="bg-primary/10 text-primary font-bold transition-transform group-hover:scale-110">
+              {grade.studentName.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{grade.studentName}</p>
+            <p className="text-xs text-muted-foreground capitalize">{grade.type} — {grade.updatedAt}</p>
           </div>
         </div>
-      ),
-    },
-    {
-      key: 'finalScore',
-      header: 'Final Score',
-      render: (g) => (
-        <div className="text-center">
-          <p className="text-lg font-bold text-primary">{g.finalScore}%</p>
-          <Badge className="bg-primary text-primary-foreground">{g.grade}</Badge>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className={`rounded-xl px-3 py-1 border text-center min-w-[3rem] ${gc}`}>
+            <p className="text-base font-bold leading-none">{grade.grade}</p>
+          </div>
+          <Badge variant="outline" className={`text-xs ${sc.cls}`}>{sc.label}</Badge>
         </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (g) => <StatusBadge status={g.status} />,
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (g) => (
-        <div className="flex gap-2">
+      </div>
+
+      {/* Score + bar */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">Final score</span>
+          <span className="font-bold text-primary">{grade.finalScore}%</span>
+        </div>
+        <Progress value={grade.finalScore} className="h-1.5" />
+      </div>
+
+      {/* Mini breakdown */}
+      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="rounded-lg bg-muted/40 py-1.5">
+          <p className="text-muted-foreground">Evaluators</p>
+          <p className="font-semibold">{eAvg.toFixed(0)}/40</p>
+        </div>
+        <div className="rounded-lg bg-muted/40 py-1.5">
+          <p className="text-muted-foreground">Advisor</p>
+          <p className="font-semibold">{aScore}/30</p>
+        </div>
+        <div className="rounded-lg bg-muted/40 py-1.5">
+          <p className="text-muted-foreground">Docs</p>
+          <p className="font-semibold">{dScore}/30</p>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end pt-1">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setSelectedGrade(localGrades.find(lg => lg.studentName === g.studentName) || null)
-              setAdjustmentDialogOpen(true)
-            }}
-          >
-            Adjust
-          </Button>
-        </div>
-      ),
-    },
-  ]
+          className="h-8 gap-1.5 text-xs hover:border-primary hover:text-primary"
+          onClick={() => onAdjust(grade)}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" /> Details & Adjust
+        </Button>
+      </div>
+    </div>
+  )
+}
 
-  const statsCards = [
-    {
-      title: 'Total Grades',
-      value: localGrades.length,
-      subtitle: 'Students graded',
-      icon: Users,
-      color: 'bg-primary/10 text-primary',
-    },
-    {
-      title: 'Average Score',
-      value: `${(localGrades.reduce((sum, g) => sum + g.finalScore, 0) / localGrades.length).toFixed(1)}%`,
-      subtitle: 'Class average',
-      icon: Target,
-      color: 'bg-success/10 text-success',
-    },
-    {
-      title: 'Provisional',
-      value: localGrades.filter(g => g.status === 'provisional').length,
-      subtitle: 'Awaiting finalization',
-      icon: Clock,
-      color: 'bg-warning/10 text-warning',
-    },
-    {
-      title: 'Grade Distribution',
-      value: `${localGrades.filter(g => ['A', 'A-', 'A+'].includes(g.grade)).length}`,
-      subtitle: 'A grades',
-      icon: Award,
-      color: 'bg-accent/10 text-accent',
-    },
-  ]
+/* ─── Publish Dialog ──────────────────────────────────────────────────── */
+function PublishDialog({
+  open,
+  provisionalCount,
+  onClose,
+  onPublish,
+}: {
+  open: boolean
+  provisionalCount: number
+  onClose: () => void
+  onPublish: (days: string) => void
+}) {
+  const [days, setDays]     = useState('7')
+  const [saving, setSaving] = useState(false)
+
+  const handle = async () => {
+    setSaving(true)
+    await new Promise(r => setTimeout(r, 700))
+    setSaving(false)
+    onPublish(days)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileCheck className="h-5 w-5 text-primary" /> Publish Provisional Grades
+          </DialogTitle>
+          <DialogDescription>
+            {provisionalCount} provisional grade{provisionalCount !== 1 ? 's' : ''} will be published as final.
+            Students will be notified.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Complaint Window (Days)</Label>
+            <Input
+              type="number"
+              value={days}
+              onChange={e => setDays(e.target.value)}
+              min={1} max={30}
+              className="h-9"
+            />
+            <p className="text-xs text-muted-foreground">
+              Students can file grade complaints during this period after publishing.
+            </p>
+          </div>
+          <div className="rounded-xl bg-muted/40 border px-4 py-3 space-y-1 text-sm">
+            <p className="font-medium">Before publishing, ensure:</p>
+            <ul className="space-y-1 text-muted-foreground text-xs list-disc list-inside">
+              <li>All evaluator scores have been submitted</li>
+              <li>Advisor scores are complete</li>
+              <li>Documentation scores are recorded</li>
+              <li>No pending complaint reviews remain</li>
+            </ul>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button className="flex-1 gap-2" onClick={handle} disabled={saving || !days}>
+              {saving
+                ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                : <FileCheck className="h-4 w-4" />
+              }
+              Publish Grades
+          </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ─── Page ────────────────────────────────────────────────────────────── */
+export default function GradeManagementPage() {
+  const [localGrades, setLocalGrades]         = useState<Grade[]>(mockGrades)
+  const [sheetGrade, setSheetGrade]           = useState<Grade | null>(null)
+  const [sheetOpen, setSheetOpen]             = useState(false)
+  const [publishOpen, setPublishOpen]         = useState(false)
+  const [search, setSearch]                   = useState('')
+  const [statusFilter, setStatusFilter]       = useState('all')
+  const [typeFilter, setTypeFilter]           = useState('all')
+  const [recalcLoading, setRecalcLoading]     = useState(false)
+
+  /* ── Derived ── */
+  const provisional  = localGrades.filter(g => g.status === 'provisional')
+  const finalised    = localGrades.filter(g => g.status === 'final')
+  const avgScore     = localGrades.length > 0
+    ? (localGrades.reduce((s, g) => s + g.finalScore, 0) / localGrades.length).toFixed(1)
+    : '0.0'
+  const aGrades      = localGrades.filter(g => ['A+', 'A', 'A-'].includes(g.grade)).length
+  const passRate     = localGrades.length > 0
+    ? Math.round((localGrades.filter(g => g.finalScore >= 50).length / localGrades.length) * 100)
+    : 0
+
+  const filtered = useMemo(() => {
+    return localGrades.filter(g => {
+      const q = search.toLowerCase()
+      const matchSearch = !search || g.studentName.toLowerCase().includes(q) || g.grade.toLowerCase().includes(q)
+      const matchStatus = statusFilter === 'all' || g.status === statusFilter
+      const matchType   = typeFilter   === 'all' || g.type   === typeFilter
+      return matchSearch && matchStatus && matchType
+    })
+  }, [localGrades, search, statusFilter, typeFilter])
 
   const gradeDistribution = useMemo(() => {
-    const distribution = {
-      'A+': 0, 'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0,
-      'C+': 0, 'C': 0, 'C-': 0, 'F': 0
+    const dist: Record<string, number> = {
+      'A+': 0, 'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0, 'C+': 0, 'C': 0, 'C-': 0, 'F': 0,
     }
-
-    localGrades.forEach(grade => {
-      if (distribution.hasOwnProperty(grade.grade)) {
-        distribution[grade.grade as keyof typeof distribution]++
-      }
-    })
-
-    return Object.entries(distribution).map(([grade, count]) => ({
+    localGrades.forEach(g => { if (g.grade in dist) dist[g.grade]++ })
+    return Object.entries(dist).map(([grade, count]) => ({
       grade,
       count,
-      percentage: Math.round((count / localGrades.length) * 100)
+      pct: localGrades.length > 0 ? Math.round((count / localGrades.length) * 100) : 0,
     }))
   }, [localGrades])
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Grade Management System"
-        description="Calculate, review, and publish student grades with detailed breakdowns"
-      />
+  /* ── Actions ── */
+  const handleRecalculate = async () => {
+    setRecalcLoading(true)
+    await new Promise(r => setTimeout(r, 800))
+    setLocalGrades(prev => prev.map(g => {
+      const eScores = g.evaluatorScores ?? [35, 38, 32]
+      const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
+      const aScore  = g.advisorScore      ?? 28
+      const dScore  = g.documentationScore ?? 25
+      const score   = Math.round(((eAvg * 0.4) + (aScore * 0.3) + (dScore * 0.3)) * 10) / 10
+      return { ...g, finalScore: score, grade: scoreToGrade(score) }
+    }))
+    setRecalcLoading(false)
+    toast.success('Grades Recalculated', { description: 'All final scores have been updated.' })
+  }
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statsCards.map((stat, index) => (
-          <Card key={index}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className={`h-12 w-12 rounded-xl ${stat.color} flex items-center justify-center`}>
-                  <stat.icon className="h-6 w-6" />
+  const handlePublish = (days: string) => {
+    setLocalGrades(prev => prev.map(g => g.status === 'provisional' ? { ...g, status: 'final' as const } : g))
+    toast.success('Grades Published', {
+      description: `Complaint window open for ${days} day${days !== '1' ? 's' : ''}.`,
+    })
+    setPublishOpen(false)
+  }
+
+  const handleAdjust = (id: string, score: number, _reason: string) => {
+    setLocalGrades(prev => prev.map(g =>
+      g.id === id ? { ...g, finalScore: score, grade: scoreToGrade(score), status: 'provisional' } : g
+    ))
+  }
+
+  const kpi = [
+    { label: 'Total Grades',    value: localGrades.length, icon: Users,        bg: 'bg-primary/10',     color: 'text-primary' },
+    { label: 'Class Average',   value: `${avgScore}%`,     icon: Target,       bg: 'bg-primary/[0.06]', color: 'text-primary/80' },
+    { label: 'Provisional',     value: provisional.length, icon: Clock,        bg: provisional.length > 0 ? 'bg-destructive/10' : 'bg-muted', color: provisional.length > 0 ? 'text-destructive' : 'text-muted-foreground' },
+    { label: 'A Grades',        value: aGrades,            icon: Award,        bg: 'bg-muted',          color: 'text-foreground' },
+  ]
+
+  return (
+    <div className="space-y-6 pb-8 animate-fade-in">
+
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/coordinator">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Grade Management
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Calculate, review, adjust, and publish student grades
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pl-11 sm:pl-0 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={handleRecalculate}
+            disabled={recalcLoading}
+          >
+            {recalcLoading
+              ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              : <RefreshCw className="h-4 w-4" />
+            }
+            Recalculate
+          </Button>
+          {provisional.length > 0 && (
+            <Button size="sm" className="gap-1.5" onClick={() => setPublishOpen(true)}>
+              <FileCheck className="h-4 w-4" />
+              Publish {provisional.length} Grade{provisional.length !== 1 ? 's' : ''}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpi.map(s => (
+          <Card key={s.label} className="group border-none shadow-sm transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className={`h-11 w-11 rounded-full ${s.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-sm font-medium">{stat.title}</p>
-                  <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
-                </div>
+                <p className="text-2xl font-bold tracking-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Grade Overview</TabsTrigger>
-          <TabsTrigger value="breakdown">Score Breakdown</TabsTrigger>
-          <TabsTrigger value="distribution">Grade Distribution</TabsTrigger>
-          <TabsTrigger value="actions">Bulk Actions</TabsTrigger>
+      {/* Formula banner */}
+      <div className="rounded-xl border bg-primary/5 border-primary/10 px-4 py-3 flex items-start gap-3">
+        <Calculator className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-primary">Grade Calculation Formula</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Final Score = (Evaluator Average × 40%) + (Advisor Score × 30%) + (Documentation Score × 30%)
+          </p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-10">
+          <TabsTrigger value="overview"     className="gap-2"><GraduationCap className="h-4 w-4" /> Grades</TabsTrigger>
+          <TabsTrigger value="distribution" className="gap-2"><BarChart3 className="h-4 w-4" /> Distribution</TabsTrigger>
+          <TabsTrigger value="actions"      className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Bulk Actions</TabsTrigger>
+          <TabsTrigger value="complaints"   className="gap-2 relative">
+            <AlertTriangle className="h-4 w-4" /> Complaints
+            {mockComplaints.filter(c => c.status === 'open').length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] text-destructive-foreground flex items-center justify-center font-bold">
+                {mockComplaints.filter(c => c.status === 'open').length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="font-display">Grade Management Overview</CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCalculateAll}>
-                  <Calculator className="mr-2 h-4 w-4" />
-                  Recalculate All
-                </Button>
-                <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="btn-gradient" size="sm">
-                      <FileCheck className="mr-2 h-4 w-4" />
-                      Publish Grades
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Publish Provisional Grades</DialogTitle>
-                      <DialogDescription>
-                        Set the complaint window period before publishing grades.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label>Complaint Window (Days)</Label>
+        {/* ── Grades Overview Tab ── */}
+        <TabsContent value="overview" className="space-y-4">
+          {/* Search + filters */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          type="number"
-                          value={complaintDays}
-                          onChange={(e) => setComplaintDays(e.target.value)}
-                          className="mt-1.5"
-                          min="1"
-                          max="30"
-                        />
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Students can file complaints during this period.
-                        </p>
+                placeholder="Search by student name or grade…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-10"
+              />
                       </div>
-                      <Button className="w-full btn-gradient" onClick={handlePublishGrades}>
-                        Publish Grades
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-10 w-44 shrink-0">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="provisional">Provisional</SelectItem>
+                <SelectItem value="final">Final</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-10 w-40 shrink-0">
+                <BookOpen className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="project">Project</SelectItem>
+                <SelectItem value="internship">Internship</SelectItem>
+              </SelectContent>
+            </Select>
+            {(search || statusFilter !== 'all' || typeFilter !== 'all') && (
+              <Button variant="ghost" size="sm" className="h-10 text-xs shrink-0"
+                onClick={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all') }}>
+                Clear
                       </Button>
+            )}
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 p-4 bg-info/10 rounded-lg border border-info/20">
-                <div className="flex items-start gap-3">
-                  <Calculator className="h-5 w-5 text-info mt-0.5" />
-                  <div>
-                    <p className="font-medium text-sm">Grade Calculation Formula</p>
-                    <p className="text-sm text-muted-foreground">
-                      Final Score = (Evaluator Average &times; 40%) + (Advisor Score &times; 30%) + (Documentation &times; 30%)
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <DataTable data={gradeBreakdowns} columns={gradeColumns} />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="breakdown">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display">Detailed Score Breakdown</CardTitle>
-              <CardDescription>
-                Component-wise breakdown of all grade calculations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {gradeBreakdowns.map((grade, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-medium">{grade.studentName}</h4>
-                        <p className="text-sm text-muted-foreground">{grade.projectTitle}</p>
+          {(search || statusFilter !== 'all' || typeFilter !== 'all') && (
+            <p className="text-sm text-muted-foreground">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</p>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed">
+              <GraduationCap className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="font-medium text-muted-foreground">No grades match your filters</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting the search or filters</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">{grade.finalScore}%</p>
-                        <Badge className="bg-primary text-primary-foreground">{grade.grade}</Badge>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Evaluator Scores (40%)</p>
-                        <div className="flex gap-1">
-                          {grade.evaluatorScores.map((score, i) => (
-                            <Badge key={i} variant="outline">{score}/40</Badge>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map(g => (
+                <GradeCard
+                  key={g.id}
+                  grade={g}
+                  onAdjust={grade => { setSheetGrade(grade); setSheetOpen(true) }}
+                />
                           ))}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Avg: {(grade.evaluatorScores.reduce((a, b) => a + b, 0) / grade.evaluatorScores.length).toFixed(1)}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Advisor Score (30%)</p>
-                        <Badge variant="outline">{grade.advisorScore}/30</Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Documentation (30%)</p>
-                        <Badge variant="outline">{grade.documentationScore}/30</Badge>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          )}
         </TabsContent>
 
+        {/* ── Distribution Tab ── */}
         <TabsContent value="distribution">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Grade Distribution</CardTitle>
-                <CardDescription>Visual breakdown of grade distribution</CardDescription>
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+
+            {/* Bar chart */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Grade Distribution
+                </CardTitle>
+                <CardDescription>Visual breakdown of all letter grades</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {gradeDistribution.map(({ grade, count, percentage }) => (
-                    <div key={grade} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="w-12 justify-center">{grade}</Badge>
-                        <span className="text-sm">{count} students</span>
+              <CardContent className="space-y-3">
+                {gradeDistribution.map(({ grade, count, pct }) => (
+                  <div key={grade} className="flex items-center gap-3">
+                    <Badge
+                      variant="outline"
+                      className={`w-10 shrink-0 justify-center text-xs font-bold ${gradeColor(grade)}`}
+                    >
+                      {grade}
+                    </Badge>
+                    <div className="flex-1">
+                      <Progress value={pct} className="h-2" />
                       </div>
-                      <div className="flex items-center gap-2 flex-1 ml-4">
-                        <Progress value={percentage} className="flex-1 h-2" />
-                        <span className="text-sm font-medium w-12 text-right">{percentage}%</span>
-                      </div>
+                    <div className="flex items-center gap-1.5 shrink-0 w-24 justify-end">
+                      <span className="text-xs text-muted-foreground">{count} student{count !== 1 ? 's' : ''}</span>
+                      <span className="text-xs font-bold text-primary w-9 text-right">{pct}%</span>
+                    </div>
                     </div>
                   ))}
-                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Grade Statistics</CardTitle>
-                <CardDescription>Key statistical insights</CardDescription>
+            {/* Stats */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Statistics
+                </CardTitle>
+                <CardDescription>Key grade insights</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Highest Score</span>
-                    <span className="text-sm font-bold">
-                      {Math.max(...localGrades.map(g => g.finalScore))}%
-                    </span>
+              <CardContent className="space-y-2">
+                {[
+                  { label: 'Highest Score', value: `${Math.max(...localGrades.map(g => g.finalScore))}%` },
+                  { label: 'Lowest Score',  value: `${Math.min(...localGrades.map(g => g.finalScore))}%` },
+                  {
+                    label: 'Median Score',
+                    value: (() => {
+                      const s = [...localGrades].sort((a, b) => a.finalScore - b.finalScore)
+                      const m = Math.floor(s.length / 2)
+                      return s.length % 2 === 0
+                        ? `${((s[m - 1].finalScore + s[m].finalScore) / 2).toFixed(1)}%`
+                        : `${s[m].finalScore.toFixed(1)}%`
+                    })(),
+                  },
+                  { label: 'Class Average', value: `${avgScore}%` },
+                  { label: 'Pass Rate (≥50%)', value: `${passRate}%` },
+                  { label: 'A Grades',      value: `${aGrades} / ${localGrades.length}` },
+                  { label: 'Provisional',   value: provisional.length },
+                  { label: 'Finalised',     value: finalised.length },
+                ].map(row => (
+                  <div key={row.label} className="flex justify-between items-center rounded-lg bg-muted/40 px-3 py-2.5">
+                    <span className="text-sm text-muted-foreground">{row.label}</span>
+                    <span className="font-bold text-sm">{row.value}</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Lowest Score</span>
-                    <span className="text-sm font-bold">
-                      {Math.min(...localGrades.map(g => g.finalScore))}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Median Score</span>
-                    <span className="text-sm font-bold">
-                      {(() => {
-                        const sorted = [...localGrades].sort((a, b) => a.finalScore - b.finalScore)
-                        const mid = Math.floor(sorted.length / 2)
-                        return sorted.length % 2 === 0
-                          ? ((sorted[mid - 1].finalScore + sorted[mid].finalScore) / 2).toFixed(1)
-                          : sorted[mid].finalScore.toFixed(1)
-                      })()}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Pass Rate</span>
-                    <span className="text-sm font-bold">
-                      {Math.round((localGrades.filter(g => g.finalScore >= 50).length / localGrades.length) * 100)}%
-                    </span>
-                  </div>
-                </div>
+                ))}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
+        {/* ── Bulk Actions Tab ── */}
         <TabsContent value="actions">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleCalculateAll}>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Calculator className="h-6 w-6 text-primary" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: RefreshCw,
+                title: 'Recalculate All Grades',
+                desc: 'Re-run the grade formula for all students using current component scores.',
+                cta: 'Recalculate',
+                action: handleRecalculate,
+                loading: recalcLoading,
+                disabled: recalcLoading,
+              },
+              {
+                icon: FileCheck,
+                title: 'Publish Provisional Grades',
+                desc: `Finalise ${provisional.length} provisional grade${provisional.length !== 1 ? 's' : ''} and open the student complaint window.`,
+                cta: 'Publish Grades',
+                action: () => setPublishOpen(true),
+                loading: false,
+                disabled: provisional.length === 0,
+              },
+              {
+                icon: Download,
+                title: 'Export Grade Report',
+                desc: 'Download grades in PDF, Word, or CSV format for external use.',
+                cta: 'Export',
+                action: () => toast.info('Export Started', { description: 'Grade report export initiated.' }),
+                loading: false,
+                disabled: false,
+              },
+              {
+                icon: Upload,
+                title: 'Bulk Import Grades',
+                desc: 'Import component scores from a CSV file to populate grade calculations.',
+                cta: 'Import CSV',
+                action: () => toast.info('Import', { description: 'Bulk import dialog would open here.' }),
+                loading: false,
+                disabled: false,
+              },
+              {
+                icon: Star,
+                title: 'Generate Transcripts',
+                desc: 'Generate official grade transcripts for students with finalised grades.',
+                cta: 'Generate',
+                action: () => toast.info('Transcripts', { description: 'Transcript generation initiated.' }),
+                loading: false,
+                disabled: finalised.length === 0,
+              },
+              {
+                icon: FileText,
+                title: 'Grade Appeal Summary',
+                desc: 'View all pending grade complaints linked to current grade records.',
+                cta: 'View Complaints',
+                href: '/dashboard/coordinator/complaints',
+                loading: false,
+                disabled: false,
+              },
+            ].map(item => (
+              <Card key={item.title} className="group border-none shadow-sm transition-all hover:shadow-md hover:border-primary/20">
+                <CardContent className="p-5 flex flex-col gap-4 h-full">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110">
+                      <item.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold">Recalculate All</h3>
-                    <p className="text-sm text-muted-foreground">Refresh all grade calculations</p>
+                    <p className="font-semibold text-sm">{item.title}</p>
                   </div>
-                </div>
+                  <p className="text-sm text-muted-foreground flex-1">{item.desc}</p>
+                  {'href' in item && item.href ? (
+                    <Link href={item.href}>
+                      <Button variant="outline" size="sm" className="w-full gap-1.5 hover:border-primary hover:text-primary">
+                        {item.cta} <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1.5 hover:border-primary hover:text-primary"
+                      onClick={item.action}
+                      disabled={item.disabled}
+                    >
+                      {item.loading
+                        ? <div className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                        : <item.icon className="h-3.5 w-3.5" />
+                      }
+                      {item.cta}
+                    </Button>
+                  )}
               </CardContent>
             </Card>
+            ))}
+                </div>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleExportGrades}>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
-                    <Download className="h-6 w-6 text-success" />
+          {/* Quick summary */}
+          <Card className="border-none shadow-sm mt-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Grade Readiness Checklist
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: 'Evaluator scores submitted', ok: true },
+                  { label: 'Advisor scores recorded',    ok: true },
+                  { label: 'Documentation scored',       ok: true },
+                  { label: 'No unresolved complaints',   ok: false },
+                ].map(item => (
+                  <div key={item.label} className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm border ${
+                    item.ok
+                      ? 'bg-primary/5 border-primary/10 text-foreground'
+                      : 'bg-destructive/5 border-destructive/10 text-destructive'
+                  }`}>
+                    {item.ok
+                      ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      : <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                    }
+                    {item.label}
                   </div>
-                  <div>
-                    <h3 className="font-semibold">Export Grades</h3>
-                    <p className="text-sm text-muted-foreground">Download in multiple formats</p>
-                  </div>
+                ))}
                 </div>
               </CardContent>
             </Card>
+        </TabsContent>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleBulkImport}>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                    <Upload className="h-6 w-6 text-accent" />
+        {/* ── Complaints Tab ── */}
+        <TabsContent value="complaints" className="space-y-4">
+          {/* KPI row */}
+          {(() => {
+            const total      = mockComplaints.length
+            const openC      = mockComplaints.filter(c => c.status === 'open').length
+            const reviewing  = mockComplaints.filter(c => c.status === 'under_review').length
+            const resolved   = mockComplaints.filter(c => c.status === 'resolved').length
+            const rejected   = mockComplaints.filter(c => c.status === 'rejected').length
+            const kpis = [
+              { label: 'Total',        value: total,     bg: 'bg-muted/60',           text: 'text-foreground',   icon: MessageSquare },
+              { label: 'Open',         value: openC,     bg: 'bg-destructive/10',     text: 'text-destructive',  icon: AlertTriangle },
+              { label: 'Under Review', value: reviewing, bg: 'bg-primary/10',         text: 'text-primary',      icon: Eye           },
+              { label: 'Resolved',     value: resolved,  bg: 'bg-primary/[0.06]',     text: 'text-primary/70',   icon: CheckCircle2  },
+            ]
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {kpis.map(k => (
+                  <div key={k.label} className={`rounded-xl border p-4 flex items-center gap-3 ${k.bg}`}>
+                    <k.icon className={`h-5 w-5 shrink-0 ${k.text}`} />
+                    <div>
+                      <p className={`text-2xl font-bold ${k.text}`}>{k.value}</p>
+                      <p className="text-xs text-muted-foreground">{k.label}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold">Bulk Import</h3>
-                    <p className="text-sm text-muted-foreground">Import grades from CSV</p>
-                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Compact complaints list */}
+          <Card className="border-none shadow-sm">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" /> Recent Complaints
+              </CardTitle>
+              <Link href="/dashboard/coordinator/complaints">
+                <Button size="sm" variant="outline" className="gap-1.5 hover:border-primary hover:text-primary text-xs h-8">
+                  View All <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/40">
+                {mockComplaints.slice(0, 8).map(c => {
+                  const statusCfg = {
+                    open:         { label: 'Open',         cls: 'bg-destructive/10 text-destructive border-destructive/30',   icon: AlertTriangle },
+                    under_review: { label: 'Under Review', cls: 'bg-primary/10 text-primary border-primary/30',               icon: Eye           },
+                    resolved:     { label: 'Resolved',     cls: 'bg-muted text-foreground border-border',                     icon: CheckCircle2  },
+                    rejected:     { label: 'Rejected',     cls: 'bg-muted text-muted-foreground border-border',               icon: XCircle       },
+                  }[c.status]
+                  const typeCfg = {
+                    grade:      { label: 'Grade Dispute',      cls: 'bg-primary/10 text-primary' },
+                    evaluation: { label: 'Evaluation Dispute', cls: 'bg-primary/[0.06] text-primary/80' },
+                    assignment: { label: 'Assignment',         cls: 'bg-muted text-foreground' },
+                    defense:    { label: 'Defense Dispute',    cls: 'bg-muted text-muted-foreground' },
+                  }[c.targetType]
+                  const StatusIcon = statusCfg.icon
+                  return (
+                    <div key={c.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors group">
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-xs font-bold text-muted-foreground">
+                        {c.studentName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.studentName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{c.targetName}</p>
+                      </div>
+                      <span className={`hidden sm:inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeCfg.cls}`}>
+                        {typeCfg.label}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusCfg.cls}`}>
+                        <StatusIcon className="h-2.5 w-2.5" />
+                        {statusCfg.label}
+                      </span>
+                      <Link href="/dashboard/coordinator/complaints">
+                        <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary">
+                          Review
+                        </Button>
+                      </Link>
+                    </div>
+                  )
+                })}
+              </div>
+              {mockComplaints.length > 8 && (
+                <div className="px-5 py-3 border-t border-border/40 text-center">
+                  <Link href="/dashboard/coordinator/complaints">
+                    <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary gap-1">
+                      See {mockComplaints.length - 8} more complaints <ChevronRight className="h-3 w-3" />
+                    </Button>
+                  </Link>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick actions */}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="rounded-xl border bg-destructive/5 border-destructive/20 p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold">Unresolved Complaints</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {mockComplaints.filter(c => c.status === 'open' || c.status === 'under_review').length} complaint(s) still require attention before grades can be finalised.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-xl border bg-primary/5 border-primary/10 p-4 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold">Resolution Rate</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {mockComplaints.length > 0
+                    ? Math.round(mockComplaints.filter(c => c.status === 'resolved').length / mockComplaints.length * 100)
+                    : 0}% of all complaints have been resolved.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center pt-1">
+            <Link href="/dashboard/coordinator/complaints">
+              <Button className="gap-2 px-8">
+                <AlertTriangle className="h-4 w-4" />
+                Open Full Complaints Manager
+              </Button>
+            </Link>
           </div>
         </TabsContent>
       </Tabs>
 
-      {/* Grade Adjustment Dialog */}
-      <Dialog open={adjustmentDialogOpen} onOpenChange={setAdjustmentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust Grade</DialogTitle>
-            <DialogDescription>
-              Make manual adjustments to {selectedGrade?.studentName}&apos;s grade
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="newScore">New Score (%)</Label>
-              <Input
-                id="newScore"
-                type="number"
-                placeholder="Enter new score"
-                value={newScore}
-                onChange={(e) => setNewScore(e.target.value)}
-                className="mt-1.5"
-                min="0"
-                max="100"
-                step="0.1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="reason">Reason for Adjustment</Label>
-              <Textarea
-                id="reason"
-                placeholder="Explain the reason for this grade adjustment..."
-                value={adjustmentReason}
-                onChange={(e) => setAdjustmentReason(e.target.value)}
-                className="mt-1.5"
-                rows={3}
-              />
-            </div>
-            <Button
-              className="w-full btn-gradient"
-              onClick={handleGradeAdjustment}
-              disabled={!newScore || !adjustmentReason.trim()}
-            >
-              Apply Adjustment
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Grade detail + adjustment sheet */}
+      <GradeSheet
+        grade={sheetGrade}
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onAdjust={handleAdjust}
+      />
+
+      {/* Publish dialog */}
+      <PublishDialog
+        open={publishOpen}
+        provisionalCount={provisional.length}
+        onClose={() => setPublishOpen(false)}
+        onPublish={handlePublish}
+      />
     </div>
   )
 }

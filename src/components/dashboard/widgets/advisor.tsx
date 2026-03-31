@@ -16,13 +16,28 @@ interface FollowupItem {
   due: string
 }
 
+function readNumber(stats: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = stats?.[key]
+  return typeof value === "number" ? value : undefined
+}
+
+function readText(stats: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = stats?.[key]
+  return typeof value === "string" ? value : undefined
+}
+
 const followups: FollowupItem[] = [
   { id: "f1", team: "Team Nova", task: "Methodology revision feedback", focus: "Feedback", due: "Due Thu" },
   { id: "f2", team: "Team Atlas", task: "Implementation review", focus: "Review", due: "Due Fri" },
   { id: "f3", team: "Team Orion", task: "Final chapter comments", focus: "Feedback", due: "Due Mon" },
 ]
 
-function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, unknown>; stats?: any }) {
+function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, unknown>; stats?: Record<string, unknown> }) {
+  const assignedProjects = readNumber(stats, "totalAssignedStudents") ?? readNumber(stats, "activeProjects") ?? 0
+  const activeStudents = readNumber(stats, "studentsCount") ?? 0
+  const pendingEvaluations = readNumber(stats, "pendingReviews") ?? 0
+  const completionRate = readText(stats, "completionRate") ?? "--"
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card>
@@ -31,7 +46,7 @@ function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, u
           <FolderKanban className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{stats?.totalAssignedStudents ?? stats?.activeProjects ?? 0}</p>
+          <p className="text-2xl font-bold">{assignedProjects}</p>
           <p className="text-xs text-muted-foreground">Current department cycle</p>
         </CardContent>
       </Card>
@@ -42,7 +57,7 @@ function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, u
           <GraduationCap className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{stats?.studentsCount ?? 0}</p>
+          <p className="text-2xl font-bold">{activeStudents}</p>
           <p className="text-xs text-muted-foreground">Across project teams</p>
         </CardContent>
       </Card>
@@ -53,7 +68,7 @@ function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, u
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{stats?.pendingReviews ?? 0}</p>
+          <p className="text-2xl font-bold">{pendingEvaluations}</p>
           <p className="text-xs text-muted-foreground">Need completion this week</p>
         </CardContent>
       </Card>
@@ -64,7 +79,7 @@ function AdvisorSummaryWidget({ settings, stats }: { settings?: Record<string, u
           <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{stats?.completionRate ?? "--"}</p>
+          <p className="text-2xl font-bold">{completionRate}</p>
           <p className="text-xs text-muted-foreground">On-time response rate</p>
         </CardContent>
       </Card>

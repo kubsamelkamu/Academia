@@ -3,29 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-<<<<<<< HEAD
-=======
-import Image from "next/image"
-
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Archive,
-  ArrowLeft,
-  Clock,
-  Download,
-  Eye,
-  File as FileIcon,
-  FileText,
-  Image as ImageIcon,
-  Loader2,
-  User,
-  Video as VideoIcon,
-} from "lucide-react"
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -51,7 +28,12 @@ function formatDate(value?: string) {
 }
 
 function canPreview(mimeType?: string) {
-  return Boolean(mimeType && (mimeType.startsWith("image/") || mimeType === "application/pdf" || mimeType.startsWith("video/")))
+  return Boolean(
+    mimeType &&
+      (mimeType.startsWith("image/") ||
+        mimeType === "application/pdf" ||
+        mimeType.startsWith("video/")),
+  )
 }
 
 function Preview({ fileUrl, mimeType, title }: { fileUrl: string; mimeType?: string; title: string }) {
@@ -59,7 +41,9 @@ function Preview({ fileUrl, mimeType, title }: { fileUrl: string; mimeType?: str
     return <iframe src={fileUrl} title={title} className="h-[640px] w-full rounded-lg border" />
   }
   if (mimeType?.startsWith("image/")) {
-    return <img src={fileUrl} alt={title} className="max-h-[640px] w-full rounded-lg border object-contain" />
+    return (
+      <img src={fileUrl} alt={title} className="max-h-[640px] w-full rounded-lg border object-contain" />
+    )
   }
   if (mimeType?.startsWith("video/")) {
     return (
@@ -68,46 +52,6 @@ function Preview({ fileUrl, mimeType, title }: { fileUrl: string; mimeType?: str
       </video>
     )
   }
-<<<<<<< HEAD
-=======
-
-  if (document.type === "image") {
-    return (
-      <div className="relative border rounded-lg overflow-hidden flex justify-center">
-        <Image
-          src={`/mock-images/${document.name}`}
-          alt={document.name}
-          fill
-          className="object-contain"
-        />
-      </div>
-    )
-  }
-
-  if (document.type === "video") {
-    return (
-      <div className="border rounded-lg overflow-hidden">
-        <video controls className="w-full h-[600px]">
-          <source src={`/mock-videos/${document.name}`} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    )
-  }
-
-  if (document.type === "docx" || document.type === "zip") {
-    return (
-      <Alert className="bg-muted/50">
-        <FileIcon className="h-4 w-4" />
-        <AlertDescription>
-          {document.type === "docx" ? "Word documents" : "Archive files"} can only be downloaded and viewed
-          externally. Please use the download button to access the file.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
->>>>>>> 07a2570ae68450a4a6f54472eb0a28472d2b7faa
   return (
     <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
       Preview is not available for this file type. Use the external open or download actions instead.
@@ -161,14 +105,16 @@ export function AdvisorDocumentDetailPage({ documentId }: AdvisorDocumentDetailP
   }
 
   if (documentQuery.isLoading) {
-    return <div className="py-16 text-center text-sm text-muted-foreground">Loading document...</div>
+    return <div className="py-16 text-center text-sm text-muted-foreground">Loading document…</div>
   }
 
   if (!documentQuery.data) {
     return (
       <div className="space-y-6 animate-fade-in">
         <p className="text-sm text-muted-foreground">Document not found.</p>
-        <Button asChild variant="outline"><Link href="/dashboard/advisor/documents">Back to Documents</Link></Button>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/advisor/documents">Back to Documents</Link>
+        </Button>
       </div>
     )
   }
@@ -180,7 +126,9 @@ export function AdvisorDocumentDetailPage({ documentId }: AdvisorDocumentDetailP
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{document.name}</h1>
-          <p className="text-sm text-muted-foreground">{document.project} - {document.group}</p>
+          <p className="text-sm text-muted-foreground">
+            {document.project} - {document.group}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
@@ -225,20 +173,33 @@ export function AdvisorDocumentDetailPage({ documentId }: AdvisorDocumentDetailP
               <p>Uploaded at: {formatDate(document.uploadedAt)}</p>
               <p>Type: {document.type}</p>
               <p>Size: {document.size}</p>
-              {document.reviewedBy ? <p>Reviewed by: {document.reviewedBy}</p> : null}
-              {document.reviewedAt ? <p>Reviewed at: {formatDate(document.reviewedAt)}</p> : null}
+              {document.reviewedBy && <p>Reviewed by: {document.reviewedBy}</p>}
+              {document.reviewedAt && <p>Reviewed at: {formatDate(document.reviewedAt)}</p>}
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium">Feedback</p>
-              <Textarea rows={8} value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="Write approval notes or revision feedback..." />
+              <Textarea
+                rows={8}
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Write approval notes or revision feedback…"
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Button onClick={() => void handleApprove()} disabled={approveDocumentMutation.isPending}>
-                {approveDocumentMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                {approveDocumentMutation.isPending
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <CheckCircle className="mr-2 h-4 w-4" />}
                 Approve Document
               </Button>
-              <Button variant="outline" onClick={() => void handleRevision()} disabled={requestDocumentRevisionMutation.isPending}>
-                {requestDocumentRevisionMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button
+                variant="outline"
+                onClick={() => void handleRevision()}
+                disabled={requestDocumentRevisionMutation.isPending}
+              >
+                {requestDocumentRevisionMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Request Revision
               </Button>
             </div>

@@ -1,17 +1,24 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
-import PageHeader from '@/components/shared/PageHeader'
-import DataTable, { Column } from '@/components/shared/DataTable'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
 import {
   Users,
   TrendingUp,
@@ -20,13 +27,23 @@ import {
   MessageSquare,
   BarChart3,
   Clock,
-  Eye,
-  Target
+  CheckCircle2,
+  FolderKanban,
+  ArrowLeft,
+  Search,
+  Filter,
+  ChevronRight,
+  Award,
+  Activity,
+  Star,
+  GraduationCap,
+  Bell,
 } from 'lucide-react'
-import Link from "next/link"
+import Link from 'next/link'
+import { toast } from 'sonner'
 import { mockUsers, mockProjects, mockEvaluations } from '@/data/mockData'
-import { useToast } from '@/hooks/use-toast'
 
+/* ─── Types ───────────────────────────────────────────────────────────── */
 interface AdvisorMetrics {
   id: string
   name: string
@@ -41,404 +58,655 @@ interface AdvisorMetrics {
   performance: 'excellent' | 'good' | 'needs_attention'
 }
 
+/* ─── Config ──────────────────────────────────────────────────────────── */
+const PERF_CONFIG = {
+  excellent:      { label: 'Excellent',      dot: 'bg-primary',            badge: 'bg-primary/10 text-primary border-primary/20',            bar: 'bg-primary' },
+  good:           { label: 'Good',           dot: 'bg-primary/50',          badge: 'bg-primary/[0.06] text-primary/80 border-primary/10',    bar: 'bg-primary/60' },
+  needs_attention:{ label: 'Needs Attention',dot: 'bg-destructive',         badge: 'bg-destructive/10 text-destructive border-destructive/20',bar: 'bg-destructive' },
+} as const
+
+/* ─── Advisor Detail Sheet ────────────────────────────────────────────── */
+function AdvisorSheet({
+  advisor,
+  open,
+  onClose,
+}: {
+  advisor: AdvisorMetrics | null
+  open: boolean
+  onClose: () => void
+}) {
+  const [notes, setNotes] = useState('')
+  const [sending, setSending] = useState(false)
+
+  React.useEffect(() => { if (advisor) setNotes('') }, [advisor?.id])
+
+  if (!advisor) return null
+
+  const pc = PERF_CONFIG[advisor.performance]
+  const projects = mockProjects.filter(p => p.advisorId === advisor.id)
+
+  const handleSendFeedback = async () => {
+    if (!notes.trim()) return
+    setSending(true)
+    await new Promise(r => setTimeout(r, 700))
+    setSending(false)
+    toast.success('Feedback Sent', { description: `Message delivered to ${advisor.name}` })
+    setNotes('')
+    onClose()
+  }
+
+  const handleRemind = async () => {
+    setSending(true)
+    await new Promise(r => setTimeout(r, 500))
+    setSending(false)
+    toast.success('Reminder Sent', { description: `Reminder sent to ${advisor.name} about pending evaluations` })
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto p-0 gap-0">
+
+        {/* Header */}
+        <SheetHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 shrink-0">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold text-base">
+                {advisor.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <SheetTitle className="text-base truncate">{advisor.name}</SheetTitle>
+              <SheetDescription className="text-xs truncate">{advisor.email}</SheetDescription>
+            </div>
+            <Badge className={`ml-auto shrink-0 text-xs ${pc.badge}`}>{pc.label}</Badge>
+          </div>
+        </SheetHeader>
+
+        <div className="p-6 space-y-5">
+
+          {/* KPI pills */}
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {[
+              { label: 'Total',     value: advisor.totalProjects,     color: 'text-primary' },
+              { label: 'Active',    value: advisor.activeProjects,    color: 'text-foreground' },
+              { label: 'Done',      value: advisor.completedProjects, color: 'text-foreground' },
+              { label: 'Pending',   value: advisor.pendingEvaluations,color: advisor.pendingEvaluations > 0 ? 'text-destructive' : 'text-muted-foreground' },
+            ].map(k => (
+              <div key={k.label} className="rounded-xl bg-muted/40 py-2.5 px-1 space-y-0.5">
+                <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+                <p className="text-xs text-muted-foreground">{k.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Avg project progress</span>
+              <span className="font-semibold">{advisor.avgProgress}%</span>
+            </div>
+            <Progress value={advisor.avgProgress} className="h-2" />
+          </div>
+
+          <Separator />
+
+          {/* Projects breakdown */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <FolderKanban className="h-3.5 w-3.5" /> Assigned Projects
+            </p>
+            {projects.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No projects assigned</p>
+            ) : (
+              <div className="space-y-2">
+                {projects.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2.5">
+                    <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <GraduationCap className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.title}</p>
+                      <p className="text-xs text-muted-foreground">{p.groupName}</p>
+                    </div>
+                    <div className="shrink-0 text-right space-y-1">
+                      <p className="text-xs font-semibold text-primary">{p.progress ?? 0}%</p>
+                      <Progress value={p.progress ?? 0} className="h-1 w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Performance detail */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" /> Performance Detail
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                { label: 'Overdue Tasks',    value: advisor.overdueTasks,         warn: advisor.overdueTasks > 0 },
+                { label: 'Last Activity',    value: advisor.lastActivity,         warn: false },
+                { label: 'Eval Pending',     value: `${advisor.pendingEvaluations}`, warn: advisor.pendingEvaluations > 0 },
+                { label: 'Completed Proj.',  value: advisor.completedProjects,    warn: false },
+              ].map(row => (
+                <div key={row.label} className="rounded-lg bg-muted/30 px-3 py-2 space-y-0.5">
+                  <p className="text-muted-foreground">{row.label}</p>
+                  <p className={`font-semibold text-sm ${row.warn ? 'text-destructive' : 'text-foreground'}`}>{row.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Feedback form */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5" /> Send Message / Feedback
+            </p>
+            <Textarea
+              placeholder={`Write feedback or a message to ${advisor.name}…`}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="resize-none text-sm min-h-[100px]"
+            />
+            <div className="flex gap-2">
+              {advisor.pendingEvaluations > 0 && (
+                <Button variant="outline" className="flex-1 gap-2 text-sm" disabled={sending} onClick={handleRemind}>
+                  <Bell className="h-4 w-4" /> Send Reminder
+                </Button>
+              )}
+              <Button className="flex-1 gap-2 text-sm" disabled={sending || !notes.trim()} onClick={handleSendFeedback}>
+                {sending
+                  ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  : <Send className="h-4 w-4" />
+                }
+                Send Feedback
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/* ─── Advisor Card ────────────────────────────────────────────────────── */
+function AdvisorCard({
+  advisor,
+  onView,
+}: {
+  advisor: AdvisorMetrics
+  onView: (a: AdvisorMetrics) => void
+}) {
+  const pc = PERF_CONFIG[advisor.performance]
+
+  return (
+    <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20 space-y-4">
+
+      {/* Top */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-11 w-11 shrink-0">
+            <AvatarFallback className="bg-primary/10 text-primary font-bold text-base transition-transform group-hover:scale-110">
+              {advisor.name.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{advisor.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{advisor.email}</p>
+          </div>
+        </div>
+        <Badge className={`shrink-0 text-xs ${pc.badge}`}>{pc.label}</Badge>
+      </div>
+
+      {/* Stat pills */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium">
+          <FolderKanban className="h-3 w-3" /> {advisor.totalProjects} projects
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full bg-muted text-foreground px-2.5 py-0.5 text-xs font-medium">
+          <Activity className="h-3 w-3" /> {advisor.activeProjects} active
+        </div>
+        {advisor.completedProjects > 0 && (
+          <div className="flex items-center gap-1.5 rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-xs">
+            <CheckCircle2 className="h-3 w-3" /> {advisor.completedProjects} done
+          </div>
+        )}
+        {advisor.pendingEvaluations > 0 && (
+          <div className="flex items-center gap-1.5 rounded-full bg-destructive/10 text-destructive px-2.5 py-0.5 text-xs font-medium">
+            <AlertTriangle className="h-3 w-3" /> {advisor.pendingEvaluations} pending
+          </div>
+        )}
+      </div>
+
+      {/* Progress */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">Avg progress</span>
+          <span className="font-semibold text-primary">{advisor.avgProgress}%</span>
+        </div>
+        <Progress value={advisor.avgProgress} className="h-1.5" />
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Clock className="h-3 w-3" /> {advisor.lastActivity}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 text-xs hover:border-primary hover:text-primary"
+          onClick={() => onView(advisor)}
+        >
+          View Details <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Page ────────────────────────────────────────────────────────────── */
 export default function AdvisorProgressPage() {
-  const { toast } = useToast()
-  const [selectedAdvisor, setSelectedAdvisor] = useState<AdvisorMetrics | null>(null)
-  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false)
-  const [feedbackText, setFeedbackText] = useState('')
-  const [activeTab, setActiveTab] = useState('overview')
+  const [sheetAdvisor, setSheetAdvisor] = useState<AdvisorMetrics | null>(null)
+  const [sheetOpen, setSheetOpen]       = useState(false)
+  const [search, setSearch]             = useState('')
+  const [perfFilter, setPerfFilter]     = useState('all')
 
   const advisors = mockUsers.filter(u => u.role === 'advisor')
 
   const advisorMetrics: AdvisorMetrics[] = useMemo(() => {
     return advisors.map(advisor => {
-      const advisorProjects = mockProjects.filter(p => p.advisorId === advisor.id)
-      const activeProjects = advisorProjects.filter(p => p.status === 'in_progress')
-      const completedProjects = advisorProjects.filter(p => p.status === 'completed')
-      const avgProgress = advisorProjects.length > 0
-        ? Math.round(advisorProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / advisorProjects.length)
+      const projects        = mockProjects.filter(p => p.advisorId === advisor.id)
+      const activeProjects  = projects.filter(p => p.status === 'in_progress')
+      const completedProjects = projects.filter(p => p.status === 'completed')
+      const avgProgress     = projects.length > 0
+        ? Math.round(projects.reduce((s, p) => s + (p.progress ?? 0), 0) / projects.length)
         : 0
-
-      const pendingEvaluations = mockEvaluations.filter(e =>
-        advisorProjects.some(p => p.id === e.projectId) && e.status === 'pending'
+      const pendingEvals    = mockEvaluations.filter(e =>
+        projects.some(p => p.id === e.projectId) && e.status === 'pending'
       ).length
+      const overdueTasks    = projects.filter(p => p.status === 'in_progress' && (p.progress ?? 0) < 50).length
 
-      // Calculate overdue tasks (simplified logic)
-      const overdueTasks = advisorProjects.filter(p =>
-        p.status === 'in_progress' && (p.progress || 0) < 50
-      ).length
-
-      // Determine performance based on metrics
       let performance: AdvisorMetrics['performance'] = 'good'
-      if (avgProgress >= 80 && overdueTasks === 0) performance = 'excellent'
-      else if (avgProgress < 50 || overdueTasks > 2) performance = 'needs_attention'
+      if (avgProgress >= 75 && overdueTasks === 0) performance = 'excellent'
+      else if (avgProgress < 50 || overdueTasks > 1) performance = 'needs_attention'
 
       return {
         id: advisor.id,
         name: advisor.name,
         email: advisor.email,
-        totalProjects: advisorProjects.length,
+        totalProjects: projects.length,
         activeProjects: activeProjects.length,
         completedProjects: completedProjects.length,
         avgProgress,
-        pendingEvaluations,
+        pendingEvaluations: pendingEvals,
         overdueTasks,
-        lastActivity: '2 days ago', // Mock data
-        performance
+        lastActivity: '2 days ago',
+        performance,
       }
     })
   }, [advisors])
 
-  const handleSendFeedback = () => {
-    if (!selectedAdvisor || !feedbackText.trim()) return
-
-    toast("Feedback Sent", {
-      description: `Feedback sent to ${selectedAdvisor.name}`,
+  const filtered = useMemo(() => {
+    return advisorMetrics.filter(a => {
+      const q = search.toLowerCase()
+      const matchSearch = !search || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+      const matchPerf   = perfFilter === 'all' || a.performance === perfFilter
+      return matchSearch && matchPerf
     })
+  }, [advisorMetrics, search, perfFilter])
 
-    setFeedbackDialogOpen(false)
-    setFeedbackText('')
-    setSelectedAdvisor(null)
-  }
+  const openSheet = (a: AdvisorMetrics) => { setSheetAdvisor(a); setSheetOpen(true) }
 
-  const handleSendReminder = (advisor: AdvisorMetrics) => {
-    toast("Reminder Sent", {
-      description: `Reminder sent to ${advisor.name} about pending evaluations`,
-    })
-  }
+  /* Summary stats */
+  const totalAdvisors     = advisorMetrics.length
+  const avgAll            = totalAdvisors > 0 ? Math.round(advisorMetrics.reduce((s, a) => s + a.avgProgress, 0) / totalAdvisors) : 0
+  const totalPending      = advisorMetrics.reduce((s, a) => s + a.pendingEvaluations, 0)
+  const excellentCount    = advisorMetrics.filter(a => a.performance === 'excellent').length
+  const attentionCount    = advisorMetrics.filter(a => a.performance === 'needs_attention').length
 
-  const getPerformanceColor = (performance: AdvisorMetrics['performance']) => {
-    switch (performance) {
-      case 'excellent': return 'text-success'
-      case 'good': return 'text-primary'
-      case 'needs_attention': return 'text-destructive'
-      default: return 'text-muted-foreground'
-    }
-  }
-
-  const getPerformanceBadge = (performance: AdvisorMetrics['performance']) => {
-    switch (performance) {
-      case 'excellent': return <Badge className="bg-success/10 text-success border-success/20">Excellent</Badge>
-      case 'good': return <Badge className="bg-primary/10 text-primary border-primary/20">Good</Badge>
-      case 'needs_attention': return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Needs Attention</Badge>
-      default: return <Badge variant="outline">Unknown</Badge>
-    }
-  }
-
-  const advisorColumns: Column<AdvisorMetrics>[] = [
-    {
-      key: 'advisor',
-      header: 'Advisor',
-      render: (advisor) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary/10 text-primary">
-              {advisor.name.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{advisor.name}</p>
-            <p className="text-sm text-muted-foreground">{advisor.email}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'projects',
-      header: 'Projects',
-      render: (advisor) => (
-        <div className="text-center">
-          <p className="font-medium">{advisor.activeProjects}/{advisor.totalProjects}</p>
-          <p className="text-xs text-muted-foreground">active/total</p>
-        </div>
-      ),
-    },
-    {
-      key: 'progress',
-      header: 'Avg Progress',
-      render: (advisor) => (
-        <div className="w-24">
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span>{advisor.avgProgress}%</span>
-          </div>
-          <Progress value={advisor.avgProgress} className="h-2" />
-        </div>
-      ),
-    },
-    {
-      key: 'performance',
-      header: 'Performance',
-      render: (advisor) => getPerformanceBadge(advisor.performance),
-    },
-    {
-      key: 'pending',
-      header: 'Pending',
-      render: (advisor) => (
-        <div className="space-y-1">
-          {advisor.pendingEvaluations > 0 && (
-            <Badge variant="outline" className="bg-warning/10 text-warning">
-              {advisor.pendingEvaluations} eval{advisor.pendingEvaluations !== 1 ? 's' : ''}
-            </Badge>
-          )}
-          {advisor.overdueTasks > 0 && (
-            <Badge variant="outline" className="bg-destructive/10 text-destructive">
-              {advisor.overdueTasks} overdue
-            </Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (advisor) => (
-        <div className="flex gap-2">
-          <Link href={`/dashboard/coordinator/advisor-progress/${advisor.id}`}>
-            <Button variant="outline" size="sm">
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
-            </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleSendReminder(advisor)}
-            disabled={advisor.pendingEvaluations === 0}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            Remind
-          </Button>
-        </div>
-      ),
-    },
-  ]
-
-  const statsCards = [
-    {
-      title: 'Total Advisors',
-      value: advisors.length,
-      subtitle: 'Active faculty members',
-      icon: Users,
-      color: 'bg-primary/10 text-primary',
-    },
-    {
-      title: 'Avg Progress',
-      value: `${Math.round(advisorMetrics.reduce((sum, a) => sum + a.avgProgress, 0) / advisorMetrics.length)}%`,
-      subtitle: 'Across all projects',
-      icon: TrendingUp,
-      color: 'bg-success/10 text-success',
-    },
-    {
-      title: 'Pending Evaluations',
-      value: advisorMetrics.reduce((sum, a) => sum + a.pendingEvaluations, 0),
-      subtitle: 'Require attention',
-      icon: AlertTriangle,
-      color: 'bg-warning/10 text-warning',
-    },
-    {
-      title: 'Excellent Performers',
-      value: advisorMetrics.filter(a => a.performance === 'excellent').length,
-      subtitle: 'Top tier advisors',
-      icon: Target,
-      color: 'bg-accent/10 text-accent',
-    },
+  const kpi = [
+    { label: 'Total Advisors',      value: totalAdvisors,   icon: Users,        bg: 'bg-primary/10',     color: 'text-primary'     },
+    { label: 'Avg Progress',        value: `${avgAll}%`,    icon: TrendingUp,   bg: 'bg-primary/[0.06]', color: 'text-primary/80'  },
+    { label: 'Pending Evaluations', value: totalPending,    icon: AlertTriangle,bg: 'bg-destructive/10', color: 'text-destructive' },
+    { label: 'Excellent Advisors',  value: excellentCount,  icon: Award,        bg: 'bg-muted',          color: 'text-foreground'  },
   ]
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Advisor Progress & Performance"
-        description="Monitor advisor performance, project progress, and provide feedback"
-      />
+    <div className="space-y-6 pb-8 animate-fade-in">
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statsCards.map((stat, index) => (
-          <Card key={index}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className={`h-12 w-12 rounded-xl ${stat.color} flex items-center justify-center`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-sm font-medium">{stat.title}</p>
-                  <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
-                </div>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/coordinator">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Advisor Analytics
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Monitor performance, project progress, and communicate with advisors
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+          <Link href="/dashboard/coordinator/notify-advisors">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Bell className="h-4 w-4" /> Notify All
+            </Button>
+          </Link>
+          {attentionCount > 0 && (
+            <Badge variant="destructive" className="gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" /> {attentionCount} need attention
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpi.map(s => (
+          <Card key={s.label} className="group border-none shadow-sm transition-all hover:shadow-md">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className={`h-11 w-11 rounded-full ${s.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tracking-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
+      {/* Overall progress bar */}
+      <Card className="border-none shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold">Department-wide Average Progress</p>
+            <span className="text-sm font-bold text-primary">{avgAll}%</span>
+          </div>
+          <Progress value={avgAll} className="h-2.5" />
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+            <span>{advisorMetrics.reduce((s, a) => s + a.activeProjects, 0)} active projects</span>
+            <span>{advisorMetrics.reduce((s, a) => s + a.completedProjects, 0)} completed</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-10">
+          <TabsTrigger value="overview"     className="gap-2"><Users className="h-4 w-4" /> Overview</TabsTrigger>
+          <TabsTrigger value="performance"  className="gap-2"><BarChart3 className="h-4 w-4" /> Performance</TabsTrigger>
+          <TabsTrigger value="communication"className="gap-2"><MessageSquare className="h-4 w-4" /> Communication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display">Advisor Performance Overview</CardTitle>
-              <CardDescription>
-                Comprehensive view of advisor workload, progress, and performance metrics
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <DataTable data={advisorMetrics} columns={advisorColumns} />
-            </CardContent>
-          </Card>
+        {/* ── Overview Tab ── */}
+        <TabsContent value="overview" className="space-y-4">
+
+          {/* Search + filter */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search advisor by name or email…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-10"
+              />
+            </div>
+            <Select value={perfFilter} onValueChange={setPerfFilter}>
+              <SelectTrigger className="h-10 w-48 shrink-0">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Performance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Advisors</SelectItem>
+                <SelectItem value="excellent">Excellent</SelectItem>
+                <SelectItem value="good">Good</SelectItem>
+                <SelectItem value="needs_attention">Needs Attention</SelectItem>
+              </SelectContent>
+            </Select>
+            {(search || perfFilter !== 'all') && (
+              <Button variant="ghost" size="sm" className="h-10 text-xs"
+                onClick={() => { setSearch(''); setPerfFilter('all') }}>
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Results label */}
+          {(search || perfFilter !== 'all') && (
+            <p className="text-sm text-muted-foreground">{filtered.length} advisor{filtered.length !== 1 ? 's' : ''} found</p>
+          )}
+
+          {/* Cards grid */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed">
+              <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="font-medium text-muted-foreground">No advisors match your filters</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting the search or filter</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map(a => (
+                <AdvisorCard key={a.id} advisor={a} onView={openSheet} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
+        {/* ── Performance Tab ── */}
         <TabsContent value="performance">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Performance Distribution</CardTitle>
+
+            {/* Distribution */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Star className="h-4 w-4 text-primary" /> Performance Distribution
+                </CardTitle>
                 <CardDescription>Advisor performance breakdown</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {['excellent', 'good', 'needs_attention'].map((performance) => {
-                    const count = advisorMetrics.filter(a => a.performance === performance).length
-                    const percentage = Math.round((count / advisorMetrics.length) * 100)
-                    return (
-                      <div key={performance} className="flex items-center justify-between">
+              <CardContent className="space-y-4">
+                {(['excellent', 'good', 'needs_attention'] as const).map(p => {
+                  const count = advisorMetrics.filter(a => a.performance === p).length
+                  const pct   = advisorMetrics.length > 0 ? Math.round((count / advisorMetrics.length) * 100) : 0
+                  const pc    = PERF_CONFIG[p]
+                  return (
+                    <div key={p} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${getPerformanceColor(performance as AdvisorMetrics['performance'])}`} />
-                          <span className="capitalize">{performance.replace('_', ' ')}</span>
+                          <div className={`h-2.5 w-2.5 rounded-full ${pc.dot}`} />
+                          <span>{pc.label}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{count} advisors</span>
-                          <Badge variant="outline">{percentage}%</Badge>
+                          <span className="text-xs text-muted-foreground">{count} advisor{count !== 1 ? 's' : ''}</span>
+                          <Badge variant="outline" className="text-xs">{pct}%</Badge>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
+                      <Progress value={pct} className="h-1.5" />
+                    </div>
+                  )
+                })}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Progress Insights</CardTitle>
-                <CardDescription>Key metrics and trends</CardDescription>
+            {/* Insights */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Progress Insights
+                </CardTitle>
+                <CardDescription>Key metrics across all advisors</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Highest Progress</span>
-                    <span className="text-sm">
-                      {Math.max(...advisorMetrics.map(a => a.avgProgress))}%
-                    </span>
+              <CardContent className="space-y-2">
+                {[
+                  { label: 'Highest Avg Progress',  value: `${Math.max(...advisorMetrics.map(a => a.avgProgress), 0)}%` },
+                  { label: 'Lowest Avg Progress',   value: `${Math.min(...advisorMetrics.map(a => a.avgProgress), 0)}%` },
+                  { label: 'Total Active Projects',  value: advisorMetrics.reduce((s, a) => s + a.activeProjects, 0) },
+                  { label: 'Total Completed',        value: advisorMetrics.reduce((s, a) => s + a.completedProjects, 0) },
+                  { label: 'Total Overdue Tasks',    value: advisorMetrics.reduce((s, a) => s + a.overdueTasks, 0) },
+                  { label: 'Total Pending Evals',    value: totalPending },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
+                    <span className="text-sm text-muted-foreground">{item.label}</span>
+                    <span className="font-bold text-sm">{item.value}</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Lowest Progress</span>
-                    <span className="text-sm">
-                      {Math.min(...advisorMetrics.map(a => a.avgProgress))}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <span className="text-sm font-medium">Total Overdue Tasks</span>
-                    <span className="text-sm">
-                      {advisorMetrics.reduce((sum, a) => sum + a.overdueTasks, 0)}
-                    </span>
-                  </div>
-                </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Per-advisor progress chart */}
+            <Card className="border-none shadow-sm md:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Per-Advisor Progress
+                </CardTitle>
+                <CardDescription>Visual comparison of progress across all advisors</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {advisorMetrics.map(a => {
+                  const pc = PERF_CONFIG[a.performance]
+                  return (
+                    <div key={a.id} className="flex items-center gap-4">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                          {a.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium truncate">{a.name}</p>
+                          <span className="text-xs font-semibold ml-2 shrink-0 text-primary">{a.avgProgress}%</span>
+                        </div>
+                        <Progress value={a.avgProgress} className="h-1.5" />
+                      </div>
+                      <Badge className={`shrink-0 text-xs ${pc.badge}`}>{pc.label}</Badge>
+                    </div>
+                  )
+                })}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
+        {/* ── Communication Tab ── */}
         <TabsContent value="communication">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display">Communication Tools</CardTitle>
-              <CardDescription>Send feedback and reminders to advisors</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <MessageSquare className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Send Feedback</h3>
-                        <p className="text-sm text-muted-foreground">Provide constructive feedback</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
 
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
-                        <Clock className="h-6 w-6 text-warning" />
+            {/* Quick actions */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  href: '/dashboard/coordinator/notify-advisors',
+                  icon: Bell,
+                  title: 'Broadcast Notification',
+                  desc: 'Send a notification or announcement to all advisors at once.',
+                  cta: 'Notify All Advisors',
+                },
+                {
+                  href: '/dashboard/coordinator/notify-advisors',
+                  icon: Send,
+                  title: 'Send Reminders',
+                  desc: 'Remind advisors who have pending evaluations or overdue tasks.',
+                  cta: 'Send Reminders',
+                },
+                {
+                  href: '/dashboard/coordinator/messages',
+                  icon: MessageSquare,
+                  title: 'Direct Message',
+                  desc: 'Open the messages inbox to send a direct message to a specific advisor.',
+                  cta: 'Open Messages',
+                },
+                {
+                  href: '/dashboard/coordinator/reports',
+                  icon: BarChart3,
+                  title: 'Performance Reports',
+                  desc: 'Generate and download detailed performance reports for advisors.',
+                  cta: 'View Reports',
+                },
+              ].map(item => (
+                <Card key={item.title} className="border-none shadow-sm group transition-all hover:shadow-md hover:border-primary/20">
+                  <CardContent className="p-5 flex flex-col gap-4 h-full">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110">
+                        <item.icon className="h-5 w-5 text-primary" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold">Send Reminders</h3>
-                        <p className="text-sm text-muted-foreground">Remind about pending tasks</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm">{item.title}</p>
                       </div>
                     </div>
+                    <p className="text-sm text-muted-foreground flex-1">{item.desc}</p>
+                    <Link href={item.href}>
+                      <Button variant="outline" size="sm" className="w-full gap-1.5 hover:border-primary hover:text-primary">
+                        {item.cta} <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
+              ))}
+            </div>
 
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
-                        <BarChart3 className="h-6 w-6 text-success" />
+            {/* Advisors needing attention */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Advisors Needing Attention
+              </h3>
+              {advisorMetrics.filter(a => a.performance === 'needs_attention' || a.pendingEvaluations > 0).length === 0 ? (
+                <div className="rounded-xl border border-dashed flex flex-col items-center py-8 text-center">
+                  <CheckCircle2 className="h-8 w-8 text-primary/40 mb-2" />
+                  <p className="text-sm text-muted-foreground font-medium">All advisors on track</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">No immediate action needed</p>
+                </div>
+              ) : (
+                advisorMetrics
+                  .filter(a => a.performance === 'needs_attention' || a.pendingEvaluations > 0)
+                  .map(a => (
+                    <div key={a.id} className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm hover:border-primary/20 transition-all">
+                      <Avatar className="h-9 w-9 shrink-0">
+                        <AvatarFallback className="bg-destructive/10 text-destructive font-semibold text-sm">
+                          {a.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{a.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {a.pendingEvaluations > 0 ? `${a.pendingEvaluations} eval pending` : 'Low progress'}
+                        </p>
                       </div>
-                      <div>
-                        <h3 className="font-semibold">Performance Report</h3>
-                        <p className="text-sm text-muted-foreground">Generate detailed reports</p>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1 text-xs shrink-0"
+                        onClick={() => openSheet(a)}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
+                  ))
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
-      {/* Feedback Dialog */}
-      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Feedback</DialogTitle>
-            <DialogDescription>
-              Provide constructive feedback to {selectedAdvisor?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="feedback">Feedback Message</Label>
-              <Textarea
-                id="feedback"
-                placeholder="Enter your feedback..."
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                className="mt-1.5"
-                rows={4}
-              />
-            </div>
-            <Button
-              className="w-full btn-gradient"
-              onClick={handleSendFeedback}
-              disabled={!feedbackText.trim()}
-            >
-              Send Feedback
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Advisor detail sheet — no navigation, no auth issue */}
+      <AdvisorSheet
+        advisor={sheetAdvisor}
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+      />
     </div>
   )
 }
