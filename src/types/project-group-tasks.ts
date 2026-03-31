@@ -25,6 +25,7 @@ export type UpdateProjectGroupTaskAssigneeDto = {
 export type ProjectGroupTaskListItem = {
   id: string
   title: string
+  description?: string | null
   status: ProjectGroupTaskStatus
   assignedToUserId: string | null
   createdByUserId: string
