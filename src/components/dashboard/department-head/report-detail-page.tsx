@@ -1,9 +1,9 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
-import { ArrowLeft, Download } from "lucide-react"
+import { Download } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,9 +24,7 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
           title="Report not found"
           description="The requested report could not be found."
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/reports">Back to Reports</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/reports" variant="outline" />
       </div>
     )
   }
@@ -45,12 +43,7 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
           description={report.description}
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/dashboard/department-head/reports" className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
+              <DashboardBackLink href="/dashboard/department-head/reports" variant="outline" />
               <Button size="sm" onClick={handleDownload} className="gap-2">
                 <Download className="h-4 w-4" />
                 Download

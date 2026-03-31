@@ -9,39 +9,32 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  BarChart3, 
-  Download, 
-  FileText, 
-  PieChart, 
-  TrendingUp, 
-  Calendar, 
-  Users, 
-  FolderOpen, 
+import {
+  Download,
+  FileText,
+  PieChart,
+  TrendingUp,
+  Calendar,
+  Users,
   ClipboardCheck,
   Filter,
   Search,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   ChevronDown,
   Eye,
   Star,
   Award,
-  BookOpen,
   GraduationCap,
   FileSpreadsheet,
   FileBarChart,
   RefreshCw,
   Printer,
   Share2,
-  MoreHorizontal,
   Zap,
   Activity,
   Target,
   Globe,
   Briefcase,
-  TrendingDown
 } from 'lucide-react';
 
 // Enhanced reports data with categories and metrics
@@ -275,13 +268,6 @@ const DeptReportsPage: React.FC = () => {
         duration: 3000,
       })
     }, 1500);
-  };
-
-  const handleViewReport = (reportId: string) => {
-    toast("Opening Report", {
-      description: "Loading report viewer...",
-      duration: 2000,
-    })
   };
 
   return (

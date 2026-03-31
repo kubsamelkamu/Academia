@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState } from "react"
-import Link from "next/link"
 import { ArrowLeft, CheckCircle, XCircle, AlertCircle, FileText, User, Calendar, Mail, MessageSquare } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
-import { type GroupManagerApplication, mockGroupManagerApplications } from "@/data/mockData"
+import { mockGroupManagerApplications } from "@/data/mockData"
 import { cn } from "@/lib/utils"
 
 interface GroupManagerApplicationDetailPageProps {
@@ -41,12 +41,7 @@ export function GroupManagerApplicationDetailPage({
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center">
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/department-head/grades" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Return to Grade Approval
-              </Link>
-            </Button>
+            <DashboardBackLink href="/dashboard/department-head/review" variant="outline" />
           </CardFooter>
         </Card>
       </div>
@@ -111,14 +106,7 @@ export function GroupManagerApplicationDetailPage({
       <DashboardPageHeader
         title="Group Leader Application"
         description={`Review and process application from ${application.studentName}`}
-        actions={
-          <Button variant="ghost" size="sm" asChild className="gap-2">
-            <Link href="/dashboard/department-head/grades">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Grade Approval
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/review" />}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

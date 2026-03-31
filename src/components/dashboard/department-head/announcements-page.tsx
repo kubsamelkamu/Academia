@@ -1,22 +1,12 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Pencil, Plus, Trash2, X } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -24,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog"
 import {
   useCreateDepartmentAnnouncement,
@@ -36,32 +25,6 @@ import type { DepartmentAnnouncementActionType, DepartmentAnnouncementItem } fro
 import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
 import { DepartmentAnnouncementFormCard } from "@/components/dashboard/department-head/department-announcement-form-card"
-
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
-  } catch {
-    return false
-  }
-}
-
-function toIsoFromDatetimeLocal(value: string): string | null {
-  if (!value.trim()) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toISOString()
-}
-
-function toLocalInputValue(isoDate: string | null): string {
-  if (!isoDate) return ""
-  const date = new Date(isoDate)
-  if (Number.isNaN(date.getTime())) return ""
-
-  const offsetMs = date.getTimezoneOffset() * 60_000
-  const local = new Date(date.getTime() - offsetMs)
-  return local.toISOString().slice(0, 16)
-}
 
 function clampPage(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -289,7 +252,8 @@ function AnnouncementEditForm({
   departmentId: string | null
   onClose: () => void
   onSaved: () => void
-}) {  function toLocalInputValue(isoDate: string | null): string {
+}) {
+  function toLocalInputValue(isoDate: string | null): string {
     if (!isoDate) return ""
     const date = new Date(isoDate)
     if (Number.isNaN(date.getTime())) return ""
@@ -325,23 +289,6 @@ function AnnouncementEditForm({
   const [deadlineError, setDeadlineError] = useState<string | null>(null)
   const [actionLabelError, setActionLabelError] = useState<string | null>(null)
   const [actionUrlError, setActionUrlError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTitle(announcement.title)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMessage(announcement.message)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setActionType(announcement.actionType)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setActionLabel(announcement.actionLabel ?? "")
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setActionUrl(announcement.actionUrl ?? "")
-    setDeadlineAtLocal(toLocalInputValue(announcement.deadlineAt ?? null))
-    setDeadlineError(null)
-    setActionLabelError(null)
-    setActionUrlError(null)
-  }, [announcement.id, announcement.title, announcement.message, announcement.actionType, announcement.actionLabel, announcement.actionUrl, announcement.deadlineAt])
 
   const handleSubmit = async () => {
     if (!departmentId) {
@@ -648,6 +595,7 @@ export function DepartmentHeadAnnouncementsPage() {
         >
           <DialogContent className="max-w-4xl w-[95vw]">
             <AnnouncementEditForm
+              key={`${selectedAnnouncement.id}-${selectedAnnouncement.updatedAt}`}
               announcement={selectedAnnouncement}
               departmentId={departmentId}
               onClose={() => setEditOpen(false)}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { type UserRole } from "@/config/navigation"
 import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard"

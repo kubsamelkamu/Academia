@@ -2,8 +2,11 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+  DashboardBackButton,
+  DASHBOARD_BACK_ICON_CLASS,
+} from "@/components/dashboard/dashboard-back"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import DataTable, { type Column } from "@/components/shared/DataTable"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -39,13 +42,43 @@ import {
   ExternalLink,
   ArrowLeft,
   Info,
+  MessageSquare,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
+
+function memberInitials(name: string) {
+  return name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+}
 
 // Helper Components for better reusability and styling
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex justify-between items-center text-sm">
-    <span className="text-muted-foreground">{label}:</span>
-    <span className="font-medium">{value}</span>
+  <div className="flex justify-between items-start gap-4 py-2.5 text-sm border-b border-border/50 last:border-0 last:pb-0 first:pt-0">
+    <span className="text-muted-foreground shrink-0 text-xs font-medium uppercase tracking-wide">{label}</span>
+    <span className="font-medium text-right min-w-0">{value}</span>
   </div>
 );
 
@@ -105,6 +138,8 @@ interface Project {
   category: string;
   tags: string[];
   lastActivity: string;
+  /** Academic term label, e.g. Spring 2024 */
+  semester?: string;
   description?: string;
   technologies?: string[];
   milestones?: { name: string; status: "pending" | "in-progress" | "completed"; dueDate: string }[];
@@ -153,6 +188,7 @@ const mockActiveProjects: Project[] = [
     category: 'Artificial Intelligence',
     tags: ['AI', 'Machine Learning', 'Education'],
     lastActivity: '2024-03-15',
+    semester: 'Spring 2024',
     description: "An AI-powered assistant to help students with coursework, reminders, and scheduling.",
     technologies: ["Python", "TensorFlow", "React", "Node.js"],
     milestones: [
@@ -179,6 +215,7 @@ const mockActiveProjects: Project[] = [
     category: 'Blockchain',
     tags: ['Blockchain', 'Security', 'E-voting'],
     lastActivity: '2024-03-14',
+    semester: 'Spring 2024',
     description: "A secure blockchain-based voting system for academic institutions.",
     technologies: ["Ethereum", "Solidity", "Web3.js", "React"],
     milestones: [
@@ -205,6 +242,7 @@ const mockActiveProjects: Project[] = [
     category: 'IoT',
     tags: ['IoT', 'Smart Campus', 'Sensors'],
     lastActivity: '2024-03-16',
+    semester: 'Spring 2024',
     description: "An IoT platform for monitoring and managing campus resources in real time.",
     technologies: ["Arduino", "Raspberry Pi", "MQTT", "React"],
     milestones: [
@@ -231,6 +269,7 @@ const mockActiveProjects: Project[] = [
     category: 'VR/AR',
     tags: ['VR', 'Education', 'Simulation'],
     lastActivity: '2024-03-10',
+    semester: 'Spring 2024',
     description: "A virtual reality laboratory simulator to support science education and experiments.",
     technologies: ["Unity", "C#", "Blender", "SteamVR"],
     milestones: [
@@ -348,8 +387,347 @@ const StatusBadge = ({ status }: { status: string }) => {
   )
 }
 
+/** Popup card for one team member on an active project (matches team-detail MemberPopup style). */
+function ActiveProjectMemberDetailDialog({
+  member,
+  project,
+  open,
+  onClose,
+}: {
+  member: string | null
+  project: Project | null
+  open: boolean
+  onClose: () => void
+}) {
+  if (!project || !member) return null
+  const fellowMembers = project.groupMembers.filter((m) => m !== member)
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <div className="relative h-[4.5rem] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 left-2 h-6 gap-0.5 px-1.5 text-[10px] font-semibold bg-background/85 hover:bg-background border border-border/40 shadow-sm"
+            onClick={onClose}
+            title="Back"
+          >
+            <ArrowLeft className={cn("h-3 w-3", DASHBOARD_BACK_ICON_CLASS)} />
+            Back
+          </Button>
+          <div className="absolute -bottom-6 left-5">
+            <div className="h-12 w-12 rounded-full bg-primary/15 border-2 border-background flex items-center justify-center font-bold text-primary text-base shadow-sm">
+              {memberInitials(member)}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-8 px-5 pb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-bold truncate">{member}</p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {project.groupName} · {project.departmentName}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 mt-0.5 flex-wrap justify-end">
+            <Badge variant="secondary" className="text-[10px]">Student</Badge>
+            <StatusBadge status={project.status} />
+          </div>
+        </div>
+
+        <Separator className="mx-5" />
+
+        {/* KPI strip (aligned with team detail page) */}
+        <div className="px-5 py-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              {
+                label: "Members",
+                value: String(project.groupMembers.length),
+                icon: Users,
+                iconBg: "bg-primary/10",
+                iconColor: "text-primary",
+              },
+              {
+                label: "Status",
+                value: project.status
+                  .split("-")
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(" "),
+                icon: Activity,
+                iconBg: "bg-primary/10",
+                iconColor: "text-primary",
+              },
+              {
+                label: "Semester",
+                value: project.semester ?? "—",
+                icon: Calendar,
+                iconBg: "bg-muted/80",
+                iconColor: "text-muted-foreground",
+              },
+              {
+                label: "Last Activity",
+                value: new Date(project.lastActivity).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                }),
+                icon: Clock,
+                iconBg: "bg-muted/80",
+                iconColor: "text-muted-foreground",
+              },
+            ].map((k) => (
+              <div
+                key={k.label}
+                className="flex items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5"
+              >
+                <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", k.iconBg)}>
+                  <k.icon className={cn("h-4 w-4", k.iconColor)} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-tight truncate" title={k.value}>
+                    {k.value}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{k.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Separator className="mx-5" />
+
+        <div className="px-5 pt-4 pb-5 space-y-4 max-h-[min(55vh,420px)] overflow-y-auto [scrollbar-width:thin]">
+          <div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <FolderOpen className="h-3.5 w-3.5 text-primary" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Project context</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div className="col-span-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Project</p>
+                <p className="text-sm font-medium mt-0.5">{project.title}</p>
+              </div>
+              {[
+                { label: "Group",       value: project.groupName },
+                { label: "Advisor",     value: project.advisorName },
+                { label: "Department",  value: project.departmentName },
+                { label: "Progress",    value: `${project.progress}%` },
+                { label: "Due date",     value: new Date(project.dueDate).toLocaleDateString() },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="text-xs font-medium mt-0.5 truncate" title={value}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {fellowMembers.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fellow team members</p>
+                  <Badge variant="secondary" className="text-[10px] ml-auto">
+                    {fellowMembers.length}
+                  </Badge>
+                </div>
+                <ul className="space-y-1.5">
+                  {fellowMembers.map((m) => (
+                    <li
+                      key={m}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+                    >
+                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-semibold text-primary">{memberInitials(m)}</span>
+                      </div>
+                      <span className="text-sm truncate">{m}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Popup for one student on a completed (past) project — same layout as active member popup, view-only. */
+function PastProjectMemberDetailDialog({
+  member,
+  project,
+  open,
+  onClose,
+}: {
+  member: string | null
+  project: PastProject | null
+  open: boolean
+  onClose: () => void
+}) {
+  if (!project || !member) return null
+  const fellowMembers = project.students.filter((m) => m !== member)
+  const statusLabel = project.status
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <div className="relative h-[4.5rem] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 left-2 h-6 gap-0.5 px-1.5 text-[10px] font-semibold bg-background/85 hover:bg-background border border-border/40 shadow-sm"
+            onClick={onClose}
+            title="Back"
+          >
+            <ArrowLeft className={cn("h-3 w-3", DASHBOARD_BACK_ICON_CLASS)} />
+            Back
+          </Button>
+          <div className="absolute -bottom-6 left-5">
+            <div className="h-12 w-12 rounded-full bg-primary/15 border-2 border-background flex items-center justify-center font-bold text-primary text-base shadow-sm">
+              {memberInitials(member)}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-8 px-5 pb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-bold truncate">{member}</p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {project.groupName} · {project.departmentName}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 mt-0.5 flex-wrap justify-end">
+            <Badge variant="secondary" className="text-[10px]">Student</Badge>
+            <StatusBadge status={project.status} />
+          </div>
+        </div>
+
+        <Separator className="mx-5" />
+
+        <div className="px-5 py-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              {
+                label: "Members",
+                value: String(project.students.length),
+                icon: Users,
+                iconBg: "bg-primary/10",
+                iconColor: "text-primary",
+              },
+              {
+                label: "Status",
+                value: statusLabel,
+                icon: Activity,
+                iconBg: "bg-primary/10",
+                iconColor: "text-primary",
+              },
+              {
+                label: "Semester",
+                value: project.academicYear,
+                icon: Calendar,
+                iconBg: "bg-muted/80",
+                iconColor: "text-muted-foreground",
+              },
+              {
+                label: "Last Activity",
+                value: new Date(project.lastActivity).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                }),
+                icon: Clock,
+                iconBg: "bg-muted/80",
+                iconColor: "text-muted-foreground",
+              },
+            ].map((k) => (
+              <div
+                key={k.label}
+                className="flex items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5"
+              >
+                <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", k.iconBg)}>
+                  <k.icon className={cn("h-4 w-4", k.iconColor)} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-tight truncate" title={k.value}>
+                    {k.value}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{k.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Separator className="mx-5" />
+
+        <div className="px-5 pt-4 pb-5 space-y-4 max-h-[min(55vh,420px)] overflow-y-auto [scrollbar-width:thin]">
+          <div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <FolderOpen className="h-3.5 w-3.5 text-primary" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Project context</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div className="col-span-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Project</p>
+                <p className="text-sm font-medium mt-0.5">{project.title}</p>
+              </div>
+              {[
+                { label: "Group", value: project.groupName },
+                { label: "Advisor", value: project.advisorName },
+                { label: "Department", value: project.departmentName },
+                { label: "Completed", value: new Date(project.completionDate).toLocaleDateString() },
+                { label: "Final grade", value: `${project.grade}%` },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="text-xs font-medium mt-0.5 truncate" title={value}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {fellowMembers.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fellow team members</p>
+                  <Badge variant="secondary" className="text-[10px] ml-auto">
+                    {fellowMembers.length}
+                  </Badge>
+                </div>
+                <ul className="space-y-1.5">
+                  {fellowMembers.map((m) => (
+                    <li
+                      key={m}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+                    >
+                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-semibold text-primary">{memberInitials(m)}</span>
+                      </div>
+                      <span className="text-sm truncate">{m}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function ProjectsOverview() {
-  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [selectedProject, setSelectedProject] = useState<PastProject | null>(null)
@@ -357,6 +735,10 @@ export default function ProjectsOverview() {
   const [activeTab, setActiveTab] = useState<"active" | "past">("active")
   const [selectedActiveProject, setSelectedActiveProject] = useState<Project | null>(null)
   const [showActiveDetails, setShowActiveDetails] = useState(false)
+  const [selectedActiveMemberName, setSelectedActiveMemberName] = useState<string | null>(null)
+  const [selectedPastMemberName, setSelectedPastMemberName] = useState<string | null>(null)
+  const [showProjectCommentDialog, setShowProjectCommentDialog] = useState(false)
+  const [projectCommentText, setProjectCommentText] = useState("")
 
   // Get unique categories
   const allProjects = [...mockActiveProjects, ...mockPastProjects];
@@ -382,14 +764,16 @@ export default function ProjectsOverview() {
 
   const handleViewPastProject = (project: PastProject) => {
     setSelectedProject(project)
+    setSelectedPastMemberName(null)
     setShowPastDetails(true)
-    setShowActiveDetails(false)
   }
 
   const handleViewActiveProject = (project: Project) => {
     setSelectedActiveProject(project)
+    setSelectedActiveMemberName(null)
+    setShowProjectCommentDialog(false)
+    setProjectCommentText("")
     setShowActiveDetails(true)
-    setShowPastDetails(false)
   }
 
   const triggerBrowserDownload = (filePath: string, fileName?: string) => {
@@ -504,7 +888,7 @@ export default function ProjectsOverview() {
       key: 'actions', 
       header: 'Actions', 
       render: (p) => (
-        <div className="flex gap-2 whitespace-nowrap">
+        <div className="flex gap-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
@@ -512,12 +896,14 @@ export default function ProjectsOverview() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDownloadActiveSummary(p)}
-          >
-            <Download className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground p-0 h-8 w-8" asChild>
+            <Link
+              href="/dashboard/department-head/messages"
+              title="Contact coordinator"
+              aria-label="Contact coordinator"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Link>
           </Button>
         </div>
       )
@@ -593,7 +979,7 @@ export default function ProjectsOverview() {
       key: 'actions', 
       header: 'Actions', 
       render: (p) => (
-        <div className="flex gap-2 whitespace-nowrap">
+        <div className="flex gap-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="sm" onClick={() => handleViewPastProject(p)}>
             <Eye className="h-4 w-4" />
           </Button>
@@ -611,101 +997,113 @@ export default function ProjectsOverview() {
 
   const renderPastProjectDetails = (project: PastProject) => {
     return (
-      <div className="min-h-screen bg-background overflow-y-auto">
-        {/* Header - matching system background, removed sticky positioning */}
+      <div className="min-h-screen bg-muted/30 overflow-y-auto">
         <div className="border-b bg-background">
-          <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 min-w-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPastDetails(false)}
-                  className="gap-2 hover:bg-background/80 flex-shrink-0"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Projects
-                </Button>
-                <div className="h-6 w-px bg-border hidden sm:block" />
-                <div className="min-w-0">
-                  <h1 className="text-xl font-semibold truncate max-w-2xl" title={project.title}>
-                    {project.title}
-                  </h1>
-                  <p className="text-sm text-muted-foreground truncate">{project.groupName}</p>
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+                <DashboardBackButton
+                  onClick={() => {
+                    setSelectedPastMemberName(null)
+                    setShowPastDetails(false)
+                  }}
+                />
+                <div className="hidden sm:block h-10 w-px bg-border shrink-0" />
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-11 w-11 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
+                    <Archive className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Completed project</p>
+                    <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate" title={project.title}>
+                      {project.title}
+                    </h1>
+                    <p className="text-sm text-muted-foreground truncate">{project.groupName}</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <Badge variant="outline" className="px-3 py-1">
-                  <Calendar className="h-3 w-3 mr-1" />
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Badge variant="outline" className="px-2.5 py-1 gap-1 font-normal">
+                  <Calendar className="h-3.5 w-3.5" />
                   {project.academicYear}
                 </Badge>
-                <Badge className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                  Grade: {project.grade}%
+                <Badge variant="outline" className="px-2.5 py-1 font-semibold bg-emerald-500/10 text-emerald-700 border-emerald-200/60 dark:text-emerald-400">
+                  Grade {project.grade}%
                 </Badge>
+                <StatusBadge status={project.status} />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Content - natural scrolling */}
-        <div className="px-8 py-6 space-y-6">
-          {/* Project Overview Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Main Info Card */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Info className="h-5 w-5 text-primary" />
-                  Project Overview
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+          <div className="grid gap-5 lg:grid-cols-3">
+            <Card className="lg:col-span-2 rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="space-y-1 pb-4 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Info className="h-4 w-4 text-primary" />
+                  </span>
+                  Project overview
                 </CardTitle>
-                <CardDescription>{project.description || "No description provided."}</CardDescription>
+                <CardDescription className="text-sm leading-relaxed">
+                  {project.description || "No description provided."}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Details</h4>
+              <CardContent className="pt-5">
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/20 px-4 py-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Details</h4>
                     <DetailRow label="Advisor" value={project.advisorName} />
                     <DetailRow label="Department" value={project.departmentName} />
                     <DetailRow label="Category" value={project.category} />
                     <DetailRow label="Budget" value={`$${project.budget?.toLocaleString() ?? "—"}`} />
                   </div>
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Timeline</h4>
-                    <DetailRow label="Start Date" value={new Date(project.startDate).toLocaleDateString()} />
-                    <DetailRow label="Completion Date" value={new Date(project.completionDate).toLocaleDateString()} />
-                    <DetailRow label="Academic Year" value={project.academicYear} />
-                    <DetailRow label="Final Grade" value={`${project.grade}%`} />
+                  <div className="rounded-lg border bg-muted/20 px-4 py-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Timeline</h4>
+                    <DetailRow label="Start" value={new Date(project.startDate).toLocaleDateString()} />
+                    <DetailRow label="Completed" value={new Date(project.completionDate).toLocaleDateString()} />
+                    <DetailRow label="Academic year" value={project.academicYear} />
+                    <DetailRow label="Final grade" value={`${project.grade}%`} />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Team Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Team Members ({project.students.length})
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="space-y-0 pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Users className="h-4 w-4 text-primary" />
+                  </span>
+                  Team ({project.students.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {project.students.map((student, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium text-primary">
-                          {student
-                            .split(" ")
-                            .filter(Boolean)
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </span>
+              <CardContent className="pt-4 max-h-[320px] overflow-y-auto [scrollbar-width:thin]">
+                <div className="space-y-2">
+                  {project.students.map((student) => (
+                    <div
+                      key={student}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 transition-colors hover:bg-muted/40",
+                        "sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-x-3"
+                      )}
+                    >
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
+                        {memberInitials(student)}
                       </div>
-                      <span className="text-sm font-medium truncate" title={student}>
+                      <span className="text-sm font-medium truncate min-w-0" title={student}>
                         {student}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5 shrink-0 w-full sm:w-auto justify-center"
+                        title={`View ${student}`}
+                        onClick={() => setSelectedPastMemberName(student)}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -713,20 +1111,20 @@ export default function ProjectsOverview() {
             </Card>
           </div>
 
-          {/* Technologies & Awards */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Technologies */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Code className="h-5 w-5 text-primary" />
-                  Technologies Used
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Code className="h-4 w-4 text-primary" />
+                  </span>
+                  Technologies
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 <div className="flex flex-wrap gap-2">
                   {project.metadata.technologies.map((tech) => (
-                    <Badge key={tech} variant="secondary" className="px-3 py-1">
+                    <Badge key={tech} variant="secondary" className="px-2.5 py-1 font-normal">
                       {tech}
                     </Badge>
                   ))}
@@ -734,21 +1132,22 @@ export default function ProjectsOverview() {
               </CardContent>
             </Card>
 
-            {/* Awards */}
             {project.metadata.awards && project.metadata.awards.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Award className="h-5 w-5 text-yellow-500" />
-                    Awards & Recognition
+              <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+                <CardHeader className="pb-3 border-b bg-muted/30">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15">
+                      <Award className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </span>
+                    Awards
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-4">
                   <div className="space-y-2">
                     {project.metadata.awards.map((awardText, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="text-sm">{awardText}</span>
+                      <div key={index} className="flex items-center gap-2.5 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                        <Star className="h-4 w-4 text-amber-500 shrink-0 fill-amber-500/30" />
+                        {awardText}
                       </div>
                     ))}
                   </div>
@@ -757,21 +1156,22 @@ export default function ProjectsOverview() {
             )}
           </div>
 
-          {/* Publications */}
           {project.metadata.publications && project.metadata.publications.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                  </span>
                   Publications
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+              <CardContent className="pt-4">
+                <div className="grid gap-2 sm:grid-cols-2">
                   {project.metadata.publications.map((pub, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm">
-                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                      <span>{pub}</span>
+                    <div key={index} className="flex items-start gap-2 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <span className="leading-snug">{pub}</span>
                     </div>
                   ))}
                 </div>
@@ -779,17 +1179,18 @@ export default function ProjectsOverview() {
             </Card>
           )}
 
-          {/* Documents */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Project Documents
+          <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/30">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-4 w-4 text-primary" />
+                </span>
+                Documents
               </CardTitle>
-              <CardDescription>Download project documentation and resources</CardDescription>
+              <CardDescription className="text-xs">Download project documentation and resources</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {project.documents.srs && (
                   <DocumentButton icon={FileText} label="SRS Document" onClick={() => handleDownloadDocument(project.documents.srs!, "SRS.pdf")} />
                 )}
@@ -817,22 +1218,19 @@ export default function ProjectsOverview() {
             </CardContent>
           </Card>
 
-          {/* Feedback Card */}
-          <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/10">
-            <CardContent className="pt-6">
+          <Card className="rounded-xl shadow-sm border-primary/15 bg-gradient-to-br from-primary/5 via-transparent to-transparent overflow-hidden">
+            <CardContent className="pt-5 pb-5">
               <div className="flex items-start gap-4">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="h-11 w-11 rounded-xl bg-primary/15 flex items-center justify-center shrink-0 border border-primary/10">
                   <UserCheck className="h-5 w-5 text-primary" />
                 </div>
                 <div className="space-y-2 flex-1 min-w-0">
-                  <p className="font-semibold">Evaluator Feedback</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Feedback: {project.feedback}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
-                    <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                  <p className="text-sm font-semibold">Evaluator feedback</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{project.feedback}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1 flex-wrap">
+                    <Users className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate" title={project.evaluatorNames.join(", ")}>
-                      Evaluators: {project.evaluatorNames.join(", ")}
+                      {project.evaluatorNames.join(", ")}
                     </span>
                   </div>
                 </div>
@@ -840,68 +1238,93 @@ export default function ProjectsOverview() {
             </CardContent>
           </Card>
         </div>
+
+        <PastProjectMemberDetailDialog
+          member={selectedPastMemberName}
+          project={project}
+          open={selectedPastMemberName !== null}
+          onClose={() => setSelectedPastMemberName(null)}
+        />
       </div>
     )
   }
 
   const renderActiveProjectDetails = (project: Project) => {
     return (
-      <div className="min-h-screen bg-background overflow-y-auto">
-        {/* Header - matching system background, removed sticky positioning */}
+      <div className="min-h-screen bg-muted/30 overflow-y-auto">
         <div className="border-b bg-background">
-          <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 min-w-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowActiveDetails(false)}
-                  className="gap-2 hover:bg-background/80 flex-shrink-0"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Projects
-                </Button>
-                <div className="h-6 w-px bg-border hidden sm:block" />
-                <div className="min-w-0">
-                  <h1 className="text-xl font-semibold truncate max-w-2xl" title={project.title}>
-                    {project.title}
-                  </h1>
-                  <p className="text-sm text-muted-foreground truncate">{project.groupName}</p>
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+                <DashboardBackButton
+                  onClick={() => {
+                    setSelectedActiveMemberName(null)
+                    setShowProjectCommentDialog(false)
+                    setProjectCommentText("")
+                    setShowActiveDetails(false)
+                  }}
+                />
+                <div className="hidden sm:block h-10 w-px bg-border shrink-0" />
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-11 w-11 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
+                    <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Active project</p>
+                    <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate" title={project.title}>
+                      {project.title}
+                    </h1>
+                    <p className="text-sm text-muted-foreground truncate">{project.groupName}</p>
+                    <div className="mt-3 max-w-md">
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-semibold text-primary">{project.progress}%</span>
+                      </div>
+                      <Progress value={project.progress} className="h-2" />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <Badge variant="outline" className="px-3 py-1 flex-shrink-0">
-                Project ID: {project.id}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Badge variant="outline" className="px-2.5 py-1 font-mono text-xs">
+                  ID {project.id}
+                </Badge>
+                <StatusBadge status={project.status} />
+                <Badge variant="secondary" className="px-2.5 py-1 font-normal">
+                  {project.category}
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Content - natural scrolling */}
-        <div className="px-8 py-6 space-y-6">
-          {/* Project Overview Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Main Info Card */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Info className="h-5 w-5 text-primary" />
-                  Project Overview
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+          <div className="grid gap-5 lg:grid-cols-3">
+            <Card className="lg:col-span-2 rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="space-y-1 pb-4 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Info className="h-4 w-4 text-primary" />
+                  </span>
+                  Project overview
                 </CardTitle>
-                <CardDescription>{project.description || "No description provided."}</CardDescription>
+                <CardDescription className="text-sm leading-relaxed">
+                  {project.description || "No description provided."}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Details</h4>
+              <CardContent className="pt-5">
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/20 px-4 py-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Details</h4>
                     <DetailRow label="Advisor" value={project.advisorName} />
                     <DetailRow label="Department" value={project.departmentName} />
                     <DetailRow label="Category" value={project.category} />
                     <DetailRow label="Budget" value={`$${project.budget?.toLocaleString() ?? "—"}`} />
                   </div>
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Timeline</h4>
-                    <DetailRow label="Start Date" value={new Date(project.startDate).toLocaleDateString()} />
-                    <DetailRow label="Due Date" value={new Date(project.dueDate).toLocaleDateString()} />
+                  <div className="rounded-lg border bg-muted/20 px-4 py-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Timeline</h4>
+                    <DetailRow label="Start" value={new Date(project.startDate).toLocaleDateString()} />
+                    <DetailRow label="Due" value={new Date(project.dueDate).toLocaleDateString()} />
                     <DetailRow label="Status" value={<StatusBadge status={project.status} />} />
                     <DetailRow label="Progress" value={`${project.progress}%`} />
                   </div>
@@ -909,32 +1332,40 @@ export default function ProjectsOverview() {
               </CardContent>
             </Card>
 
-            {/* Team Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Team Members ({project.groupMembers.length})
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="space-y-0 pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Users className="h-4 w-4 text-primary" />
+                  </span>
+                  Team ({project.groupMembers.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {project.groupMembers.map((member, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium text-primary">
-                          {member
-                            .split(" ")
-                            .filter(Boolean)
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </span>
+              <CardContent className="pt-4 max-h-[320px] overflow-y-auto [scrollbar-width:thin]">
+                <div className="space-y-2">
+                  {project.groupMembers.map((member) => (
+                    <div
+                      key={member}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 transition-colors hover:bg-muted/40",
+                        "sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-x-3"
+                      )}
+                    >
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
+                        {memberInitials(member)}
                       </div>
-                      <span className="text-sm font-medium truncate" title={member}>
+                      <span className="text-sm font-medium truncate min-w-0" title={member}>
                         {member}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5 shrink-0 w-full sm:w-auto justify-center sm:justify-center"
+                        title={`View ${member}`}
+                        onClick={() => setSelectedActiveMemberName(member)}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -942,19 +1373,20 @@ export default function ProjectsOverview() {
             </Card>
           </div>
 
-          {/* Technologies */}
           {project.technologies && project.technologies.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Code className="h-5 w-5 text-primary" />
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Code className="h-4 w-4 text-primary" />
+                  </span>
                   Technologies
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 <div className="flex flex-wrap gap-2">
                   {project.technologies.map((tech) => (
-                    <Badge key={tech} variant="secondary" className="px-3 py-1">
+                    <Badge key={tech} variant="secondary" className="px-2.5 py-1 font-normal">
                       {tech}
                     </Badge>
                   ))}
@@ -963,40 +1395,43 @@ export default function ProjectsOverview() {
             </Card>
           )}
 
-          {/* Milestones */}
           {project.milestones && project.milestones.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <GitBranch className="h-5 w-5 text-primary" />
-                  Project Milestones
+            <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <GitBranch className="h-4 w-4 text-primary" />
+                  </span>
+                  Milestones
                 </CardTitle>
-                <CardDescription>Track progress of key project phases</CardDescription>
+                <CardDescription className="text-xs">Key phases and due dates</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="pt-4">
+                <div className="space-y-3">
                   {project.milestones.map((milestone, index) => (
-                    <div key={index} className="flex items-center gap-4">
+                    <div
+                      key={index}
+                      className="flex gap-4 rounded-lg border bg-muted/20 px-3 py-3 sm:px-4"
+                    >
                       <div
-                        className={`h-2 w-2 rounded-full ${
-                          milestone.status === "completed"
-                            ? "bg-green-500"
-                            : milestone.status === "in-progress"
-                              ? "bg-yellow-500"
-                              : "bg-gray-300"
-                        }`}
+                        className={cn(
+                          "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background",
+                          milestone.status === "completed" && "bg-emerald-500",
+                          milestone.status === "in-progress" && "bg-primary",
+                          milestone.status === "pending" && "bg-muted-foreground/35"
+                        )}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center gap-3">
-                          <p className="text-sm font-medium truncate" title={milestone.name}>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <p className="text-sm font-medium leading-snug" title={milestone.name}>
                             {milestone.name}
                           </p>
-                          <p className="text-xs text-muted-foreground whitespace-nowrap">
-                            Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                          </p>
+                          <Badge variant="outline" className="w-fit text-[10px] capitalize shrink-0">
+                            {milestone.status.replace("-", " ")}
+                          </Badge>
                         </div>
-                        <p className="text-xs capitalize text-muted-foreground mt-1">
-                          Status: {milestone.status.replace("-", " ")}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Due {new Date(milestone.dueDate).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -1006,12 +1441,12 @@ export default function ProjectsOverview() {
             </Card>
           )}
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
+          <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/30">
+              <CardTitle className="text-base font-semibold">Quick actions</CardTitle>
+              <CardDescription className="text-xs">Shortcuts for this project</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <ActionButton
                   icon={FileText}
@@ -1024,14 +1459,83 @@ export default function ProjectsOverview() {
                   onClick={() => toast("Schedule meeting", { description: "Calendar integration coming soon" })}
                 />
                 <ActionButton
-                  icon={Users}
-                  label="Contact Team"
-                  onClick={() => router.push("/dashboard/department-head/projects/teams")}
+                  icon={MessageSquare}
+                  label="Comment"
+                  onClick={() => setShowProjectCommentDialog(true)}
                 />
               </div>
             </CardContent>
           </Card>
         </div>
+
+        <Dialog open={showProjectCommentDialog} onOpenChange={setShowProjectCommentDialog}>
+          <DialogContent
+            showCloseButton
+            className="sm:max-w-[440px] gap-0 overflow-hidden rounded-xl border-0 p-0 shadow-xl sm:rounded-xl"
+          >
+            <div className="border-b bg-gradient-to-r from-primary/15 via-primary/5 to-transparent px-6 pt-6 pb-4">
+              <DialogHeader className="space-y-2 text-left">
+                <DialogTitle className="flex items-center gap-3 text-lg font-semibold tracking-tight">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 border border-primary/10">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                  </span>
+                  Comment
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
+                  Leave a note for <span className="font-medium text-foreground">{project.title}</span>
+                  . This is a UI preview only until messaging is connected.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="space-y-3 px-6 py-5">
+              <Textarea
+                placeholder="Write your comment for the project team…"
+                value={projectCommentText}
+                onChange={(e) => setProjectCommentText(e.target.value)}
+                className="min-h-[132px] resize-none rounded-lg border-border/80 bg-muted/20 text-sm leading-relaxed focus-visible:ring-primary/30"
+              />
+            </div>
+            <DialogFooter className="border-t bg-muted/20 px-6 py-4 sm:justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowProjectCommentDialog(false)
+                  setProjectCommentText("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="btn-gradient"
+                onClick={() => {
+                  const trimmed = projectCommentText.trim()
+                  if (!trimmed) {
+                    toast.error("Comment is empty", {
+                      description: "Add some text before sending.",
+                    })
+                    return
+                  }
+                  toast.success("Comment sent", {
+                    description: `Your note on “${project.title}” was recorded (demo).`,
+                  })
+                  setProjectCommentText("")
+                  setShowProjectCommentDialog(false)
+                }}
+              >
+                Send
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <ActiveProjectMemberDetailDialog
+          member={selectedActiveMemberName}
+          project={project}
+          open={selectedActiveMemberName !== null}
+          onClose={() => setSelectedActiveMemberName(null)}
+        />
       </div>
     )
   }
@@ -1045,7 +1549,7 @@ export default function ProjectsOverview() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in px-6 max-w-[1920px] mx-auto">
+    <div className="space-y-6 animate-fade-in">
       <DashboardPageHeader
         title="Projects Overview"
         description="Monitor and manage all department projects, both active and completed"
@@ -1065,23 +1569,27 @@ export default function ProjectsOverview() {
         }
       />
 
-      {/* Statistics Cards - Full width grid */}
+      {/* ── KPI row (aligned with standard dashboard cards) ── */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
                 <p className="text-3xl font-bold mt-2">{totalProjects}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 whitespace-nowrap">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge className="text-xs bg-primary/10 text-primary whitespace-nowrap">
+                    <Activity className="h-3 w-3 mr-1" />
                     Active: {activeCount}
                   </Badge>
-                  <Badge variant="secondary" className="text-xs whitespace-nowrap">Completed: {completedCount}</Badge>
+                  <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Done: {completedCount}
+                  </Badge>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-                <FolderOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <FolderOpen className="h-6 w-6 text-primary" />
               </div>
             </div>
           </CardContent>
@@ -1089,17 +1597,19 @@ export default function ProjectsOverview() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
                 <p className="text-3xl font-bold mt-2">{activeCount}</p>
                 <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">Avg Progress: {avgProgress}%</span>
+                  <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    Avg progress: <span className="font-semibold text-foreground">{avgProgress}%</span>
+                  </span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
-                <Activity className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                <Activity className="h-6 w-6 text-emerald-600" />
               </div>
             </div>
           </CardContent>
@@ -1107,17 +1617,19 @@ export default function ProjectsOverview() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
                 <p className="text-3xl font-bold mt-2">{completedCount}</p>
                 <div className="flex items-center gap-1 mt-2">
-                  <Award className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">Avg Grade: 90%</span>
+                  <Award className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    Avg grade: <span className="font-semibold text-foreground">90%</span>
+                  </span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                <CheckCircle className="h-6 w-6 text-amber-600" />
               </div>
             </div>
           </CardContent>
@@ -1125,98 +1637,109 @@ export default function ProjectsOverview() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
                 <p className="text-3xl font-bold mt-2">${(totalBudget / 1000).toFixed(1)}K</p>
                 <div className="flex items-center gap-1 mt-2">
-                  <Users className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">{allProjects.reduce((acc, p) => acc + p.groupMembers.length, 0)} Students</span>
+                  <Users className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    {allProjects.reduce((acc, p) => acc + p.groupMembers.length, 0)} students
+                  </span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center flex-shrink-0">
-                <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <DollarSign className="h-6 w-6 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filter - Full width */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search projects by title, group, advisor, or tags..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-full"
-              />
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-input bg-background rounded-md text-sm min-w-[180px]"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'all' ? 'All Categories' : cat}
-                  </option>
-                ))}
-              </select>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchTerm('');
-                  setCategoryFilter('all');
-                }}
-                className="whitespace-nowrap"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Clear
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Search + Filter bar ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-muted/40 border rounded-xl px-4 py-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search by title, group, advisor or tags…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-background border-0 shadow-sm h-9 text-sm"
+          />
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="min-w-[160px] h-9 text-sm bg-background border-0 shadow-sm">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat} className="text-sm">
+                  {cat === "all" ? "All Categories" : cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(searchTerm || categoryFilter !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSearchTerm(""); setCategoryFilter("all") }}
+              className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Filter className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
+      </div>
 
-      {/* Projects Tabs */}
+      {/* ── Projects Tabs ── */}
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as "active" | "past")}
         className="space-y-4"
       >
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="active" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Active ({filteredActiveProjects.length})
+        <TabsList className="h-10 bg-muted/50 p-1 rounded-xl gap-1">
+          <TabsTrigger
+            value="active"
+            className="rounded-lg text-sm gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm px-5"
+          >
+            <Activity className="h-3.5 w-3.5" />
+            Active
+            <span className="ml-1 inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold bg-primary/15 text-primary">
+              {filteredActiveProjects.length}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="past" className="flex items-center gap-2">
-            <Archive className="h-4 w-4" />
-            Past ({filteredPastProjects.length})
+          <TabsTrigger
+            value="past"
+            className="rounded-lg text-sm gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm px-5"
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Past
+            <span className="ml-1 inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold bg-muted-foreground/15 text-muted-foreground">
+              {filteredPastProjects.length}
+            </span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
+        <TabsContent value="active" className="mt-0">
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/20">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-display">Current Projects</CardTitle>
-                  <CardDescription>
-                    {filteredActiveProjects.length} active projects in progress
-                  </CardDescription>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                    <Activity className="h-3.5 w-3.5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Current Projects</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      {filteredActiveProjects.length} active project{filteredActiveProjects.length !== 1 ? "s" : ""} in progress
+                    </CardDescription>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                >
-                  <Link href="/dashboard/department-head/projects/active" className="whitespace-nowrap">
-                    View All <ChevronRight className="h-4 w-4 ml-1" />
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+                  <Link href="/dashboard/department-head/projects/active">
+                    View All <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
               </div>
@@ -1233,23 +1756,24 @@ export default function ProjectsOverview() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="past" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
+        <TabsContent value="past" className="mt-0">
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/20">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-display">Completed Projects</CardTitle>
-                  <CardDescription>
-                    {filteredPastProjects.length} archived projects with documentation
-                  </CardDescription>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                    <Archive className="h-3.5 w-3.5 text-amber-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Completed Projects</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      {filteredPastProjects.length} archived project{filteredPastProjects.length !== 1 ? "s" : ""} with documentation
+                    </CardDescription>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                >
-                  <Link href="/dashboard/department-head/projects/archived" className="whitespace-nowrap">
-                    View Archive <ChevronRight className="h-4 w-4 ml-1" />
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+                  <Link href="/dashboard/department-head/projects/archived">
+                    View Archive <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
               </div>
@@ -1267,47 +1791,42 @@ export default function ProjectsOverview() {
         </TabsContent>
       </Tabs>
 
-      {/* Quick Stats - Full width */}
+      {/* ── Quick Stats strip ── */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Upcoming Deadlines</p>
-                <p className="text-2xl font-bold mt-2">5</p>
-                <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">Next: May 30, 2024</p>
-              </div>
-              <Clock className="h-8 w-8 text-blue-500 flex-shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-4 rounded-xl border bg-primary/5 border-primary/10 px-5 py-4">
+          <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Upcoming Deadlines</p>
+            <p className="text-2xl font-bold mt-0.5">5</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Next: May 30, 2024</p>
+          </div>
+        </div>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/20 dark:to-green-900/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">Projects Awaiting Review</p>
-                <p className="text-2xl font-bold mt-2">3</p>
-                <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">Pending evaluation</p>
-              </div>
-              <ClipboardCheck className="h-8 w-8 text-green-500 flex-shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-4 rounded-xl border bg-emerald-500/5 border-emerald-200/40 px-5 py-4">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <ClipboardCheck className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Awaiting Review</p>
+            <p className="text-2xl font-bold mt-0.5">3</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Pending evaluation</p>
+          </div>
+        </div>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/20 dark:to-purple-900/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Top Categories</p>
-                <p className="text-2xl font-bold mt-2">6</p>
-                <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">AI, IoT, Blockchain, etc.</p>
-              </div>
-              <PieChart className="h-8 w-8 text-purple-500 flex-shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-4 rounded-xl border bg-muted/40 px-5 py-4">
+          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <PieChart className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Top Categories</p>
+            <p className="text-2xl font-bold mt-0.5">6</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">AI, IoT, Blockchain…</p>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }

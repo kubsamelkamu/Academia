@@ -2,12 +2,11 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowLeft,
   Send,
   Users,
   Save,
@@ -21,11 +20,6 @@ import {
   ChevronDown
 } from "lucide-react"
 import { toast } from "sonner"
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
@@ -231,7 +225,7 @@ export function DepartmentHeadMessagesComposePage() {
       setPriority("normal")
       setAttachments([])
       
-    } catch (error) {
+    } catch {
       toast.error("Failed to send message", {
         description: "Please try again or contact support.",
         icon: <AlertCircle className="h-4 w-4" />,
@@ -256,7 +250,7 @@ export function DepartmentHeadMessagesComposePage() {
       toast.success("Draft saved", {
         description: "Your message has been saved to drafts.",
       })
-    } catch (error) {
+    } catch {
       toast.error("Failed to save draft")
     } finally {
       setIsSaving(false)

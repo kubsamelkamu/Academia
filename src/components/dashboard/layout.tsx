@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { Suspense, useEffect, useMemo, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
@@ -9,6 +9,7 @@ import { ThemeCustomizer } from "@/components/providers/theme-customizer"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
+import { DepartmentHeadVerificationRouteGuard } from "@/components/dashboard/department-head-verification-route-guard"
 import { TenantEnforcementNotice } from "@/components/notifications/tenant-enforcement-notice"
 import { NotificationsRealtime } from "@/components/notifications/notifications-realtime"
 import { ProjectGroupAnnouncementsRealtime } from "@/components/realtime/project-group-announcements-realtime"
@@ -71,29 +72,6 @@ export default function DashboardLayout({
     }
   }, [accessToken, pathname, primaryRole, router, user])
 
-  useEffect(() => {
-    if (!accessToken || !user) {
-      return
-    }
-
-    if (primaryRole !== "department_head") {
-      return
-    }
-
-    // Unknown state (not fetched yet) -> don't redirect.
-    if (user.tenantVerification === undefined) {
-      return
-    }
-
-    const status = user.tenantVerification?.status ?? null
-    const requiresUpload = status === null || status === "REJECTED"
-    const isOnVerificationPage = pathname === "/dashboard/verify-institution"
-
-    if (requiresUpload && !isOnVerificationPage) {
-      router.replace("/dashboard/verify-institution")
-    }
-  }, [accessToken, pathname, primaryRole, router, user])
-
   const shellUser = useMemo(() => {
     const role = primaryRole ?? "student"
     const name = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || "User"
@@ -121,6 +99,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <Suspense fallback={null}>
+        <DepartmentHeadVerificationRouteGuard />
+      </Suspense>
       <NotificationsRealtime />
       <ProjectGroupAnnouncementsRealtime />
       <DepartmentAnnouncementsRealtime />

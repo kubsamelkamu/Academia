@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Save } from "lucide-react"
+import { Save } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
@@ -100,23 +101,6 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
   const actionUrl = draft?.actionUrl ?? announcement?.actionUrl ?? ""
   const deadlineAtLocal = draft?.deadlineAtLocal ?? toLocalInputValue(announcement?.deadlineAt ?? null)
   const initialDeadlineAtIso = announcement?.deadlineAt ?? null
-
-  const createdByLabel = useMemo(() => {
-    if (!announcement) return "Unknown"
-    const firstName = announcement.createdBy.firstName?.trim() ?? ""
-    const lastName = announcement.createdBy.lastName?.trim() ?? ""
-    return `${firstName} ${lastName}`.trim() || "Unknown"
-  }, [announcement])
-
-  const statusLabel = useMemo(() => {
-    if (!announcement) return undefined
-    return announcement.isExpired ? "Expired" : "Active"
-  }, [announcement])
-
-  const createdAtLabel = useMemo(() => {
-    if (!announcement) return undefined
-    return new Date(announcement.createdAt).toLocaleString()
-  }, [announcement])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -260,9 +244,7 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
           title="Announcement not found"
           description="The requested announcement could not be found."
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/announcements">Back to Announcements</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/announcements" variant="outline" />
       </div>
     )
   }
@@ -272,14 +254,7 @@ export function AnnouncementEditPage({ announcementId }: AnnouncementEditPagePro
       <DashboardPageHeader
         title="Edit Announcement"
         description={`Edit information for ${announcement.title}`}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/announcements" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Announcements
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/announcements" variant="outline" />}
       />
 
       <form

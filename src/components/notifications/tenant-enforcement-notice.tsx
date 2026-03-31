@@ -118,7 +118,7 @@ export function TenantEnforcementNotice({ role, isAuthenticated }: { role: UserR
 
   const href =
     resolveInternalHref(target.notification) ??
-    (target.kind === "suspension" ? "/account-suspended" : "/dashboard/verify-institution")
+    (target.kind === "suspension" ? "/account-suspended" : "/dashboard/settings?tab=verification")
 
   const variant = target.kind === "suspension" ? "destructive" : "default"
   const Icon = target.kind === "suspension" ? AlertCircle : Clock
