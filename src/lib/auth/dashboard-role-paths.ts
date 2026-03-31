@@ -6,6 +6,7 @@ const roleSlugMap: Record<UserRole, string> = {
   advisor: "advisor",
   student: "student",
   department_committee: "department-committee",
+  evaluator: "evaluator",
 }
 
 const slugRoleMap: Record<string, UserRole> = {
@@ -19,6 +20,7 @@ const slugRoleMap: Record<string, UserRole> = {
   "department-committee": "department_committee",
   departmentcommittee: "department_committee",
   committee: "department_committee",
+  evaluator: "evaluator",
 }
 
 const directRoleMap: Record<string, UserRole> = {
@@ -27,6 +29,7 @@ const directRoleMap: Record<string, UserRole> = {
   advisor: "advisor",
   student: "student",
   department_committee: "department_committee",
+  evaluator: "evaluator",
 }
 
 function normalizeRoleInput(value: string): string {
@@ -67,6 +70,7 @@ export function getPrimaryRoleFromBackendRoles(roles: string[] | undefined): Use
     "department_head",
     "coordinator",
     "advisor",
+    "evaluator",
     "department_committee",
     "student",
   ]

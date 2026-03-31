@@ -198,6 +198,24 @@ export function getDefaultDashboardLayout(role: UserRole): DashboardLayoutState 
       }
     }
 
+    case "evaluator": {
+      const layouts = baseLayouts({
+        lg: [],
+        md: [],
+        sm: [],
+        xs: [],
+      })
+
+      return {
+        version: 1,
+        role,
+        enabledWidgetIds: [],
+        layouts,
+        widgetSettings: {},
+        updatedAt: nowIso(),
+      }
+    }
+
     default: {
       const exhaustive: never = role
       return exhaustive
