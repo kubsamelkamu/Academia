@@ -13,7 +13,6 @@ import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
-import type { DepartmentAnnouncementItem } from "@/types/department-announcements"
 import { getTemplateDueDate } from "@/lib/milestone-template-dates"
 import {
   BarChart3,
@@ -225,10 +224,12 @@ interface StudentDashboardProps {
   userName?: string
 }
 
+type StudentDeadlineAnnouncement = import("@/types/department-announcements").DepartmentAnnouncementItem
+
 function StudentNextDeadlineAnnouncementBody({
   announcement,
 }: {
-  announcement: DepartmentAnnouncementItem
+  announcement: StudentDeadlineAnnouncement
 }) {
   const [elapsed, setElapsed] = useState(0)
 
