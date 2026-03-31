@@ -4,6 +4,12 @@ import { useAuthStore } from "@/store/auth-store"
 import * as React from "react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { useMemo, useCallback, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/auth-store"
+import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
+import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
+import type { ApiAdvisorProject, ApiMilestoneDetail } from "@/lib/api/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -21,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+
 import {
   advisorKeys,
   useAdvisorAnnouncements,
@@ -218,6 +224,52 @@ const ProjectCard = React.memo(function ProjectCard({
   )
 })
 
+ProjectCard.displayName = "ProjectCard"
+
+// ── API → dashboard shape mappers ───────────────────────────────────────────
+
+const DASH_PROJECT_STATUS: Record<string, ProjectStatus> = {
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  CANCELLED: "on-hold",
+  IN_PROGRESS: "active",
+  PENDING_REVIEW: "pending-review",
+  CLEARED: "cleared",
+}
+
+const DASH_MILESTONE_STATUS: Record<string, MilestoneStatus> = {
+  APPROVED: "approved",
+  COMPLETED: "approved",
+  SUBMITTED: "submitted",
+  PENDING: "pending",
+  REJECTED: "revision",
+  IN_PROGRESS: "pending",
+}
+
+function mapDetailToMilestone(m: ApiMilestoneDetail): ProjectMilestone {
+  return {
+    id: m.id,
+    name: m.title,
+    dueDate: m.dueDate,
+    status: DASH_MILESTONE_STATUS[m.status] ?? "pending",
+    submittedAt: m.submittedAt ?? undefined,
+  }
+}
+
+function mapApiToDashboardProject(p: ApiAdvisorProject): AdvisorProject {
+  return {
+    id: p.id,
+    title: p.title,
+    groupName: p.group.name,
+    advisorId: "",
+    status: DASH_PROJECT_STATUS[p.status] ?? "active",
+    progress: p.milestones.progressPercent,
+    lastUpdated: p.startedAt,
+    milestones: (p.milestones.details ?? []).map(mapDetailToMilestone),
+  }
+}
+
+// Main component
 interface AdvisorDashboardProps {
   userName?: string
 }
@@ -278,30 +330,42 @@ export function AdvisorDashboard({ userName = "Advisor" }: AdvisorDashboardProps
     upcomingMeetings: meetings.filter((meeting: AdvisorMeeting) => new Date(`${meeting.date}T${meeting.time}:00`).getTime() >= now.getTime()).length,
   }
 
-  const clearMutation = useClearProjectMutation()
-  const requestRevisionMutation = useRequestRevisionMutation()
-  const approveMilestoneMutation = useApproveMilestoneMutation()
-  const sendGroupMessageMutation = useSendGroupMessageMutation()
-  const createMeetingMutation = useCreateMeetingMutation()
-  const deleteMeetingMutation = useDeleteMeetingMutation()
-  const createAnnouncementMutation = useCreateAnnouncementMutation()
+  const { data: summaryData } = useAdvisorSummary()
+  const { data: projectsData } = useAdvisorProjects()
 
-  const handleApproveMilestone = async (project: AdvisorProject, milestone: ProjectMilestone) => {
-    try {
-      await approveMilestoneMutation.mutateAsync({ milestoneId: milestone.id, dto: { status: "APPROVED" } })
-      toast.success(`${project.groupName}: ${milestone.name} approved.`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to approve milestone")
-    }
-  }
+  const myProjects = useMemo(() =>
+    projectsData
+      ? projectsData.map(mapApiToDashboardProject)
+      : mockAdvisorProjects.filter((p) => p.advisorId === advisorId),
+    [projectsData, advisorId]
+  )
+  
+  const pendingMilestones = useMemo(() => 
+    myProjects.flatMap((p) => 
+      p.milestones
+        .filter((m) => m.status === "submitted")
+        .map((m) => ({ project: p, milestone: m }))
+    ), 
+    [myProjects]
+  )
 
-  const handleRequestMilestoneRevision = async (project: AdvisorProject, milestone: ProjectMilestone) => {
-    const feedback = window.prompt(`Revision feedback for ${milestone.name}`, "")
-    if (feedback === null) return
-    if (!feedback.trim()) {
-      toast.error("Revision feedback is required.")
-      return
-    }
+  const stats = useMemo(() => {
+    const activeProjects = summaryData?.metrics.projectStatusCounts.ACTIVE ?? 0
+    const totalGroups = summaryData?.metrics.totalGroupsAdvising ?? 0
+    const studentsCount = summaryData?.metrics.totalStudentsAdvising ?? 0
+    const clearedCount = summaryData?.metrics.projectStatusCounts.COMPLETED ?? 0
+
+    return { activeProjects, totalGroups, studentsCount, clearedCount }
+  }, [summaryData, projectsData])
+
+  // Event handlers
+  const handleApproveMilestone = useCallback((project: AdvisorProject, milestone: ProjectMilestone) => {
+    toast.success("Milestone Approved", { 
+      description: `${project.groupName} • ${milestone.name} has been approved.`,
+      duration: 5000,
+    })
+    // Here you would typically update the backend
+  }, [])
 
     try {
       await requestRevisionMutation.mutateAsync({
@@ -437,7 +501,7 @@ export function AdvisorDashboard({ userName = "Advisor" }: AdvisorDashboardProps
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Advisor Workspace</h1>
           <p className="text-muted-foreground">
-            Live advisor dashboard for {displayName || "Advisor"}. Projects, reviews, chat, meetings, and announcements are connected to the backend.
+            You have {stats.activeProjects} active project{stats.activeProjects !== 1 ? 's' : ''} and {stats.totalGroups} project group{stats.totalGroups !== 1 ? 's' : ''} under your supervision.
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground">
@@ -445,18 +509,49 @@ export function AdvisorDashboard({ userName = "Advisor" }: AdvisorDashboardProps
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard title="Active Projects" value={stats.activeProjects} subtitle="Current supervision" icon={FolderOpen} iconClassName="bg-primary/10 text-primary" />
-        <StatCard title="Pending Reviews" value={stats.pendingReviews} subtitle="Milestones waiting" icon={Clock} iconClassName="bg-warning/10 text-warning" />
-        <StatCard title="Students" value={stats.studentsCount} subtitle="Under your guidance" icon={Users} iconClassName="bg-accent/10 text-accent" />
-        <StatCard title="Cleared" value={stats.clearedCount} subtitle="Ready for evaluation" icon={CheckCircle} iconClassName="bg-success/10 text-success" />
-        <StatCard title="Unread Groups" value={stats.unreadGroups} subtitle={`${stats.upcomingMeetings} upcoming meetings`} icon={MessageSquare} iconClassName="bg-muted text-foreground" />
+      {/* Stats Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Active Projects"
+          value={stats.activeProjects}
+          subtitle="Currently supervising"
+          icon={FolderOpen}
+          iconClassName="bg-primary/10 text-primary"
+        />
+        <StatCard
+          title="Project Groups"
+          value={stats.totalGroups}
+          subtitle="Total groups assigned"
+          icon={Users}
+          iconClassName="bg-warning/10 text-warning"
+        />
+        <StatCard
+          title="Students"
+          value={stats.studentsCount}
+          subtitle="Under your guidance"
+          icon={Users}
+          iconClassName="bg-accent/10 text-accent"
+        />
+        <StatCard
+          title="Cleared Projects"
+          value={stats.clearedCount}
+          subtitle="Ready for evaluation"
+          icon={CheckCircle}
+          iconClassName="bg-success/10 text-success"
+        />
       </div>
 
       <Tabs defaultValue="projects" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto">
           <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <TabsTrigger value="milestones" className="relative">
+            Reviews
+            {pendingMilestones.length > 0 && (
+              <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                {pendingMilestones.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
         </TabsList>
 

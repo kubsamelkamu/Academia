@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,11 +11,19 @@ import { ArrowLeft, Download, Eye, FileText, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { useDocumentTemplatesList } from "@/lib/hooks/use-document-templates"
-import { useCreateProposalWithPdf, useSubmitProposalForReview } from "@/lib/hooks/use-project-proposals"
+import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
+import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
+import {
+  useCreateProposalWithPdf,
+  useMyGroupProposals,
+  useSubmitProposalForReview,
+} from "@/lib/hooks/use-project-proposals"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useAuthStore } from "@/store/auth-store"
 import type { DepartmentDocumentTemplate, DocumentTemplateType } from "@/types/document-templates"
 import type { ProjectProposal } from "@/types/project-proposals"
+
+type MilestoneStatus = "pending" | "submitted" | "approved"
 
 function getRecommendedTemplateType(milestone: string): DocumentTemplateType | null {
   if (milestone === "requirements") return "SRS"
@@ -32,6 +40,7 @@ function milestoneParamToKey(param: string | null): string {
   const normalized = normalizeMilestoneParam(param)
   if (!normalized) return ""
   if (normalized.includes("proposal")) return "proposal"
+  if (normalized.includes("project title")) return "proposal"
   if (normalized.includes("requirement") || normalized.includes("srs")) return "requirements"
   if (normalized.includes("design") || normalized.includes("sdd")) return "design"
   if (normalized.includes("implementation")) return "implementation"
@@ -77,24 +86,93 @@ function formatFileSize(sizeBytes: number | null | undefined) {
   return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
+function normalizeMilestoneName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function isProposalMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  return normalized.includes("proposal") || normalized.includes("project title")
+}
+
+function toProposalMilestoneState(proposals: ProjectProposal[] | null | undefined): {
+  status: MilestoneStatus
+  submittedAt?: string
+} | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  const latest = sorted[0]
+  const latestStatus = normalizeStatus(latest?.status)
+  const latestSubmittedAt = latest?.submittedAt ?? latest?.updatedAt ?? latest?.createdAt ?? undefined
+
+  if (latestStatus === "APPROVED") {
+    return { status: "approved", submittedAt: latestSubmittedAt }
+  }
+
+  if (latestStatus === "SUBMITTED") {
+    return { status: "submitted", submittedAt: latestSubmittedAt }
+  }
+
+  return { status: "pending" }
+}
+
+function mapBackendStatus(status: string): MilestoneStatus {
+  const normalized = status.trim().toLowerCase()
+  if (normalized === "approved" || normalized === "completed") return "approved"
+  if (normalized === "submitted") return "submitted"
+  return "pending"
+}
+
+function titleToMilestoneKey(title: string): string {
+  const normalized = normalizeMilestoneName(title)
+  if (!normalized) return ""
+  if (normalized.includes("proposal") || normalized.includes("project title")) return "proposal"
+  if (normalized.includes("requirement") || normalized.includes("srs")) return "requirements"
+  if (normalized.includes("design") || normalized.includes("sdd")) return "design"
+  if (normalized.includes("implementation")) return "implementation"
+  if (
+    normalized.includes("final") ||
+    normalized.includes("defense") ||
+    normalized.includes("presentation") ||
+    normalized.includes("report")
+  ) {
+    return "final"
+  }
+  return ""
+}
+
 export function StudentUploadDocumentsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const departmentId = useAuthStore((s) => s.user?.departmentId)
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const studentId = useAuthStore((s) => s.user?.id)
-  const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+  const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const studentId = user?.id ?? null
+
+  const myProjectGroupQuery = useMyProjectGroup(Boolean(user))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(user))
   const projectTitle = myProjectGroupQuery.data?.name?.trim() || ""
   const [title, setTitle] = useState("")
   const [milestone, setMilestone] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const hasRedirectedRef = useRef(false)
 
   const milestoneParam = searchParams.get("milestone")
   const milestoneKeyFromParam = useMemo(() => milestoneParamToKey(milestoneParam), [milestoneParam])
 
   useEffect(() => {
     if (!milestone && milestoneKeyFromParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMilestone(milestoneKeyFromParam)
     }
   }, [milestone, milestoneKeyFromParam])
@@ -105,6 +183,90 @@ export function StudentUploadDocumentsPage() {
     return normalizedParam.includes("proposal")
   }, [milestone, milestoneParam])
 
+  const { data: milestoneTemplatesData } = useMilestoneTemplatesList(departmentId, {
+    page: 1,
+    limit: 100,
+  })
+
+  const { data: projectsData } = useStudentProjects({
+    departmentId,
+    studentId,
+  })
+
+  const activeProject = useMemo(() => {
+    const items = projectsData?.items ?? []
+    if (!items.length) return null
+
+    return (
+      items.find((project) => project.status.toLowerCase() === "in-progress") ??
+      items.find((project) => project.status.toLowerCase() === "active") ??
+      items[0]
+    )
+  }, [projectsData?.items])
+
+  const { data: projectMilestonesData } = useProjectMilestones({
+    projectId: activeProject?.id,
+    enabled: Boolean(activeProject?.id),
+  })
+
+  const prerequisiteCheck = useMemo(() => {
+    if (!milestone) return null
+
+    const templates = milestoneTemplatesData?.templates ?? []
+    const activeTemplate = templates.find((t) => t.isActive) ?? templates[0] ?? null
+    if (!activeTemplate?.milestones?.length) return null
+
+    const orderedTemplateMilestones = activeTemplate.milestones
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+
+    const projectMilestonesByName = new Map(
+      (projectMilestonesData?.items ?? []).map((item) => [normalizeMilestoneName(item.title), item])
+    )
+
+    const proposalMilestoneState = toProposalMilestoneState(myGroupProposalsQuery.data)
+
+    const orderedStatuses = orderedTemplateMilestones.map((templateMilestone) => {
+      const matched = projectMilestonesByName.get(normalizeMilestoneName(templateMilestone.title))
+      const mappedStatus = matched ? mapBackendStatus(matched.status) : ("pending" as const)
+
+      if (proposalMilestoneState && isProposalMilestoneName(templateMilestone.title)) {
+        return proposalMilestoneState.status
+      }
+
+      return mappedStatus
+    })
+
+    const currentIndex = orderedTemplateMilestones.findIndex((templateMilestone) => {
+      const key = titleToMilestoneKey(templateMilestone.title)
+      return key === milestone
+    })
+
+    if (currentIndex === -1) return null
+    if (currentIndex <= 0) return { blocked: false }
+
+    const previousIndex = currentIndex - 1
+    const previousStatus = orderedStatuses[previousIndex]
+    if (previousStatus === "approved") return { blocked: false }
+
+    const blockingMilestoneNumber =
+      orderedTemplateMilestones[previousIndex].sequence ?? previousIndex + 1
+    return { blocked: true, blockingMilestoneNumber }
+  }, [milestone, milestoneTemplatesData?.templates, myGroupProposalsQuery.data, projectMilestonesData?.items])
+
+  useEffect(() => {
+    if (hasRedirectedRef.current) return
+    if (!prerequisiteCheck?.blocked) return
+
+    hasRedirectedRef.current = true
+    toast.error(
+      prerequisiteCheck.blockingMilestoneNumber
+        ? `Locked until Milestone ${prerequisiteCheck.blockingMilestoneNumber} is approved.`
+        : "This milestone is locked until previous milestones are approved."
+    )
+    router.replace("/dashboard/student/milestones")
+  }, [prerequisiteCheck, router])
+
   const milestoneLabel = useMemo(() => milestoneKeyToLabel(milestone), [milestone])
 
   useEffect(() => {
@@ -114,7 +276,6 @@ export function StudentUploadDocumentsPage() {
 
     const base = projectTitle || ""
     const suggested = base ? `${base} — ${milestoneLabel}` : milestoneLabel
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(suggested)
   }, [isProposalFlow, milestone, milestoneLabel, projectTitle, title])
 
