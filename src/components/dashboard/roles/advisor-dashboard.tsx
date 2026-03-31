@@ -532,9 +532,9 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="milestones" className="relative">
             Reviews
-            {stats.pendingReviews > 0 && (
+            {pendingMilestones.length > 0 && (
               <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-                {stats.pendingReviews}
+                {pendingMilestones.length}
               </Badge>
             )}
           </TabsTrigger>
