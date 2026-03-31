@@ -4,25 +4,22 @@ import React, { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { DashboardBackButton } from "@/components/dashboard/dashboard-back"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  ArrowLeft, 
-  Search, 
-  Filter, 
-  MessageSquare, 
-  Users, 
-  Clock, 
+import {
+  Search,
+  Filter,
+  MessageSquare,
+  Users,
   Plus,
   Inbox,
-  Send,
   Archive,
   Star,
   MoreVertical,
   CheckCheck,
-  AlertCircle
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -151,13 +148,6 @@ export function DepartmentHeadMessagesPage() {
     )
   }
 
-  const handleArchiveToggle = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setConversations(prev =>
-      prev.map(c => c.id === id ? { ...c, isArchived: !c.isArchived } : c)
-    )
-  }
-
   const getStatusBadge = (status: Conversation["status"]) => {
     switch (status) {
       case "active":
@@ -190,15 +180,10 @@ export function DepartmentHeadMessagesPage() {
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
+              <DashboardBackButton
                 onClick={() => router.back()}
-                className="gap-2 hover:bg-background/80"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
+                className="hover:bg-background/80"
+              />
               <div className="h-8 w-px bg-border" />
               <div>
                 <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">

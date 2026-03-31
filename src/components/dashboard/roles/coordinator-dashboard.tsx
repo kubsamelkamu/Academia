@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState } from "react"
 import StatCard from "@/components/shared/StatCard"
 import DataTable, { Column } from "@/components/shared/DataTable"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -12,24 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { TimelineCard } from "@/components/timeline/TimelineCard"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import {
-  LayoutDashboard,
   FileText,
   Users,
   ClipboardCheck,
   Calculator,
-  MessageSquare,
   AlertTriangle,
   Send,
   UserPlus,
   CheckCircle2,
-  XCircle,
   TrendingUp,
   Clock,
-  FileCheck,
   BarChart3,
   Timer,
 } from "lucide-react"
@@ -39,15 +34,10 @@ import {
   mockProjectTitles,
   mockProjects,
   mockEvaluations,
-  mockGrades,
   mockComplaints,
   mockUsers,
-  ProjectTitle,
   ProjectSummary,
-  Grade,
   Complaint,
-  Evaluation,
-  formatDate
 } from "@/data/mockData"
 import { mockProjectTimelines, mockTimelineAlerts } from "@/data/timelineData"
 
@@ -55,7 +45,6 @@ export function CoordinatorDashboard() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
   const [selectedAdvisor, setSelectedAdvisor] = useState('')
-  const [localGrades, setLocalGrades] = useState<Grade[]>(mockGrades)
 
   const pendingTitles = mockProjectTitles.filter(t => t.status === 'pending')
   const activeProjects = mockProjects.filter(p => p.status === 'in_progress')
@@ -70,52 +59,6 @@ export function CoordinatorDashboard() {
       description: `Successfully assigned advisor to the project.`,
     })
     setAssignDialogOpen(false)
-  }
-
-  const handleCalculateAll = () => {
-    setLocalGrades(prevGrades =>
-      prevGrades.map(grade => {
-        const scores = grade.evaluatorScores ?? [];
-        const evaluatorAvg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-        const newFinalScore = (grade.advisorScore ?? 0) + (grade.documentationScore ?? 0) + evaluatorAvg;
-
-        // Convert final score to letter grade
-        let newGrade = 'F';
-        if (newFinalScore >= 90) newGrade = 'A+';
-        else if (newFinalScore >= 85) newGrade = 'A';
-        else if (newFinalScore >= 80) newGrade = 'A-';
-        else if (newFinalScore >= 75) newGrade = 'B+';
-        else if (newFinalScore >= 70) newGrade = 'B';
-        else if (newFinalScore >= 65) newGrade = 'B-';
-        else if (newFinalScore >= 60) newGrade = 'C+';
-        else if (newFinalScore >= 55) newGrade = 'C';
-        else if (newFinalScore >= 50) newGrade = 'C-';
-
-        return {
-          ...grade,
-          finalScore: newFinalScore,
-          grade: newGrade
-        };
-      })
-    );
-
-    toast.success('Grades Calculated', {
-      description: 'All final scores have been calculated and grades assigned.',
-    })
-  }
-
-  const handlePublishGrades = () => {
-    setLocalGrades(prevGrades =>
-      prevGrades.map(grade =>
-        grade.status === 'provisional'
-          ? { ...grade, status: 'final' as const }
-          : grade
-      )
-    )
-
-    toast.success('Grades Published', {
-      description: 'Provisional grades have been published as final. Complaint window is now open for 7 days.',
-    })
   }
 
   const projectColumns: Column<ProjectSummary>[] = [
@@ -234,33 +177,6 @@ export function CoordinatorDashboard() {
           </DialogContent>
         </Dialog>
       )
-    },
-  ]
-
-  const gradeColumns: Column<Grade>[] = [
-    { 
-      key: 'studentName', 
-      header: 'Student', 
-      render: (g) => g.studentName 
-    },
-    { 
-      key: 'finalScore', 
-      header: 'Final Score', 
-      render: (g) => (
-        <span className="font-semibold">{g.finalScore.toFixed(1)}%</span>
-      )
-    },
-    { 
-      key: 'grade', 
-      header: 'Grade', 
-      render: (g) => (
-        <Badge className="bg-primary text-primary-foreground">{g.grade}</Badge>
-      )
-    },
-    { 
-      key: 'status', 
-      header: 'Status', 
-      render: (g) => <StatusBadge status={g.status} /> 
     },
   ]
 

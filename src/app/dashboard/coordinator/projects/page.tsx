@@ -34,7 +34,7 @@ function AssignmentDialog({ project, onClose, onAssign, open }: AssignmentDialog
   const [selectedEvaluators, setSelectedEvaluators] = useState<string[]>(project.evaluatorIds || [])
   const { toast } = useToast()
 
-const prevAdvisorIdRef = React.useRef(project.advisorId || '')
+  const prevAdvisorIdRef = React.useRef(project.advisorId || '')
   const prevEvaluatorIdsRef = React.useRef(project.evaluatorIds || [])
 
   useEffect(() => {

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { MessageSquare, Send, Megaphone, Upload, Link as LinkIcon, Calendar } from 'lucide-react';
+import { MessageSquare, Send, Megaphone } from 'lucide-react';
 import { mockUsers, type User } from '@/data/mockData';
 import { toast } from 'sonner';
 
@@ -30,7 +30,7 @@ export function CoordinatorCommunicationPage() {
     { value: 'department_admin', label: 'Department Admins' },
     { value: 'project_coordinator', label: 'Project Coordinators' },
   ];
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [, setUploadedFile] = useState<File | null>(null);
   interface ConversationMessage {
     id: string
     senderName: string

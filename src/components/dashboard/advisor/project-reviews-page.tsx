@@ -1,17 +1,14 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-import { ArrowLeft, CheckCircle, AlertCircle, FileText, MessageSquare, Send } from "lucide-react"
+import { ArrowLeft, CheckCircle, AlertCircle, FileText, MessageSquare } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import StatusBadge from "@/components/shared/StatusBadge"
 
@@ -64,7 +61,8 @@ interface AdvisorProjectReviewsPageProps {
   projectId: string
 }
 
-export function AdvisorProjectReviewsPage({ projectId }: AdvisorProjectReviewsPageProps) {
+export function AdvisorProjectReviewsPage(_props: AdvisorProjectReviewsPageProps) {
+  void _props.projectId
   const router = useRouter()
   const [feedback, setFeedback] = React.useState("")
   const [selectedMilestone, setSelectedMilestone] = React.useState<Milestone | null>(null)

@@ -3,8 +3,8 @@
 import React, { useState, useRef, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { DashboardBackButton } from "@/components/dashboard/dashboard-back"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Tooltip,
@@ -13,7 +13,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { 
-  ArrowLeft, 
   MessageSquare, 
   Users, 
   PhoneCall, 
@@ -24,7 +23,6 @@ import {
   CheckCheck,
   Check,
   Reply,
-  MoreHorizontal,
   Copy,
   Trash2,
   Edit
@@ -570,14 +568,10 @@ export function DepartmentHeadMessagesThreadPage() {
         <div className="flex-shrink-0 border-b bg-background/95 backdrop-blur-sm">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Button
-                variant="ghost"
-                size="icon"
+              <DashboardBackButton
                 onClick={() => router.back()}
-                className="h-8 w-8"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+                className="h-8 px-2 gap-1.5 shrink-0"
+              />
               
               <div className="min-w-0">
                 <h1 className="text-sm font-semibold truncate">{conversation.title}</h1>

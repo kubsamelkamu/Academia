@@ -2,8 +2,9 @@
 
 import React from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, Mail, UserCheck, Users } from "lucide-react"
+import { BookOpen, Mail, UserCheck, Users } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -73,9 +74,7 @@ export function FacultyDetailPage({ facultyId }: FacultyDetailPageProps) {
               : "The requested faculty member could not be found."
           }
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/faculty">Back to Faculty</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />
       </div>
     )
   }
@@ -120,14 +119,7 @@ export function FacultyDetailPage({ facultyId }: FacultyDetailPageProps) {
       <DashboardPageHeader
         title="Faculty details"
         description="View and manage this faculty member"
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/faculty" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Faculty
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />}
       />
 
       <Card>

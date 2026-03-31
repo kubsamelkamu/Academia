@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { mockTeams } from "./projects-teams-data"
-import { ArrowLeft, Send } from "lucide-react"
+import { Send } from "lucide-react"
 import { toast } from "sonner"
+import { DashboardBackButton, DashboardBackLink } from "@/components/dashboard/dashboard-back"
 
 export function ProjectsTeamMessagePage() {
   const router = useRouter()
@@ -24,9 +25,7 @@ export function ProjectsTeamMessagePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
           <p className="text-lg font-semibold">Team not found</p>
-          <Button variant="outline" onClick={() => router.push("/dashboard/department-head/projects/teams")}>
-            Go back to teams
-          </Button>
+          <DashboardBackLink href="/dashboard/department-head/projects/teams" variant="outline" />
         </div>
       </div>
     )
@@ -47,15 +46,10 @@ export function ProjectsTeamMessagePage() {
         <div className="px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
+              <DashboardBackButton
                 onClick={() => router.back()}
-                className="gap-2 hover:bg-background/80"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
+                className="hover:bg-background/80"
+              />
               <div className="h-6 w-px bg-border" />
               <div>
                 <h1 className="text-xl font-semibold truncate max-w-2xl">

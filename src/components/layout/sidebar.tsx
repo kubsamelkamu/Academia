@@ -120,7 +120,7 @@ export function Sidebar({ user }: SidebarProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 text-black" />
                   </motion.span>
                   <span className="relative flex-1">{item.title}</span>
                   {item.badge && (

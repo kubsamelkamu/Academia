@@ -175,10 +175,6 @@ export function AdvisorStudentsPage() {
     setClearanceNotes("")
   }
 
-  function handleRequestRevision(project: ClearanceProject) {
-    toast.message("Revision requested", { description: `Revision request has been sent for ${project.title}.` })
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}

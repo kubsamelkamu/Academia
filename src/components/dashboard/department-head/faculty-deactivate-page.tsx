@@ -3,8 +3,9 @@
 import React, { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, UserCheck, UserX } from "lucide-react"
+import { UserCheck, UserX } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackButton, DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useDeactivateTenantUser, useReactivateTenantUser, useTenantUser } from "@/lib/hooks/use-users"
@@ -44,9 +45,7 @@ export function FacultyDeactivatePage({ facultyId }: FacultyDeactivatePageProps)
               : "The requested faculty member could not be found."
           }
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/faculty">Back to Faculty</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />
       </div>
     )
   }
@@ -96,14 +95,7 @@ export function FacultyDeactivatePage({ facultyId }: FacultyDeactivatePageProps)
             ? "Deactivate this faculty member's account"
             : "Reactivate this faculty member's account"
         }
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/faculty" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Faculty
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />}
       />
 
       <Card className={isActive ? "border-destructive/50" : "border-green-500/40"}>
@@ -160,13 +152,11 @@ export function FacultyDeactivatePage({ facultyId }: FacultyDeactivatePageProps)
                 </Link>
               </p>
               <div className="mt-3">
-                <Button
-                  size="sm"
+                <DashboardBackButton
                   variant="outline"
+                  size="compact"
                   onClick={() => router.push("/dashboard/department-head/faculty")}
-                >
-                  Back to Faculty List
-                </Button>
+                />
               </div>
             </div>
           )}

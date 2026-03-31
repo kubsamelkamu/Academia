@@ -23,7 +23,7 @@ export default async function SectionIdPage({ params }: SectionIdPageProps) {
     return <FacultyDetailPage facultyId={id} />
   }
 
-  if (section === "grades") {
+  if (section === "grades" || section === "review") {
     if (id.startsWith("ga")) {
       return <GroupManagerApplicationDetailPage applicationId={id} />
     }

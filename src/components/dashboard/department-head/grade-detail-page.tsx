@@ -1,9 +1,8 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -25,9 +24,7 @@ export function GradeDetailPage({ gradeId }: GradeDetailPageProps) {
           title="Grade not found"
           description="The requested grade could not be found."
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/grades">Back to Grade Approval</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/review" variant="outline" />
       </div>
     )
   }
@@ -49,14 +46,7 @@ export function GradeDetailPage({ gradeId }: GradeDetailPageProps) {
       <DashboardPageHeader
         title="Grade details"
         description={`Project grade for ${grade.studentName}`}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/grades" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Grade Approval
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/review" variant="outline" />}
       />
 
       <Card>

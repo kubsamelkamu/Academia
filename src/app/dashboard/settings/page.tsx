@@ -1,8 +1,7 @@
 "use client"
 
+import { Suspense, useEffect, useMemo } from "react"
 import { SettingsPageClient } from "@/components/dashboard/settings/settings-page-client"
-
-import { useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
@@ -25,5 +24,15 @@ export default function SettingsPage() {
     return <></>
   }
 
-  return <SettingsPageClient role={primaryRole ?? "student"} />
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+          Loading settings…
+        </div>
+      }
+    >
+      <SettingsPageClient role={primaryRole ?? "student"} />
+    </Suspense>
+  )
 }
