@@ -207,6 +207,7 @@ export function StudentMilestonesPage() {
 
   useEffect(() => {
     const nextOverride = readProposalOverrideFromStorage(studentId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (nextOverride) setProposalOverride(nextOverride)
   }, [studentId])
 
@@ -315,7 +316,7 @@ export function StudentMilestonesPage() {
     }
 
     return myProject.milestones
-  }, [projectMilestonesData?.items, templatesData?.templates])
+  }, [projectMilestonesData?.items, templatesData?.templates, proposalOverride])
 
   const completedMilestones = milestones.filter((m) => m.status === "approved").length
   const totalMilestones = milestones.length

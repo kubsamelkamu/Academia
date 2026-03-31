@@ -357,11 +357,14 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       })[0]
   }, [departmentAnnouncementsQuery.data?.items])
 
-  const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(null)
+  const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(
+    nextDeadlineAnnouncement?.secondsRemaining ?? null
+  )
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUiSecondsRemaining(nextDeadlineAnnouncement?.secondsRemaining ?? null)
-  }, [nextDeadlineAnnouncement?.id, nextDeadlineAnnouncement?.secondsRemaining])
+  }, [nextDeadlineAnnouncement?.secondsRemaining])
 
   useEffect(() => {
     if (uiSecondsRemaining === null || uiSecondsRemaining <= 0) return

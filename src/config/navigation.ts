@@ -16,14 +16,18 @@ import {
   Megaphone,
   MessageSquare,
   Edit,
+  BarChart,
+  Star,
+  Send,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react"
 
-export type UserRole = "department_head" | "coordinator" | "advisor" | "student" | "department_committee"
+export type UserRole = "department_head" | "coordinator" | "advisor" | "student" | "department_committee" | "evaluator"
 
 export interface NavItem {
   title: string
-  href: string
+  href?: string          // optional for parent group items that only expand/collapse
   icon: LucideIcon
   badge?: number
   children?: NavItem[]
@@ -94,34 +98,9 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
-      title: "Projects",
-      href: "/dashboard/coordinator/projects",
-      icon: FolderKanban,
-    },
-    {
-      title: "Students",
-      href: "/dashboard/coordinator/students",
-      icon: GraduationCap,
-    },
-    {
-      title: "Advisors",
-      href: "/dashboard/coordinator/advisors",
-      icon: UserCheck,
-    },
-    {
-      title: "Defenses",
-      href: "/dashboard/coordinator/defenses",
-      icon: Calendar,
-    },
-    {
-      title: "Evaluations",
-      href: "/dashboard/coordinator/evaluations",
-      icon: ClipboardList,
-    },
-    {
-      title: "Messages",
-      href: "/dashboard/coordinator/messages",
-      icon: MessageSquare,
+      title: "Groups",
+      href: "/dashboard/coordinator/groups",
+      icon: BookOpen,
     },
     {
       title: "Title Management",
@@ -129,9 +108,56 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: Edit,
     },
     {
+      title: "Assignments",
+      href: "/dashboard/coordinator/projects",
+      icon: FolderKanban,
+    },
+    {
+      title: "Progress",
+      icon: BarChart,
+      children: [
+        {
+          title: "Advisor Progress",
+          href: "/dashboard/coordinator/advisor-progress",
+          icon: BarChart,
+        },
+        {
+          title: "Evaluator Progress",
+          href: "/dashboard/coordinator/evaluator-progress",
+          icon: Star,
+        },
+      ],
+    },
+    {
+      title: "Notify",
+      icon: Bell,
+      children: [
+        {
+          title: "Notify Advisors",
+          href: "/dashboard/coordinator/notify-advisors",
+          icon: Bell,
+        },
+        {
+          title: "Notify Evaluators",
+          href: "/dashboard/coordinator/notify-evaluators",
+          icon: Send,
+        },
+      ],
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/coordinator/messages",
+      icon: MessageSquare,
+    },
+    {
       title: "Reports",
       href: "/dashboard/coordinator/reports",
       icon: FileText,
+    },
+    {
+      title: "Notifications",
+      href: "/dashboard/notifications",
+      icon: Bell,
     },
     {
       title: "Profile",
@@ -236,6 +262,48 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Profile",
       href: "/dashboard/profile",
       icon: User,
+    },
+  ],
+  evaluator: [
+    {
+      title: "Dashboard",
+      href: "/dashboard/evaluator",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Assigned Projects",
+      href: "/dashboard/evaluator/assigned-projects",
+      icon: FolderKanban,
+    },
+    {
+      title: "Evaluations",
+      href: "/dashboard/evaluator/evaluations",
+      icon: ClipboardCheck,
+    },
+    {
+      title: "Defense Schedule",
+      href: "/dashboard/evaluator/schedule",
+      icon: Calendar,
+    },
+    {
+      title: "Reports",
+      href: "/dashboard/evaluator/reports",
+      icon: BarChart,
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/evaluator/messages",
+      icon: MessageSquare,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
+    },
+    {
+      title: "Settings",
+      href: "/dashboard/settings",
+      icon: Settings,
     },
   ],
   department_committee: [

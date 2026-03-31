@@ -85,6 +85,7 @@ function getRoleLabel(role: UserRole): string {
     advisor: "Advisor",
     student: "Student",
     department_committee: "Committee Member",
+    evaluator: "Evaluator",
   }
   return labels[role]
 }
