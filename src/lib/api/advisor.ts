@@ -1,6 +1,142 @@
 import apiClient from "@/lib/api/client";
 import { AdvisorDashboardOverview } from "@/lib/types/advisor";
 
+export interface AdvisorSummaryMetrics {
+  totalProjectsAdvising: number
+  totalGroupsAdvising: number
+  totalStudentsAdvising: number
+  totalGroupsSupervising: number
+  totalStudentsSupervising: number
+  projectStatusCounts: {
+    ACTIVE: number
+    COMPLETED: number
+    CANCELLED: number
+  }
+  totalProjectsAssigned: number
+}
+
+export interface AdvisorSummaryProject {
+  id: string
+  title: string
+  status: string
+  startedAt: string
+  proposal: { id: string; title: string }
+  group: {
+    id: string
+    name: string
+    objectives: string
+    technologies: string[]
+    status: string
+    leader: {
+      id: string
+      firstName: string
+      lastName: string
+      email: string
+      avatarUrl: string | null
+      student: {
+        id: string
+        bio: string
+        githubUrl: string | null
+        linkedinUrl: string | null
+        portfolioUrl: string | null
+        techStack: string[]
+      } | null
+    }
+    members: {
+      id: string
+      firstName: string
+      lastName: string
+      email: string
+      avatarUrl: string | null
+      student: {
+        id: string
+        bio: string
+        githubUrl: string | null
+        linkedinUrl: string | null
+        portfolioUrl: string | null
+        techStack: string[]
+      } | null
+    }[]
+    studentCount: number
+  }
+}
+
+export interface AdvisorSummary {
+  advisor: {
+    id: string
+    advisorProfileId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  }
+  metrics: AdvisorSummaryMetrics
+  projects: AdvisorSummaryProject[]
+}
+
+// ── /projects/advisors/me/projects ──────────────────────────────────────────
+
+interface ApiGroupMember {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  avatarUrl: string | null
+  student: {
+    id: string
+    bio: string
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+  } | null
+}
+
+export interface ApiMilestoneDetail {
+  id: string
+  title: string
+  description: string
+  dueDate: string
+  status: string
+  submittedAt: string | null
+}
+
+export interface ApiAdvisorProject {
+  id: string
+  title: string
+  status: string
+  startedAt: string
+  group: {
+    id: string
+    name: string
+    objectives: string
+    technologies: string[]
+    status: string
+    leader: ApiGroupMember
+    members: ApiGroupMember[]
+    studentCount: number
+  }
+  milestones: {
+    total: number
+    completed: number
+    approved: number
+    pending: number
+    submitted: number
+    rejected: number
+    progressPercent: number
+    details: ApiMilestoneDetail[]
+  }
+}
+
+/**
+ * Fetches the full project list for the currently authenticated advisor.
+ */
+export async function getAdvisorProjects(): Promise<ApiAdvisorProject[]> {
+  const response = await apiClient.get<ApiAdvisorProject[]>("/projects/advisors/me/projects")
+  return response.data
+}
+
 
 /**
  * Mock data fallback when API is unreachable or we are in active UI development.
@@ -58,6 +194,15 @@ const mockOverviewData: AdvisorDashboardOverview = {
         { id: "STU-003", name: "Liam Johnson", projectId: "proj-2", projectName: "IoT Home Automation", status: "Active" }
     ]
 };
+
+/**
+ * Fetches the summary data for the currently authenticated advisor,
+ * including metrics and projects list.
+ */
+export async function getAdvisorSummary(): Promise<AdvisorSummary> {
+  const response = await apiClient.get<AdvisorSummary>("/projects/advisors/me/summary")
+  return response.data
+}
 
 /**
  * Fetches the overview dashboard data for the currently authenticated advisor.

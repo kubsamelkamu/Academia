@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -528,10 +529,11 @@ export default function VerifyInstitutionPage() {
                           )}
                           {previewUrl && (
                             <div className="relative h-20 w-20 overflow-hidden rounded-lg border">
-                              <img 
+                              <Image 
                                 src={previewUrl} 
                                 alt="Preview" 
-                                className="h-full w-full object-cover"
+                                fill
+                                className="object-cover"
                               />
                             </div>
                           )}

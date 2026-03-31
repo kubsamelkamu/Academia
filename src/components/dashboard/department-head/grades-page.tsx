@@ -221,8 +221,9 @@ export function DepartmentHeadGradesPage() {
           setApprovingId(null)
           setConfirmApproveId(null)
         },
-        onError: (err: any) => {
-          toast.error(err?.message || "Failed to approve request")
+        onError: (err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : "Failed to approve request"
+          toast.error(errMsg)
           setApprovingId(null)
           setConfirmApproveId(null)
         },
@@ -247,8 +248,9 @@ export function DepartmentHeadGradesPage() {
           setRejectingId(null)
           setRejectReason("")
         },
-        onError: (err: any) => {
-          toast.error(err?.message || "Failed to reject request")
+        onError: (err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : "Failed to reject request"
+          toast.error(errMsg)
           setRejectDialogOpen(false)
           setRejectingId(null)
           setRejectReason("")
@@ -257,7 +259,18 @@ export function DepartmentHeadGradesPage() {
     )
   }
 
-  const pendingApplications = (groupLeaderData as any)?.data?.items || []
+  type PendingApplication = {
+    id: string
+    firstName?: string
+    lastName?: string
+    email?: string
+    departmentName?: string
+    status?: string
+    createdAt?: string
+  }
+
+  const pendingApplications =
+    (groupLeaderData as { data?: { items?: PendingApplication[] } } | undefined)?.data?.items ?? []
   
   const stats = {
     totalGroups: mockStudentGroups.length,
@@ -370,17 +383,17 @@ export function DepartmentHeadGradesPage() {
   ]
 
   // Filter by search (API already filters, but fallback for mock)
-  const filteredApplications = pendingApplications.filter((a: any) => {
+  const filteredApplications = pendingApplications.filter((a) => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     return (
-      (a.firstName?.toLowerCase().includes(q) || "") ||
-      (a.lastName?.toLowerCase().includes(q) || "") ||
-      (a.email?.toLowerCase().includes(q) || "")
+      (a.firstName?.toLowerCase().includes(q) ?? false) ||
+      (a.lastName?.toLowerCase().includes(q) ?? false) ||
+      (a.email?.toLowerCase().includes(q) ?? false)
     )
   })
 
-  const applicationColumns: Column<any>[] = [
+  const applicationColumns: Column<PendingApplication>[] = [
     {
       key: "applicant",
       header: "Applicant",
@@ -412,7 +425,7 @@ export function DepartmentHeadGradesPage() {
     {
       key: "status",
       header: "Status",
-      render: (a) => <StatusBadge status={a.status} />,
+      render: (a) => <StatusBadge status={a.status ?? ""} />,
     },
     {
       key: "createdAt",

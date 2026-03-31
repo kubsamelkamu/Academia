@@ -1,6 +1,15 @@
 import apiClient from "@/lib/api/client"
 import type { CreateProjectProposalDraftDto, ProjectProposal } from "@/types/project-proposals"
 
+function extractProposalItems(payload: unknown): ProjectProposal[] {
+  if (Array.isArray(payload)) return payload as ProjectProposal[]
+  if (!payload || typeof payload !== "object") return []
+
+  const candidate = (payload as { items?: unknown }).items
+  if (Array.isArray(candidate)) return candidate as ProjectProposal[]
+  return []
+}
+
 export async function createProposalDraft(dto: CreateProjectProposalDraftDto): Promise<ProjectProposal> {
   const titles = dto.titles
   const cleanedTitles = titles.map((title) => title.trim()) as [string, string, string]
@@ -60,4 +69,9 @@ export async function submitProposalForReview(proposalId: string): Promise<Proje
   )
 
   return response.data
+}
+
+export async function listMyGroupProposals(): Promise<ProjectProposal[]> {
+  const response = await apiClient.get<unknown>("/projects/proposals/group")
+  return extractProposalItems(response.data)
 }

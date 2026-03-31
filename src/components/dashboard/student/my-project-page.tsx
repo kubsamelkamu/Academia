@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,7 +18,10 @@ import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
+import { useProjectDetails } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
+import type { ProjectProposal } from "@/types/project-proposals"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -41,7 +43,6 @@ interface ProjectData {
   advisorName: string
   progress: number
   startDate: string
-  dueDate: string
   milestones: Milestone[]
   description?: string
 }
@@ -50,6 +51,7 @@ interface ProjectData {
 // Helper Functions
 // ----------------------------------------------------------------------
 const formatDate = (dateString: string): string => {
+  if (!dateString?.trim()) return "—"
   try {
     const date = new Date(dateString)
     if (isNaN(date.getTime())) {
@@ -111,6 +113,52 @@ const StatusBadge = ({ status }: { status: string }) => {
 const normalizeMilestoneName = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, " ")
 
+function isProposalMilestoneName(name: string): boolean {
+  const normalized = normalizeMilestoneName(name)
+  return normalized.includes("proposal") || normalized.includes("project title")
+}
+
+function toProposalMilestoneStatus(proposals: ProjectProposal[] | null | undefined):
+  | "pending"
+  | "submitted"
+  | "approved"
+  | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  const latest = sorted[0]
+  const status = normalizeStatus(latest?.status)
+
+  if (status === "APPROVED") return "approved"
+  if (status === "SUBMITTED") return "submitted"
+  return "pending"
+}
+
+function getLatestProposal(proposals: ProjectProposal[] | null | undefined): ProjectProposal | null {
+  const items = proposals ?? []
+  if (!items.length) return null
+
+  const sorted = items
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+
+  return sorted[0] ?? null
+}
+
 function addDays(baseDate: string, daysToAdd: number): string {
   const date = new Date(baseDate)
   if (Number.isNaN(date.getTime())) return baseDate
@@ -132,100 +180,40 @@ const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
   return "pending"
 }
 
-// ----------------------------------------------------------------------
-// Mock Data
-// ----------------------------------------------------------------------
-const getInitialProjectData = (): ProjectData => {
-  const today = new Date()
-  const startDate = new Date(today)
-  startDate.setMonth(startDate.getMonth() - 2) // 2 months ago
-  
-  const dueDate = new Date(today)
-  dueDate.setMonth(dueDate.getMonth() + 6) // 6 months from now
-
-  // Milestone dates
-  const milestone1Date = new Date(today)
-  milestone1Date.setMonth(milestone1Date.getMonth() - 1)
-  
-  const milestone2Date = new Date(today)
-  milestone2Date.setDate(milestone2Date.getDate() - 5)
-  
-  const milestone3Date = new Date(today)
-  milestone3Date.setMonth(milestone3Date.getMonth() + 1)
-  
-  const milestone4Date = new Date(today)
-  milestone4Date.setMonth(milestone4Date.getMonth() + 3)
-  
-  const milestone5Date = new Date(today)
-  milestone5Date.setMonth(milestone5Date.getMonth() + 5)
-
-  const formatDateString = (date: Date): string => {
-    return date.toISOString().split("T")[0]
-  }
-
-  return {
-    title: "AI-Driven Academic Assistant",
-    groupName: "Group 4",
-    status: "in-progress",
-    advisorName: "Dr. Alan Turing",
-    progress: 40,
-    startDate: formatDateString(startDate),
-    dueDate: formatDateString(dueDate),
-    description:
-      "This project focuses on developing an innovative solution using cutting-edge technology to address real-world challenges in the academic environment. The system will help students and faculty manage academic workflows more efficiently.",
-    milestones: [
-      {
-        id: "m1",
-        name: "Project Proposal",
-        dueDate: formatDateString(milestone1Date),
-        status: "approved",
-        description: "Initial project proposal and scope definition",
-      },
-      {
-        id: "m2",
-        name: "Software Requirements Specification Document (SRS)",
-        dueDate: formatDateString(milestone2Date),
-        status: "submitted",
-        submittedAt: formatDateString(new Date(milestone2Date.getTime() - 2 * 24 * 60 * 60 * 1000)),
-        description: "describes the system’s requirements, interfaces, and design constraints for the proposed platform.",
-      },
-      {
-        id: "m3",
-        name: "System Design Document (SDD) ",
-        dueDate: formatDateString(milestone3Date),
-        status: "pending",
-        description: "Detailed system design and architecture documentation",
-      },
-      {
-        id: "m4",
-        name: "Implementation",
-        dueDate: formatDateString(milestone4Date),
-        status: "pending",
-        description: "Core functionality implementation",
-      },
-      {
-        id: "m5",
-        name: "Final Presentation",
-        dueDate: formatDateString(milestone5Date),
-        status: "pending",
-        description: "Final project presentation and demonstration",
-      },
-    ],
-  }
+function toDisplayName(parts: Array<string | null | undefined>): string {
+  const joined = parts.map((p) => (p ?? "").trim()).filter(Boolean).join(" ")
+  return joined
 }
 
-const initialProjectData: ProjectData = getInitialProjectData()
+function mapProjectStatus(status: string | null | undefined): ProjectData["status"] {
+  const normalized = String(status ?? "").trim().toLowerCase()
+
+  if (normalized === "completed" || normalized === "done" || normalized === "finished") {
+    return "completed"
+  }
+
+  if (
+    normalized === "active" ||
+    normalized === "in-progress" ||
+    normalized === "in progress" ||
+    normalized === "ongoing"
+  ) {
+    return "in-progress"
+  }
+
+  return "pending"
+}
 
 // ----------------------------------------------------------------------
 // Main Component
 // ----------------------------------------------------------------------
 
-function MyProjectHeader() {
+function MyProjectHeader({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          My Project
+          {title}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           View and manage your project details, milestones, and submissions
@@ -236,12 +224,15 @@ function MyProjectHeader() {
 }
 
 export function StudentMyProjectPage() {
-  const [projectState, setProjectState] = useState<ProjectData>(initialProjectData)
-
   const user = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const studentId = user?.id ?? null
   const { data: myGroupData } = useMyProjectGroup(Boolean(user))
+  const myGroupProposalsQuery = useMyGroupProposals(Boolean(user))
+
+  const departmentIdForProjects =
+    departmentId ?? myGroupData?.departmentId ?? null
 
   const { data: templatesData } = useMilestoneTemplatesList(departmentId, {
     page: 1,
@@ -254,7 +245,7 @@ export function StudentMyProjectPage() {
   }, [templatesData?.templates])
 
   const { data: projectsData } = useStudentProjects({
-    departmentId,
+    departmentId: departmentIdForProjects,
     studentId,
   })
 
@@ -269,17 +260,35 @@ export function StudentMyProjectPage() {
     )
   }, [projectsData?.items])
 
+  const resolvedProjectId =
+    activeProject?.id ?? myGroupData?.projectId ?? null
+
   const { data: projectMilestonesData } = useProjectMilestones({
-    projectId: activeProject?.id,
-    enabled: Boolean(activeProject?.id),
+    projectId: resolvedProjectId,
+    enabled: Boolean(resolvedProjectId),
   })
+
+  const projectDetailsQuery = useProjectDetails({
+    projectId: resolvedProjectId,
+    enabled: Boolean(resolvedProjectId),
+  })
+
+  const projectCreatedAt = useMemo(() => {
+    return projectDetailsQuery.data?.createdAt?.trim() ?? ""
+  }, [projectDetailsQuery.data?.createdAt])
+
+  const milestoneBaseDate = useMemo(() => {
+    if (projectCreatedAt) return projectCreatedAt
+    if (activeTemplate?.createdAt) return activeTemplate.createdAt
+    return new Date().toISOString()
+  }, [activeTemplate?.createdAt, projectCreatedAt])
 
   const templateMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
     const activeTemplate = getActiveMilestoneTemplate(templates)
     if (!activeTemplate?.milestones?.length) return []
 
-    const baseDate = projectState.startDate?.trim() ? projectState.startDate : activeTemplate.createdAt
+    const baseDate = milestoneBaseDate
 
     let cumulativeDays = 0
     return activeTemplate.milestones
@@ -296,10 +305,10 @@ export function StudentMyProjectPage() {
           sequence: milestone.sequence,
         }
       })
-  }, [projectState.startDate, templatesData?.templates])
+  }, [milestoneBaseDate, templatesData?.templates])
 
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
-    if (!templateMilestones.length) return []
+    const proposalStatus = toProposalMilestoneStatus(myGroupProposalsQuery.data)
 
     const projectMilestonesByName = new Map(
       (projectMilestonesData?.items ?? []).map((milestone) => [
@@ -308,7 +317,27 @@ export function StudentMyProjectPage() {
       ])
     )
 
-    return templateMilestones.map((templateMilestone) => {
+    const fromProjectOnly = (projectMilestonesData?.items ?? [])
+      .map((milestone) => ({
+        id: milestone.id,
+        name: milestone.title,
+        dueDate: milestone.dueDate,
+        status: mapStudentMilestoneStatus(milestone.status),
+        submittedAt: milestone.submittedAt ?? undefined,
+        description: milestone.description ?? undefined,
+        sequence: undefined,
+      }))
+      .filter((milestone) => milestone.name.trim().length > 0)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+
+    if (!templateMilestones.length) {
+      if (!proposalStatus) return fromProjectOnly
+      return fromProjectOnly.map((milestone) =>
+        isProposalMilestoneName(milestone.name) ? { ...milestone, status: proposalStatus } : milestone
+      )
+    }
+
+    const merged = templateMilestones.map((templateMilestone) => {
       const matchedProjectMilestone = projectMilestonesByName.get(
         normalizeMilestoneName(templateMilestone.name)
       )
@@ -323,57 +352,77 @@ export function StudentMyProjectPage() {
         submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
       }
     })
-  }, [templateMilestones, projectMilestonesData?.items])
 
-  const computedMyProject = useMemo<ProjectData>(() => {
-    let nextProject = projectState
+    if (!proposalStatus) return merged
+    return merged.map((milestone) => {
+      if (!isProposalMilestoneName(milestone.name)) return milestone
+      return { ...milestone, status: proposalStatus }
+    })
+  }, [myGroupProposalsQuery.data, projectMilestonesData?.items, templateMilestones])
 
-    if (mergedBackendMilestones.length) {
-      const existingMilestonesById = new Map(
-        nextProject.milestones.map((milestone) => [milestone.id, milestone])
-      )
+  const myProject = useMemo<ProjectData>(() => {
+    const latestProposal = getLatestProposal(myGroupProposalsQuery.data)
 
-      const mergedMilestones = mergedBackendMilestones.map((milestone) => {
-        const existing = existingMilestonesById.get(milestone.id)
-        if (!existing) return milestone
+    const advisor = projectDetailsQuery.data?.advisor
+    const advisorName = advisor
+      ? toDisplayName([advisor.firstName, advisor.lastName]) || advisor.email?.trim() || "—"
+      : latestProposal?.advisor
+          ? toDisplayName([
+              latestProposal.advisor.firstName,
+              latestProposal.advisor.lastName,
+            ]) || latestProposal.advisor.email?.trim() || "—"
+          : "—"
 
-        return {
-          ...milestone,
-          status: milestone.status,
-          submittedAt: milestone.submittedAt ?? existing.submittedAt,
-        }
-      })
+    const milestones = mergedBackendMilestones
 
-      const completedMilestonesCount = mergedMilestones.filter(
-        (milestone) => milestone.status === "approved" || milestone.status === "submitted"
-      ).length
-      const progress = Math.round((completedMilestonesCount / mergedMilestones.length) * 100)
+    const completedMilestonesCount = milestones.filter(
+      (milestone) => milestone.status === "approved"
+    ).length
 
-      nextProject = {
-        ...nextProject,
-        milestones: mergedMilestones,
-        progress,
-      }
+    const progress = milestones.length
+      ? Math.round((completedMilestonesCount / milestones.length) * 100)
+      : 0
+
+    const backendGroupName = myGroupData?.name?.trim() ?? ""
+
+    return {
+      title:
+        projectDetailsQuery.data?.title?.trim() ||
+        activeProject?.title?.trim() ||
+        latestProposal?.title?.trim() ||
+        latestProposal?.titles?.[0]?.trim() ||
+        latestProposal?.proposedTitles?.[0]?.trim() ||
+        "My Project",
+      groupName: backendGroupName || "—",
+      status: mapProjectStatus(projectDetailsQuery.data?.status || activeProject?.status),
+      advisorName,
+      progress,
+      startDate: projectCreatedAt || milestoneBaseDate,
+      milestones,
+      description: projectDetailsQuery.data?.description ?? undefined,
     }
+  }, [
+    activeProject?.status,
+    activeProject?.title,
+    mergedBackendMilestones,
+    myGroupData?.name,
+    myGroupData?.projectId,
+    myGroupProposalsQuery.data,
+    projectDetailsQuery.data?.advisor,
+    projectDetailsQuery.data?.description,
+    projectDetailsQuery.data?.status,
+    projectDetailsQuery.data?.title,
+    milestoneBaseDate,
+    projectCreatedAt,
+  ])
 
-    const backendGroupName = myGroupData?.name?.trim()
-    if (backendGroupName && backendGroupName !== nextProject.groupName) {
-      nextProject = {
-        ...nextProject,
-        groupName: backendGroupName,
-      }
-    }
-
-    return nextProject
-  }, [projectState, mergedBackendMilestones, myGroupData?.name])
-
-  const myProject = computedMyProject
+  const headerTitle = myProject.title?.trim() ? myProject.title : "My Project"
 
   // Ensure we have valid project data
   if (!myProject || !myProject.milestones || myProject.milestones.length === 0) {
     return (
       <div className="space-y-6 w-full">
-        <MyProjectHeader />
+        <MyProjectHeader title={headerTitle} />
         <Card>
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">No project data available.</p>
@@ -384,13 +433,13 @@ export function StudentMyProjectPage() {
   }
 
   const completedMilestones = myProject.milestones.filter(
-    (m) => m.status === "approved" || m.status === "submitted"
+    (m) => m.status === "approved"
   ).length
   const totalMilestones = myProject.milestones.length
 
   return (
     <div className="space-y-6 w-full">
-      <MyProjectHeader />
+      <MyProjectHeader title={headerTitle} />
 
       {/* Project Overview Card */}
       <Card>
@@ -403,12 +452,6 @@ export function StudentMyProjectPage() {
                   <span className="flex items-center gap-1.5">
                     <Users className="h-4 w-4" />
                     <span className="font-medium">{myProject.groupName}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      Due: <span className="font-medium">{formatDate(myProject.dueDate)}</span>
-                    </span>
                   </span>
                   <span className="flex items-center gap-1.5">
                     <FileText className="h-4 w-4" />
@@ -425,13 +468,6 @@ export function StudentMyProjectPage() {
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2 text-base">Project Overview</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {myProject.description ||
-                    "This project focuses on developing an innovative solution using cutting-edge technology to address real-world challenges in the academic environment."}
-                </p>
-              </div>
               <div className="space-y-2">
                 <div>
                   <p className="text-sm font-medium mb-1">Advisor</p>
@@ -447,14 +483,10 @@ export function StudentMyProjectPage() {
                 </div>
                 <Progress value={myProject.progress} className="h-3" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="p-3 bg-muted/30 rounded-lg border">
                   <p className="text-xs text-muted-foreground mb-1">Started</p>
                   <p className="font-medium text-sm">{formatDate(myProject.startDate)}</p>
-                </div>
-                <div className="p-3 bg-muted/30 rounded-lg border">
-                  <p className="text-xs text-muted-foreground mb-1">Deadline</p>
-                  <p className="font-medium text-sm">{formatDate(myProject.dueDate)}</p>
                 </div>
               </div>
             </div>
