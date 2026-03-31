@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import {
   FolderOpen,
@@ -22,52 +22,19 @@ import {
   TrendingUp,
   Search,
   Download,
-  Plus,
-  Star,
-  Flag,
   AlertTriangle,
   ListChecks,
   Activity,
-  XCircle,
-  HelpCircle,
   ChevronDown,
-  Send,
-  Paperclip,
-  Settings,
-  Menu,
   Filter,
   LayoutGrid,
   List,
-  UserCheck,
-  Award,
-  BookOpen,
-  Video,
-  Link2,
-  Github,
-  ExternalLink,
   ThumbsUp,
   CalendarDays,
   CheckCheck,
   MoreHorizontal,
-  Phone,
   Mail,
-  Briefcase,
-  GraduationCap,
-  Sparkles,
-  Shield,
-  Zap,
-  Target,
-  Compass,
-  BarChart3,
-  PieChart,
-  Layers,
-  Users2,
-  ArrowUpRight,
-  CircleDot,
   Upload,
-  Pin,
-  Bookmark,
-  Share2,
   LucideIcon,
 } from 'lucide-react'
 import {
@@ -84,7 +51,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -190,12 +156,6 @@ const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: s
   'pending': { label: 'Pending', color: 'gray', icon: Clock },
   'overdue': { label: 'Overdue', color: 'red', icon: AlertTriangle },
   'submitted': { label: 'Submitted', color: 'purple', icon: Upload }
-}
-
-const PRIORITY_CONFIG: Record<PriorityLevel, { label: string; color: string; icon: LucideIcon }> = {
-  'high': { label: 'High', color: 'red', icon: Flag },
-  'medium': { label: 'Medium', color: 'amber', icon: AlertCircle },
-  'low': { label: 'Low', color: 'green', icon: CheckCircle }
 }
 
 const formatDate = (dateString: string) => {
@@ -398,36 +358,6 @@ const StatCard = ({ title, value, icon: Icon, trend, color = 'blue' }: StatCardP
     </CardContent>
   </Card>
 )
-
-interface MilestoneItemProps {
-  milestone: ProjectMilestone
-}
-
-const MilestoneItem = ({ milestone }: MilestoneItemProps) => {
-  const config = MILESTONE_STATUS_CONFIG[milestone.status]
-  const StatusIcon = config?.icon || Clock
-  const PriorityIcon = PRIORITY_CONFIG[milestone.priority]?.icon || Flag
-
-  return (
-    <div className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={cn(
-          "h-2 w-2 rounded-full flex-shrink-0",
-          milestone.status === 'approved' || milestone.status === 'completed' ? 'bg-green-500' :
-          milestone.status === 'in-progress' ? 'bg-blue-500' :
-          milestone.status === 'submitted' ? 'bg-purple-500' :
-          milestone.status === 'pending' ? 'bg-gray-300' :
-          'bg-red-500'
-        )} />
-        <span className="text-sm font-medium truncate">{milestone.name}</span>
-      </div>
-      <Badge variant="outline" className={cn("text-xs whitespace-nowrap", getStatusColor(config?.color || 'gray'))}>
-        <StatusIcon className="h-3 w-3 mr-1" />
-        {config?.label || milestone.status}
-      </Badge>
-    </div>
-  )
-}
 
 interface ProjectCardProps {
   project: AdvisorProject

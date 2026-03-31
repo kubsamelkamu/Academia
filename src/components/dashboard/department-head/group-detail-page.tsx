@@ -1,13 +1,15 @@
 "use client"
 
-import React from "react"
-import Link from "next/link"
-import { ArrowLeft, Users, UserCheck } from "lucide-react"
+import React, { useState } from "react"
+import { Users, UserCheck } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { mockStudentGroups } from "@/data/mockData"
+import { DepartmentHeadStudentDetailPage } from "@/components/dashboard/department-head/student-detail-page"
 
 interface GroupDetailPageProps {
   groupId: string
@@ -15,6 +17,7 @@ interface GroupDetailPageProps {
 
 export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
   const group = mockStudentGroups.find((g) => g.id === groupId)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
 
   if (!group) {
     return (
@@ -22,32 +25,19 @@ export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
         <DashboardPageHeader
           title="Group not found"
           description="The requested project group could not be found."
-          actions={
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/department-head/grades" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Grade Overview
-              </Link>
-            </Button>
-          }
+          actions={<DashboardBackLink href="/dashboard/department-head/review" variant="outline" />}
         />
       </div>
     )
   }
 
   return (
+    <>
     <div className="space-y-6">
       <DashboardPageHeader
         title={group.name}
         description="Detailed view of project group and members"
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/grades" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Grade Overview
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/review" variant="outline" />}
       />
 
       <Card>
@@ -94,7 +84,7 @@ export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
                 <p className="text-sm font-medium">
                   {member.name}
                   {member.isManager && (
-                    <span className="ml-1 text-[10px] uppercase tracking-wide text-emerald-600">
+                    <span className="ml-1 text-[10px] uppercase tracking-wide text-primary">
                       (Manager)
                     </span>
                   )}
@@ -106,16 +96,11 @@ export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-xs"
-                  asChild
+                  className="h-7 px-2 text-xs gap-1"
+                  onClick={() => setSelectedMemberId(member.id)}
                 >
-                  <Link
-                    href={`/dashboard/department-head/grades/student-${member.id}`}
-                    className="gap-1"
-                  >
-                    <Users className="h-3 w-3" />
-                    View
-                  </Link>
+                  <Users className="h-3 w-3" />
+                  View
                 </Button>
               </div>
             </div>
@@ -123,6 +108,18 @@ export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
         </CardContent>
       </Card>
     </div>
+
+      {/* Student detail popup */}
+      <Dialog open={!!selectedMemberId} onOpenChange={(open) => { if (!open) setSelectedMemberId(null) }}>
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden gap-0 border-0">
+          {selectedMemberId && (
+            <DepartmentHeadStudentDetailPage
+              studentId={selectedMemberId}
+              onClose={() => setSelectedMemberId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
-

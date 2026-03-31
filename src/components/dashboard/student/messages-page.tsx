@@ -442,7 +442,7 @@ export function StudentMessagesPage() {
   const [isCheckingDevices, setIsCheckingDevices] = useState(false)
   const [isGroupCallOngoing, setIsGroupCallOngoing] = useState(false)
   const [groupCallParticipantCount, setGroupCallParticipantCount] = useState<number | null>(null)
-  const [groupCallStartedByUserId, setGroupCallStartedByUserId] = useState<string | null>(null)
+  const [, setGroupCallStartedByUserId] = useState<string | null>(null)
   const [activeMeetingRoomName, setActiveMeetingRoomName] = useState<string | null>(null)
   const jitsiContainerRef = useRef<HTMLDivElement | null>(null)
   const jitsiApiRef = useRef<JitsiExternalApi | null>(null)
@@ -1562,8 +1562,10 @@ export function StudentMessagesPage() {
     }
 
     viewport.addEventListener("scroll", onScroll, { passive: true })
-    // Initial sync (also covers non-overflow content)
-    sync()
+    // Initial sync (also covers non-overflow content); defer to avoid set-state-in-effect on mount
+    const initialSyncRaf = requestAnimationFrame(() => {
+      sync()
+    })
 
     if (autoFillRoomIdRef.current !== roomId) {
       autoFillRoomIdRef.current = roomId
@@ -1595,6 +1597,7 @@ export function StudentMessagesPage() {
     }
 
     return () => {
+      cancelAnimationFrame(initialSyncRaf)
       viewport.removeEventListener("scroll", onScroll)
     }
   }, [chatFetchNextPage, chatHasNextPage, chatIsFetchingNextPage, chatMessagesData, effectiveSelectedConversation?.id, roomId])

@@ -1,9 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, Save } from "lucide-react"
-import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { Save } from "lucide-react"
+import { DashboardBackButton } from "@/components/dashboard/dashboard-back"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
@@ -12,7 +11,6 @@ import { useAuthStore } from "@/store/auth-store"
 import { useCreateDepartmentAnnouncement } from "@/lib/hooks/use-department-announcements"
 import type { DepartmentAnnouncementActionType } from "@/types/department-announcements"
 import { DepartmentAnnouncementFormCard } from "@/components/dashboard/department-head/department-announcement-form-card"
-import { DepartmentAnnouncementPreviewCard } from "@/components/dashboard/department-head/department-announcement-preview-card"
 
 function toIsoFromDatetimeLocal(value: string): string | null {
   if (!value.trim()) return null
@@ -148,9 +146,7 @@ export function AnnouncementNewPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-      </Button>
+      <DashboardBackButton onClick={() => router.back()} className="mb-4 -ml-2" />
 
       <Card className="border-0 shadow-none">
         <CardHeader className="pb-4">

@@ -259,6 +259,124 @@ interface StudentDashboardProps {
   userName?: string
 }
 
+function StudentNextDeadlineAnnouncementBody({
+  announcement,
+}: {
+  announcement: DepartmentAnnouncementItem
+}) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const serverSeconds = announcement.secondsRemaining
+    if (serverSeconds === null || serverSeconds <= 0) return
+
+    const timerId = window.setInterval(() => {
+      setElapsed((e) => e + 1)
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [announcement.secondsRemaining])
+
+  const uiSecondsRemaining =
+    announcement.secondsRemaining === null
+      ? null
+      : Math.max(0, announcement.secondsRemaining - elapsed)
+
+  const countdownParts = toCountdownParts(uiSecondsRemaining)
+  const isAnnouncementDeadlinePassed =
+    Boolean(announcement.isExpired) ||
+    (uiSecondsRemaining !== null && uiSecondsRemaining <= 0)
+  const isAnnouncementDisabled =
+    Boolean(announcement.isDisabled) || isAnnouncementDeadlinePassed
+  const isCriticalWindow =
+    uiSecondsRemaining !== null && uiSecondsRemaining > 0 && uiSecondsRemaining <= 3_600
+  const isWarningWindow =
+    uiSecondsRemaining !== null && uiSecondsRemaining > 3_600 && uiSecondsRemaining <= 86_400
+  const countdownToneClass = isAnnouncementDeadlinePassed
+    ? "border-destructive/40 bg-destructive/5"
+    : isCriticalWindow
+      ? "border-destructive/30 bg-destructive/5"
+      : isWarningWindow
+        ? "border-yellow-500/30 bg-yellow-500/10"
+        : "border-primary/20 bg-primary/5"
+
+  const announcementTitle = getMeaningfulText(announcement.title)
+  const actionTypeLabel = formatActionTypeLabel(announcement.actionType)
+  const nextDeadlineTitle = announcementTitle || actionTypeLabel || "No active deadline"
+  const shouldShowTypeBadge = Boolean(
+    actionTypeLabel && actionTypeLabel.toLowerCase() !== nextDeadlineTitle.toLowerCase()
+  )
+
+  const nextDeadlineDueText = isAnnouncementDeadlinePassed
+    ? "Deadline passed"
+    : countdownParts
+      ? `${formatCountdown(countdownParts)} remaining`
+      : "No deadline"
+
+  const nextDeadlineSummary = getMeaningfulText(announcement.message)
+  const nextDeadlineActionTitle =
+    getMeaningfulText(
+      getAnnouncementActionLabel(announcement.actionType, announcement.actionLabel)
+    ) || getAnnouncementActionLabel(announcement.actionType, announcement.actionLabel)
+
+  const creatorName =
+    `${announcement.createdBy.firstName ?? ""} ${announcement.createdBy.lastName ?? ""}`.trim() ||
+    ""
+
+  const secondaryCardText = announcement.deadlineAt
+    ? `Deadline set for ${formatDate(announcement.deadlineAt)}.`
+    : ""
+
+  const hasActionUrl = Boolean(announcement.actionUrl?.trim())
+
+  return (
+    <>
+      <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
+          {shouldShowTypeBadge ? (
+            <Badge variant={isAnnouncementDeadlinePassed ? "destructive" : "secondary"}>
+              {actionTypeLabel}
+            </Badge>
+          ) : null}
+        </div>
+        {nextDeadlineSummary ? (
+          <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-3">
+        <div className="rounded-lg border p-3">
+          {nextDeadlineActionTitle ? (
+            <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
+          ) : null}
+          {creatorName ? (
+            <p className="mt-1 text-xs text-muted-foreground">Announcement by {creatorName}</p>
+          ) : null}
+          {secondaryCardText ? (
+            <p className="mt-1 text-xs text-muted-foreground">{secondaryCardText}</p>
+          ) : null}
+        </div>
+
+        {hasActionUrl ? (
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={isAnnouncementDisabled}
+            onClick={() => {
+              const target = announcement.actionUrl
+              if (!target) return
+              window.open(target, "_blank", "noopener,noreferrer")
+            }}
+          >
+            {nextDeadlineActionTitle}
+          </Button>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)

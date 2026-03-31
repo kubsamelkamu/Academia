@@ -2,8 +2,8 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -30,9 +30,7 @@ export function FacultyEditPage({ facultyId }: FacultyEditPageProps) {
           title="Faculty not found"
           description="The requested faculty member could not be found."
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/faculty">Back to Faculty</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />
       </div>
     )
   }
@@ -49,14 +47,7 @@ export function FacultyEditPage({ facultyId }: FacultyEditPageProps) {
       <DashboardPageHeader
         title="Edit faculty"
         description={`Edit details for ${faculty.name}`}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/faculty" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Faculty
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/faculty" variant="outline" />}
       />
 
       <Card>

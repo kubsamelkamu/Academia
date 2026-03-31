@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -497,60 +503,126 @@ export function StudentSubmissionsPage() {
       </Tabs>
 
       <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
-        <DialogContent className="sm:max-w-[680px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              Advisor Feedback
-            </DialogTitle>
-            <DialogDescription>{selectedDoc?.name}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
 
-          {selectedDoc && (
-            <div className="space-y-4">
-              <ScrollArea className="h-[260px] pr-2">
-                <div className="space-y-3">
-                  {selectedDoc.comments.length === 0 ? (
-                    <div className="text-sm text-muted-foreground rounded-lg border p-4">
-                      No feedback yet for this document.
+          {/* ── Gradient header ─────────────────────────────────── */}
+          <div className="relative h-16 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
+            {/* doc icon centered-bottom overlap */}
+            <div className="absolute -bottom-5 left-4">
+              <div className="h-10 w-10 rounded-xl bg-primary/15 border-2 border-background flex items-center justify-center shadow-sm">
+                <MessageCircle className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Identity row ─────────────────────────────────────── */}
+          <div className="pt-7 px-4 pb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate" title={selectedDoc?.name}>
+                {selectedDoc?.name}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {selectedDoc?.milestone} · {selectedDoc && new Date(selectedDoc.uploadedAt).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+              {selectedDoc && statusBadge(selectedDoc.status)}
+            </div>
+          </div>
+
+          <div className="mx-4 border-t" />
+
+          {/* ── Comments ─────────────────────────────────────────── */}
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <MessageCircle className="h-3 w-3 text-primary" />
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Advisor Feedback
+              </p>
+              {selectedDoc && selectedDoc.comments.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] h-4 ml-auto">
+                  {selectedDoc.comments.length}
+                </Badge>
+              )}
+            </div>
+
+            <ScrollArea className="h-[180px] pr-1">
+              <div className="space-y-2">
+                {!selectedDoc || selectedDoc.comments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center mb-2">
+                      <MessageCircle className="h-4 w-4 text-muted-foreground" />
                     </div>
-                  ) : (
-                    selectedDoc.comments.map((comment) => (
-                      <div key={comment.id} className="rounded-lg border p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium">{comment.author}</p>
-                          <Badge variant={comment.resolved ? "secondary" : "outline"}>
+                    <p className="text-xs text-muted-foreground">No feedback yet for this document.</p>
+                  </div>
+                ) : (
+                  selectedDoc.comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="rounded-lg border bg-muted/20 px-3 py-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-[9px] font-bold text-primary">
+                              {comment.author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold truncate">{comment.author}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] text-muted-foreground">{comment.date}</span>
+                          <Badge
+                            variant={comment.resolved ? "secondary" : "outline"}
+                            className={`text-[10px] h-4 ${comment.resolved ? "" : "border-amber-200 text-amber-700 bg-amber-500/10"}`}
+                          >
                             {comment.resolved ? "Resolved" : "Pending"}
                           </Badge>
                         </div>
-                        <p className="text-sm">{comment.text}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{comment.date}</p>
                       </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-
-              <div className="space-y-2">
-                <Textarea
-                  placeholder="Reply to advisor..."
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => {
-                      if (!reply.trim()) return
-                      toast.success("Reply sent to advisor")
-                      setReply("")
-                    }}
-                  >
-                    Send Reply
-                  </Button>
-                </div>
+                      <p className="text-xs text-foreground leading-relaxed">{comment.text}</p>
+                    </div>
+                  ))
+                )}
               </div>
+            </ScrollArea>
+          </div>
+
+          <div className="mx-4 border-t" />
+
+          {/* ── Reply ────────────────────────────────────────────── */}
+          <div className="px-4 pt-3 pb-4 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your Reply</p>
+            <Textarea
+              placeholder="Write a reply to your advisor…"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={2}
+              className="resize-none text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setSelectedDoc(null)}
+              >
+                Close
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  if (!reply.trim()) return
+                  toast.success("Reply sent to advisor")
+                  setReply("")
+                }}
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> Send Reply
+              </Button>
             </div>
-          )}
+          </div>
+
         </DialogContent>
       </Dialog>
 

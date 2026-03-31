@@ -359,7 +359,7 @@ interface AdvisorDashboardProps {
   advisorId?: string
 }
 
-export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: AdvisorDashboardProps) {
+export function AdvisorDashboard({ advisorId = "u7" }: AdvisorDashboardProps) {
   const router = useRouter()
   const [now, setNow] = useState<Date>(new Date())
 

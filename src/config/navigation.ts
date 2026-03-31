@@ -51,7 +51,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
     },
     {
       title: "Review & Approval",
-      href: "/dashboard/department-head/grades",
+      href: "/dashboard/department-head/review",
       icon: ClipboardCheck,
     },
     {
@@ -68,11 +68,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Announcements",
       href: "/dashboard/department-head/announcements",
       icon: Megaphone,
-    },
-    {
-      title: "Verification",
-      href: "/dashboard/verify-institution",
-      icon: CheckSquare,
     },
     {
       title: "Messages",

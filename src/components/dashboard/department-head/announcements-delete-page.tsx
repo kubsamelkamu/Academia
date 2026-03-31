@@ -2,9 +2,10 @@
 
 import React from "react"
 import Link from "next/link"
-import { ArrowLeft, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { AlertTriangle } from "lucide-react"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -68,9 +69,7 @@ export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePag
           title="Announcement not found"
           description="The requested announcement could not be found."
         />
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/department-head/announcements">Back to Announcements</Link>
-        </Button>
+        <DashboardBackLink href="/dashboard/department-head/announcements" variant="outline" />
       </div>
     )
   }
@@ -101,14 +100,7 @@ export function AnnouncementDeletePage({ announcementId }: AnnouncementDeletePag
       <DashboardPageHeader
         title="Delete Announcement"
         description={`Are you sure you want to delete "${announcement.title}"?`}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/department-head/announcements" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Announcements
-            </Link>
-          </Button>
-        }
+        actions={<DashboardBackLink href="/dashboard/department-head/announcements" variant="outline" />}
       />
 
       <Card className="border-destructive/50">
