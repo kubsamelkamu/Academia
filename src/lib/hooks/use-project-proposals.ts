@@ -1,12 +1,29 @@
 "use client"
 
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   createProposalDraft,
   createProposalWithProposalPdf,
+  listMyGroupProposals,
   submitProposalForReview,
 } from "@/lib/api/project-proposals"
 import type { ProjectProposal } from "@/types/project-proposals"
+
+export function projectProposalKeys() {
+  return {
+    root: ["project-proposals"] as const,
+    group: () => ["project-proposals", "group"] as const,
+  }
+}
+
+export function useMyGroupProposals(enabled = true) {
+  return useQuery<ProjectProposal[], Error>({
+    queryKey: enabled ? projectProposalKeys().group() : projectProposalKeys().root,
+    queryFn: () => listMyGroupProposals(),
+    enabled,
+    staleTime: 30_000,
+  })
+}
 
 export function useCreateProposalDraft() {
   return useMutation<ProjectProposal, Error, {

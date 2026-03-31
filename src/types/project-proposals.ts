@@ -6,6 +6,7 @@ export interface ProposalDocument {
   mimeType?: string | null
   sizeBytes?: number | null
   uploadedAt?: string | null
+  originalName?: string | null
 }
 
 export type ProposalStatus =
@@ -23,12 +24,20 @@ export interface ProjectProposal {
   title?: string
   description?: string | null
   documents: ProposalDocument[]
+  feedback?: string | null
   submittedBy?: string | null
   submitter?: {
     id: string
     firstName?: string
     lastName?: string
     email?: string
+  } | null
+  advisor?: {
+    id: string
+    firstName?: string
+    lastName?: string
+    email?: string
+    avatarUrl?: string | null
   } | null
   submittedAt?: string | null
   createdAt?: string
