@@ -29,7 +29,11 @@ import {
   useAdvisorMessageGroups,
   useCreateAnnouncementMutation,
 } from "@/lib/hooks/useAdvisor"
-import type { AdvisorCreateAnnouncementDto } from "@/lib/types/advisor"
+import type {
+  AdvisorAnnouncement,
+  AdvisorCreateAnnouncementDto,
+  AdvisorMessageGroup,
+} from "@/lib/types/advisor"
 import { Bell, MoreVertical, Paperclip, Plus, Search } from "lucide-react"
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -67,11 +71,11 @@ export function AdvisorAnnouncementsPage() {
   })
 
   const announcements = React.useMemo(() => {
-    const items = announcementsQuery.data?.items ?? []
+    const items: AdvisorAnnouncement[] = announcementsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
     if (!term) return items
-    return items.filter((a) =>
-      [a.title, a.content].some((v) => v.toLowerCase().includes(term))
+    return items.filter((a: AdvisorAnnouncement) =>
+      [a.title, a.content].some((v: string) => v.toLowerCase().includes(term))
     )
   }, [announcementsQuery.data?.items, searchTerm])
 
@@ -170,7 +174,7 @@ export function AdvisorAnnouncementsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            {announcements.map((announcement) => {
+            {announcements.map((announcement: AdvisorAnnouncement) => {
               const cfg = getPriorityConfig(announcement.priority)
               return (
                 <div
@@ -276,7 +280,7 @@ export function AdvisorAnnouncementsPage() {
 
 function CreateAnnouncementForm({ onClose }: { onClose: () => void }) {
   const groupsQuery = useAdvisorMessageGroups()
-  const groups = groupsQuery.data?.items ?? []
+  const groups: AdvisorMessageGroup[] = groupsQuery.data?.items ?? []
 
   const createMutation = useCreateAnnouncementMutation()
 
@@ -292,7 +296,7 @@ function CreateAnnouncementForm({ onClose }: { onClose: () => void }) {
 
   const toggleProject = (id: string) => {
     setSelectedProjectIds((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((p: string) => p !== id) : [...prev, id]
     )
   }
 
@@ -418,7 +422,7 @@ function CreateAnnouncementForm({ onClose }: { onClose: () => void }) {
               </span>
             </Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {groups.map((g) => (
+              {groups.map((g: AdvisorMessageGroup) => (
                 <Button
                   key={g.id}
                   type="button"

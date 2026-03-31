@@ -1,5 +1,69 @@
 import apiClient from "@/lib/api/client";
-import { AdvisorDashboardOverview } from "@/lib/types/advisor";
+import type {
+  AdvisorAnnouncement,
+  AdvisorAnnouncementsResponse,
+  AdvisorCreateAnnouncementDto,
+  AdvisorCreateMeetingDto,
+  AdvisorCreateMessageDto,
+  AdvisorCreateMessageGroupDto,
+  AdvisorDashboardOverview,
+  AdvisorDocumentDetail,
+  AdvisorDocumentsResponse,
+  AdvisorEvaluationDetail,
+  AdvisorEvaluationsResponse,
+  AdvisorGroupMessagesResponse,
+  AdvisorMeeting,
+  AdvisorMessage,
+  AdvisorMessageGroup,
+  AdvisorMessageGroupsResponse,
+  AdvisorMilestoneStatusDto,
+  AdvisorProjectDetail,
+  AdvisorProjectsResponse,
+  AdvisorReviewDocumentDto,
+  AdvisorRevisionRequestDto,
+  AdvisorScheduleResponse,
+  AdvisorStudentsResponse,
+  AdvisorUpdateEvaluationDto,
+  AdvisorUpdateMeetingDto,
+  AdvisorUploadDocumentDto,
+} from "@/lib/types/advisor";
+
+type QueryParams = Record<string, string | number | boolean | undefined | null>;
+
+function cleanParams(params?: QueryParams) {
+  if (!params) return undefined;
+
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  );
+}
+
+function appendValue(formData: FormData, key: string, value: unknown) {
+  if (value === undefined || value === null || value === "") return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => appendValue(formData, key, item));
+    return;
+  }
+
+  formData.append(key, String(value));
+}
+
+function buildDocumentFormData(dto: AdvisorUploadDocumentDto, file: File) {
+  const formData = new FormData();
+  Object.entries(dto).forEach(([key, value]) => appendValue(formData, key, value));
+  formData.append("file", file);
+  return formData;
+}
+
+function buildAnnouncementFormData(dto: AdvisorCreateAnnouncementDto, file?: File | null) {
+  const formData = new FormData();
+  Object.entries(dto).forEach(([key, value]) => appendValue(formData, key, value));
+  if (file) {
+    formData.append("file", file);
+  }
+  return formData;
+}
 
 export interface AdvisorSummaryMetrics {
   totalProjectsAdvising: number

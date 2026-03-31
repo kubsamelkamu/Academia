@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useAdvisorProjects, useUploadDocumentMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectItem, AdvisorProjectMilestone } from "@/lib/types/advisor"
 import { ArrowLeft, Loader2, Upload } from "lucide-react"
 
 export function AdvisorUploadPage() {
@@ -25,7 +26,7 @@ export function AdvisorUploadPage() {
   const [description, setDescription] = React.useState("")
   const [file, setFile] = React.useState<File | null>(null)
 
-  const projects = projectsQuery.data?.items ?? []
+  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
 
   React.useEffect(() => {
     if (!projectId && projects[0]?.id) {
@@ -34,7 +35,7 @@ export function AdvisorUploadPage() {
   }, [projectId, projects])
 
   const selectedProject = React.useMemo(
-    () => projects.find((project) => project.id === projectId) ?? null,
+    () => projects.find((project: AdvisorProjectItem) => project.id === projectId) ?? null,
     [projectId, projects],
   )
 
@@ -93,7 +94,7 @@ export function AdvisorUploadPage() {
                 <SelectValue placeholder="Choose project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map((project) => (
+                {projects.map((project: AdvisorProjectItem) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.groupName} - {project.title}
                   </SelectItem>
@@ -110,7 +111,7 @@ export function AdvisorUploadPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">General project document</SelectItem>
-                {(selectedProject?.milestones ?? []).map((milestone) => (
+                {(selectedProject?.milestones ?? []).map((milestone: AdvisorProjectMilestone) => (
                   <SelectItem key={milestone.id} value={milestone.id}>
                     {milestone.name}
                   </SelectItem>

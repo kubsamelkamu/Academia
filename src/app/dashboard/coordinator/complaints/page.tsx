@@ -567,7 +567,7 @@ export default function ComplaintsPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-12 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-12 sm:pl-0">
           {openC.length > 0 && (
             <Badge variant="destructive" className="gap-1.5 shrink-0 pl-2 pr-3 py-1.5 text-xs font-semibold animate-pulse">
               <AlertTriangle className="h-3.5 w-3.5" />
@@ -595,7 +595,7 @@ export default function ComplaintsPage() {
       </div>
 
       {/* ── Resolution progress banner ── */}
-      <div className="rounded-xl border bg-primary/5 border-primary/10 px-5 py-3.5 flex items-center gap-4">
+      <div className="rounded-xl border bg-primary/5 border-primary/10 px-5 py-3.5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <BarChart3 className="h-5 w-5 text-primary shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1.5">
@@ -604,7 +604,7 @@ export default function ComplaintsPage() {
           </div>
           <Progress value={resolutionRate} className="h-1.5" />
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 sm:flex">
           <TrendingUp className="h-3.5 w-3.5 text-primary" />
           {resolved.length} of {enriched.length} resolved
         </div>
@@ -613,24 +613,24 @@ export default function ComplaintsPage() {
       {/* ── Tabs ── */}
       <Tabs defaultValue="all" className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="h-10 bg-muted/40 p-1">
-            <TabsTrigger value="all" className="gap-1.5 text-xs sm:text-sm rounded-md">
+          <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap bg-muted/40 p-1">
+            <TabsTrigger value="all" className="gap-1.5 shrink-0 text-xs sm:text-sm rounded-md">
               All
               <Badge variant="secondary" className="text-xs px-1.5 py-0 ml-0.5">{enriched.length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="open" className="gap-1.5 text-xs sm:text-sm rounded-md">
+            <TabsTrigger value="open" className="gap-1.5 shrink-0 text-xs sm:text-sm rounded-md">
               Open
               {openC.length > 0 && (
                 <Badge variant="destructive" className="text-xs px-1.5 py-0 ml-0.5">{openC.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="review" className="gap-1.5 text-xs sm:text-sm rounded-md">
+            <TabsTrigger value="review" className="gap-1.5 shrink-0 text-xs sm:text-sm rounded-md">
               Review
               {underReview.length > 0 && (
                 <Badge variant="secondary" className="text-xs px-1.5 py-0 ml-0.5">{underReview.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="resolved" className="gap-1.5 text-xs sm:text-sm rounded-md">
+            <TabsTrigger value="resolved" className="gap-1.5 shrink-0 text-xs sm:text-sm rounded-md">
               Resolved
             </TabsTrigger>
           </TabsList>

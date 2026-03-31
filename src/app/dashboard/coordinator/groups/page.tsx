@@ -512,10 +512,10 @@ function ProjectDetailSheet({
 
           <div className="p-6 space-y-6">
             <Tabs defaultValue="overview">
-              <TabsList className="w-full h-9">
-                <TabsTrigger value="overview" className="flex-1 text-xs">Overview</TabsTrigger>
-                <TabsTrigger value="students" className="flex-1 text-xs">Students</TabsTrigger>
-                <TabsTrigger value="activities" className="flex-1 text-xs">Activities</TabsTrigger>
+              <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+                <TabsTrigger value="overview" className="text-xs shrink-0">Overview</TabsTrigger>
+                <TabsTrigger value="students" className="text-xs shrink-0">Students</TabsTrigger>
+                <TabsTrigger value="activities" className="text-xs shrink-0">Activities</TabsTrigger>
               </TabsList>
 
               {/* Overview Tab */}
@@ -838,11 +838,11 @@ export default function GroupsPage() {
 
       {/* Page Tabs */}
       <Tabs defaultValue="projects">
-        <TabsList className="h-10">
-          <TabsTrigger value="projects" className="gap-1.5 text-sm">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="projects" className="gap-1.5 shrink-0 text-sm">
             <BookOpen className="h-4 w-4" /> All Projects
           </TabsTrigger>
-          <TabsTrigger value="students" className="gap-1.5 text-sm">
+          <TabsTrigger value="students" className="gap-1.5 shrink-0 text-sm">
             <GraduationCap className="h-4 w-4" /> All Students
           </TabsTrigger>
         </TabsList>
@@ -935,6 +935,7 @@ export default function GroupsPage() {
                 className="h-7 w-7"
                 onClick={() => setStuView("grid")}
                 title="Grid view"
+                aria-label="Grid view"
               >
                 <LayoutGrid className="h-4 w-4" />
               </Button>
@@ -944,6 +945,7 @@ export default function GroupsPage() {
                 className="h-7 w-7"
                 onClick={() => setStuView("table")}
                 title="Table view"
+                aria-label="Table view"
               >
                 <List className="h-4 w-4" />
               </Button>

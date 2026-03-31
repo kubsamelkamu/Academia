@@ -575,11 +575,11 @@ export default function GradeManagementPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-10">
-          <TabsTrigger value="overview"     className="gap-2"><GraduationCap className="h-4 w-4" /> Grades</TabsTrigger>
-          <TabsTrigger value="distribution" className="gap-2"><BarChart3 className="h-4 w-4" /> Distribution</TabsTrigger>
-          <TabsTrigger value="actions"      className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Bulk Actions</TabsTrigger>
-          <TabsTrigger value="complaints"   className="gap-2 relative">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="overview"     className="gap-2 shrink-0"><GraduationCap className="h-4 w-4" /> Grades</TabsTrigger>
+          <TabsTrigger value="distribution" className="gap-2 shrink-0"><BarChart3 className="h-4 w-4" /> Distribution</TabsTrigger>
+          <TabsTrigger value="actions"      className="gap-2 shrink-0"><SlidersHorizontal className="h-4 w-4" /> Bulk Actions</TabsTrigger>
+          <TabsTrigger value="complaints"   className="gap-2 relative shrink-0">
             <AlertTriangle className="h-4 w-4" /> Complaints
             {mockComplaints.filter(c => c.status === 'open').length > 0 && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[9px] text-destructive-foreground flex items-center justify-center font-bold">

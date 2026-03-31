@@ -171,14 +171,14 @@ export default function EvaluatorProgressPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="h-10">
-          <TabsTrigger value="overview" className="gap-2">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="overview" className="gap-2 shrink-0">
             <Activity className="h-4 w-4" /> Overview
           </TabsTrigger>
-          <TabsTrigger value="performance" className="gap-2">
+          <TabsTrigger value="performance" className="gap-2 shrink-0">
             <BarChart3 className="h-4 w-4" /> Performance
           </TabsTrigger>
-          <TabsTrigger value="communication" className="gap-2">
+          <TabsTrigger value="communication" className="gap-2 shrink-0">
             <MessageSquare className="h-4 w-4" /> Communication
           </TabsTrigger>
         </TabsList>
@@ -360,19 +360,27 @@ export default function EvaluatorProgressPage() {
                   </Card>
                 </Link>
               ) : (
-                <Card key={item.label} className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/30" onClick={item.action ?? undefined}>
-                  <CardContent className="pt-5 pb-5">
-                    <div className="flex items-center gap-4">
-                      <div className={`h-11 w-11 rounded-xl ${item.bg} flex items-center justify-center`}>
-                        <item.icon className={`h-5 w-5 ${item.color}`} />
+                <button
+                  key={item.label}
+                  type="button"
+                  className="w-full text-left"
+                  onClick={item.action ?? undefined}
+                  aria-label={item.label}
+                >
+                  <Card className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/30">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex items-center gap-4">
+                        <div className={`h-11 w-11 rounded-xl ${item.bg} flex items-center justify-center`}>
+                          <item.icon className={`h-5 w-5 ${item.color}`} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{item.label}</p>
+                          <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{item.label}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </button>
               )
             ))}
           </div>

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { useAdvisorStudents, useClearProjectMutation, useRequestRevisionMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorClearanceProject } from "@/lib/types/advisor"
 import { Search } from "lucide-react"
 
 export function AdvisorStudentsPage() {
@@ -18,11 +19,11 @@ export function AdvisorStudentsPage() {
   const requestRevisionMutation = useRequestRevisionMutation()
 
   const items = React.useMemo(() => {
-    const projects = studentsQuery.data?.items ?? []
+    const projects: AdvisorClearanceProject[] = studentsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
     if (!term) return projects
-    return projects.filter((project) =>
-      [project.title, project.groupName, ...project.members.map((member) => member.name)].some((value) =>
+    return projects.filter((project: AdvisorClearanceProject) =>
+      [project.title, project.groupName, ...project.members.map((member) => member.name)].some((value: string) =>
         value.toLowerCase().includes(term),
       ),
     )
@@ -96,7 +97,7 @@ export function AdvisorStudentsPage() {
         ) : items.length === 0 ? (
           <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No projects found.</CardContent></Card>
         ) : (
-          items.map((project) => (
+          items.map((project: AdvisorClearanceProject) => (
             <Card key={project.id}>
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

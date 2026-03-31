@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { useAdvisorProject, useApproveMilestoneMutation, useRequestRevisionMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectDetail, AdvisorProjectMilestone } from "@/lib/types/advisor"
 import { ArrowLeft, Loader2, Save, Send } from "lucide-react"
 
 interface AdvisorProjectReviewsPageProps {
@@ -50,8 +51,9 @@ export function AdvisorProjectReviewsPage({ projectId }: AdvisorProjectReviewsPa
     }
   }
 
-  const project = projectQuery.data
-  const submittedMilestones = project?.milestones.filter((milestone) => milestone.status === "submitted") ?? []
+  const project = projectQuery.data as AdvisorProjectDetail | undefined
+  const submittedMilestones =
+    project?.milestones.filter((milestone: AdvisorProjectMilestone) => milestone.status === "submitted") ?? []
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -73,7 +75,7 @@ export function AdvisorProjectReviewsPage({ projectId }: AdvisorProjectReviewsPa
           ) : submittedMilestones.length === 0 ? (
             <p className="text-sm text-muted-foreground">No submitted milestones are waiting for review.</p>
           ) : (
-            submittedMilestones.map((milestone) => (
+            submittedMilestones.map((milestone: AdvisorProjectMilestone) => (
               <Card key={milestone.id}>
                 <CardHeader>
                   <CardTitle className="text-lg">{milestone.name}</CardTitle>

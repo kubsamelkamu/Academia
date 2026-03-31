@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useAdvisorProjects, useCreateAnnouncementMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectItem } from "@/lib/types/advisor"
 import { ArrowLeft, Loader2, Send } from "lucide-react"
 
 export function AdvisorAnnouncementNewPage() {
@@ -28,7 +29,12 @@ export function AdvisorAnnouncementNewPage() {
   const [targetProjectId, setTargetProjectId] = React.useState("")
   const [file, setFile] = React.useState<File | null>(null)
 
-  const projects = projectsQuery.data?.items ?? []
+  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
+  const projectOptions = projects.map((project: AdvisorProjectItem) => (
+    <SelectItem key={project.id} value={project.id}>
+      {project.groupName} - {project.title}
+    </SelectItem>
+  ))
 
   async function handleSubmit() {
     if (!title.trim() || !content.trim()) {
@@ -97,11 +103,7 @@ export function AdvisorAnnouncementNewPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All my projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.groupName} - {project.title}
-                    </SelectItem>
-                  ))}
+                  {projectOptions}
                 </SelectContent>
               </Select>
             </div>

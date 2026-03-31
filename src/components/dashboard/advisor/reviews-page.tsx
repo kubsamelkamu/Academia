@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAdvisorProjects } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectItem, AdvisorProjectMilestone } from "@/lib/types/advisor"
 
 export function AdvisorReviewsPage() {
   const projectsQuery = useAdvisorProjects()
 
   const pendingMilestones = React.useMemo(() => {
-    return (projectsQuery.data?.items ?? []).flatMap((project) =>
+    return ((projectsQuery.data?.items ?? []) as AdvisorProjectItem[]).flatMap((project: AdvisorProjectItem) =>
       project.milestones
-        .filter((milestone) => milestone.status === "submitted")
-        .map((milestone) => ({
+        .filter((milestone: AdvisorProjectMilestone) => milestone.status === "submitted")
+        .map((milestone: AdvisorProjectMilestone) => ({
           projectId: project.id,
           projectTitle: project.title,
           groupName: project.groupName,
@@ -56,7 +57,14 @@ export function AdvisorReviewsPage() {
               ) : pendingMilestones.length === 0 ? (
                 <TableRow><TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">No pending milestone reviews.</TableCell></TableRow>
               ) : (
-                pendingMilestones.map((row) => (
+                pendingMilestones.map((row: {
+                  projectId: string
+                  projectTitle: string
+                  groupName: string
+                  milestoneId: string
+                  milestoneName: string
+                  submittedAt: string
+                }) => (
                   <TableRow key={`${row.projectId}:${row.milestoneId}`}>
                     <TableCell>
                       <div>

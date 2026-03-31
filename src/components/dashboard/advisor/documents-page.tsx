@@ -15,6 +15,7 @@ import {
   useApproveDocumentMutation,
   useRequestDocumentRevisionMutation,
 } from "@/lib/hooks/useAdvisor"
+import type { AdvisorDocumentRow } from "@/lib/types/advisor"
 import { CheckCircle, Download, Eye, FileText, Loader2, Search, Upload } from "lucide-react"
 
 function formatDate(value: string) {
@@ -41,11 +42,11 @@ export function AdvisorDocumentsPage() {
   const requestDocumentRevisionMutation = useRequestDocumentRevisionMutation()
 
   const documents = React.useMemo(() => {
-    const items = documentsQuery.data?.items ?? []
+    const items: AdvisorDocumentRow[] = documentsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
     if (!term) return items
-    return items.filter((document) =>
-      [document.name, document.project, document.group].some((value) =>
+    return items.filter((document: AdvisorDocumentRow) =>
+      [document.name, document.project, document.group].some((value: string) =>
         value.toLowerCase().includes(term),
       ),
     )
@@ -184,7 +185,7 @@ export function AdvisorDocumentsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                documents.map((document) => (
+                documents.map((document: AdvisorDocumentRow) => (
                   <TableRow key={document.id}>
                     <TableCell>
                       <p className="font-medium">{document.name}</p>

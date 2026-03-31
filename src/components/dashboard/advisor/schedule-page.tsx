@@ -21,6 +21,7 @@ import {
   useDeleteMeetingMutation,
   useUpdateMeetingMutation,
 } from "@/lib/hooks/useAdvisor"
+import type { AdvisorMeeting, AdvisorProjectItem } from "@/lib/types/advisor"
 import { Calendar, Loader2, MapPin, Pencil, Trash2, Video } from "lucide-react"
 
 function formatDate(value: string) {
@@ -75,10 +76,12 @@ export function AdvisorSchedulePage() {
   const [form, setForm] = React.useState(EMPTY_FORM)
   const [editingId, setEditingId] = React.useState("")
 
-  const projects = projectsQuery.data?.items ?? []
-  const allMeetings = scheduleQuery.data?.items ?? []
+  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
+  const allMeetings: AdvisorMeeting[] = scheduleQuery.data?.items ?? []
   const meetings = React.useMemo(() => {
-    return selectedDate ? allMeetings.filter((meeting) => meeting.date === selectedDate) : allMeetings
+    return selectedDate
+      ? allMeetings.filter((meeting: AdvisorMeeting) => meeting.date === selectedDate)
+      : allMeetings
   }, [allMeetings, selectedDate])
 
   React.useEffect(() => {
@@ -89,9 +92,14 @@ export function AdvisorSchedulePage() {
 
   React.useEffect(() => {
     if (!editId) return
-    const meeting = allMeetings.find((item) => item.id === editId)
+    const meeting = allMeetings.find((item: AdvisorMeeting) => item.id === editId)
     if (!meeting) return
-    const project = projects.find((candidate) => candidate.id === meeting.projectId || candidate.title === meeting.project || candidate.groupName === meeting.project)
+    const project = projects.find(
+      (candidate: AdvisorProjectItem) =>
+        candidate.id === meeting.projectId ||
+        candidate.title === meeting.project ||
+        candidate.groupName === meeting.project
+    )
     setEditingId(meeting.id)
     setForm({
       projectId: meeting.projectId || project?.id || projects[0]?.id || "",
@@ -108,7 +116,7 @@ export function AdvisorSchedulePage() {
   React.useEffect(() => {
     if (!deleteId) return
     if (deleteMeetingMutation.isPending) return
-    const meeting = allMeetings.find((item) => item.id === deleteId)
+    const meeting = allMeetings.find((item: AdvisorMeeting) => item.id === deleteId)
     if (!meeting) return
     const confirmed = window.confirm(`Delete ${meeting.title}?`)
     if (!confirmed) {
@@ -208,7 +216,7 @@ export function AdvisorSchedulePage() {
               <Select value={form.projectId} onValueChange={(value) => setForm((current) => ({ ...current, projectId: value }))}>
                 <SelectTrigger><SelectValue placeholder="Choose project" /></SelectTrigger>
                 <SelectContent>
-                  {projects.map((project) => (
+                  {projects.map((project: AdvisorProjectItem) => (
                     <SelectItem key={project.id} value={project.id}>{project.groupName} - {project.title}</SelectItem>
                   ))}
                 </SelectContent>
@@ -299,7 +307,7 @@ export function AdvisorSchedulePage() {
               ) : meetings.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">No meetings found.</TableCell></TableRow>
               ) : (
-                meetings.map((meeting) => (
+                meetings.map((meeting: AdvisorMeeting) => (
                   <TableRow key={meeting.id}>
                     <TableCell>
                       <div>

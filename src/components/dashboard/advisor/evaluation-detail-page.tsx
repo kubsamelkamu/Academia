@@ -14,6 +14,11 @@ import {
   useRequestEvaluationRevisionMutation,
   useUpdateEvaluationMutation,
 } from "@/lib/hooks/useAdvisor"
+import type {
+  AdvisorAttachmentLink,
+  AdvisorEvaluationDetail,
+  AdvisorRubricItem,
+} from "@/lib/types/advisor"
 import { ArrowLeft, Loader2, Save, Send } from "lucide-react"
 
 function formatDate(value?: string) {
@@ -105,9 +110,9 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: AdvisorEvaluationD
     )
   }
 
-  const evaluation = evaluationQuery.data
-  const totalScore = evaluation.rubric.reduce((sum, item) => sum + item.score, 0)
-  const totalMax = evaluation.rubric.reduce((sum, item) => sum + item.max, 0)
+  const evaluation: AdvisorEvaluationDetail = evaluationQuery.data
+  const totalScore = evaluation.rubric.reduce((sum: number, item: AdvisorRubricItem) => sum + item.score, 0)
+  const totalMax = evaluation.rubric.reduce((sum: number, item: AdvisorRubricItem) => sum + item.max, 0)
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -138,7 +143,7 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: AdvisorEvaluationD
               <p>Score: {totalScore}/{totalMax || 0}</p>
             </div>
             <div className="space-y-3">
-              {evaluation.rubric.map((item) => (
+              {evaluation.rubric.map((item: AdvisorRubricItem) => (
                 <div key={item.id} className="rounded-lg border p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -153,7 +158,7 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: AdvisorEvaluationD
             {evaluation.attachments.length ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Attachments</p>
-                {evaluation.attachments.map((attachment) => (
+                {evaluation.attachments.map((attachment: AdvisorAttachmentLink) => (
                   <a key={attachment.url} href={attachment.url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">
                     {attachment.name}
                   </a>

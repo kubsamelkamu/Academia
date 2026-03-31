@@ -511,7 +511,7 @@ export default function ReportsPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <Button size="sm" className="gap-1.5" onClick={() => openGenerate()}>
             <Plus className="h-4 w-4" /> New Report
           </Button>
@@ -537,10 +537,10 @@ export default function ReportsPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="generate" className="space-y-5">
-        <TabsList className="h-10">
-          <TabsTrigger value="generate"   className="gap-2"><Plus className="h-4 w-4" /> Generate</TabsTrigger>
-          <TabsTrigger value="history"    className="gap-2"><FileText className="h-4 w-4" /> History</TabsTrigger>
-          <TabsTrigger value="analytics"  className="gap-2"><BarChart3 className="h-4 w-4" /> Analytics</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="generate"   className="gap-2 shrink-0"><Plus className="h-4 w-4" /> Generate</TabsTrigger>
+          <TabsTrigger value="history"    className="gap-2 shrink-0"><FileText className="h-4 w-4" /> History</TabsTrigger>
+          <TabsTrigger value="analytics"  className="gap-2 shrink-0"><BarChart3 className="h-4 w-4" /> Analytics</TabsTrigger>
         </TabsList>
 
         {/* ── Generate Tab ── */}

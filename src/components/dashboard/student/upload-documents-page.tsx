@@ -162,20 +162,13 @@ export function StudentUploadDocumentsPage() {
   const myProjectGroupQuery = useMyProjectGroup(Boolean(user))
   const myGroupProposalsQuery = useMyGroupProposals(Boolean(user))
   const projectTitle = myProjectGroupQuery.data?.name?.trim() || ""
+  const milestoneParam = searchParams.get("milestone")
+  const milestoneKeyFromParam = useMemo(() => milestoneParamToKey(milestoneParam), [milestoneParam])
   const [title, setTitle] = useState("")
-  const [milestone, setMilestone] = useState("")
+  const [milestone, setMilestone] = useState(() => milestoneKeyFromParam)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const hasRedirectedRef = useRef(false)
-
-  const milestoneParam = searchParams.get("milestone")
-  const milestoneKeyFromParam = useMemo(() => milestoneParamToKey(milestoneParam), [milestoneParam])
-
-  useEffect(() => {
-    if (!milestone && milestoneKeyFromParam) {
-      setMilestone(milestoneKeyFromParam)
-    }
-  }, [milestone, milestoneKeyFromParam])
 
   const isProposalFlow = useMemo(() => {
     if (milestone === "proposal") return true
@@ -268,16 +261,12 @@ export function StudentUploadDocumentsPage() {
   }, [prerequisiteCheck, router])
 
   const milestoneLabel = useMemo(() => milestoneKeyToLabel(milestone), [milestone])
-
-  useEffect(() => {
-    if (isProposalFlow) return
-    if (!milestone) return
-    if (title.trim()) return
-
+  const suggestedTitle = useMemo(() => {
+    if (isProposalFlow || !milestone) return ""
     const base = projectTitle || ""
-    const suggested = base ? `${base} — ${milestoneLabel}` : milestoneLabel
-    setTitle(suggested)
-  }, [isProposalFlow, milestone, milestoneLabel, projectTitle, title])
+    return base ? `${base} — ${milestoneLabel}` : milestoneLabel
+  }, [isProposalFlow, milestone, milestoneLabel, projectTitle])
+  const effectiveTitle = title || suggestedTitle
 
   const createProposalMutation = useCreateProposalWithPdf()
   const submitProposalMutation = useSubmitProposalForReview()
@@ -310,7 +299,7 @@ export function StudentUploadDocumentsPage() {
   }, [recommendedType, templatesQuery.data?.templates])
 
   const handleSubmit = async () => {
-    if (!title.trim() || !milestone) {
+    if (!effectiveTitle.trim() || !milestone) {
       toast.error("Document title and milestone are required")
       return
     }
@@ -562,7 +551,7 @@ export function StudentUploadDocumentsPage() {
                 <Input
                   id="document-title"
                   placeholder="e.g., Project Proposal v3"
-                  value={title}
+                  value={effectiveTitle}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </div>

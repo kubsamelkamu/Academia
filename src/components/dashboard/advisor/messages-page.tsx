@@ -17,6 +17,12 @@ import {
   useAdvisorMessageGroups,
   useSendGroupMessageMutation,
 } from "@/lib/hooks/useAdvisor"
+import type {
+  AdvisorMessage,
+  AdvisorMessageAttachment,
+  AdvisorMessageGroup,
+  AdvisorMessageGroupMember,
+} from "@/lib/types/advisor"
 import { Loader2, MessageSquare, Plus, Search, Send, Users } from "lucide-react"
 
 function formatTime(timestamp: string) {
@@ -46,7 +52,7 @@ export function AdvisorMessagesPage() {
   const [draft, setDraft] = React.useState("")
 
   const groupsQuery = useAdvisorMessageGroups(searchTerm ? { search: searchTerm } : undefined)
-  const groups = groupsQuery.data?.items ?? []
+  const groups: AdvisorMessageGroup[] = groupsQuery.data?.items ?? []
 
   React.useEffect(() => {
     if (requestedGroupId) {
@@ -62,7 +68,7 @@ export function AdvisorMessagesPage() {
   const groupMessagesQuery = useAdvisorGroupMessages(effectiveSelectedGroupId || undefined)
   const selectedGroup =
     groupMessagesQuery.data?.group ??
-    groups.find((group) => group.id === effectiveSelectedGroupId) ??
+    groups.find((group: AdvisorMessageGroup) => group.id === effectiveSelectedGroupId) ??
     null
   const messages = groupMessagesQuery.data?.items ?? []
 
@@ -133,7 +139,7 @@ export function AdvisorMessagesPage() {
                     </p>
                   </div>
                 ) : (
-                  groups.map((group) => (
+                  groups.map((group: AdvisorMessageGroup) => (
                     <button
                       key={group.id}
                       type="button"
@@ -180,7 +186,7 @@ export function AdvisorMessagesPage() {
                   <Badge variant="outline">{selectedGroup.privacy}</Badge>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {selectedGroup.members.map((member) => (
+                  {selectedGroup.members.map((member: AdvisorMessageGroupMember) => (
                     <div
                       key={member.id}
                       className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs"
@@ -224,7 +230,7 @@ export function AdvisorMessagesPage() {
                     </p>
                   </div>
                 ) : (
-                  messages.map((message) => (
+                  messages.map((message: AdvisorMessage) => (
                     <div
                       key={message.id}
                       className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}
@@ -241,7 +247,7 @@ export function AdvisorMessagesPage() {
                         <p>{message.content}</p>
                         {message.attachments?.length ? (
                           <div className="mt-3 space-y-2 border-t border-black/10 pt-2 text-xs">
-                            {message.attachments.map((attachment) => (
+                            {message.attachments.map((attachment: AdvisorMessageAttachment) => (
                               <div
                                 key={`${message.id}:${attachment.name}`}
                                 className="rounded bg-black/10 px-2 py-1"

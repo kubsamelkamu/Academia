@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAdvisorEvaluations } from "@/lib/hooks/useAdvisor"
+import type { AdvisorEvaluationRow } from "@/lib/types/advisor"
 import { Search } from "lucide-react"
 
 function formatDate(value: string) {
@@ -34,11 +35,11 @@ export function AdvisorEvaluationsPage() {
   })
 
   const evaluations = React.useMemo(() => {
-    const items = evaluationsQuery.data?.items ?? []
+    const items: AdvisorEvaluationRow[] = evaluationsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
     if (!term) return items
-    return items.filter((evaluation) =>
-      [evaluation.studentName, evaluation.studentId ?? "", evaluation.projectTitle].some((value) =>
+    return items.filter((evaluation: AdvisorEvaluationRow) =>
+      [evaluation.studentName, evaluation.studentId ?? "", evaluation.projectTitle].some((value: string) =>
         value.toLowerCase().includes(term),
       ),
     )
@@ -52,6 +53,13 @@ export function AdvisorEvaluationsPage() {
     overdueCount: 0,
     completionRate: 0,
   }
+  const projectTypes: string[] = [
+    ...new Set<string>(
+      (evaluationsQuery.data?.items ?? [])
+        .map((item: AdvisorEvaluationRow) => item.projectType)
+        .filter((type: string | undefined): type is string => Boolean(type))
+    ),
+  ]
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -113,11 +121,7 @@ export function AdvisorEvaluationsPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All project types</SelectItem>
-                {[...new Set(
-                  (evaluationsQuery.data?.items ?? [])
-                    .map((item) => item.projectType)
-                    .filter(Boolean),
-                )].map((type) => (
+                {projectTypes.map((type: string) => (
                   <SelectItem key={type} value={String(type).toLowerCase()}>
                     {type}
                   </SelectItem>
@@ -159,7 +163,7 @@ export function AdvisorEvaluationsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                evaluations.map((evaluation) => (
+                evaluations.map((evaluation: AdvisorEvaluationRow) => (
                   <TableRow
                     key={evaluation.id}
                     className="cursor-pointer"

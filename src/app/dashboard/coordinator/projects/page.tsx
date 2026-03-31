@@ -350,7 +350,7 @@ export default function ProjectsPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <Badge variant="secondary" className="gap-1.5">
             <FolderKanban className="h-3.5 w-3.5" /> {stats.total} Projects
           </Badge>
@@ -464,11 +464,11 @@ export default function ProjectsPage() {
         <div className="space-y-4">
 
           <Tabs defaultValue="advisors">
-            <TabsList className="w-full h-9">
-              <TabsTrigger value="advisors" className="flex-1 text-xs gap-1.5">
+            <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+              <TabsTrigger value="advisors" className="text-xs gap-1.5 shrink-0">
                 <Users className="h-3.5 w-3.5" /> Advisors
               </TabsTrigger>
-              <TabsTrigger value="evaluators" className="flex-1 text-xs gap-1.5">
+              <TabsTrigger value="evaluators" className="text-xs gap-1.5 shrink-0">
                 <Star className="h-3.5 w-3.5" /> Evaluators
               </TabsTrigger>
             </TabsList>

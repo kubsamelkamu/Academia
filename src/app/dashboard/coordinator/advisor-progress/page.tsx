@@ -397,7 +397,7 @@ export default function AdvisorProgressPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <Link href="/dashboard/coordinator/notify-advisors">
             <Button variant="outline" size="sm" className="gap-1.5">
               <Bell className="h-4 w-4" /> Notify All
@@ -445,10 +445,10 @@ export default function AdvisorProgressPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-10">
-          <TabsTrigger value="overview"     className="gap-2"><Users className="h-4 w-4" /> Overview</TabsTrigger>
-          <TabsTrigger value="performance"  className="gap-2"><BarChart3 className="h-4 w-4" /> Performance</TabsTrigger>
-          <TabsTrigger value="communication"className="gap-2"><MessageSquare className="h-4 w-4" /> Communication</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="overview"     className="gap-2 shrink-0"><Users className="h-4 w-4" /> Overview</TabsTrigger>
+          <TabsTrigger value="performance"  className="gap-2 shrink-0"><BarChart3 className="h-4 w-4" /> Performance</TabsTrigger>
+          <TabsTrigger value="communication"className="gap-2 shrink-0"><MessageSquare className="h-4 w-4" /> Communication</TabsTrigger>
         </TabsList>
 
         {/* ── Overview Tab ── */}

@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useAdvisorProjects, useCreateMessageGroupMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectItem } from "@/lib/types/advisor"
 import { ArrowLeft, Loader2, Search, Users } from "lucide-react"
 
 function getInitials(name: string) {
@@ -41,7 +42,7 @@ export function AdvisorCreateGroupPage() {
   const [searchTerm, setSearchTerm] = React.useState("")
   const [selectedMembers, setSelectedMembers] = React.useState<string[]>([])
 
-  const projects = projectsQuery.data?.items ?? []
+  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
 
   React.useEffect(() => {
     if (!formData.projectId && projects[0]?.id) {
@@ -50,7 +51,7 @@ export function AdvisorCreateGroupPage() {
   }, [formData.projectId, projects])
 
   const selectedProject = React.useMemo(
-    () => projects.find((project) => project.id === formData.projectId) ?? null,
+    () => projects.find((project: AdvisorProjectItem) => project.id === formData.projectId) ?? null,
     [formData.projectId, projects],
   )
 
@@ -59,7 +60,7 @@ export function AdvisorCreateGroupPage() {
     const term = searchTerm.trim().toLowerCase()
     if (!term) return members
     return members.filter((member) =>
-      [member.name, member.email, member.role].some((value) => value.toLowerCase().includes(term)),
+      [member.name, member.email, member.role].some((value: string) => value.toLowerCase().includes(term)),
     )
   }, [searchTerm, selectedProject])
 
@@ -150,7 +151,7 @@ export function AdvisorCreateGroupPage() {
                       <SelectValue placeholder="Choose project" />
                     </SelectTrigger>
                     <SelectContent>
-                      {projects.map((project) => (
+                      {projects.map((project: AdvisorProjectItem) => (
                         <SelectItem key={project.id} value={project.id}>
                           {project.groupName} - {project.title}
                         </SelectItem>
