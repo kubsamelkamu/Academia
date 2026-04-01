@@ -1,201 +1,253 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import { ArrowLeft, Send, Users, Loader2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { useAdvisorProjects, useCreateAnnouncementMutation } from "@/lib/hooks/useAdvisor"
-import type { AdvisorProjectItem } from "@/lib/types/advisor"
-import { ArrowLeft, Loader2, Send } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+
+import type { AnnouncementPriority, AnnouncementStatus } from "@/types/announcements"
+
+const GROUP_OPTIONS = [
+  { id: "g1", name: "AI Research Group", memberCount: 8 },
+  { id: "g2", name: "Team Atlas", memberCount: 5 },
+  { id: "g3", name: "Team Nova", memberCount: 6 },
+  { id: "g4", name: "Quantum Computing", memberCount: 4 },
+]
+
+type AnnouncementFormData = {
+  title: string
+  priority: AnnouncementPriority
+  content: string
+  selectedGroupIds: string[]
+  deadline: string
+  resourceLink: string
+  resourceFile: File | null
+  status: AnnouncementStatus
+}
 
 export function AdvisorAnnouncementNewPage() {
   const router = useRouter()
-  const projectsQuery = useAdvisorProjects()
-  const createAnnouncementMutation = useCreateAnnouncementMutation()
+  const [formData, setFormData] = React.useState<AnnouncementFormData>({
+    title: "",
+    priority: "MEDIUM",
+    content: "",
+    selectedGroupIds: [],
+    deadline: "",
+    resourceLink: "",
+    resourceFile: null,
+    status: "published",
+  })
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-  const [title, setTitle] = React.useState("")
-  const [content, setContent] = React.useState("")
-  const [priority, setPriority] = React.useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM")
-  const [status, setStatus] = React.useState<"DRAFT" | "PUBLISHED" | "ARCHIVED">("PUBLISHED")
-  const [audience, setAudience] = React.useState<"ALL" | "STUDENTS" | "ADVISORS">("STUDENTS")
-  const [deadlineAt, setDeadlineAt] = React.useState("")
-  const [targetProjectId, setTargetProjectId] = React.useState("")
-  const [file, setFile] = React.useState<File | null>(null)
-
-  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
-  const projectOptions = projects.map((project: AdvisorProjectItem) => (
-    <SelectItem key={project.id} value={project.id}>
-      {project.groupName} - {project.title}
-    </SelectItem>
-  ))
-
-  async function handleSubmit() {
-    if (!title.trim() || !content.trim()) {
-      toast.error("Title and content are required.")
-      return
-    }
-
-    try {
-      await createAnnouncementMutation.mutateAsync({
-        dto: {
-          title: title.trim(),
-          content: content.trim(),
-          priority,
-          status,
-          audience,
-          deadlineAt: deadlineAt || undefined,
-          targetProjectIds: targetProjectId ? [targetProjectId] : undefined,
-        },
-        file,
-      })
-      toast.success("Announcement created.")
-      router.push("/dashboard/advisor/announcements")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create announcement")
-    }
+  const handleFieldChange = <K extends keyof AnnouncementFormData>(field: K, value: AnnouncementFormData[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const toggleGroup = (id: string) => {
+    const current = formData.selectedGroupIds
+    const next = current.includes(id) 
+      ? current.filter(g => g !== id) 
+      : [...current, id]
+    handleFieldChange("selectedGroupIds" as keyof AnnouncementFormData, next)
+  }
+
+  const handleSubmit = () => {
+    if (!formData.title.trim() || !formData.content.trim() || formData.selectedGroupIds.length === 0 || !formData.deadline) {
+      toast.error("Missing required fields")
+      return
+    }
+    setIsSubmitting(true)
+    setTimeout(() => {
+      toast.success("Announcement created!")
+      router.push("/dashboard/advisor/announcements")
+      setIsSubmitting(false)
+    }, 1500)
+  }
+
+  const priorityLabel = {
+    LOW: "Low",
+    MEDIUM: "Medium",
+    HIGH: "High",
+  }[formData.priority]
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Create Announcement</h1>
-          <p className="text-sm text-muted-foreground">Publish an advisor announcement to your assigned groups.</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/dashboard/advisor/announcements">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Announcements
-          </Link>
+    <>
+      {/* Page Header */}
+      <div className="space-y-6">
+        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
-      </div>
 
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle className="text-lg">Announcement Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Final review deadline"
-              />
+        <Card className="border-0 shadow-none">
+          <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Create Announcement</CardTitle>
+            <CardDescription>Set up a new announcement for your project team.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Form - Matching schedule layout */}
+            <div className="grid gap-4 py-2">
+              
+              {/* Row 1: Title + Priority (like title + project) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., Upcoming Project Deadline"
+                    value={formData.title}
+                    onChange={(e) => handleFieldChange("title" as const, e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select value={formData.priority} onValueChange={(v) => handleFieldChange("priority" as const, v as AnnouncementPriority)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">Low</SelectItem>
+                      <SelectItem value="MEDIUM">Medium</SelectItem>
+                      <SelectItem value="HIGH">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Badge variant="outline" className="capitalize mt-1">{priorityLabel}</Badge>
+                </div>
+              </div>
+
+              {/* Row 2: Deadline + Groups (like date + time) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Deadline *</Label>
+                  <Input
+                    id="deadline"
+                    type="datetime-local"
+                    value={formData.deadline}
+                    onChange={(e) => handleFieldChange("deadline" as const, e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <Label>Recipient Groups *</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {GROUP_OPTIONS.map((group) => {
+                      const isSelected = formData.selectedGroupIds.includes(group.id)
+                      return (
+                        <Button
+                          key={group.id}
+                          variant={isSelected ? "default" : "outline"}
+                          className="justify-start h-auto p-3"
+                          onClick={() => toggleGroup(group.id)}
+                        >
+                          <Users className="mr-2 h-4 w-4 shrink-0" />
+                          {group.name} ({group.memberCount})
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Full width Content */}
+              <div className="space-y-2">
+                <Label htmlFor="content">Message *</Label>
+                <Textarea
+                  id="content"
+                  placeholder="Write your announcement message..."
+                  value={formData.content}
+                  onChange={(e) => handleFieldChange("content" as const, e.target.value)}
+                  rows={4}
+                />
+              </div>
+
+              {/* Resource field (Optional link and/or file) */}
+              <div className="space-y-2">
+                <Label htmlFor="resource-link">Resource URL (Optional)</Label>
+                <Input
+                  id="resource-link"
+                  type="url"
+                  placeholder="https://..."
+                  value={formData.resourceLink}
+                  onChange={(e) => handleFieldChange("resourceLink" as const, e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="resource-file">Upload File (Optional)</Label>
+                <Input
+                  id="resource-file"
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null
+                    handleFieldChange("resourceFile" as const, file)
+                  }}
+                />
+                {formData.resourceFile && (
+                  <div className="text-sm text-muted-foreground">
+                    Selected file: {formData.resourceFile.name} ({(formData.resourceFile.size / 1024 / 1024).toFixed(2)} MB)
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-3"
+                      onClick={() => handleFieldChange("resourceFile" as const, null)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Optionally provide a link, a file, or both as additional announcement resources.
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label>Target Project</Label>
-              <Select
-                value={targetProjectId || "__all__"}
-                onValueChange={(value) => setTargetProjectId(value === "__all__" ? "" : value)}
+
+            {/* Buttons - matching schedule */}
+            <div className="flex justify-end gap-2 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={isSubmitting}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="All my projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All my projects</SelectItem>
-                  {projectOptions}
-                </SelectContent>
-              </Select>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmit} 
+                disabled={isSubmitting}
+                className="min-w-[160px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Publish Announcement
+                  </>
+                )}
+              </Button>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Low</SelectItem>
-                  <SelectItem value="MEDIUM">Medium</SelectItem>
-                  <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="URGENT">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="PUBLISHED">Published</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Audience</Label>
-              <Select value={audience} onValueChange={(v) => setAudience(v as typeof audience)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All</SelectItem>
-                  <SelectItem value="STUDENTS">Students</SelectItem>
-                  <SelectItem value="ADVISORS">Advisors</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="deadline">Deadline (optional)</Label>
-            <Input
-              id="deadline"
-              type="datetime-local"
-              value={deadlineAt}
-              onChange={(e) => setDeadlineAt(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="content">Message</Label>
-            <Textarea
-              id="content"
-              rows={6}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your announcement..."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="file">Attachment (optional)</Label>
-            <Input
-              id="file"
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              accept=".pdf,.docx,.jpg,.jpeg,.png,.webp"
-            />
-            {file && <p className="text-xs text-muted-foreground">Selected: {file.name}</p>}
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button asChild variant="outline">
-              <Link href="/dashboard/advisor/announcements">Cancel</Link>
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={createAnnouncementMutation.isPending || projectsQuery.isLoading}
-            >
-              {createAnnouncementMutation.isPending
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Send className="mr-2 h-4 w-4" />}
-              Publish Announcement
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   )
 }
 
-export default AdvisorAnnouncementNewPage
