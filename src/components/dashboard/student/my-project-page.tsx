@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -276,12 +276,9 @@ export function StudentMyProjectPage() {
   const projectCreatedAt = useMemo(() => {
     return projectDetailsQuery.data?.createdAt?.trim() ?? ""
   }, [projectDetailsQuery.data?.createdAt])
+  const [fallbackMilestoneBaseDate] = useState(() => new Date().toISOString())
 
-  const milestoneBaseDate = useMemo(() => {
-    if (projectCreatedAt) return projectCreatedAt
-    if (activeTemplate?.createdAt) return activeTemplate.createdAt
-    return new Date().toISOString()
-  }, [activeTemplate?.createdAt, projectCreatedAt])
+  const milestoneBaseDate = projectCreatedAt || activeTemplate?.createdAt || fallbackMilestoneBaseDate
 
   const templateMilestones = useMemo<Milestone[]>(() => {
     const templates = templatesData?.templates ?? []
@@ -360,61 +357,38 @@ export function StudentMyProjectPage() {
     })
   }, [myGroupProposalsQuery.data, projectMilestonesData?.items, templateMilestones])
 
-  const myProject = useMemo<ProjectData>(() => {
-    const latestProposal = getLatestProposal(myGroupProposalsQuery.data)
-
-    const advisor = projectDetailsQuery.data?.advisor
-    const advisorName = advisor
-      ? toDisplayName([advisor.firstName, advisor.lastName]) || advisor.email?.trim() || "—"
-      : latestProposal?.advisor
-          ? toDisplayName([
-              latestProposal.advisor.firstName,
-              latestProposal.advisor.lastName,
-            ]) || latestProposal.advisor.email?.trim() || "—"
-          : "—"
-
-    const milestones = mergedBackendMilestones
-
-    const completedMilestonesCount = milestones.filter(
-      (milestone) => milestone.status === "approved"
-    ).length
-
-    const progress = milestones.length
-      ? Math.round((completedMilestonesCount / milestones.length) * 100)
-      : 0
-
-    const backendGroupName = myGroupData?.name?.trim() ?? ""
-
-    return {
-      title:
-        projectDetailsQuery.data?.title?.trim() ||
-        activeProject?.title?.trim() ||
-        latestProposal?.title?.trim() ||
-        latestProposal?.titles?.[0]?.trim() ||
-        latestProposal?.proposedTitles?.[0]?.trim() ||
-        "My Project",
-      groupName: backendGroupName || "—",
-      status: mapProjectStatus(projectDetailsQuery.data?.status || activeProject?.status),
-      advisorName,
-      progress,
-      startDate: projectCreatedAt || milestoneBaseDate,
-      milestones,
-      description: projectDetailsQuery.data?.description ?? undefined,
-    }
-  }, [
-    activeProject?.status,
-    activeProject?.title,
-    mergedBackendMilestones,
-    myGroupData?.name,
-    myGroupData?.projectId,
-    myGroupProposalsQuery.data,
-    projectDetailsQuery.data?.advisor,
-    projectDetailsQuery.data?.description,
-    projectDetailsQuery.data?.status,
-    projectDetailsQuery.data?.title,
-    milestoneBaseDate,
-    projectCreatedAt,
-  ])
+  const latestProposal = getLatestProposal(myGroupProposalsQuery.data)
+  const advisor = projectDetailsQuery.data?.advisor
+  const advisorName = advisor
+    ? toDisplayName([advisor.firstName, advisor.lastName]) || advisor.email?.trim() || "—"
+    : latestProposal?.advisor
+        ? toDisplayName([
+            latestProposal.advisor.firstName,
+            latestProposal.advisor.lastName,
+          ]) || latestProposal.advisor.email?.trim() || "—"
+        : "—"
+  const myProject: ProjectData = {
+    title:
+      projectDetailsQuery.data?.title?.trim() ||
+      activeProject?.title?.trim() ||
+      latestProposal?.title?.trim() ||
+      latestProposal?.titles?.[0]?.trim() ||
+      latestProposal?.proposedTitles?.[0]?.trim() ||
+      "My Project",
+    groupName: myGroupData?.name?.trim() || "—",
+    status: mapProjectStatus(projectDetailsQuery.data?.status || activeProject?.status),
+    advisorName,
+    progress: mergedBackendMilestones.length
+      ? Math.round(
+          (mergedBackendMilestones.filter((milestone) => milestone.status === "approved").length /
+            mergedBackendMilestones.length) *
+            100
+        )
+      : 0,
+    startDate: projectCreatedAt || milestoneBaseDate,
+    milestones: mergedBackendMilestones,
+    description: projectDetailsQuery.data?.description ?? undefined,
+  }
 
   const headerTitle = myProject.title?.trim() ? myProject.title : "My Project"
 

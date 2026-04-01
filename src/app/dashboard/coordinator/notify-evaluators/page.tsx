@@ -212,7 +212,7 @@ export default function NotifyEvaluatorsPage() {
             <p className="text-sm text-muted-foreground">Send notifications and announcements to project evaluators</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <div className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5">
             <Star className="h-4 w-4 text-amber-500" />
             <span className="text-sm font-medium">{evaluators.length} evaluators</span>
@@ -225,11 +225,11 @@ export default function NotifyEvaluatorsPage() {
       </div>
 
       <Tabs defaultValue="compose" className="space-y-4">
-        <TabsList className="h-10">
-          <TabsTrigger value="compose" className="gap-2">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="compose" className="gap-2 shrink-0">
             <Send className="h-4 w-4" /> Compose
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
+          <TabsTrigger value="history" className="gap-2 shrink-0">
             <Clock className="h-4 w-4" /> History
             <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{mockNotificationLogs.length}</Badge>
           </TabsTrigger>
@@ -455,14 +455,14 @@ export default function NotifyEvaluatorsPage() {
 
                   <Separator />
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                       {recipientCount > 0
                         ? `Ready to send to ${recipientCount} evaluator${recipientCount !== 1 ? 's' : ''}`
                         : 'Select recipients to continue'}
                     </p>
                     <Button
-                      className={`btn-gradient gap-2 min-w-[160px] ${sent ? 'bg-emerald-500 hover:bg-emerald-600' : ''}`}
+                      className={`btn-gradient gap-2 w-full sm:w-auto sm:min-w-[160px] ${sent ? 'bg-emerald-500 hover:bg-emerald-600' : ''}`}
                       onClick={handleSend}
                       disabled={isSending || recipientCount === 0 || !subject.trim() || !message.trim()}
                     >

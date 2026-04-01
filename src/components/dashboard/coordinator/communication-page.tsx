@@ -1016,7 +1016,7 @@ export function CoordinatorCommunicationPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-11 sm:pl-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           {activeTab === "inbox" ? (
             <>
               {totalUnread > 0 && (
@@ -1038,9 +1038,9 @@ export function CoordinatorCommunicationPage() {
 
       {/* Main tabs */}
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as "inbox" | "announcements")} className="space-y-4">
-        <TabsList className="h-10">
-          <TabsTrigger value="inbox"         className="gap-2"><Inbox className="h-4 w-4" /> Inbox</TabsTrigger>
-          <TabsTrigger value="announcements" className="gap-2"><Megaphone className="h-4 w-4" /> Announcements</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="inbox"         className="gap-2 shrink-0"><Inbox className="h-4 w-4" /> Inbox</TabsTrigger>
+          <TabsTrigger value="announcements" className="gap-2 shrink-0"><Megaphone className="h-4 w-4" /> Announcements</TabsTrigger>
         </TabsList>
 
         {/* ── Inbox ── */}
@@ -1056,7 +1056,7 @@ export function CoordinatorCommunicationPage() {
                 className="pl-9 h-9"
               />
             </div>
-            <div className="flex gap-1 shrink-0 bg-muted rounded-lg p-1">
+            <div className="flex gap-1 shrink-0 overflow-x-auto rounded-lg bg-muted p-1 whitespace-nowrap">
               {(["all", "unread", "starred", "archived"] as InboxFilter[]).map(f => (
                 <button
                   key={f}

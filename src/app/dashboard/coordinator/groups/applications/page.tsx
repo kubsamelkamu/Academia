@@ -460,7 +460,7 @@ export default function CoordinatorApplicationsPage() {
             </p>
           </div>
         </div>
-        <div className="pl-11 sm:pl-0 flex items-center gap-2">
+        <div className="pl-11 sm:pl-0 flex flex-wrap items-center gap-2">
           {counts.pending > 0 && (
             <Badge variant="outline" className="bg-amber-500/10 border-amber-400/30 text-amber-600 text-xs animate-pulse">
               <Clock className="h-3 w-3 mr-1" /> {counts.pending} pending
@@ -505,25 +505,25 @@ export default function CoordinatorApplicationsPage() {
       {/* Tabs + Search */}
       <Tabs value={tab} onValueChange={setTab}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="h-9">
-            <TabsTrigger value="pending"  className="text-xs gap-1.5">
+          <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
+            <TabsTrigger value="pending"  className="text-xs gap-1.5 shrink-0">
               <Clock className="h-3.5 w-3.5" /> Pending
               {counts.pending > 0 && (
                 <Badge className="h-4 px-1.5 text-[10px] bg-amber-500/20 text-amber-600 border-amber-400/30 ml-0.5">{counts.pending}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="approved" className="text-xs gap-1.5">
+            <TabsTrigger value="approved" className="text-xs gap-1.5 shrink-0">
               <CheckCircle className="h-3.5 w-3.5" /> Approved
             </TabsTrigger>
-            <TabsTrigger value="rejected" className="text-xs gap-1.5">
+            <TabsTrigger value="rejected" className="text-xs gap-1.5 shrink-0">
               <XCircle className="h-3.5 w-3.5" /> Rejected
             </TabsTrigger>
-            <TabsTrigger value="all"      className="text-xs gap-1.5">
+            <TabsTrigger value="all"      className="text-xs gap-1.5 shrink-0">
               <Filter className="h-3.5 w-3.5" /> All
             </TabsTrigger>
           </TabsList>
 
-          <div className="relative sm:w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search name, email, group…"
