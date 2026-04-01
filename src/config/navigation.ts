@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-export type UserRole = "department_head" | "coordinator" | "advisor" | "student" | "department_committee"
+export type UserRole = "department_head" | "coordinator" | "advisor" | "student" | "department_committee" | "evaluator"
 
 export interface NavItem {
   title: string
@@ -261,6 +261,43 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       title: "Reports",
       href: "/dashboard/department-committee/reports",
       icon: FileText,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: User,
+    },
+  ],
+  evaluator: [
+    {
+      title: "Dashboard",
+      href: "/dashboard/evaluator",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Assigned Projects",
+      href: "/dashboard/evaluator/assigned-projects",
+      icon: FolderKanban,
+    },
+    {
+      title: "Evaluations",
+      href: "/dashboard/evaluator/evaluations",
+      icon: CheckSquare,
+    },
+    {
+      title: "Schedule",
+      href: "/dashboard/evaluator/schedule",
+      icon: Calendar,
+    },
+    {
+      title: "Reports",
+      href: "/dashboard/evaluator/reports",
+      icon: FileText,
+    },
+    {
+      title: "Messages",
+      href: "/dashboard/evaluator/messages",
+      icon: MessageSquare,
     },
     {
       title: "Profile",
