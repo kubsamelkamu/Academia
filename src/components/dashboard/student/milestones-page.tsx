@@ -224,12 +224,17 @@ export function StudentMilestonesPage() {
   const studentId = user?.id ?? null
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
   const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
-  const proposalOverride = useMemo(() => {
-    return readProposalOverrideFromStorage(studentId)
-  }, [studentId]) as {
+  const [proposalOverride, setProposalOverride] = useState<{
     status: MilestoneStatus
     submittedAt?: string
-  } | null
+  } | null>(() => {
+    return readProposalOverrideFromStorage(studentId)
+  })
+
+  useEffect(() => {
+    const nextOverride = readProposalOverrideFromStorage(studentId)
+    if (nextOverride) setProposalOverride(nextOverride)
+  }, [studentId])
 
   const proposalMilestoneState = useMemo(() => {
     const fromBackend = toProposalMilestoneState(myGroupProposalsQuery.data)

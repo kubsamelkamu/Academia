@@ -468,10 +468,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     const backendStatus = projectDetailsQuery.data?.status
     return formatProjectStatusLabel(backendStatus || activeProject.status)
   }, [activeProject, activeProject?.status, myGroup?.status, projectDetailsQuery.data?.status])
-  const now = useLiveTime(1000)
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
-    const nowMs = now.getTime()
+    const nowMs = Date.now()
 
     const activeWithDeadline = items.filter((item) => {
       if (!item.deadlineAt) return false
@@ -503,20 +502,29 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         const bDeadline = new Date(b.deadlineAt ?? "").getTime()
         return aDeadline - bDeadline
       })[0]
-  }, [departmentAnnouncementsQuery.data?.items, now])
+  }, [departmentAnnouncementsQuery.data?.items])
 
-  const uiSecondsRemaining = useMemo(() => {
-    if (!nextDeadlineAnnouncement) return null
-    if (typeof nextDeadlineAnnouncement.secondsRemaining === "number") {
-      return Math.max(0, nextDeadlineAnnouncement.secondsRemaining)
-    }
-    if (!nextDeadlineAnnouncement.deadlineAt) return null
+  const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(
+    nextDeadlineAnnouncement?.secondsRemaining ?? null
+  )
 
-    const deadlineMs = new Date(nextDeadlineAnnouncement.deadlineAt).getTime()
-    if (Number.isNaN(deadlineMs)) return null
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUiSecondsRemaining(nextDeadlineAnnouncement?.secondsRemaining ?? null)
+  }, [nextDeadlineAnnouncement?.secondsRemaining])
 
-    return Math.max(0, Math.floor((deadlineMs - now.getTime()) / 1000))
-  }, [nextDeadlineAnnouncement, now])
+  useEffect(() => {
+    if (uiSecondsRemaining === null || uiSecondsRemaining <= 0) return
+
+    const timerId = window.setInterval(() => {
+      setUiSecondsRemaining((prev) => {
+        if (prev === null || prev <= 0) return 0
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [uiSecondsRemaining])
 
   const countdownParts = toCountdownParts(uiSecondsRemaining)
   const isAnnouncementDeadlinePassed =
@@ -611,6 +619,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const welcomeTitle =
     userName && userName.trim().length > 0 ? `Welcome, ${userName.trim()}` : "Welcome"
 
+  const now = useLiveTime(1000)
   const timeString = useMemo(
     () =>
       new Intl.DateTimeFormat(undefined, {
