@@ -99,9 +99,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
+import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
+import type { ApiAdvisorProject } from "@/lib/api/advisor"
 
 // ==================== Types ====================
-type ProjectStatus = 'active' | 'completed' | 'on-hold' | 'pending-review' | 'cleared' | 'in-progress'
+type ProjectStatus = 'active' | 'completed' | 'on-hold' | 'cancelled' | 'cleared' | 'in-progress'
 type MilestoneStatus = 'completed' | 'in-progress' | 'pending' | 'overdue' | 'approved' | 'submitted'
 type PriorityLevel = 'high' | 'medium' | 'low'
 
@@ -179,9 +182,15 @@ const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon:
   'in-progress': { label: 'In Progress', color: 'indigo', icon: TrendingUp },
   'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
   'on-hold': { label: 'On Hold', color: 'amber', icon: AlertCircle },
-  'pending-review': { label: 'Pending Review', color: 'purple', icon: ClipboardCheck },
+  'cancelled': { label: 'Cancelled', color: 'red', icon: XCircle },
   'cleared': { label: 'Cleared', color: 'emerald', icon: CheckCheck }
 }
+
+const FILTER_STATUS_OPTIONS: Array<{ key: 'active' | 'cancelled' | 'completed'; label: string }> = [
+  { key: 'active', label: 'Active' },
+  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'completed', label: 'Completed' },
+]
 
 const MILESTONE_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: LucideIcon }> = {
   'completed': { label: 'Completed', color: 'green', icon: CheckCircle },
@@ -219,13 +228,6 @@ const getInitials = (name: string) => {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-const getDaysRemaining = (dueDate: string) => {
-  const due = new Date(dueDate).getTime()
-  const now = new Date().getTime()
-  const diff = due - now
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
-}
-
 const getStatusColor = (color: string) => {
   const colors: Record<string, string> = {
     blue: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
@@ -238,6 +240,118 @@ const getStatusColor = (color: string) => {
     gray: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400 dark:border-gray-700',
   }
   return colors[color] || colors.gray
+}
+
+const normalizeProjectStatus = (status?: string | null): ProjectStatus => {
+  const normalized = status?.trim().toUpperCase()
+
+  switch (normalized) {
+    case 'ACTIVE':
+      return 'active'
+    case 'IN_PROGRESS':
+    case 'IN-PROGRESS':
+    case 'IN PROGRESS':
+      return 'in-progress'
+    case 'COMPLETED':
+      return 'completed'
+    case 'CANCELLED':
+      return 'cancelled'
+    case 'CLEARED':
+      return 'cleared'
+    case 'ON_HOLD':
+    case 'ON-HOLD':
+    case 'ON HOLD':
+      return 'on-hold'
+    default:
+      return 'active'
+  }
+}
+
+const normalizeMilestoneStatus = (status?: string | null): MilestoneStatus => {
+  const normalized = status?.trim().toUpperCase()
+
+  switch (normalized) {
+    case 'APPROVED':
+      return 'approved'
+    case 'COMPLETED':
+      return 'completed'
+    case 'SUBMITTED':
+      return 'submitted'
+    case 'OVERDUE':
+      return 'overdue'
+    case 'IN_PROGRESS':
+    case 'IN-PROGRESS':
+    case 'IN PROGRESS':
+      return 'in-progress'
+    default:
+      return 'pending'
+  }
+}
+
+const getMemberName = (member: {
+  firstName: string
+  lastName: string
+  email: string
+}) => {
+  const fullName = `${member.firstName} ${member.lastName}`.trim()
+  return fullName || member.email
+}
+
+const getProjectDueDate = (project: ApiAdvisorProject) => {
+  const milestoneDates = project.milestones.details
+    .map((milestone) => milestone.dueDate)
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())
+
+  return milestoneDates[0] ?? project.startedAt
+}
+
+const mapApiProjectToAdvisorProject = (project: ApiAdvisorProject): AdvisorProject => {
+  const members = [project.group.leader, ...project.group.members]
+  const uniqueMembers = Array.from(new Map(members.map((member) => [member.id, member])).values())
+
+  return {
+    id: project.id,
+    title: project.title,
+    description: project.group.objectives?.trim() || 'No project summary available.',
+    groupName: project.group.name,
+    groupId: project.group.id,
+    advisorId: '',
+    startDate: project.startedAt,
+    dueDate: getProjectDueDate(project),
+    status: normalizeProjectStatus(project.status),
+    progress: project.milestones.progressPercent,
+    category: project.group.status,
+    tags: [],
+    technologies: project.group.technologies ?? [],
+    members: uniqueMembers.map((member, index) => ({
+      id: member.id,
+      name: getMemberName(member),
+      email: member.email,
+      role: index === 0 ? 'Team Lead' : 'Member',
+      avatar: member.avatarUrl ?? undefined,
+      joinedAt: project.startedAt,
+    })),
+    milestones: project.milestones.details.map((milestone) => ({
+      id: milestone.id,
+      name: milestone.title,
+      description: milestone.description,
+      dueDate: milestone.dueDate,
+      status: normalizeMilestoneStatus(milestone.status),
+      completedDate: milestone.submittedAt ?? undefined,
+      priority: 'medium',
+      deliverables: [],
+    })),
+    documents: [],
+    meetings: [],
+    messages: [],
+    evaluation: [],
+  }
+}
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message
+  return 'Something went wrong while loading advisor projects.'
 }
 
 // ==================== Mock Data ====================
@@ -330,7 +444,7 @@ const MOCK_PROJECTS: AdvisorProject[] = [
     advisorId: 'adv1',
     startDate: '2024-01-10',
     dueDate: '2024-04-30',
-    status: 'pending-review',
+    status: 'cancelled',
     progress: 90,
     category: 'EdTech',
     tags: ['Education', 'Web Platform', 'Interactive'],
@@ -365,28 +479,16 @@ interface StatCardProps {
   title: string
   value: number
   icon: LucideIcon
-  trend?: number
   color?: string
 }
 
-const StatCard = ({ title, value, icon: Icon, trend, color = 'blue' }: StatCardProps) => (
+const StatCard = ({ title, value, icon: Icon, color = 'blue' }: StatCardProps) => (
   <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/30">
     <CardContent className="p-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-bold tracking-tight">{value}</p>
-            {trend !== undefined && (
-              <span className={cn(
-                "text-xs font-medium px-1.5 py-0.5 rounded-full",
-                trend > 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : 
-                            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              )}>
-                {trend > 0 ? "+" : ""}{trend}%
-              </span>
-            )}
-          </div>
+          <p className="text-3xl font-bold tracking-tight">{value}</p>
         </div>
         <div className={cn(
           "h-12 w-12 rounded-xl flex items-center justify-center transition-all group-hover:scale-110",
@@ -437,12 +539,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: ProjectCardProps) => {
-  const daysRemaining = getDaysRemaining(project.dueDate)
   const completedMilestones = project.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length
   const statusConfig = STATUS_CONFIG[project.status]
   const StatusIcon = statusConfig?.icon || FolderOpen
-  const isDueSoon = daysRemaining <= 14 && daysRemaining > 0
-  const isOverdue = daysRemaining < 0
 
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20">
@@ -465,11 +564,6 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
               <div className="flex items-center gap-1">
                 <Users className="h-3.5 w-3.5" />
                 <span>{project.groupName}</span>
-              </div>
-              <Separator orientation="vertical" className="h-4" />
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Due {formatDate(project.dueDate)}</span>
               </div>
             </div>
           </div>
@@ -511,7 +605,7 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
           <Progress value={project.progress} className="h-2" />
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="text-center p-2 rounded-lg bg-muted/30">
             <div className="flex items-center justify-center gap-1 text-sm font-medium">
               <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -525,17 +619,6 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
               <span>{completedMilestones}/{project.milestones.length}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">Milestones</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className={cn(
-                isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : ""
-              )}>
-                {isOverdue ? 'Overdue' : `${daysRemaining}d`}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
           </div>
         </div>
 
@@ -585,24 +668,52 @@ export function AdvisorMyProjectsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const summaryQuery = useAdvisorSummary()
+  const projectsQuery = useAdvisorProjects()
 
-  const advisorProjects = MOCK_PROJECTS
+  const advisorProjects = useMemo(
+    () => (projectsQuery.data ?? []).map(mapApiProjectToAdvisorProject),
+    [projectsQuery.data]
+  )
+
+  const reviewRequestCount = useMemo(
+    () => advisorProjects.reduce(
+      (total, project) => total + project.milestones.filter((milestone) => milestone.status === 'submitted').length,
+      0
+    ),
+    [advisorProjects]
+  )
 
   const filteredProjects = useMemo(() => {
     return advisorProjects.filter(project => {
       const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            project.groupName.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesStatus = filterStatus === 'all' || project.status === filterStatus
+      const matchesStatus =
+        filterStatus === 'all' ||
+        (filterStatus === 'active' && (project.status === 'active' || project.status === 'in-progress')) ||
+        (filterStatus === 'completed' && (project.status === 'completed' || project.status === 'cleared')) ||
+        (filterStatus === 'cancelled' && project.status === 'cancelled')
+
       return matchesSearch && matchesStatus
     })
   }, [advisorProjects, searchQuery, filterStatus])
 
-  const stats = useMemo(() => ({
-    total: advisorProjects.length,
-    active: advisorProjects.filter(p => p.status === 'active' || p.status === 'in-progress').length,
-    pendingReview: advisorProjects.filter(p => p.status === 'pending-review').length,
-    completed: advisorProjects.filter(p => p.status === 'completed' || p.status === 'cleared').length,
-  }), [advisorProjects])
+  const stats = useMemo(() => {
+    const metrics = summaryQuery.data?.metrics
+
+    return {
+      total: metrics?.totalProjectsAssigned ?? metrics?.totalProjectsAdvising ?? advisorProjects.length,
+      active: metrics?.projectStatusCounts?.ACTIVE ?? advisorProjects.filter(
+        (project) => project.status === 'active' || project.status === 'in-progress'
+      ).length,
+      cancelled: metrics?.projectStatusCounts?.CANCELLED ?? advisorProjects.filter(
+        (project) => project.status === 'cancelled'
+      ).length,
+      completed: metrics?.projectStatusCounts?.COMPLETED ?? advisorProjects.filter(
+        (project) => project.status === 'completed' || project.status === 'cleared'
+      ).length,
+    }
+  }, [advisorProjects, summaryQuery.data])
 
   const handleViewDetails = (project: AdvisorProject) => {
     setSelectedProject(project)
@@ -657,24 +768,34 @@ export function AdvisorMyProjectsPage() {
               <Button className="gap-2 relative">
                 <ClipboardCheck className="h-4 w-4" />
                 Review Requests
-                {stats.pendingReview > 0 && (
+                {reviewRequestCount > 0 && (
                   <Badge 
                     variant="destructive" 
                     className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
                   >
-                    {stats.pendingReview}
+                    {reviewRequestCount}
                   </Badge>
                 )}
               </Button>
             </div>
           </div>
 
+          {(summaryQuery.error || projectsQuery.error) && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Could not load advisor data</AlertTitle>
+              <AlertDescription>
+                {getErrorMessage(summaryQuery.error ?? projectsQuery.error)}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Stats */}
           <div className="grid gap-4 md:grid-cols-4 mb-8">
             <StatCard title="Total Projects" value={stats.total} icon={FolderOpen} color="blue" />
-            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" trend={12} />
-            <StatCard title="Pending Review" value={stats.pendingReview} icon={ClipboardCheck} color="purple" />
-            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" trend={8} />
+            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" />
+            <StatCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" />
+            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" />
           </div>
 
           {/* Filters */}
@@ -694,7 +815,9 @@ export function AdvisorMyProjectsPage() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <Filter className="h-4 w-4" />
-                    {filterStatus === 'all' ? 'All Status' : STATUS_CONFIG[filterStatus as ProjectStatus]?.label}
+                    {filterStatus === 'all'
+                      ? 'All Status'
+                      : FILTER_STATUS_OPTIONS.find((option) => option.key === filterStatus)?.label}
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -703,9 +826,9 @@ export function AdvisorMyProjectsPage() {
                     All Status
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                    <DropdownMenuItem key={key} onClick={() => setFilterStatus(key)}>
-                      {config.label}
+                  {FILTER_STATUS_OPTIONS.map((option) => (
+                    <DropdownMenuItem key={option.key} onClick={() => setFilterStatus(option.key)}>
+                      {option.label}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -733,7 +856,19 @@ export function AdvisorMyProjectsPage() {
           </div>
 
           {/* Projects Grid */}
-          {filteredProjects.length > 0 ? (
+          {projectsQuery.isLoading ? (
+            <Card className="p-12 text-center">
+              <div className="flex flex-col items-center max-w-md mx-auto">
+                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FolderOpen className="h-10 w-10 text-muted-foreground/50 animate-pulse" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Loading projects</h3>
+                <p className="text-muted-foreground">
+                  Fetching your current advisor project assignments.
+                </p>
+              </div>
+            </Card>
+          ) : filteredProjects.length > 0 ? (
             <div className={cn(
               "grid gap-6",
               viewMode === 'grid' ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
@@ -798,23 +933,12 @@ export function AdvisorMyProjectsPage() {
                   <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
                     <div className="space-y-6 py-4">
                       {/* Stats */}
-                      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                         <Card>
                           <CardContent className="pt-6 text-center">
                             <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
                             <p className="text-sm text-muted-foreground">Progress</p>
                             <Progress value={selectedProject.progress} className="mt-2 h-1.5" />
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className={cn(
-                              "text-2xl font-bold",
-                              getDaysRemaining(selectedProject.dueDate) < 0 ? "text-red-600" : ""
-                            )}>
-                              {getDaysRemaining(selectedProject.dueDate)}d
-                            </p>
-                            <p className="text-sm text-muted-foreground">Days Left</p>
                           </CardContent>
                         </Card>
                         <Card>
@@ -911,10 +1035,6 @@ export function AdvisorMyProjectsPage() {
                                         </div>
                                         <p className="text-sm text-muted-foreground">{milestone.description}</p>
                                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                          <span className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" />
-                                            Due: {formatDate(milestone.dueDate)}
-                                          </span>
                                           {milestone.completedDate && (
                                             <span className="flex items-center gap-1 text-green-600">
                                               <CheckCircle className="h-3 w-3" />
@@ -938,34 +1058,16 @@ export function AdvisorMyProjectsPage() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                               {selectedProject.members.map((member) => (
-                                <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div key={member.id} className="flex items-center p-3 border rounded-lg">
                                   <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10">
+                                      <AvatarImage src={member.avatar} alt={member.name} />
                                       <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                                     </Avatar>
                                     <div>
                                       <p className="font-medium">{member.name}</p>
                                       <p className="text-sm text-muted-foreground">{member.role}</p>
-                                      <p className="text-xs text-muted-foreground">{member.email}</p>
                                     </div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <Mail className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send email</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <MessageSquare className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send message</TooltipContent>
-                                    </Tooltip>
                                   </div>
                                 </div>
                               ))}
