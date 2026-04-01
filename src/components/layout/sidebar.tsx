@@ -11,6 +11,7 @@ import { navigationConfig, type UserRole, type NavItem } from "@/config/navigati
 import { LogOut, Bell, ChevronDown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuthStore } from "@/store/auth-store"
+import { useSidebarStore } from "@/store/sidebar-store"
 
 interface SidebarProps {
   user: {
@@ -25,12 +26,18 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const closeSidebar = useSidebarStore((state) => state.close)
   const navItems = navigationConfig[user.role]
 
   const handleLogout = React.useCallback(() => {
+    closeSidebar()
     useAuthStore.getState().logout()
     router.replace("/login")
-  }, [router])
+  }, [closeSidebar, router])
+
+  const handleNavigation = React.useCallback(() => {
+    closeSidebar()
+  }, [closeSidebar])
 
   const sidebarNav = React.useMemo(() => {
     const filtered = navItems.filter((i) => i.href !== "/dashboard/settings" && i.href !== "/dashboard/profile")
@@ -190,6 +197,7 @@ export function Sidebar({ user }: SidebarProps) {
                                 >
                                   <Link
                                     href={child.href}
+                                    onClick={handleNavigation}
                                     aria-current={childActive ? "page" : undefined}
                                     className={cn(
                                       "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-all duration-200 overflow-hidden",
@@ -236,6 +244,7 @@ export function Sidebar({ user }: SidebarProps) {
                   /* ── Regular flat item ── */
                   <Link
                     href={item.href ?? "#"}
+                    onClick={handleNavigation}
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 overflow-hidden",

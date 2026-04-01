@@ -6,6 +6,9 @@ import { toast } from "sonner"
 import { useMemo, useCallback, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth-store"
+import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
+import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
+import type { ApiAdvisorProject } from "@/lib/api/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -14,7 +17,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockStudentGroups } from "@/data/mockData"
 import {
   CheckCircle,
   Clock,
@@ -30,7 +32,7 @@ import {
 } from "lucide-react"
 
 // Types
-type ProjectStatus = "active" | "completed" | "on-hold" | "pending-review" | "cleared"
+type ProjectStatus = "active" | "completed" | "on-hold" | "cancelled" | "cleared" | "in-progress"
 type MilestoneStatus = "approved" | "submitted" | "revision" | "pending"
 
 interface ProjectMilestone {
@@ -107,51 +109,70 @@ const getDueDateStatus = (dueDate: string, status: MilestoneStatus) => {
   return null
 }
 
-// Mock data (would typically come from an API)
-const mockAdvisorProjects: AdvisorProject[] = [
-  {
-    id: "p1",
-    title: "AI‑Driven Academic Assistant",
-    groupName: "AI Research Group",
-    advisorId: "u7",
-    status: "active",
-    progress: 72,
-    lastUpdated: "2024-07-08T10:30:00Z",
-    milestones: [
-      { id: "m1", name: "Proposal Submission", dueDate: "2024-05-05", status: "approved", submittedAt: "2024-05-01" },
-      { id: "m2", name: "Architecture Design", dueDate: "2024-06-02", status: "approved", submittedAt: "2024-05-31" },
-      { id: "m3", name: "Working Prototype", dueDate: "2024-07-10", status: "submitted", submittedAt: "2024-07-08" },
-    ],
-  },
-  {
-    id: "p2",
-    title: "Real‑Time Campus Analytics",
-    groupName: "Team Atlas",
-    advisorId: "u7",
-    status: "pending-review",
-    progress: 58,
-    lastUpdated: "2024-06-24T14:15:00Z",
-    milestones: [
-      { id: "m1", name: "Requirements Analysis", dueDate: "2024-05-18", status: "approved", submittedAt: "2024-05-15" },
-      { id: "m2", name: "Data Pipeline", dueDate: "2024-06-25", status: "submitted", submittedAt: "2024-06-24" },
-      { id: "m3", name: "Dashboard MVP", dueDate: "2024-07-20", status: "pending" },
-    ],
-  },
-  {
-    id: "p3",
-    title: "Secure Research Data Platform",
-    groupName: "Team Nova",
-    advisorId: "u7",
-    status: "active",
-    progress: 83,
-    lastUpdated: "2024-06-30T09:45:00Z",
-    milestones: [
-      { id: "m1", name: "Threat Model", dueDate: "2024-05-10", status: "approved", submittedAt: "2024-05-09" },
-      { id: "m2", name: "Encryption Layer", dueDate: "2024-06-14", status: "approved", submittedAt: "2024-06-13" },
-      { id: "m3", name: "Audit Logging", dueDate: "2024-07-01", status: "submitted", submittedAt: "2024-06-30" },
-    ],
-  },
-]
+const normalizeProjectStatus = (status?: string | null): ProjectStatus => {
+  const normalized = status?.trim().toUpperCase()
+
+  switch (normalized) {
+    case "ACTIVE":
+      return "active"
+    case "IN_PROGRESS":
+    case "IN-PROGRESS":
+    case "IN PROGRESS":
+      return "in-progress"
+    case "COMPLETED":
+      return "completed"
+    case "CLEARED":
+      return "cleared"
+    case "CANCELLED":
+      return "cancelled"
+    case "ON_HOLD":
+    case "ON-HOLD":
+    case "ON HOLD":
+      return "on-hold"
+    default:
+      return "active"
+  }
+}
+
+const normalizeMilestoneStatus = (status?: string | null): MilestoneStatus => {
+  const normalized = status?.trim().toUpperCase()
+
+  switch (normalized) {
+    case "APPROVED":
+    case "COMPLETED":
+      return "approved"
+    case "SUBMITTED":
+      return "submitted"
+    case "REJECTED":
+    case "REVISION":
+    case "REVISION_REQUIRED":
+      return "revision"
+    default:
+      return "pending"
+  }
+}
+
+const mapApiProject = (project: ApiAdvisorProject): AdvisorProject => ({
+  id: project.id,
+  title: project.title,
+  groupName: project.group.name,
+  advisorId: "me",
+  status: normalizeProjectStatus(project.status),
+  progress: project.milestones.progressPercent,
+  lastUpdated: project.startedAt,
+  milestones: project.milestones.details.map((milestone) => ({
+    id: milestone.id,
+    name: milestone.title,
+    dueDate: milestone.dueDate,
+    status: normalizeMilestoneStatus(milestone.status),
+    submittedAt: milestone.submittedAt ?? undefined,
+  })),
+})
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message
+  return "Something went wrong while loading advisor dashboard data."
+}
 
 // Sub-components
 interface MilestoneItemProps {
@@ -362,6 +383,8 @@ interface AdvisorDashboardProps {
 export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: AdvisorDashboardProps) {
   const router = useRouter()
   const [now, setNow] = useState<Date>(new Date())
+  const summaryQuery = useAdvisorSummary()
+  const projectsQuery = useAdvisorProjects()
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -371,10 +394,9 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
   const formattedDate = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
   const formattedTime = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 
-  // Data fetching (would typically be in a useEffect)
-  const myProjects = useMemo(() => 
-    mockAdvisorProjects.filter((p) => p.advisorId === advisorId), 
-    [advisorId]
+  const myProjects = useMemo(
+    () => (projectsQuery.data ?? []).map(mapApiProject),
+    [projectsQuery.data]
   )
   
   const pendingMilestones = useMemo(() => 
@@ -387,17 +409,20 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
   )
 
   const stats = useMemo(() => {
-    const studentsCount = mockStudentGroups.flatMap((g) => g.members).length
-    const clearedCount = myProjects.filter((p) => p.status === "cleared").length
-    const activeProjects = myProjects.filter((p) => p.status === "active").length
+    const metrics = summaryQuery.data?.metrics
+    const activeProjects = metrics?.projectStatusCounts?.ACTIVE ?? myProjects.filter(
+      (project) => project.status === "active" || project.status === "in-progress"
+    ).length
+    const projectGroups = metrics?.totalGroupsAdvising ?? myProjects.length
+    const studentsCount = metrics?.totalStudentsAdvising ?? 0
     
     return {
       studentsCount,
-      clearedCount,
       activeProjects,
+      projectGroups,
       pendingReviews: pendingMilestones.length
     }
-  }, [myProjects, pendingMilestones.length])
+  }, [myProjects, pendingMilestones.length, summaryQuery.data])
 
   // Event handlers
   const handleApproveMilestone = useCallback((project: AdvisorProject, milestone: ProjectMilestone) => {
@@ -448,6 +473,16 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
         </div>
       </div>
 
+      {(summaryQuery.error || projectsQuery.error) && (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">
+              {getErrorMessage(summaryQuery.error ?? projectsQuery.error)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -472,9 +507,9 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
           iconClassName="bg-accent/10 text-accent"
         />
         <StatCard
-          title="Cleared Projects"
-          value={stats.clearedCount}
-          subtitle="Ready for evaluation"
+          title="Project Groups"
+          value={stats.projectGroups}
+          subtitle="Groups assigned to you"
           icon={CheckCircle}
           iconClassName="bg-success/10 text-success"
         />
@@ -496,7 +531,15 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
         </TabsList>
 
         <TabsContent value="projects" className="space-y-4">
-          {myProjects.length === 0 ? (
+          {projectsQuery.isLoading ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4 animate-pulse" />
+                <p className="text-lg font-medium text-muted-foreground">Loading projects</p>
+                <p className="text-sm text-muted-foreground mt-1">Fetching your current advisor assignments.</p>
+              </CardContent>
+            </Card>
+          ) : myProjects.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
