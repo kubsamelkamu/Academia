@@ -19,7 +19,6 @@ import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Re
 import { DepartmentHeadMessagesPage } from "@/components/dashboard/department-head/messages-page"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
-import { StudentAnnouncementsPage } from "@/components/dashboard/student/announcements-page"
 import StudentDefensePage from "@/components/dashboard/student/defense-page"
 import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
 import { StudentMilestonesPage } from "@/components/dashboard/student/milestones-page"
@@ -92,7 +91,6 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     defense: StudentDefensePage,
     timeline: StudentTimelinePage,
     messages: StudentMessagesPage,
-    announcements: StudentAnnouncementsPage,
   },
   department_committee: {
     "assigned-projects": CommitteeAssignedProjectsPage,

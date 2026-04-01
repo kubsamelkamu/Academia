@@ -249,11 +249,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
-      title: "Announcements",
-      href: "/dashboard/student/announcements",
-      icon: Bell,
-    },
-    {
       title: "Notifications",
       href: "/dashboard/notifications",
       icon: Bell,
