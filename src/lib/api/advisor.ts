@@ -1,5 +1,205 @@
 import apiClient from "@/lib/api/client";
-import { AdvisorDashboardOverview } from "@/lib/types/advisor";
+import type {
+  AdvisorAnnouncement,
+  AdvisorAnnouncementsResponse,
+  AdvisorCreateAnnouncementDto,
+  AdvisorCreateMeetingDto,
+  AdvisorCreateMessageDto,
+  AdvisorCreateMessageGroupDto,
+  AdvisorDashboardOverview,
+  AdvisorDocumentDetail,
+  AdvisorDocumentsResponse,
+  AdvisorEvaluationDetail,
+  AdvisorEvaluationsResponse,
+  AdvisorGroupMessagesResponse,
+  AdvisorMeeting,
+  AdvisorMessage,
+  AdvisorMessageGroup,
+  AdvisorMessageGroupsResponse,
+  AdvisorMilestoneStatusDto,
+  AdvisorProjectDetail,
+  AdvisorProjectsResponse,
+  AdvisorReviewDocumentDto,
+  AdvisorRevisionRequestDto,
+  AdvisorScheduleResponse,
+  AdvisorStudentsResponse,
+  AdvisorUpdateEvaluationDto,
+  AdvisorUpdateMeetingDto,
+  AdvisorUploadDocumentDto,
+} from "@/lib/types/advisor";
+
+type QueryParams = Record<string, string | number | boolean | undefined | null>;
+
+function cleanParams(params?: QueryParams) {
+  if (!params) return undefined;
+
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  );
+}
+
+function appendValue(formData: FormData, key: string, value: unknown) {
+  if (value === undefined || value === null || value === "") return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => appendValue(formData, key, item));
+    return;
+  }
+
+  formData.append(key, String(value));
+}
+
+function buildDocumentFormData(dto: AdvisorUploadDocumentDto, file: File) {
+  const formData = new FormData();
+  Object.entries(dto).forEach(([key, value]) => appendValue(formData, key, value));
+  formData.append("file", file);
+  return formData;
+}
+
+function buildAnnouncementFormData(dto: AdvisorCreateAnnouncementDto, file?: File | null) {
+  const formData = new FormData();
+  Object.entries(dto).forEach(([key, value]) => appendValue(formData, key, value));
+  if (file) {
+    formData.append("file", file);
+  }
+  return formData;
+}
+
+export interface AdvisorSummaryMetrics {
+  totalProjectsAdvising: number
+  totalGroupsAdvising: number
+  totalStudentsAdvising: number
+  totalGroupsSupervising: number
+  totalStudentsSupervising: number
+  projectStatusCounts: {
+    ACTIVE: number
+    COMPLETED: number
+    CANCELLED: number
+  }
+  totalProjectsAssigned: number
+}
+
+export interface AdvisorSummaryProject {
+  id: string
+  title: string
+  status: string
+  startedAt: string
+  proposal: { id: string; title: string }
+  group: {
+    id: string
+    name: string
+    objectives: string
+    technologies: string[]
+    status: string
+    leader: {
+      id: string
+      firstName: string
+      lastName: string
+      email: string
+      avatarUrl: string | null
+      student: {
+        id: string
+        bio: string
+        githubUrl: string | null
+        linkedinUrl: string | null
+        portfolioUrl: string | null
+        techStack: string[]
+      } | null
+    }
+    members: {
+      id: string
+      firstName: string
+      lastName: string
+      email: string
+      avatarUrl: string | null
+      student: {
+        id: string
+        bio: string
+        githubUrl: string | null
+        linkedinUrl: string | null
+        portfolioUrl: string | null
+        techStack: string[]
+      } | null
+    }[]
+    studentCount: number
+  }
+}
+
+export interface AdvisorSummary {
+  advisor: {
+    id: string
+    advisorProfileId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  }
+  metrics: AdvisorSummaryMetrics
+  projects: AdvisorSummaryProject[]
+}
+
+// ── /projects/advisors/me/projects ──────────────────────────────────────────
+
+interface ApiGroupMember {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  avatarUrl: string | null
+  student: {
+    id: string
+    bio: string
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+  } | null
+}
+
+export interface ApiMilestoneDetail {
+  id: string
+  title: string
+  description: string
+  dueDate: string
+  status: string
+  submittedAt: string | null
+}
+
+export interface ApiAdvisorProject {
+  id: string
+  title: string
+  status: string
+  startedAt: string
+  group: {
+    id: string
+    name: string
+    objectives: string
+    technologies: string[]
+    status: string
+    leader: ApiGroupMember
+    members: ApiGroupMember[]
+    studentCount: number
+  }
+  milestones: {
+    total: number
+    completed: number
+    approved: number
+    pending: number
+    submitted: number
+    rejected: number
+    progressPercent: number
+    details: ApiMilestoneDetail[]
+  }
+}
+
+/**
+ * Fetches the full project list for the currently authenticated advisor.
+ */
+export async function getAdvisorProjects(): Promise<ApiAdvisorProject[]> {
+  const response = await apiClient.get<ApiAdvisorProject[]>("/projects/advisors/me/projects")
+  return response.data
+}
 
 
 /**
@@ -60,14 +260,179 @@ const mockOverviewData: AdvisorDashboardOverview = {
 };
 
 /**
+ * Fetches the summary data for the currently authenticated advisor,
+ * including metrics and projects list.
+ */
+export async function getAdvisorSummary(): Promise<AdvisorSummary> {
+  const response = await apiClient.get<AdvisorSummary>("/projects/advisors/me/summary")
+  return response.data
+}
+
+/**
  * Fetches the overview dashboard data for the currently authenticated advisor.
  */
 export async function getAdvisorDashboardOverview(): Promise<AdvisorDashboardOverview> {
-    try {
-        const response = await apiClient.get<AdvisorDashboardOverview>("/advisor/dashboard/overview");
-        return response.data;
-    } catch (error) {
-        console.warn("Failed to fetch real advisor overview data. Falling back to MOCK data.", error);
-        return mockOverviewData;
-    }
+  const response = await apiClient.get<AdvisorDashboardOverview>("/advisor/dashboard/overview");
+  return response.data;
 }
+
+export async function getAdvisorMyProjects(params?: QueryParams): Promise<AdvisorProjectsResponse> {
+  const response = await apiClient.get<AdvisorProjectsResponse>("/advisor/my-projects", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function getAdvisorProjectById(projectId: string): Promise<AdvisorProjectDetail> {
+  const response = await apiClient.get(`/advisor/my-projects/${projectId}`);
+  return response.data;
+}
+
+export async function getAdvisorStudents(params?: QueryParams): Promise<AdvisorStudentsResponse> {
+  const response = await apiClient.get<AdvisorStudentsResponse>("/advisor/students", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function clearAdvisorProject(projectId: string, dto: { notes?: string } = {}) {
+  const response = await apiClient.post(`/advisor/students/${projectId}/clear`, dto);
+  return response.data;
+}
+
+export async function requestProjectRevision(projectId: string, dto: AdvisorRevisionRequestDto) {
+  const response = await apiClient.post(`/advisor/students/${projectId}/revision`, dto);
+  return response.data;
+}
+
+export async function updateAdvisorMilestoneStatus(milestoneId: string, dto: AdvisorMilestoneStatusDto) {
+  const response = await apiClient.put(`/projects/milestones/${milestoneId}/status`, dto);
+  return response.data;
+}
+
+export async function getAdvisorEvaluations(params?: QueryParams): Promise<AdvisorEvaluationsResponse> {
+  const response = await apiClient.get<AdvisorEvaluationsResponse>("/advisor/evaluations", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function getAdvisorEvaluationById(evaluationId: string): Promise<AdvisorEvaluationDetail> {
+  const response = await apiClient.get<AdvisorEvaluationDetail>(`/advisor/evaluations/${evaluationId}`);
+  return response.data;
+}
+
+export async function updateAdvisorEvaluation(evaluationId: string, dto: AdvisorUpdateEvaluationDto) {
+  const response = await apiClient.patch(`/advisor/evaluations/${evaluationId}`, dto);
+  return response.data;
+}
+
+export async function requestAdvisorEvaluationRevision(evaluationId: string, dto: AdvisorRevisionRequestDto) {
+  const response = await apiClient.post(`/advisor/evaluations/${evaluationId}/revision`, dto);
+  return response.data;
+}
+
+export async function getAdvisorDocuments(params?: QueryParams): Promise<AdvisorDocumentsResponse> {
+  const response = await apiClient.get<AdvisorDocumentsResponse>("/advisor/documents", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function getAdvisorDocumentById(documentId: string): Promise<AdvisorDocumentDetail> {
+  const response = await apiClient.get<AdvisorDocumentDetail>(`/advisor/documents/${documentId}`);
+  return response.data;
+}
+
+export async function uploadAdvisorDocument(dto: AdvisorUploadDocumentDto, file: File) {
+  const response = await apiClient.post("/advisor/documents", buildDocumentFormData(dto, file), {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+}
+
+export async function approveAdvisorDocument(documentId: string, dto: AdvisorReviewDocumentDto = {}) {
+  const response = await apiClient.post(`/advisor/documents/${documentId}/approve`, dto);
+  return response.data;
+}
+
+export async function requestAdvisorDocumentRevision(documentId: string, dto: AdvisorReviewDocumentDto) {
+  const response = await apiClient.post(`/advisor/documents/${documentId}/revision`, dto);
+  return response.data;
+}
+
+export async function getAdvisorSchedule(params?: QueryParams): Promise<AdvisorScheduleResponse> {
+  const response = await apiClient.get<AdvisorScheduleResponse>("/advisor/schedule", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function createAdvisorMeeting(dto: AdvisorCreateMeetingDto): Promise<AdvisorMeeting> {
+  const response = await apiClient.post<AdvisorMeeting>("/advisor/schedule", dto);
+  return response.data;
+}
+
+export async function updateAdvisorMeeting(meetingId: string, dto: AdvisorUpdateMeetingDto) {
+  const response = await apiClient.patch(`/advisor/schedule/${meetingId}`, dto);
+  return response.data;
+}
+
+export async function deleteAdvisorMeeting(meetingId: string) {
+  const response = await apiClient.delete(`/advisor/schedule/${meetingId}`);
+  return response.data;
+}
+
+export async function getAdvisorAnnouncements(params?: QueryParams): Promise<AdvisorAnnouncementsResponse> {
+  const response = await apiClient.get<AdvisorAnnouncementsResponse>("/advisor/announcements", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function createAdvisorAnnouncement(dto: AdvisorCreateAnnouncementDto, file?: File | null): Promise<AdvisorAnnouncement> {
+  const response = await apiClient.post<AdvisorAnnouncement>(
+    "/advisor/announcements",
+    buildAnnouncementFormData(dto, file),
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return response.data;
+}
+
+export async function getAdvisorMessageGroups(params?: QueryParams): Promise<AdvisorMessageGroupsResponse> {
+  const response = await apiClient.get<AdvisorMessageGroupsResponse>("/advisor/messages/groups", {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function createAdvisorMessageGroup(dto: AdvisorCreateMessageGroupDto): Promise<AdvisorMessageGroup> {
+  const response = await apiClient.post("/advisor/messages/groups", dto);
+  return response.data;
+}
+
+export async function getAdvisorMessageGroupById(groupId: string): Promise<AdvisorMessageGroup> {
+  const response = await apiClient.get(`/advisor/messages/groups/${groupId}`);
+  return response.data;
+}
+
+export async function getAdvisorGroupMessages(groupId: string, params?: QueryParams): Promise<AdvisorGroupMessagesResponse> {
+  const response = await apiClient.get<AdvisorGroupMessagesResponse>(`/advisor/messages/groups/${groupId}/messages`, {
+    params: cleanParams(params),
+  });
+  return response.data;
+}
+
+export async function sendAdvisorGroupMessage(groupId: string, dto: AdvisorCreateMessageDto): Promise<AdvisorMessage> {
+  const response = await apiClient.post<AdvisorMessage>(`/advisor/messages/groups/${groupId}/messages`, dto);
+  return response.data;
+}
+
+
+

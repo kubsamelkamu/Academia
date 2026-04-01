@@ -1,202 +1,61 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
-
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Archive,
-  ArrowLeft,
-  Clock,
-  Download,
-  Eye,
-  File as FileIcon,
-  FileText,
-  Image as ImageIcon,
-  Loader2,
-  User,
-  Video as VideoIcon,
-} from "lucide-react"
 import { toast } from "sonner"
 
-type DocumentStatus = "approved" | "pending_review" | "revision_required"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  useAdvisorDocument,
+  useApproveDocumentMutation,
+  useRequestDocumentRevisionMutation,
+} from "@/lib/hooks/useAdvisor"
+import { ArrowLeft, CheckCircle, Download, ExternalLink, Loader2 } from "lucide-react"
 
-type DocumentType = "pdf" | "docx" | "image" | "video" | "zip"
-
-interface AdvisorDocument {
-  id: string
-  name: string
-  type: DocumentType
-  size: string
-  uploadedBy: string
-  uploadedAt: string
-  project: string
-  group: string
-  status: DocumentStatus
-  description: string
+function formatDate(value?: string) {
+  return value
+    ? new Date(value).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "-"
 }
 
-const mockDocuments: AdvisorDocument[] = [
-  {
-    id: "1",
-    name: "Project Proposal - Smart Campus System.pdf",
-    type: "pdf",
-    size: "2.5 MB",
-    uploadedBy: "John Doe",
-    uploadedAt: "2024-01-15T10:30:00Z",
-    project: "Smart Campus System",
-    group: "Team Alpha",
-    status: "approved",
-    description: "Initial project proposal with system requirements and architecture overview",
-  },
-  {
-    id: "2",
-    name: "UI Wireframes.zip",
-    type: "zip",
-    size: "15.2 MB",
-    uploadedBy: "Jane Smith",
-    uploadedAt: "2024-01-14T14:20:00Z",
-    project: "Smart Campus System",
-    group: "Team Alpha",
-    status: "pending_review",
-    description: "Complete set of wireframes for the mobile and web interfaces",
-  },
-  {
-    id: "3",
-    name: "Database Schema.png",
-    type: "image",
-    size: "1.8 MB",
-    uploadedBy: "Mike Johnson",
-    uploadedAt: "2024-01-13T09:15:00Z",
-    project: "Smart Campus System",
-    group: "Team Alpha",
-    status: "approved",
-    description: "Entity relationship diagram showing database structure",
-  },
-  {
-    id: "4",
-    name: "API Documentation.docx",
-    type: "docx",
-    size: "890 KB",
-    uploadedBy: "Alex Brown",
-    uploadedAt: "2024-01-12T16:45:00Z",
-    project: "AI Chatbot",
-    group: "Team Beta",
-    status: "revision_required",
-    description: "Comprehensive API documentation with endpoints and examples",
-  },
-  {
-    id: "5",
-    name: "Final Presentation.mp4",
-    type: "video",
-    size: "45.6 MB",
-    uploadedBy: "Emma Davis",
-    uploadedAt: "2024-01-11T11:30:00Z",
-    project: "AI Chatbot",
-    group: "Team Beta",
-    status: "approved",
-    description: "Final project presentation video with demo",
-  },
-]
-
-function fileIcon(type: DocumentType) {
-  switch (type) {
-    case "pdf":
-      return <FileText className="h-6 w-6 text-red-500" />
-    case "docx":
-      return <FileIcon className="h-6 w-6 text-blue-500" />
-    case "image":
-      return <ImageIcon className="h-6 w-6 text-green-500" />
-    case "video":
-      return <VideoIcon className="h-6 w-6 text-purple-500" />
-    case "zip":
-      return <Archive className="h-6 w-6 text-yellow-500" />
-    default:
-      return <FileIcon className="h-6 w-6 text-gray-500" />
-  }
+function canPreview(mimeType?: string) {
+  return Boolean(
+    mimeType &&
+      (mimeType.startsWith("image/") ||
+        mimeType === "application/pdf" ||
+        mimeType.startsWith("video/")),
+  )
 }
 
-function statusBadge(status: DocumentStatus) {
-  switch (status) {
-    case "approved":
-      return <Badge className="bg-success/10 text-success">Approved</Badge>
-    case "pending_review":
-      return <Badge className="bg-warning/10 text-warning">Pending Review</Badge>
-    case "revision_required":
-      return <Badge className="bg-destructive/10 text-destructive">Revision Required</Badge>
-    default:
-      return <Badge variant="secondary">{status}</Badge>
+function Preview({ fileUrl, mimeType, title }: { fileUrl: string; mimeType?: string; title: string }) {
+  if (mimeType === "application/pdf") {
+    return <iframe src={fileUrl} title={title} className="h-[640px] w-full rounded-lg border" />
   }
-}
-
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-function renderViewer(document: AdvisorDocument) {
-  if (document.type === "pdf") {
+  if (mimeType?.startsWith("image/")) {
     return (
-      <div className="border rounded-lg overflow-hidden">
-        <iframe
-          src={`/mock-pdfs/${document.name}`}
-          className="w-full h-[600px]"
-          title={document.name}
-        />
-      </div>
+      <img src={fileUrl} alt={title} className="max-h-[640px] w-full rounded-lg border object-contain" />
     )
   }
-
-  if (document.type === "image") {
+  if (mimeType?.startsWith("video/")) {
     return (
-      <div className="relative border rounded-lg overflow-hidden flex justify-center">
-        <Image
-          src={`/mock-images/${document.name}`}
-          alt={document.name}
-          fill
-          className="object-contain"
-        />
-      </div>
+      <video controls className="max-h-[640px] w-full rounded-lg border">
+        <source src={fileUrl} type={mimeType} />
+      </video>
     )
   }
-
-  if (document.type === "video") {
-    return (
-      <div className="border rounded-lg overflow-hidden">
-        <video controls className="w-full h-[600px]">
-          <source src={`/mock-videos/${document.name}`} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    )
-  }
-
-  if (document.type === "docx" || document.type === "zip") {
-    return (
-      <Alert className="bg-muted/50">
-        <FileIcon className="h-4 w-4" />
-        <AlertDescription>
-          {document.type === "docx" ? "Word documents" : "Archive files"} can only be downloaded and viewed
-          externally. Please use the download button to access the file.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
   return (
-    <Alert variant="destructive">
-      <AlertDescription>Unsupported file type. Please download to view.</AlertDescription>
-    </Alert>
+    <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+      Preview is not available for this file type. Use the external open or download actions instead.
+    </div>
   )
 }
 
@@ -206,141 +65,143 @@ interface AdvisorDocumentDetailPageProps {
 
 export function AdvisorDocumentDetailPage({ documentId }: AdvisorDocumentDetailPageProps) {
   const router = useRouter()
-  const [document, setDocument] = React.useState<AdvisorDocument | null>(null)
-  const [loading, setLoading] = React.useState(true)
+  const documentQuery = useAdvisorDocument(documentId)
+  const approveDocumentMutation = useApproveDocumentMutation()
+  const requestDocumentRevisionMutation = useRequestDocumentRevisionMutation()
+  const [feedback, setFeedback] = React.useState("")
 
   React.useEffect(() => {
-    const found = mockDocuments.find((d) => d.id === documentId) ?? null
-    if (!found) {
-      toast.error("Document not found", {
-        description: "The requested document could not be found.",
-      })
-      router.push("/dashboard/advisor/documents")
-      return
+    if (documentQuery.data?.feedback) {
+      setFeedback(documentQuery.data.feedback)
     }
+  }, [documentQuery.data?.feedback])
 
-    setDocument(found)
-    setLoading(false)
-  }, [documentId, router])
-
-  function handleDownload() {
-    if (!document) return
-    toast.message("Download started", { description: `Downloading ${document.name}...` })
+  async function handleApprove() {
+    try {
+      await approveDocumentMutation.mutateAsync({
+        documentId,
+        dto: { feedback: feedback.trim() || undefined },
+      })
+      toast.success("Document approved.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to approve document")
+    }
   }
 
-  if (loading) {
+  async function handleRevision() {
+    if (!feedback.trim()) {
+      toast.error("Revision feedback is required.")
+      return
+    }
+    try {
+      await requestDocumentRevisionMutation.mutateAsync({
+        documentId,
+        dto: { feedback: feedback.trim() },
+      })
+      toast.success("Revision requested.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to request revision")
+    }
+  }
+
+  if (documentQuery.isLoading) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">Loading document…</div>
+  }
+
+  if (!documentQuery.data) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading document...</p>
-        </div>
+      <div className="space-y-6 animate-fade-in">
+        <p className="text-sm text-muted-foreground">Document not found.</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/advisor/documents">Back to Documents</Link>
+        </Button>
       </div>
     )
   }
 
-  if (!document) {
-    return null
-  }
+  const document = documentQuery.data
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => router.push("/dashboard/advisor/documents")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Documents
-          </Button>
-          <div className="flex items-center gap-3">
-            {fileIcon(document.type)}
-            <h1 className="text-2xl font-bold">{document.name}</h1>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{document.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {document.project} - {document.group}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleDownload} className="btn-gradient">
-            <Download className="h-4 w-4 mr-2" />
-            Download
+          <Button asChild variant="outline">
+            <Link href="/dashboard/advisor/documents">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={document.fileUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open
+            </a>
+          </Button>
+          <Button asChild>
+            <a href={document.fileUrl} target="_blank" rel="noreferrer">
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </a>
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Document Viewer */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Document Viewer</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">{renderViewer(document)}</CardContent>
-        </Card>
-
-        {/* Document Details */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardHeader>
-            <CardTitle>Document Details</CardTitle>
+            <CardTitle>Preview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Preview fileUrl={document.fileUrl} mimeType={document.mimeType} title={document.name} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Review</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Uploaded By</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="" alt={document.uploadedBy} />
-                  <AvatarFallback className="text-xs">
-                    {document.uploadedBy
-                      .split(" ")
-                      .filter(Boolean)
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm">{document.uploadedBy}</span>
-              </div>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>Status: {document.status}</p>
+              <p>Uploaded by: {document.uploadedBy}</p>
+              <p>Uploaded at: {formatDate(document.uploadedAt)}</p>
+              <p>Type: {document.type}</p>
+              <p>Size: {document.size}</p>
+              {document.reviewedBy && <p>Reviewed by: {document.reviewedBy}</p>}
+              {document.reviewedAt && <p>Reviewed at: {formatDate(document.reviewedAt)}</p>}
             </div>
-
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Uploaded At</span>
-              </div>
-              <p className="text-sm text-muted-foreground">{formatDate(document.uploadedAt)}</p>
+              <p className="text-sm font-medium">Feedback</p>
+              <Textarea
+                rows={8}
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Write approval notes or revision feedback…"
+              />
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Project</span>
-              </div>
-              <div>
-                <p className="font-medium">{document.project}</p>
-                <p className="text-sm text-muted-foreground">{document.group}</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Status</span>
-              </div>
-              {statusBadge(document.status)}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <FileIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">File Info</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Type: {document.type.toUpperCase()} | Size: {document.size}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Description</span>
-              </div>
-              <p className="text-sm text-muted-foreground">{document.description}</p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => void handleApprove()} disabled={approveDocumentMutation.isPending}>
+                {approveDocumentMutation.isPending
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <CheckCircle className="mr-2 h-4 w-4" />}
+                Approve Document
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleRevision()}
+                disabled={requestDocumentRevisionMutation.isPending}
+              >
+                {requestDocumentRevisionMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Request Revision
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -349,3 +210,4 @@ export function AdvisorDocumentDetailPage({ documentId }: AdvisorDocumentDetailP
   )
 }
 
+export default AdvisorDocumentDetailPage

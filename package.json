@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "lint5": "eslint ."
+    "lint": "eslint",
+    "test:responsive:coordinator": "playwright test tests/coordinator-responsive.spec.ts",
+    "test:responsive:coordinator:auth": "powershell -Command \"$env:PLAYWRIGHT_USE_DEV_COORDINATOR_LOGIN='1'; npx playwright test tests/coordinator-responsive.spec.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -38,6 +39,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

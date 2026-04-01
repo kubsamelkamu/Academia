@@ -1,548 +1,447 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { toast } from "sonner"
-import { useMemo, useCallback, useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth-store"
-
-import StatCard from "@/components/shared/StatCard"
-import StatusBadge from "@/components/shared/StatusBadge"
+import {
+  useAdvisorAnnouncements,
+  useAdvisorGroupMessages,
+  useAdvisorMessageGroups,
+  useAdvisorOverview,
+  useAdvisorProjects,
+  useAdvisorSchedule,
+  useApproveMilestoneMutation,
+  useClearProjectMutation,
+  useCreateAnnouncementMutation,
+  useCreateMeetingMutation,
+  useDeleteMeetingMutation,
+  useRequestRevisionMutation,
+  useSendGroupMessageMutation,
+} from "@/lib/hooks/useAdvisor"
+import type {
+  AdvisorAnnouncement,
+  AdvisorMeeting,
+  AdvisorMessageGroup,
+  AdvisorProjectItem,
+  AdvisorProjectMilestone,
+} from "@/lib/types/advisor"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockStudentGroups } from "@/data/mockData"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  CheckCircle,
-  Clock,
-  Eye,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Bell,
+  Calendar,
+  CheckCircle2,
   FolderOpen,
+  Loader2,
   MessageSquare,
-  Upload,
+  Send,
   Users,
   Video,
-  Calendar,
-  Bell,
-  AlertCircle,
 } from "lucide-react"
 
-// Types
-type ProjectStatus = "active" | "completed" | "on-hold" | "pending-review" | "cleared"
-type MilestoneStatus = "approved" | "submitted" | "revision" | "pending"
-
-interface ProjectMilestone {
-  id: string
-  name: string
-  dueDate: string
-  status: MilestoneStatus
-  submittedAt?: string
-  feedback?: string
-}
-
-interface AdvisorProject {
-  id: string
-  title: string
-  groupName: string
-  advisorId: string
-  status: ProjectStatus
-  progress: number
-  milestones: ProjectMilestone[]
-  lastUpdated?: string
-}
-
-// Constants
-const MILESTONE_STATUS_CONFIG = {
-  approved: {
-    label: "Approved",
-    icon: CheckCircle,
-    className: "bg-success/20 text-success border-success/30",
-    progressColor: "bg-success"
-  },
-  submitted: {
-    label: "Submitted",
-    icon: Upload,
-    className: "bg-warning/20 text-warning border-warning/30",
-    progressColor: "bg-warning"
-  },
-  revision: {
-    label: "Needs Revision",
-    icon: AlertCircle,
-    className: "bg-destructive/20 text-destructive border-destructive/30",
-    progressColor: "bg-destructive"
-  },
-  pending: {
-    label: "Pending",
-    icon: Clock,
-    className: "bg-muted text-muted-foreground border-muted",
-    progressColor: "bg-muted"
-  }
-} as const
-
-// Utility functions
-const formatDate = (iso: string) => {
-  return new Date(iso).toLocaleDateString(undefined, { 
-    year: "numeric", 
-    month: "short", 
-    day: "numeric" 
+function formatDate(value?: string | null) {
+  if (!value) return "Not available"
+  return new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   })
 }
 
-const getDaysRemaining = (dueDate: string) => {
-  const due = new Date(dueDate).getTime()
-  const now = new Date().getTime()
-  const diff = due - now
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
-  return days
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not available"
+  return new Date(value).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
-const getDueDateStatus = (dueDate: string, status: MilestoneStatus) => {
-  if (status === "approved" || status === "submitted") return null
-  
-  const daysRemaining = getDaysRemaining(dueDate)
-  if (daysRemaining < 0) return { label: "Overdue", variant: "destructive" as const }
-  if (daysRemaining <= 3) return { label: "Due soon", variant: "secondary" as const }
-  return null
-}
+function EmptyState(props: {
+  title: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+}) {
+  const { title, description, icon: Icon } = props
 
-// Mock data (would typically come from an API)
-const mockAdvisorProjects: AdvisorProject[] = [
-  {
-    id: "p1",
-    title: "AI‑Driven Academic Assistant",
-    groupName: "AI Research Group",
-    advisorId: "u7",
-    status: "active",
-    progress: 72,
-    lastUpdated: "2024-07-08T10:30:00Z",
-    milestones: [
-      { id: "m1", name: "Proposal Submission", dueDate: "2024-05-05", status: "approved", submittedAt: "2024-05-01" },
-      { id: "m2", name: "Architecture Design", dueDate: "2024-06-02", status: "approved", submittedAt: "2024-05-31" },
-      { id: "m3", name: "Working Prototype", dueDate: "2024-07-10", status: "submitted", submittedAt: "2024-07-08" },
-    ],
-  },
-  {
-    id: "p2",
-    title: "Real‑Time Campus Analytics",
-    groupName: "Team Atlas",
-    advisorId: "u7",
-    status: "pending-review",
-    progress: 58,
-    lastUpdated: "2024-06-24T14:15:00Z",
-    milestones: [
-      { id: "m1", name: "Requirements Analysis", dueDate: "2024-05-18", status: "approved", submittedAt: "2024-05-15" },
-      { id: "m2", name: "Data Pipeline", dueDate: "2024-06-25", status: "submitted", submittedAt: "2024-06-24" },
-      { id: "m3", name: "Dashboard MVP", dueDate: "2024-07-20", status: "pending" },
-    ],
-  },
-  {
-    id: "p3",
-    title: "Secure Research Data Platform",
-    groupName: "Team Nova",
-    advisorId: "u7",
-    status: "active",
-    progress: 83,
-    lastUpdated: "2024-06-30T09:45:00Z",
-    milestones: [
-      { id: "m1", name: "Threat Model", dueDate: "2024-05-10", status: "approved", submittedAt: "2024-05-09" },
-      { id: "m2", name: "Encryption Layer", dueDate: "2024-06-14", status: "approved", submittedAt: "2024-06-13" },
-      { id: "m3", name: "Audit Logging", dueDate: "2024-07-01", status: "submitted", submittedAt: "2024-06-30" },
-    ],
-  },
-]
-
-// Sub-components
-interface MilestoneItemProps {
-  milestone: ProjectMilestone
-  project: AdvisorProject
-  onApprove: (project: AdvisorProject, milestone: ProjectMilestone) => void
-  onRequestRevision: (project: AdvisorProject, milestone: ProjectMilestone) => void
-  showActions?: boolean
-}
-
-const MilestoneItem = React.memo(({ 
-  milestone, 
-  project, 
-  onApprove, 
-  onRequestRevision,
-  showActions = true 
-}: MilestoneItemProps) => {
-  const statusConfig = MILESTONE_STATUS_CONFIG[milestone.status]
-  const StatusIcon = statusConfig.icon
-  const dueDateStatus = getDueDateStatus(milestone.dueDate, milestone.status)
-  
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${statusConfig.className}`}>
-          <StatusIcon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-medium text-sm truncate">{milestone.name}</p>
-            {dueDateStatus && (
-              <Badge variant={dueDateStatus.variant} className="text-xs">
-                {dueDateStatus.label}
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-            <span>Due: {formatDate(milestone.dueDate)}</span>
-            {milestone.submittedAt && (
-              <>
-                <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                <span>Submitted: {formatDate(milestone.submittedAt)}</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 ml-13 sm:ml-0">
-        <StatusBadge status={milestone.status} />
-        
-        {showActions && milestone.status === "submitted" && (
-          <>
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={() => onApprove(project, milestone)}
-              className="shrink-0"
-              aria-label={`Approve ${milestone.name}`}
-            >
-              <CheckCircle className="mr-1 h-3 w-3" /> 
-              <span className="hidden sm:inline">Approve</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => onRequestRevision(project, milestone)}
-              className="shrink-0"
-              aria-label={`Request revision for ${milestone.name}`}
-            >
-              <AlertCircle className="mr-1 h-3 w-3" /> 
-              <span className="hidden sm:inline">Revise</span>
-            </Button>
-          </>
-        )}
-      </div>
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 text-center">
+      <Icon className="mb-3 h-8 w-8 text-muted-foreground" />
+      <p className="font-medium">{title}</p>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>
     </div>
   )
-})
-
-MilestoneItem.displayName = "MilestoneItem"
-
-interface ProjectCardProps {
-  project: AdvisorProject
-  onApproveMilestone: (project: AdvisorProject, milestone: ProjectMilestone) => void
-  onRequestRevision: (project: AdvisorProject, milestone: ProjectMilestone) => void
-  onClearForEvaluation: (project: AdvisorProject) => void
 }
 
-const ProjectCard = React.memo(({ 
-  project, 
-  onApproveMilestone, 
-  onRequestRevision,
-  onClearForEvaluation 
-}: ProjectCardProps) => {
-  const canClearForEvaluation = project.progress >= 80
-  
+function StatCard(props: { title: string; value: number; helper: string }) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <CardTitle className="font-display text-lg truncate">{project.title}</CardTitle>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-sm text-muted-foreground truncate">{project.groupName}</p>
-              {project.lastUpdated && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    Updated {formatDate(project.lastUpdated)}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <StatusBadge status={project.status} />
-            <Badge variant="outline" className="font-mono">
-              {project.progress}%
-            </Badge>
-          </div>
-        </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription>{props.title}</CardDescription>
+        <CardTitle className="text-2xl">{props.value}</CardTitle>
       </CardHeader>
-      
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Overall progress</span>
-            <span className="font-medium">{project.progress}%</span>
-          </div>
-          <Progress 
-            value={project.progress} 
-            className="h-2"
-            aria-label={`Project progress: ${project.progress}%`}
-          />
-        </div>
-
-        <div>
-          <h4 className="text-sm font-medium mb-3 flex items-center justify-between">
-            <span>Milestones</span>
-            <Badge variant="outline" className="text-xs">
-              {project.milestones.filter(m => m.status === "approved").length}/{project.milestones.length} Complete
-            </Badge>
-          </h4>
-          <div className="space-y-2">
-            {project.milestones.map((milestone) => (
-              <MilestoneItem
-                key={milestone.id}
-                milestone={milestone}
-                project={project}
-                onApprove={onApproveMilestone}
-                onRequestRevision={onRequestRevision}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/documents`}>
-              <Eye className="mr-2 h-4 w-4" /> Documents
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/upload`}>
-              <Upload className="mr-2 h-4 w-4" /> Upload
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/messages?group=${project.id}`}>
-              <MessageSquare className="mr-2 h-4 w-4" /> Message
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/advisor/announcements">
-              <Bell className="mr-2 h-4 w-4" /> Announcements
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/schedule?project=${project.id}`}>
-              <Video className="mr-2 h-4 w-4" /> Meeting
-            </Link>
-          </Button>
-          {canClearForEvaluation && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={() => onClearForEvaluation(project)}
-              className="ml-auto"
-            >
-              <CheckCircle className="mr-2 h-4 w-4" /> Clear for Evaluation
-            </Button>
-          )}
-        </div>
-      </CardContent>
+      <CardContent className="pt-0 text-sm text-muted-foreground">{props.helper}</CardContent>
     </Card>
   )
-})
+}
 
-ProjectCard.displayName = "ProjectCard"
-
-// Main component
 interface AdvisorDashboardProps {
   userName?: string
-  advisorId?: string
 }
+
+export function AdvisorDashboard({ userName = "Advisor" }: AdvisorDashboardProps) {
+  const authUser = useAuthStore((state) => state.user)
+  const displayName = authUser
+    ? `${authUser.firstName ?? ""} ${authUser.lastName ?? ""}`.trim() || userName
+    : userName
+
+  const overviewQuery = useAdvisorOverview()
+  const projectsQuery = useAdvisorProjects()
+  const groupsQuery = useAdvisorMessageGroups()
+  const scheduleQuery = useAdvisorSchedule()
+  const announcementsQuery = useAdvisorAnnouncements()
+
+  const approveMilestoneMutation = useApproveMilestoneMutation()
+  const requestRevisionMutation = useRequestRevisionMutation()
+  const clearProjectMutation = useClearProjectMutation()
+  const sendGroupMessageMutation = useSendGroupMessageMutation()
+  const createMeetingMutation = useCreateMeetingMutation()
+  const deleteMeetingMutation = useDeleteMeetingMutation()
+  const createAnnouncementMutation = useCreateAnnouncementMutation()
+
+  const projects = projectsQuery.data?.items ?? []
+  const groups = groupsQuery.data?.items ?? []
+  const meetings = scheduleQuery.data?.items ?? []
+  const announcements = announcementsQuery.data?.items ?? []
+
+  const [selectedGroupId, setSelectedGroupId] = React.useState("")
+  const [messageDraft, setMessageDraft] = React.useState("")
+  const [meetingForm, setMeetingForm] = React.useState({
+    projectId: "",
+    title: "",
+    date: "",
+    time: "",
+    durationMinutes: "60",
+    type: "VIRTUAL" as "VIRTUAL" | "IN_PERSON",
+    location: "",
+    agenda: "",
+  })
+  const [announcementForm, setAnnouncementForm] = React.useState({
+    title: "",
+    content: "",
+    priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+    status: "PUBLISHED" as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+    audience: "STUDENTS" as "ALL" | "STUDENTS" | "ADVISORS",
+    deadlineAt: "",
+    targetProjectId: "",
+  })
+
+  const effectiveSelectedGroupId = selectedGroupId || groups[0]?.id || ""
+  const groupMessagesQuery = useAdvisorGroupMessages(effectiveSelectedGroupId || undefined)
+  const selectedGroup =
+    groupMessagesQuery.data?.group ??
+    groups.find((group: AdvisorMessageGroup) => group.id === effectiveSelectedGroupId) ??
+    null
+  const messages = groupMessagesQuery.data?.items ?? []
+  const effectiveMeetingProjectId = meetingForm.projectId || projects[0]?.id || ""
+
+  const pendingMilestones = React.useMemo(
+    () =>
+      projects.flatMap((project: AdvisorProjectItem) =>
+        project.milestones
+          .filter((milestone: AdvisorProjectMilestone) => milestone.status === "submitted")
+          .map((milestone: AdvisorProjectMilestone) => ({ project, milestone }))
+      ),
+    [projects]
+  )
+
+  const upcomingMeetings = React.useMemo(
+    () =>
+      meetings
+        .filter((meeting: AdvisorMeeting) => new Date(`${meeting.date}T${meeting.time}:00`).getTime() >= new Date().getTime())
+        .slice(0, 4),
+    [meetings]
+  )
+
+  const stats = {
+    activeProjects: projectsQuery.data?.stats?.activeProjects ?? overviewQuery.data?.stats.totalActiveProjects ?? 0,
+    totalStudents: overviewQuery.data?.stats.totalAssignedStudents ?? 0,
+    pendingReviews: pendingMilestones.length,
+    clearedProjects: projectsQuery.data?.stats?.clearedProjects ?? 0,
+  }
+
+  async function handleApproveMilestone(project: AdvisorProjectItem, milestone: AdvisorProjectMilestone) {
+    try {
+      await approveMilestoneMutation.mutateAsync({
+        milestoneId: milestone.id,
+        dto: { status: "APPROVED" },
+      })
+      toast.success(`${project.groupName}: ${milestone.name} approved.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to approve milestone")
+    }
+  }
+
+  async function handleRequestRevision(project: AdvisorProjectItem, subject: string, milestoneId?: string) {
+    const feedback = window.prompt(`Revision feedback for ${subject}`, "")
+    if (feedback === null) return
+    if (!feedback.trim()) {
+      toast.error("Revision feedback is required.")
+      return
+    }
+
+    try {
+      await requestRevisionMutation.mutateAsync({
+        projectId: project.id,
+        dto: { feedback: feedback.trim(), subject: `Revision required for ${subject}`, milestoneId },
+      })
+      toast.success(`Revision request sent for ${subject}.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to request revision")
+    }
+  }
+
+  async function handleClearProject(project: AdvisorProjectItem) {
+    try {
+      await clearProjectMutation.mutateAsync({ projectId: project.id })
+      toast.success(`${project.title} cleared for evaluation.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to clear project")
+    }
+  }
+
+  async function handleSendMessage() {
+    if (!effectiveSelectedGroupId) {
+      toast.error("Choose a message group first.")
+      return
+    }
+    if (!messageDraft.trim()) {
+      toast.error("Message is required.")
+      return
+    }
 
 export function AdvisorDashboard({ advisorId = "u7" }: AdvisorDashboardProps) {
   const router = useRouter()
   const [now, setNow] = useState<Date>(new Date())
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formattedDate = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
-  const formattedTime = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-
-  // Data fetching (would typically be in a useEffect)
-  const myProjects = useMemo(() => 
-    mockAdvisorProjects.filter((p) => p.advisorId === advisorId), 
-    [advisorId]
-  )
-  
-  const pendingMilestones = useMemo(() => 
-    myProjects.flatMap((p) => 
-      p.milestones
-        .filter((m) => m.status === "submitted")
-        .map((m) => ({ project: p, milestone: m }))
-    ), 
-    [myProjects]
-  )
-
-  const stats = useMemo(() => {
-    const studentsCount = mockStudentGroups.flatMap((g) => g.members).length
-    const clearedCount = myProjects.filter((p) => p.status === "cleared").length
-    const activeProjects = myProjects.filter((p) => p.status === "active").length
-    
-    return {
-      studentsCount,
-      clearedCount,
-      activeProjects,
-      pendingReviews: pendingMilestones.length
+  async function handleCreateMeeting() {
+    if (!effectiveMeetingProjectId || !meetingForm.title || !meetingForm.date || !meetingForm.time) {
+      toast.error("Project, title, date, and time are required.")
+      return
     }
-  }, [myProjects, pendingMilestones.length])
 
-  // Event handlers
-  const handleApproveMilestone = useCallback((project: AdvisorProject, milestone: ProjectMilestone) => {
-    toast.success("Milestone Approved", { 
-      description: `${project.groupName} • ${milestone.name} has been approved.`,
-      duration: 5000,
-    })
-    // Here you would typically update the backend
-  }, [])
+    try {
+      await createMeetingMutation.mutateAsync({
+        projectId: effectiveMeetingProjectId,
+        title: meetingForm.title.trim(),
+        date: meetingForm.date,
+        time: meetingForm.time,
+        durationMinutes: Number(meetingForm.durationMinutes) || 60,
+        type: meetingForm.type,
+        location: meetingForm.location.trim() || undefined,
+        agenda: meetingForm.agenda.trim() || undefined,
+      })
+      setMeetingForm((current) => ({
+        ...current,
+        title: "",
+        date: "",
+        time: "",
+        durationMinutes: "60",
+        location: "",
+        agenda: "",
+      }))
+      toast.success("Meeting scheduled.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create meeting")
+    }
+  }
 
-  const handleRequestRevision = useCallback((project: AdvisorProject, milestone: ProjectMilestone) => {
-    toast.info("Revision Requested", { 
-      description: `Please provide feedback for ${project.groupName} • ${milestone.name}`,
-      duration: 5000,
-      action: {
-        label: "Add Feedback",
-        onClick: () => router.push(`/dashboard/advisor/reviews`)
-      }
-    })
-  }, [router])
+  async function handleDeleteMeeting(meeting: AdvisorMeeting) {
+    if (!window.confirm(`Delete "${meeting.title}"?`)) return
 
-  const handleClearForEvaluation = useCallback((project: AdvisorProject) => {
-    toast.success("Project Cleared for Evaluation", { 
-      description: `${project.title} has been marked as ready for evaluation.`,
-      duration: 5000,
-    })
-    // Here you would typically update the backend
-  }, [])
+    try {
+      await deleteMeetingMutation.mutateAsync(meeting.id)
+      toast.success(`${meeting.title} deleted.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete meeting")
+    }
+  }
 
-  const authUser = useAuthStore((state) => state.user)
-  const displayName = authUser ? `${authUser.firstName ?? ""} ${authUser.lastName ?? ""}`.trim() : "Advisor"
+  async function handleCreateAnnouncement() {
+    if (!announcementForm.title.trim() || !announcementForm.content.trim()) {
+      toast.error("Announcement title and content are required.")
+      return
+    }
+
+    try {
+      await createAnnouncementMutation.mutateAsync({
+        dto: {
+          title: announcementForm.title.trim(),
+          content: announcementForm.content.trim(),
+          priority: announcementForm.priority,
+          status: announcementForm.status,
+          audience: announcementForm.audience,
+          deadlineAt: announcementForm.deadlineAt || undefined,
+          targetProjectIds: announcementForm.targetProjectId ? [announcementForm.targetProjectId] : undefined,
+        },
+      })
+      setAnnouncementForm((current) => ({
+        ...current,
+        title: "",
+        content: "",
+        deadlineAt: "",
+        targetProjectId: "",
+      }))
+      toast.success("Announcement created.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create announcement")
+    }
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Welcome back, {displayName || "Advisor"}!</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Advisor Workspace</h1>
           <p className="text-muted-foreground">
-            You have {stats.activeProjects} active project{stats.activeProjects !== 1 ? 's' : ''} and {stats.pendingReviews} pending review{stats.pendingReviews !== 1 ? 's' : ''}.
+            Welcome back, {displayName}. Monitor assigned projects, pending reviews, and active conversations.
           </p>
         </div>
-
-        <div className="flex gap-2 items-center">
-          <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground">
-            {formattedDate} {formattedTime}
-          </div>
+        <div className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
+          {formatDate(new Date().toISOString())}
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Active Projects"
-          value={stats.activeProjects}
-          subtitle="Currently supervising"
-          icon={FolderOpen}
-          iconClassName="bg-primary/10 text-primary"
-        />
-        <StatCard
-          title="Pending Reviews"
-          value={stats.pendingReviews}
-          subtitle="Milestones to review"
-          icon={Clock}
-          iconClassName="bg-warning/10 text-warning"
-        />
-        <StatCard
-          title="Students"
-          value={stats.studentsCount}
-          subtitle="Under your guidance"
-          icon={Users}
-          iconClassName="bg-accent/10 text-accent"
-        />
-        <StatCard
-          title="Cleared Projects"
-          value={stats.clearedCount}
-          subtitle="Ready for evaluation"
-          icon={CheckCircle}
-          iconClassName="bg-success/10 text-success"
-        />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Active Projects" value={stats.activeProjects} helper="Projects in progress" />
+        <StatCard title="Assigned Students" value={stats.totalStudents} helper="Students under supervision" />
+        <StatCard title="Pending Reviews" value={stats.pendingReviews} helper="Submitted milestones awaiting feedback" />
+        <StatCard title="Cleared Projects" value={stats.clearedProjects} helper="Ready for evaluation" />
       </div>
 
-      {/* Main Content Tabs */}
       <Tabs defaultValue="projects" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="milestones" className="relative">
-            Reviews
-            {stats.pendingReviews > 0 && (
-              <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-                {stats.pendingReviews}
-              </Badge>
-            )}
-          </TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
         </TabsList>
 
         <TabsContent value="projects" className="space-y-4">
-          {myProjects.length === 0 ? (
+          {projectsQuery.isLoading ? (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">No projects assigned</p>
-                <p className="text-sm text-muted-foreground mt-1">Projects will appear here once assigned to you.</p>
-              </CardContent>
+              <CardContent className="py-10 text-center">Loading projects...</CardContent>
             </Card>
+          ) : projects.length === 0 ? (
+            <EmptyState
+              title="No projects assigned"
+              description="Projects will appear here once they are assigned to your advisor account."
+              icon={FolderOpen}
+            />
           ) : (
-            myProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onApproveMilestone={handleApproveMilestone}
-                onRequestRevision={handleRequestRevision}
-                onClearForEvaluation={handleClearForEvaluation}
-              />
-            ))
+            <div className="grid gap-4 xl:grid-cols-2">
+              {projects.map((project: AdvisorProjectItem) => (
+                <Card key={project.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-lg">{project.title}</CardTitle>
+                        <CardDescription>{project.groupName}</CardDescription>
+                      </div>
+                      <Badge variant="outline">{project.progress}%</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                      <p>Members: {project.members.length}</p>
+                      <p>Milestones: {project.milestones.length}</p>
+                      <p>Documents: {project.documents.length}</p>
+                      <p>Due: {formatDate(project.dueDate)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleRequestRevision(project, project.title)}
+                        disabled={requestRevisionMutation.isPending}
+                      >
+                        Request Revision
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => void handleClearProject(project)}
+                        disabled={clearProjectMutation.isPending}
+                      >
+                        Clear for Evaluation
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 
-        <TabsContent value="milestones">
+        <TabsContent value="reviews">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-lg">Pending Reviews</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {pendingMilestones.length} milestone{pendingMilestones.length !== 1 ? 's' : ''} waiting for your feedback
-              </p>
+              <CardTitle>Pending Milestone Reviews</CardTitle>
+              <CardDescription>
+                {pendingMilestones.length} submitted milestone{pendingMilestones.length === 1 ? "" : "s"} need action.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {pendingMilestones.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-muted-foreground">All caught up!</p>
-                  <p className="text-sm text-muted-foreground mt-1">No pending milestones to review.</p>
-                </div>
+                <EmptyState
+                  title="All caught up"
+                  description="No submitted milestones are waiting for your review."
+                  icon={CheckCircle2}
+                />
               ) : (
                 <div className="space-y-3">
-                  {pendingMilestones.map(({ project, milestone }) => (
-                    <div key={`${project.id}:${milestone.id}`} className="group">
-                      <MilestoneItem
-                        milestone={milestone}
-                        project={project}
-                        onApprove={handleApproveMilestone}
-                        onRequestRevision={handleRequestRevision}
-                        showActions={true}
-                      />
+                  {pendingMilestones.map(({ project, milestone }: {
+                    project: AdvisorProjectItem
+                    milestone: AdvisorProjectMilestone
+                  }) => (
+                    <div key={`${project.id}:${milestone.id}`} className="rounded-lg border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-medium">{milestone.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {project.groupName} · due {formatDate(milestone.dueDate)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => void handleApproveMilestone(project, milestone)}
+                            disabled={approveMilestoneMutation.isPending}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleRequestRevision(project, milestone.name, milestone.id)}
+                            disabled={requestRevisionMutation.isPending}
+                          >
+                            Request Revision
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -551,89 +450,372 @@ export function AdvisorDashboard({ advisorId = "u7" }: AdvisorDashboardProps) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="communication">
-          <div className="grid gap-4 md:grid-cols-2">
+        <TabsContent value="communication" className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle className="font-display text-lg">Recent Messages</CardTitle>
+                <CardTitle>Group Messages</CardTitle>
+                <CardDescription>Stay in sync with student project groups.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-medium text-primary">
-                          {['M', 'J', 'A'][i-1]}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm truncate">
-                            {['Maria Garcia', 'John Smith', 'Alex Chen'][i-1]}
-                          </p>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {i*2}h ago
-                          </span>
+                {groupsQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading message groups...</p>
+                ) : groups.length === 0 ? (
+                  <EmptyState
+                    title="No message groups"
+                    description="Chat groups appear once projects and students are linked."
+                    icon={MessageSquare}
+                  />
+                ) : (
+                  <>
+                    <Select value={effectiveSelectedGroupId} onValueChange={setSelectedGroupId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((group: AdvisorMessageGroup) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {selectedGroup ? (
+                      <div className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{selectedGroup.name}</p>
+                            <p className="text-sm text-muted-foreground">{selectedGroup.project}</p>
+                          </div>
+                          <Badge variant="outline">{selectedGroup.members.length} members</Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {[
-                            "Thank you for the feedback on our prototype!",
-                            "When is the next meeting scheduled?",
-                            "We've submitted the final report for review."
-                          ][i-1]}
+                      </div>
+                    ) : null}
+
+                    <ScrollArea className="h-72 rounded-lg border p-4">
+                      <div className="space-y-3">
+                        {groupMessagesQuery.isLoading ? (
+                          <p className="text-sm text-muted-foreground">Loading messages...</p>
+                        ) : messages.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No messages yet.</p>
+                        ) : (
+                          messages.map((message: {
+                            id: string
+                            isOwn: boolean
+                            sender: string
+                            timestamp: string
+                            content: string
+                          }) => (
+                            <div key={message.id} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
+                              <div
+                                className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+                                  message.isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
+                                }`}
+                              >
+                                <div className="mb-1 flex items-center justify-between gap-3 text-xs opacity-80">
+                                  <span>{message.sender}</span>
+                                  <span>{formatDateTime(message.timestamp)}</span>
+                                </div>
+                                <p>{message.content}</p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    <div className="space-y-3 rounded-lg border p-4">
+                      <Textarea
+                        value={messageDraft}
+                        onChange={(event) => setMessageDraft(event.target.value)}
+                        rows={4}
+                        placeholder="Write a message to the selected group..."
+                      />
+                      <div className="flex justify-end">
+                        <Button onClick={() => void handleSendMessage()} disabled={sendGroupMessageMutation.isPending}>
+                          {sendGroupMessageMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                          Send Message
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upcoming Meetings</CardTitle>
+                  <CardDescription>Recent meeting schedule and a quick create form.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {upcomingMeetings.length === 0 ? (
+                    <EmptyState
+                      title="No upcoming meetings"
+                      description="Create a meeting and it will show up here."
+                      icon={Calendar}
+                    />
+                  ) : (
+                    upcomingMeetings.map((meeting: AdvisorMeeting) => (
+                      <div key={meeting.id} className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{meeting.title}</p>
+                            <p className="text-sm text-muted-foreground">{meeting.project}</p>
+                          </div>
+                          <Badge variant="outline">{meeting.type}</Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {formatDateTime(`${meeting.date}T${meeting.time}:00`)}
+                        </p>
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleDeleteMeeting(meeting)}
+                            disabled={deleteMeetingMutation.isPending}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <p className="font-medium">Schedule a meeting</p>
+                    <Select
+                      value={effectiveMeetingProjectId}
+                      onValueChange={(value) => setMeetingForm((current) => ({ ...current, projectId: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((project: AdvisorProjectItem) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.groupName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={meetingForm.title}
+                      onChange={(event) => setMeetingForm((current) => ({ ...current, title: event.target.value }))}
+                      placeholder="Meeting title"
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input
+                        type="date"
+                        value={meetingForm.date}
+                        onChange={(event) => setMeetingForm((current) => ({ ...current, date: event.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={meetingForm.time}
+                        onChange={(event) => setMeetingForm((current) => ({ ...current, time: event.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input
+                        type="number"
+                        min="15"
+                        value={meetingForm.durationMinutes}
+                        onChange={(event) =>
+                          setMeetingForm((current) => ({ ...current, durationMinutes: event.target.value }))
+                        }
+                      />
+                      <Select
+                        value={meetingForm.type}
+                        onValueChange={(value: "VIRTUAL" | "IN_PERSON") =>
+                          setMeetingForm((current) => ({ ...current, type: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VIRTUAL">Virtual</SelectItem>
+                          <SelectItem value="IN_PERSON">In person</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input
+                      value={meetingForm.location}
+                      onChange={(event) => setMeetingForm((current) => ({ ...current, location: event.target.value }))}
+                      placeholder="Meeting link or location"
+                    />
+                    <Textarea
+                      value={meetingForm.agenda}
+                      onChange={(event) => setMeetingForm((current) => ({ ...current, agenda: event.target.value }))}
+                      rows={3}
+                      placeholder="Agenda"
+                    />
+                    <div className="flex justify-end">
+                      <Button onClick={() => void handleCreateMeeting()} disabled={createMeetingMutation.isPending}>
+                        {createMeetingMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Video className="h-4 w-4" />
+                        )}
+                        Schedule Meeting
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Announcements</CardTitle>
+                  <CardDescription>Publish quick updates for your active project groups.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {announcements.length === 0 ? (
+                    <EmptyState
+                      title="No announcements yet"
+                      description="Create your first advisor announcement below."
+                      icon={Bell}
+                    />
+                  ) : (
+                    announcements.slice(0, 4).map((announcement: AdvisorAnnouncement) => (
+                      <div key={announcement.id} className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{announcement.title}</p>
+                            <p className="text-sm text-muted-foreground">{announcement.content}</p>
+                          </div>
+                          <Badge variant="outline">{announcement.priority}</Badge>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {announcement.audience} · {formatDate(announcement.createdAt)}
                         </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/dashboard/advisor/messages">
-                    <MessageSquare className="mr-2 h-4 w-4" /> View All Messages
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+                    ))
+                  )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display text-lg">Upcoming Meetings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                      <Video className="h-5 w-5 text-accent" />
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <Input
+                      value={announcementForm.title}
+                      onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
+                      placeholder="Announcement title"
+                    />
+                    <Textarea
+                      value={announcementForm.content}
+                      onChange={(event) =>
+                        setAnnouncementForm((current) => ({ ...current, content: event.target.value }))
+                      }
+                      rows={4}
+                      placeholder="Announcement content"
+                    />
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Select
+                        value={announcementForm.priority}
+                        onValueChange={(value: "LOW" | "MEDIUM" | "HIGH" | "URGENT") =>
+                          setAnnouncementForm((current) => ({ ...current, priority: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="LOW">Low</SelectItem>
+                          <SelectItem value="MEDIUM">Medium</SelectItem>
+                          <SelectItem value="HIGH">High</SelectItem>
+                          <SelectItem value="URGENT">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={announcementForm.status}
+                        onValueChange={(value: "DRAFT" | "PUBLISHED" | "ARCHIVED") =>
+                          setAnnouncementForm((current) => ({ ...current, status: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">Draft</SelectItem>
+                          <SelectItem value="PUBLISHED">Published</SelectItem>
+                          <SelectItem value="ARCHIVED">Archived</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={announcementForm.audience}
+                        onValueChange={(value: "ALL" | "STUDENTS" | "ADVISORS") =>
+                          setAnnouncementForm((current) => ({ ...current, audience: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">All</SelectItem>
+                          <SelectItem value="STUDENTS">Students</SelectItem>
+                          <SelectItem value="ADVISORS">Advisors</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">Weekly Progress Review</p>
-                      <p className="text-sm text-muted-foreground">Team Atlas • Tomorrow, 2:00 PM</p>
-                      <Badge variant="outline" className="mt-1 text-xs">30 min</Badge>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input
+                        type="date"
+                        value={announcementForm.deadlineAt}
+                        onChange={(event) =>
+                          setAnnouncementForm((current) => ({ ...current, deadlineAt: event.target.value }))
+                        }
+                      />
+                      <Select
+                        value={announcementForm.targetProjectId || "__all__"}
+                        onValueChange={(value) =>
+                          setAnnouncementForm((current) => ({
+                            ...current,
+                            targetProjectId: value === "__all__" ? "" : value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Target project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">All my projects</SelectItem>
+                          {projects.map((project: AdvisorProjectItem) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.groupName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => void handleCreateAnnouncement()}
+                        disabled={createAnnouncementMutation.isPending}
+                      >
+                        {createAnnouncementMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Bell className="h-4 w-4" />
+                        )}
+                        Create Announcement
+                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="flex gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">Final Presentation Prep</p>
-                      <p className="text-sm text-muted-foreground">AI Research Group • Fri, 11:00 AM</p>
-                      <Badge variant="outline" className="mt-1 text-xs">60 min</Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/dashboard/advisor/schedule">
-                    <Calendar className="mr-2 h-4 w-4" /> Schedule Meeting
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
     </div>
   )
 }
+
+
+
+

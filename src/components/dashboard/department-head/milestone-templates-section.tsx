@@ -18,13 +18,24 @@ import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useMilestoneTemplatesStore } from "@/store/milestone-templates-store"
 import { CreateMilestoneTemplateDialog } from "@/components/dashboard/department-head/create-milestone-template-dialog"
 import { EditMilestoneTemplateDialog } from "@/components/dashboard/department-head/edit-milestone-template-dialog"
-import { DeleteMilestoneTemplateDialog } from "@/components/dashboard/department-head/delete-milestone-template-dialog"
+import type { MilestoneTemplateMilestone } from "@/types/milestone-templates"
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—"
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString()
+}
+
+function formatMilestoneSequences(milestones: MilestoneTemplateMilestone[] | null | undefined): string {
+  if (!milestones?.length) return "—"
+  const sequences = milestones
+    .map((m) => m.sequence)
+    .filter((seq): seq is number => Number.isFinite(seq))
+    .slice()
+    .sort((a, b) => a - b)
+
+  return sequences.length ? sequences.join(" • ") : "—"
 }
 
 export function MilestoneTemplatesSection() {
@@ -163,17 +174,12 @@ export function MilestoneTemplatesSection() {
                           {tpl.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{tpl.milestones?.length ?? 0}</TableCell>
+                      <TableCell>{formatMilestoneSequences(tpl.milestones)}</TableCell>
                       <TableCell>{tpl.usageCount ?? 0}</TableCell>
                       <TableCell>{formatDate(tpl.createdAt)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
                           <EditMilestoneTemplateDialog template={tpl} onUpdated={() => query.refetch()} />
-                          <DeleteMilestoneTemplateDialog
-                            templateId={tpl.templateId}
-                            templateName={tpl.name}
-                            onDeleted={() => query.refetch()}
-                          />
                         </div>
                       </TableCell>
                     </TableRow>

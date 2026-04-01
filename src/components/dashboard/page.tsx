@@ -7,6 +7,7 @@ import { CustomizableDashboard } from "@/components/dashboard/customizable-dashb
 import { StudentDashboard } from "@/components/dashboard/roles/student-dashboard"
 import { DepartmentHeadDashboard } from "@/components/dashboard/roles/department-head-dashboard"
 import { AdvisorDashboard } from "@/components/dashboard/roles/advisor-dashboard"
+import { EvaluatorDashboard } from "@/components/dashboard/roles/evaluator-dashboard"
 import { useAuthStore } from "@/store/auth-store"
 import { getDashboardRoleSlug, getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 
@@ -75,6 +76,10 @@ export default function DashboardPage({ role }: DashboardPageProps) {
 
   if (effectiveRole === "department_head") {
     return <DepartmentHeadDashboardWelcome userName={userName || undefined} />
+  }
+
+  if (effectiveRole === "evaluator") {
+    return <EvaluatorDashboard />
   }
 
   return (

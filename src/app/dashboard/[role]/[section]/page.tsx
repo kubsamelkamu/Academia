@@ -48,6 +48,13 @@ interface RoleSectionDashboardPageProps {
 
 type SectionComponent = ComponentType
 
+import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
+import EvaluatorAssignedProjectsPage from "@/app/dashboard/evaluator/assigned-projects/page"
+import EvaluatorEvaluationsPage from "@/app/dashboard/evaluator/evaluations/page"
+import EvaluatorSchedulePage from "@/app/dashboard/evaluator/schedule/page"
+import EvaluatorReportsPage from "@/app/dashboard/evaluator/reports/page"
+import EvaluatorMessagesPage from "@/app/dashboard/evaluator/messages/page"
+
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {
     announcements: DepartmentHeadAnnouncementsPage,
@@ -93,6 +100,13 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     "defense-schedule": CommitteeDefenseSchedulePage,
     reports: CommitteeReportsPage,
   },
+  evaluator: {
+    "assigned-projects": EvaluatorAssignedProjectsPage,
+    evaluations: EvaluatorEvaluationsPage,
+    schedule: EvaluatorSchedulePage,
+    reports: EvaluatorReportsPage,
+    messages: EvaluatorMessagesPage,
+  },
 }
 
 function getCanonicalSectionForRole(role: UserRole, section: string): string {
@@ -118,6 +132,7 @@ const allowedSectionsByRole: Record<UserRole, string[]> = {
   advisor: ["my-projects", "students", "evaluations", "schedule", "announcements", "messages"],
   student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],
   department_committee: ["assigned-projects", "evaluations", "defense-schedule", "reports"],
+  evaluator: ["assigned-projects", "evaluations", "schedule", "reports", "messages"],
 }
 
 function normalizeSection(section: string): string {

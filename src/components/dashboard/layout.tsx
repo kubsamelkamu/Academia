@@ -91,17 +91,14 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
         Loading...
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Suspense fallback={null}>
-        <DepartmentHeadVerificationRouteGuard />
-      </Suspense>
+    <div className="flex min-h-dvh overflow-hidden">
       <NotificationsRealtime />
       <ProjectGroupAnnouncementsRealtime />
       <DepartmentAnnouncementsRealtime />
@@ -113,7 +110,7 @@ export default function DashboardLayout({
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
-        <main className="flex-1 overflow-y-auto bg-muted/10 p-6">
+        <main className="flex-1 overflow-y-auto bg-muted/10 p-4 sm:p-6">
           <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
           {children}
         </main>

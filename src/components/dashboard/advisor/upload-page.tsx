@@ -2,45 +2,82 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Upload } from "lucide-react"
+import { useAdvisorProjects, useUploadDocumentMutation } from "@/lib/hooks/useAdvisor"
+import type { AdvisorProjectItem, AdvisorProjectMilestone } from "@/lib/types/advisor"
+import { ArrowLeft, Loader2, Upload } from "lucide-react"
 
 export function AdvisorUploadPage() {
-  const [fileName, setFileName] = React.useState("")
-  const [file, setFile] = React.useState<File | null>(null)
-  const [project, setProject] = React.useState("")
-  const [notes, setNotes] = React.useState("")
+  const searchParams = useSearchParams()
+  const initialProjectId = searchParams.get("project") ?? ""
+  const projectsQuery = useAdvisorProjects()
+  const uploadMutation = useUploadDocumentMutation()
 
-  function submit() {
-    if (!file || !project.trim()) {
-      toast.error("Missing information", { description: "Please select a file and provide a project." })
+  const [projectId, setProjectId] = React.useState(initialProjectId)
+  const [milestoneId, setMilestoneId] = React.useState("")
+  const [description, setDescription] = React.useState("")
+  const [file, setFile] = React.useState<File | null>(null)
+
+  const projects: AdvisorProjectItem[] = projectsQuery.data?.items ?? []
+
+  React.useEffect(() => {
+    if (!projectId && projects[0]?.id) {
+      setProjectId(projects[0].id)
+    }
+  }, [projectId, projects])
+
+  const selectedProject = React.useMemo(
+    () => projects.find((project: AdvisorProjectItem) => project.id === projectId) ?? null,
+    [projectId, projects],
+  )
+
+  async function handleSubmit() {
+    if (!projectId) {
+      toast.error("Choose a project first.")
+      return
+    }
+    if (!file) {
+      toast.error("Select a document to upload.")
       return
     }
 
-    toast.success("Uploaded", { description: `${file.name} → ${project}` })
-    setFileName("")
-    setFile(null)
-    setProject("")
-    setNotes("")
+    try {
+      await uploadMutation.mutateAsync({
+        dto: {
+          projectId,
+          milestoneId: milestoneId || undefined,
+          description: description.trim() || undefined,
+        },
+        file,
+      })
+      toast.success("Document uploaded.")
+      setDescription("")
+      setMilestoneId("")
+      setFile(null)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload document")
+    }
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
           <h1 className="text-2xl font-bold tracking-tight">Upload Document</h1>
-          <p className="text-sm text-muted-foreground">Attach a document to a project for review.</p>
+          <p className="text-sm text-muted-foreground">Attach a document to a project or milestone for advisor review.</p>
         </div>
         <Button asChild variant="outline">
           <Link href="/dashboard/advisor/documents">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Documents
           </Link>
         </Button>
       </div>
@@ -51,37 +88,64 @@ export function AdvisorUploadPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="file">Select file *</Label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                id="file"
-                type="file"
-                className="sm:w-auto"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null
-                  setFile(f)
-                  setFileName(f?.name ?? "")
-                }}
-              />
-              {fileName && (
-                <span className="text-xs text-muted-foreground truncate sm:max-w-[200px]">
-                  Selected: <span className="font-medium text-foreground">{fileName}</span>
-                </span>
-              )}
-            </div>
+            <Label>Project</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project: AdvisorProjectItem) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.groupName} - {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="project">Project</Label>
-            <Input id="project" value={project} onChange={(e) => setProject(e.target.value)} placeholder="e.g. AI‑Driven Academic Assistant" />
+            <Label>Milestone (optional)</Label>
+            <Select value={milestoneId || "__none__"} onValueChange={(value) => setMilestoneId(value === "__none__" ? "" : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Attach to milestone" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">General project document</SelectItem>
+                {(selectedProject?.milestones ?? []).map((milestone: AdvisorProjectMilestone) => (
+                  <SelectItem key={milestone.id} value={milestone.id}>
+                    {milestone.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={5} placeholder="Add context for reviewers..." />
+            <Label htmlFor="file">Document</Label>
+            <Input
+              id="file"
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              accept=".pdf,.docx,.jpg,.jpeg,.png,.webp,.mp4,.webm,.zip"
+            />
+            {file ? <p className="text-xs text-muted-foreground">Selected: {file.name}</p> : null}
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (optional)</Label>
+            <Textarea
+              id="description"
+              rows={5}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Add context for this upload..."
+            />
+          </div>
+
           <div className="flex justify-end">
-            <Button className="btn-gradient" onClick={submit}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
+            <Button onClick={handleSubmit} disabled={uploadMutation.isPending || projectsQuery.isLoading}>
+              {uploadMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Upload Document
             </Button>
           </div>
         </CardContent>
@@ -91,4 +155,3 @@ export function AdvisorUploadPage() {
 }
 
 export default AdvisorUploadPage
-

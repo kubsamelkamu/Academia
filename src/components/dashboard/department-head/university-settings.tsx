@@ -157,7 +157,6 @@ export function UniversitySettingsForm() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="h-16 w-16 overflow-hidden rounded-md border bg-background">
               {logoPreview || currentLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={logoPreview ?? currentLogoUrl ?? ""}
                   alt="University logo"

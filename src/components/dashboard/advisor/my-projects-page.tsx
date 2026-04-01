@@ -43,7 +43,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,
@@ -53,8 +52,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Tooltip,
   TooltipContent,
@@ -375,130 +373,34 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
   const isOverdue = daysRemaining < 0
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle 
-                className="text-xl font-semibold hover:text-primary transition-colors cursor-pointer line-clamp-1"
-                onClick={() => onViewDetails(project)}
-              >
-                {project.title}
-              </CardTitle>
-              <Badge className={cn(getStatusColor(statusConfig?.color || 'gray'), "text-xs")}>
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {statusConfig?.label || project.status}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" />
-                <span>{project.groupName}</span>
-              </div>
-              <Separator orientation="vertical" className="h-4" />
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Due {formatDate(project.dueDate)}</span>
-              </div>
-            </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg">{project.title}</CardTitle>
+            <CardDescription>{project.groupName}</CardDescription>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onViewDetails(project)}>
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onMessage(project)}>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Message Team
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onClearance(project)}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Clear for Evaluation
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Badge variant="outline">{project.progress}%</Badge>
         </div>
       </CardHeader>
-      
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground line-clamp-2">
-          {project.description}
-        </p>
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">Progress</span>
-            <span className="text-muted-foreground">{project.progress}%</span>
-          </div>
-          <Progress value={project.progress} className="h-2" />
+        <Progress value={project.progress} className="h-2" />
+        <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+          <p>Members: {project.members.length}</p>
+          <p>Milestones: {project.milestones.length}</p>
+          <p>Documents: {project.documents.length}</p>
+          <p>Due: {formatDate(project.dueDate)}</p>
         </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Users className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{project.members.length}</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Members</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{completedMilestones}/{project.milestones.length}</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Milestones</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className={cn(
-                isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : ""
-              )}>
-                {isOverdue ? 'Overdue' : `${daysRemaining}d`}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="flex-1"
-            onClick={() => onViewDetails(project)}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            Details
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => onView(project.id)}>
+            <Eye className="h-4 w-4" />
+            View details
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => onMessage(project)}
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message
+          <Button variant="outline" size="sm" onClick={() => onRevision(project)} disabled={isBusy}>
+            Request revision
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "flex-1",
-              project.status === 'cleared' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30"
-            )}
-            onClick={() => onClearance(project)}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            {project.status === 'cleared' ? 'Cleared' : 'Clear'}
+          <Button size="sm" onClick={() => onClear(project)} disabled={isBusy}>
+            Clear for evaluation
           </Button>
         </div>
       </CardContent>
@@ -506,545 +408,311 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
   )
 }
 
-// ==================== Main Component ====================
 export function AdvisorMyProjectsPage() {
-  const [selectedProject, setSelectedProject] = useState<AdvisorProject | null>(null)
-  const [showProjectDialog, setShowProjectDialog] = useState(false)
-  const [showClearanceDialog, setShowClearanceDialog] = useState(false)
-  const [showMeetingDialog, setShowMeetingDialog] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [search, setSearch] = React.useState("")
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null)
 
-  const advisorProjects = MOCK_PROJECTS
+  const projectsQuery = useAdvisorProjects()
+  const projectDetailQuery = useAdvisorProject(selectedProjectId ?? undefined)
+  const requestRevisionMutation = useRequestRevisionMutation()
+  const clearProjectMutation = useClearProjectMutation()
 
-  const filteredProjects = useMemo(() => {
-    return advisorProjects.filter(project => {
-      const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           project.groupName.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesStatus = filterStatus === 'all' || project.status === filterStatus
-      return matchesSearch && matchesStatus
+  const projects = projectsQuery.data?.items ?? []
+  const selectedProject = projectDetailQuery.data as AdvisorProjectDetail | undefined
+
+  const filteredProjects = React.useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return projects
+
+    return projects.filter((project: AdvisorProjectItem) => {
+      return (
+        project.title.toLowerCase().includes(term) ||
+        project.groupName.toLowerCase().includes(term) ||
+        project.category.toLowerCase().includes(term)
+      )
     })
-  }, [advisorProjects, searchQuery, filterStatus])
+  }, [projects, search])
 
-  const stats = useMemo(() => ({
-    total: advisorProjects.length,
-    active: advisorProjects.filter(p => p.status === 'active' || p.status === 'in-progress').length,
-    pendingReview: advisorProjects.filter(p => p.status === 'pending-review').length,
-    completed: advisorProjects.filter(p => p.status === 'completed' || p.status === 'cleared').length,
-  }), [advisorProjects])
+  async function handleRevision(project: AdvisorProjectItem) {
+    const feedback = window.prompt(`Revision feedback for ${project.title}`, "")
+    if (feedback === null) return
+    if (!feedback.trim()) {
+      toast.error("Revision feedback is required.")
+      return
+    }
 
-  const handleViewDetails = (project: AdvisorProject) => {
-    setSelectedProject(project)
-    setShowProjectDialog(true)
+    try {
+      await requestRevisionMutation.mutateAsync({
+        projectId: project.id,
+        dto: {
+          feedback: feedback.trim(),
+          subject: `Revision required for ${project.title}`,
+        },
+      })
+      toast.success(`Revision requested for ${project.title}.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to request revision")
+    }
   }
 
-  const handleClearance = (project: AdvisorProject) => {
-    setSelectedProject(project)
-    setShowClearanceDialog(true)
-  }
-
-  const handleMessage = (project: AdvisorProject) => {
-    toast.info(`Opening chat with ${project.groupName}`)
-  }
-
-  const handleScheduleMeeting = () => {
-    setShowMeetingDialog(true)
-  }
-
-  const handleConfirmClearance = () => {
-    setShowClearanceDialog(false)
-    toast.success("Project cleared for evaluation", {
-      description: "The team has been notified.",
-    })
+  async function handleClear(project: AdvisorProjectItem) {
+    try {
+      await clearProjectMutation.mutateAsync({ projectId: project.id })
+      toast.success(`${project.title} cleared for evaluation.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to clear project")
+    }
   }
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <div className="space-y-6 animate-in fade-in duration-500 px-4 py-8">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                My Projects
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                Supervise and track your assigned student projects
-              </p>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                onClick={handleScheduleMeeting}
-                className="gap-2"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Schedule Meeting
-              </Button>
-              
-              <Button className="gap-2 relative">
-                <ClipboardCheck className="h-4 w-4" />
-                Review Requests
-                {stats.pendingReview > 0 && (
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-                  >
-                    {stats.pendingReview}
-                  </Badge>
-                )}
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">My Projects</h1>
+          <p className="text-muted-foreground">
+            Review project progress, inspect details, and send revision or clearance actions.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search projects"
+            className="pl-9"
+          />
+        </div>
+      </div>
 
-          {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-4 mb-8">
-            <StatCard title="Total Projects" value={stats.total} icon={FolderOpen} color="blue" />
-            <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" trend={12} />
-            <StatCard title="Pending Review" value={stats.pendingReview} icon={ClipboardCheck} color="purple" />
-            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="emerald" trend={8} />
-          </div>
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="cleared">Cleared</TabsTrigger>
+        </TabsList>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search projects..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    {filterStatus === 'all' ? 'All Status' : STATUS_CONFIG[filterStatus as ProjectStatus]?.label}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFilterStatus('all')}>
-                    All Status
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                    <DropdownMenuItem key={key} onClick={() => setFilterStatus(key)}>
-                      {config.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="flex border rounded-md overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Projects Grid */}
-          {filteredProjects.length > 0 ? (
-            <div className={cn(
-              "grid gap-6",
-              viewMode === 'grid' ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-            )}>
-              {filteredProjects.map((project) => (
+        <TabsContent value="all" className="space-y-4">
+          {projectsQuery.isLoading ? (
+            <Card>
+              <CardContent className="py-12 text-center">Loading projects...</CardContent>
+            </Card>
+          ) : filteredProjects.length === 0 ? (
+            <EmptyState
+              title="No projects found"
+              description="Try a different search term or wait for project assignments to appear."
+            />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {filteredProjects.map((project: AdvisorProjectItem) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onViewDetails={handleViewDetails}
-                  onClearance={handleClearance}
-                  onMessage={handleMessage}
+                  onView={setSelectedProjectId}
+                  onRevision={handleRevision}
+                  onClear={handleClear}
+                  isBusy={requestRevisionMutation.isPending || clearProjectMutation.isPending}
                 />
               ))}
             </div>
-          ) : (
-            <Card className="p-12 text-center">
-              <div className="flex flex-col items-center max-w-md mx-auto">
-                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No projects found</h3>
-                <p className="text-muted-foreground mb-6">
-                  {searchQuery || filterStatus !== 'all' 
-                    ? 'Try adjusting your search or filters'
-                    : 'No projects assigned to you yet.'}
-                </p>
-                {(searchQuery || filterStatus !== 'all') && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSearchQuery('')
-                      setFilterStatus('all')
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-              </div>
-            </Card>
           )}
+        </TabsContent>
 
-          {/* Project Details Dialog */}
-          <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
-            <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden p-0">
-              {selectedProject && (
-                <>
-                  <DialogHeader className="p-6 pb-0">
-                    <div className="flex items-start justify-between pr-8">
-                      <div>
-                        <DialogTitle className="text-2xl">{selectedProject.title}</DialogTitle>
-                        <DialogDescription className="flex items-center gap-2 mt-1">
-                          <Users className="h-4 w-4" />
-                          {selectedProject.groupName}
-                        </DialogDescription>
-                      </div>
-                      <Badge className={getStatusColor(STATUS_CONFIG[selectedProject.status]?.color || 'gray')}>
-                        {STATUS_CONFIG[selectedProject.status]?.label}
-                      </Badge>
+        <TabsContent value="active" className="space-y-4">
+          {filteredProjects.filter((project: AdvisorProjectItem) => project.status !== "cleared").length === 0 ? (
+            <EmptyState title="No active projects" description="Active projects will appear here." />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {filteredProjects
+                .filter((project: AdvisorProjectItem) => project.status !== "cleared")
+                .map((project: AdvisorProjectItem) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onView={setSelectedProjectId}
+                    onRevision={handleRevision}
+                    onClear={handleClear}
+                    isBusy={requestRevisionMutation.isPending || clearProjectMutation.isPending}
+                  />
+                ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cleared" className="space-y-4">
+          {filteredProjects.filter((project: AdvisorProjectItem) => project.status === "cleared").length === 0 ? (
+            <EmptyState title="No cleared projects" description="Cleared projects will appear here." />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {filteredProjects
+                .filter((project: AdvisorProjectItem) => project.status === "cleared")
+                .map((project: AdvisorProjectItem) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onView={setSelectedProjectId}
+                    onRevision={handleRevision}
+                    onClear={handleClear}
+                    isBusy={requestRevisionMutation.isPending || clearProjectMutation.isPending}
+                  />
+                ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={Boolean(selectedProjectId)} onOpenChange={(open) => !open && setSelectedProjectId(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{selectedProject?.title ?? "Project details"}</DialogTitle>
+            <DialogDescription>{selectedProject?.groupName ?? "Project detail view"}</DialogDescription>
+          </DialogHeader>
+
+          {projectDetailQuery.isLoading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">Loading project details...</div>
+          ) : selectedProject ? (
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
+                      <p className="text-sm text-muted-foreground">Progress</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-2xl font-bold">{selectedProject.members.length}</p>
+                      <p className="text-sm text-muted-foreground">Members</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-2xl font-bold">{selectedProject.documents.length}</p>
+                      <p className="text-sm text-muted-foreground">Documents</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{selectedProject.description}</p>
+                    <div className="grid gap-2 text-sm sm:grid-cols-2">
+                      <p>Category: {selectedProject.category}</p>
+                      <p>Due date: {formatDate(selectedProject.dueDate)}</p>
+                      <p>Start date: {formatDate(selectedProject.startDate)}</p>
+                      <p>Status: {selectedProject.status}</p>
                     </div>
-                  </DialogHeader>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProject.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
-                    <div className="space-y-6 py-4">
-                      {/* Stats */}
-                      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
-                            <p className="text-sm text-muted-foreground">Progress</p>
-                            <Progress value={selectedProject.progress} className="mt-2 h-1.5" />
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className={cn(
-                              "text-2xl font-bold",
-                              getDaysRemaining(selectedProject.dueDate) < 0 ? "text-red-600" : ""
-                            )}>
-                              {getDaysRemaining(selectedProject.dueDate)}d
-                            </p>
-                            <p className="text-sm text-muted-foreground">Days Left</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold">{selectedProject.members.length}</p>
-                            <p className="text-sm text-muted-foreground">Members</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold">
-                              {selectedProject.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length}
-                            </p>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Milestones</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedProject.milestones.map((milestone) => (
+                      <div key={milestone.id} className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{milestone.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              / {selectedProject.milestones.length} Milestones
+                              Due {formatDate(milestone.dueDate)}
                             </p>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      <Tabs defaultValue="overview" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-4">
-                          <TabsTrigger value="overview">Overview</TabsTrigger>
-                          <TabsTrigger value="milestones">Milestones</TabsTrigger>
-                          <TabsTrigger value="team">Team</TabsTrigger>
-                          <TabsTrigger value="documents">Documents</TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="overview" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Description</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-muted-foreground">{selectedProject.description}</p>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Technologies</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedProject.technologies?.map(tech => (
-                                  <Badge key={tech} variant="secondary">{tech}</Badge>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Recent Messages</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              {selectedProject.messages.map((msg) => (
-                                <div key={msg.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
-                                  <MessageSquare className="h-4 w-4 text-primary mt-0.5" />
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-medium">{msg.sender}</p>
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatDateTime(msg.timestamp)}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-1">{msg.content}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </CardContent>
-                          </Card>
-                        </TabsContent>
-
-                        <TabsContent value="milestones" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Milestones</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                              {selectedProject.milestones.map((milestone) => {
-                                const config = MILESTONE_STATUS_CONFIG[milestone.status]
-                                const StatusIcon = config?.icon || Clock
-                                return (
-                                  <div key={milestone.id} className="p-4 border rounded-lg">
-                                    <div className="flex items-start justify-between">
-                                      <div className="space-y-2 flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <h4 className="font-semibold">{milestone.name}</h4>
-                                          <Badge className={getStatusColor(config?.color || 'gray')}>
-                                            <StatusIcon className="h-3 w-3 mr-1" />
-                                            {config?.label}
-                                          </Badge>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                          <span className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" />
-                                            Due: {formatDate(milestone.dueDate)}
-                                          </span>
-                                          {milestone.completedDate && (
-                                            <span className="flex items-center gap-1 text-green-600">
-                                              <CheckCircle className="h-3 w-3" />
-                                              Completed: {formatDate(milestone.completedDate)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </CardContent>
-                          </Card>
-                        </TabsContent>
-
-                        <TabsContent value="team" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Team Members</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              {selectedProject.members.map((member) => (
-                                <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-medium">{member.name}</p>
-                                      <p className="text-sm text-muted-foreground">{member.role}</p>
-                                      <p className="text-xs text-muted-foreground">{member.email}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <Mail className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send email</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                          <MessageSquare className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Send message</TooltipContent>
-                                    </Tooltip>
-                                  </div>
-                                </div>
-                              ))}
-                            </CardContent>
-                          </Card>
-                        </TabsContent>
-
-                        <TabsContent value="documents" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Documents</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              {selectedProject.documents.map((doc) => (
-                                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                    <div>
-                                      <p className="font-medium">{doc.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {doc.type} • {doc.size} • Uploaded by {doc.uploadedBy}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button variant="ghost" size="icon">
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </CardContent>
-                          </Card>
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  </ScrollArea>
-                </>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Clearance Dialog */}
-          <Dialog open={showClearanceDialog} onOpenChange={setShowClearanceDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Clear Project for Evaluation</DialogTitle>
-                <DialogDescription>
-                  Review the project before marking it as ready for final evaluation.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Important</AlertTitle>
-                  <AlertDescription>
-                    Once cleared, the project will be marked as ready for final evaluation.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-2">
-                  <Label>Clearance Checklist</Label>
-                  <div className="space-y-2">
-                    {[
-                      "All milestones completed",
-                      "Documentation submitted",
-                      "Final presentation ready",
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input type="checkbox" id={`check-${index}`} className="rounded border-muted-foreground/20" />
-                        <Label htmlFor={`check-${index}`} className="text-sm font-normal">{item}</Label>
+                          </div>
+                          <Badge variant="outline">{milestone.status}</Badge>
+                        </div>
                       </div>
                     ))}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
 
-                <div className="space-y-2">
-                  <Label htmlFor="comments">Additional Comments</Label>
-                  <Textarea id="comments" placeholder="Add any final notes..." rows={3} />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowClearanceDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleConfirmClearance}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirm Clearance
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Schedule Meeting Dialog */}
-          <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Schedule Meeting</DialogTitle>
-                <DialogDescription>
-                  Set up a new meeting with your project teams.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="meeting-title">Meeting Title</Label>
-                  <Input id="meeting-title" placeholder="e.g., Progress Review" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="project-select">Project</Label>
-                  <select 
-                    id="project-select"
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  >
-                    <option value="">Select a project</option>
-                    {advisorProjects.map(project => (
-                      <option key={project.id} value={project.id}>{project.title}</option>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Members</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedProject.members.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between rounded-lg border p-4">
+                        <div>
+                          <p className="font-medium">{member.name}</p>
+                          <p className="text-sm text-muted-foreground">{member.email}</p>
+                        </div>
+                        <Badge variant="outline">{member.role}</Badge>
+                      </div>
                     ))}
-                  </select>
-                </div>
+                  </CardContent>
+                </Card>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-date">Date</Label>
-                    <Input id="meeting-date" type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-time">Time</Label>
-                    <Input id="meeting-time" type="time" />
-                  </div>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Documents</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedProject.documents.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+                    ) : (
+                      selectedProject.documents.map((document) => (
+                        <div key={document.id} className="flex items-center justify-between rounded-lg border p-4">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{document.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {document.type} · {document.size}
+                              </p>
+                            </div>
+                          </div>
+                          <Link
+                            href="/dashboard/advisor/documents"
+                            className="text-sm text-primary underline-offset-4 hover:underline"
+                          >
+                            Open documents
+                          </Link>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revision Requests</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedProject.revisionRequests?.length ? (
+                      selectedProject.revisionRequests.map((request) => (
+                        <div key={request.id} className="rounded-lg border p-4">
+                          <p className="font-medium">{request.subject}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{request.feedback}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {request.status} · {formatDate(request.createdAt)}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No revision requests recorded for this project.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => {
-                  setShowMeetingDialog(false)
-                  toast.success("Meeting scheduled successfully")
-                }}>
-                  Schedule Meeting
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-    </TooltipProvider>
+            </ScrollArea>
+          ) : (
+            <div className="py-10 text-center text-sm text-muted-foreground">Select a project to inspect its details.</div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
+
+export default AdvisorMyProjectsPage

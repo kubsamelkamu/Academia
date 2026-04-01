@@ -55,6 +55,11 @@ function roleHeader(role: UserRole): { title: string; description: string; badge
         description: "Review project title submissions and decide approval, rejection, or re-review quickly.",
         badge: "Department Committee",
       }
+    case "evaluator":
+      return {
+        title: "Evaluator Dashboard",
+        description: "Review assigned projects, submit evaluations, and keep up with defense-related deadlines.",
+      }
     default: {
       const exhaustive: never = role
       return exhaustive

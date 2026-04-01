@@ -69,6 +69,7 @@ import {
 } from "lucide-react"
 
 const STATUSES: ProjectGroupTaskStatus[] = ["TODO", "IN_PROGRESS", "DONE"]
+const UNASSIGNED_VALUE = "__unassigned__"
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -172,7 +173,7 @@ export function ProjectGroupTasksBoard({
   const [createTitle, setCreateTitle] = useState("")
   const [createDescription, setCreateDescription] = useState("")
   const [createDueDate, setCreateDueDate] = useState("")
-  const [createAssignee, setCreateAssignee] = useState<string>("")
+  const [createAssignee, setCreateAssignee] = useState<string>(UNASSIGNED_VALUE)
 
   const tasks = useMemo(() => tasksData?.items ?? [], [tasksData?.items])
 
@@ -326,6 +327,7 @@ export function ProjectGroupTasksBoard({
     if (!createTitle.trim()) return
 
     const assignedToUserId = (() => {
+      if (createAssignee === UNASSIGNED_VALUE) return null
       const trimmed = createAssignee.trim()
       if (!trimmed) return null
       return trimmed
@@ -350,7 +352,7 @@ export function ProjectGroupTasksBoard({
       setCreateTitle("")
       setCreateDescription("")
       setCreateDueDate("")
-      setCreateAssignee("")
+      setCreateAssignee(UNASSIGNED_VALUE)
     } catch (error) {
       toast.error(getErrorMessage(error))
     }
@@ -528,10 +530,10 @@ export function ProjectGroupTasksBoard({
                   disabled={!Boolean(myUserId)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={myUserId ? "Assign to me" : "Unassigned"} />
+                    <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value={UNASSIGNED_VALUE}>Unassigned</SelectItem>
                     {memberOptions.map((member) => (
                       <SelectItem
                         key={member.id}
@@ -763,7 +765,10 @@ function TaskCard({
   const handleAssigneeChange = async (assignedToUserId: string) => {
     try {
       await updateAssignee.mutateAsync({
-        assignedToUserId: assignedToUserId ? assignedToUserId : null,
+        assignedToUserId:
+          assignedToUserId && assignedToUserId !== UNASSIGNED_VALUE
+            ? assignedToUserId
+            : null,
       })
       toast.success("Assignee updated")
     } catch (error) {
@@ -874,7 +879,7 @@ function TaskCard({
           <div className="space-y-1">
             <div className="text-xs font-medium text-muted-foreground">Assignee</div>
             <Select
-              value={task.assignedToUserId ?? ""}
+              value={task.assignedToUserId ?? UNASSIGNED_VALUE}
               onValueChange={handleAssigneeChange}
               disabled={!canReassign || updateAssignee.isPending}
             >
@@ -882,7 +887,7 @@ function TaskCard({
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Unassigned</SelectItem>
+                <SelectItem value={UNASSIGNED_VALUE}>Unassigned</SelectItem>
                 {memberOptions.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
                     {member.label}
