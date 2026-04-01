@@ -616,6 +616,23 @@ export function AdvisorAnnouncementsPage() {
 
   const { data: projects, isLoading: projectsLoading } = useAdvisorProjects()
 
+  React.useEffect(() => {
+    if (!projects?.length) {
+      setSelectedProjectId(null)
+      return
+    }
+
+    setSelectedProjectId((current) => {
+      if (current && projects.some((project) => project.id === current)) return current
+      return projects[0]?.id ?? null
+    })
+  }, [projects])
+
+  const selectedProject = React.useMemo(
+    () => projects?.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  )
+
   const {
     data: announcementsData,
     isLoading: listLoading,
@@ -629,6 +646,7 @@ export function AdvisorAnnouncementsPage() {
   })
 
   const items = announcementsData?.items ?? []
+  const hasProjects = (projects?.length ?? 0) > 0
 
   return (
     <div className="space-y-6">
@@ -655,32 +673,51 @@ export function AdvisorAnnouncementsPage() {
         }
       />
 
-      {/* Project selector */}
-      <div className="flex items-center gap-3">
-        <Label className="whitespace-nowrap text-sm font-medium">Project</Label>
-        <Select
-          value={selectedProjectId ?? ""}
-          onValueChange={(v) => setSelectedProjectId(v || null)}
-          disabled={projectsLoading}
-        >
-          <SelectTrigger className="w-full max-w-xs">
-            <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select a project"} />
-          </SelectTrigger>
-          <SelectContent>
-            {(projects ?? []).map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {!selectedProjectId && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <ChevronDown className="h-3 w-3" />
-            Select a project to view announcements
-          </p>
-        )}
-      </div>
+      {projectsLoading ? (
+        <div className="flex items-center gap-3">
+          <Label className="whitespace-nowrap text-sm font-medium">Project</Label>
+          <div className="w-full max-w-xs">
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+      ) : !hasProjects ? (
+        <Card className="rounded-xl border border-border bg-background shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Bell className="mb-4 h-12 w-12 text-muted-foreground/40" />
+            <h3 className="text-lg font-semibold">No supervised projects found</h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-md">
+              You need at least one supervised project before you can create project-group announcements.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Label className="whitespace-nowrap text-sm font-medium">Project</Label>
+            <Select
+              value={selectedProjectId ?? ""}
+              onValueChange={(v) => setSelectedProjectId(v || null)}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {(projects ?? []).map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedProject ? (
+            <p className="text-sm text-muted-foreground">
+              Posting to group <span className="font-medium text-foreground">{selectedProject.group.name}</span>.
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {/* List */}
       <section aria-labelledby="announcements-list">
@@ -688,7 +725,14 @@ export function AdvisorAnnouncementsPage() {
           Announcements list
         </h2>
 
-        {!selectedProjectId ? null : listLoading ? (
+        {!hasProjects ? null : !selectedProjectId ? (
+          <Card className="rounded-xl border border-border bg-background shadow-sm">
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              <ChevronDown className="mx-auto mb-2 h-5 w-5" />
+              Select a project to view announcements.
+            </CardContent>
+          </Card>
+        ) : listLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <AnnouncementSkeleton key={i} />

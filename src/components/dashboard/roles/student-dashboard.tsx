@@ -9,10 +9,9 @@ import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
-import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyGroupAnnouncements, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
-import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useProjectDetails } from "@/lib/hooks/use-projects"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
@@ -198,16 +197,6 @@ function formatCountdown(parts: CountdownParts): string {
   return `${parts.days}d ${parts.hours}h ${parts.minutes}m ${String(parts.seconds).padStart(2, "0")}s`
 }
 
-function formatActionTypeLabel(actionType: string | null | undefined): string {
-  if (!actionType?.trim()) return "CUSTOM_ACTION"
-  return actionType
-    .trim()
-    .toLowerCase()
-    .split("_")
-    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
-    .join(" ")
-}
-
 function getMeaningfulText(value: string | null | undefined): string {
   const trimmed = value?.trim() ?? ""
   if (!trimmed) return ""
@@ -306,12 +295,10 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     enabled: Boolean(resolvedProjectId),
   })
 
-  const departmentAnnouncementsQuery = useDepartmentAnnouncements({
-    enabled: Boolean(accessToken) && Boolean(departmentId),
-    departmentId,
+  const myGroupAnnouncementsQuery = useMyGroupAnnouncements({
+    enabled: Boolean(accessToken),
     page: 1,
     limit: 20,
-    refetchIntervalMs: 60_000,
   })
 
   const backendMilestones = useMemo<Milestone[]>(() => {
@@ -469,7 +456,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     return formatProjectStatusLabel(backendStatus || activeProject.status)
   }, [activeProject, activeProject?.status, myGroup?.status, projectDetailsQuery.data?.status])
   const nextDeadlineAnnouncement = useMemo(() => {
-    const items = departmentAnnouncementsQuery.data?.items ?? []
+    const items = myGroupAnnouncementsQuery.data?.items ?? []
     // eslint-disable-next-line react-hooks/purity
     const nowMs = Date.now()
 
@@ -503,7 +490,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         const bDeadline = new Date(b.deadlineAt ?? "").getTime()
         return aDeadline - bDeadline
       })[0]
-  }, [departmentAnnouncementsQuery.data?.items])
+  }, [myGroupAnnouncementsQuery.data?.items])
 
   const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(
     nextDeadlineAnnouncement?.secondsRemaining ?? null
@@ -551,12 +538,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         : "border-primary/20 bg-primary/5"
 
   const announcementTitle = getMeaningfulText(activeDeadlineAnnouncement?.title)
-  const actionTypeLabel = activeDeadlineAnnouncement
-    ? formatActionTypeLabel(activeDeadlineAnnouncement.actionType)
-    : ""
 
   const nextDeadlineTitle = hasActiveDeadlineAnnouncement
-    ? announcementTitle || actionTypeLabel || "Next deadline"
+    ? announcementTitle || "Next deadline"
     : "No active deadline"
 
   const nextDeadlineDueText = hasActiveDeadlineAnnouncement
@@ -567,23 +551,6 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
   const nextDeadlineSummary = getMeaningfulText(activeDeadlineAnnouncement?.message)
 
-  const nextDeadlineActionTitle = activeDeadlineAnnouncement
-    ? getMeaningfulText(
-        getAnnouncementActionLabel(
-          activeDeadlineAnnouncement.actionType,
-          activeDeadlineAnnouncement.actionLabel
-        )
-      ) ||
-      getAnnouncementActionLabel(
-        activeDeadlineAnnouncement.actionType,
-        activeDeadlineAnnouncement.actionLabel
-      )
-    : ""
-
-  const shouldShowTypeBadge = hasActiveDeadlineAnnouncement && Boolean(
-    actionTypeLabel && actionTypeLabel.toLowerCase() !== nextDeadlineTitle.toLowerCase()
-  )
-
   const announcementCreator = activeDeadlineAnnouncement?.createdBy
   const creatorName =
     `${announcementCreator?.firstName ?? ""} ${announcementCreator?.lastName ?? ""}`.trim() ||
@@ -593,7 +560,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     ? `Deadline set for ${formatDate(activeDeadlineAnnouncement.deadlineAt)}.`
     : ""
 
-  const hasActionUrl = Boolean(activeDeadlineAnnouncement?.actionUrl?.trim())
+  const hasAttachmentUrl = Boolean(activeDeadlineAnnouncement?.attachmentUrl?.trim())
 
   const myTeamMembers: TeamMember[] = myGroup
     ? [
@@ -853,7 +820,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {departmentAnnouncementsQuery.isLoading ? (
+            {myGroupAnnouncementsQuery.isLoading ? (
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm text-muted-foreground">Loading deadline...</p>
               </div>
@@ -861,7 +828,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm font-medium">No active deadline</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  No department announcement with a deadline is available right now.
+                  No advisor announcement with a deadline is available right now.
                 </p>
               </div>
             ) : (
@@ -869,11 +836,6 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
-                    {shouldShowTypeBadge ? (
-                      <Badge variant={isAnnouncementDeadlinePassed ? "destructive" : "secondary"}>
-                        {actionTypeLabel}
-                      </Badge>
-                    ) : null}
                   </div>
                   {nextDeadlineSummary ? (
                     <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
@@ -882,8 +844,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
 
                 <div className="space-y-3">
                   <div className="rounded-lg border p-3">
-                    {nextDeadlineActionTitle ? (
-                      <p className="text-sm font-medium">{nextDeadlineActionTitle}</p>
+                    {announcementTitle ? (
+                      <p className="text-sm font-medium">{announcementTitle}</p>
                     ) : null}
                     {creatorName ? (
                       <p className="mt-1 text-xs text-muted-foreground">Announcement by {creatorName}</p>
@@ -893,18 +855,18 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                     ) : null}
                   </div>
 
-                  {hasActionUrl ? (
+                  {hasAttachmentUrl ? (
                     <Button
                       size="sm"
                       className="w-full"
                       disabled={isAnnouncementDisabled}
                       onClick={() => {
-                        const target = activeDeadlineAnnouncement.actionUrl
+                        const target = activeDeadlineAnnouncement.attachmentUrl
                         if (!target) return
                         window.open(target, "_blank", "noopener,noreferrer")
                       }}
                     >
-                      {nextDeadlineActionTitle}
+                      Open attachment
                     </Button>
                   ) : null}
                 </div>
