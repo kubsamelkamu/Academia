@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   DashboardKpiGrid,
   DashboardPageHeader,
@@ -9,10 +10,11 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
+import { Bell, Building2, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
 import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
 import { UniversitySettingsForm } from "@/components/dashboard/department-head/university-settings"
+import { VerifyInstitutionPanel } from "@/components/dashboard/department-head/verify-institution-panel"
 import { AppearanceWizard } from "@/components/dashboard/settings/appearance-wizard"
 import { DepartmentGroupSizeSettings } from "@/components/dashboard/settings/department-group-size-settings"
 import { PushNotificationSettings } from "@/components/dashboard/settings/push-notification-settings"
@@ -91,6 +93,10 @@ function getRoleLabel(role: UserRole): string {
 }
 
 export function SettingsPageClient({ role }: { role: UserRole }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [policies, setPolicies] = useState<PolicyToggle[]>(initialPolicies)
   const [rules, setRules] = useState<NotificationRule[]>(initialRules)
 
@@ -100,8 +106,35 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
   const showGovernance = role === "department_head" || role === "coordinator"
   const showDepartment = role === "department_head"
   const showUniversity = role === "department_head"
+  const showVerification = role === "department_head"
 
-  const defaultTab = "appearance"
+  const allowedTabs = useMemo(() => {
+    const tabs = ["appearance", "notifications"]
+    if (showGovernance) tabs.push("governance")
+    if (showDepartment) tabs.push("department")
+    if (showUniversity) tabs.push("university")
+    if (showVerification) tabs.push("verification")
+    return tabs
+  }, [showGovernance, showDepartment, showUniversity, showVerification])
+
+  const activeTab = useMemo(() => {
+    const requested = searchParams.get("tab")
+    if (requested && allowedTabs.includes(requested)) {
+      return requested
+    }
+    return "appearance"
+  }, [allowedTabs, searchParams])
+
+  const onTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === "appearance") {
+      params.delete("tab")
+    } else {
+      params.set("tab", value)
+    }
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
 
   const handleTogglePolicy = (policyId: string) => {
     setPolicies((current) =>
@@ -137,13 +170,36 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
         badge={getRoleLabel(role)}
       />
 
-      <Tabs defaultValue={defaultTab}>
-        <TabsList>
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="notifications">Notification Preferences</TabsTrigger>
-          {showGovernance ? <TabsTrigger value="governance">Governance</TabsTrigger> : null}
-          {showDepartment ? <TabsTrigger value="department">Department</TabsTrigger> : null}
-          {showUniversity ? <TabsTrigger value="university">University</TabsTrigger> : null}
+      <Tabs value={activeTab} onValueChange={onTabChange}>
+        <TabsList className="inline-flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border/60 bg-muted/50 p-1.5 shadow-sm">
+          <TabsTrigger value="appearance" className="gap-1.5 data-[state=active]:shadow-sm">
+            Appearance
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-1.5 data-[state=active]:shadow-sm">
+            Notification Preferences
+          </TabsTrigger>
+          {showGovernance ? (
+            <TabsTrigger value="governance" className="gap-1.5 data-[state=active]:shadow-sm">
+              Governance
+            </TabsTrigger>
+          ) : null}
+          {showDepartment ? (
+            <TabsTrigger value="department" className="gap-1.5 data-[state=active]:shadow-sm">
+              Department
+            </TabsTrigger>
+          ) : null}
+          {showUniversity ? (
+            <TabsTrigger value="university" className="gap-1.5 data-[state=active]:shadow-sm">
+              <Building2 className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              University
+            </TabsTrigger>
+          ) : null}
+          {showVerification ? (
+            <TabsTrigger value="verification" className="gap-1.5 data-[state=active]:shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              Verification
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="appearance">
@@ -263,6 +319,12 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
             >
               <UniversitySettingsForm />
             </DashboardSectionCard>
+          </TabsContent>
+        ) : null}
+
+        {showVerification ? (
+          <TabsContent value="verification" className="mt-4">
+            <VerifyInstitutionPanel variant="embedded" />
           </TabsContent>
         ) : null}
 

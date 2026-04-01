@@ -17,27 +17,27 @@ import { Separator } from "@/components/ui/separator"
 import { TimelineCard } from "@/components/timeline/TimelineCard"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import {
-  LayoutDashboard,
   FileText,
+  FileCheck,
   Users,
   ClipboardCheck,
   Calculator,
-  MessageSquare,
   AlertTriangle,
   Send,
   UserPlus,
   CheckCircle2,
   TrendingUp,
   Clock,
-  FileCheck,
   BarChart3,
   Timer,
   ArrowRight,
   Bell,
   GraduationCap,
+  LayoutDashboard,
   Zap,
   Activity,
   ChevronRight,
+  MessageSquare,
   Shield,
   Star,
 } from "lucide-react"
@@ -47,12 +47,12 @@ import {
   mockProjectTitles,
   mockProjects,
   mockEvaluations,
-  mockGrades,
   mockComplaints,
   mockUsers,
+  mockGrades,
   ProjectSummary,
-  Grade,
   Complaint,
+  Grade,
 } from "@/data/mockData"
 import { mockProjectTimelines, mockTimelineAlerts } from "@/data/timelineData"
 

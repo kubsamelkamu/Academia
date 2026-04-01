@@ -300,6 +300,9 @@ export const mockGrades: Grade[] = [
     status: "provisional",
     type: "project",
     updatedAt: "2024-01-10",
+    evaluatorScores: [35, 36, 34],
+    advisorScore: 26,
+    documentationScore: 27.5,
   },
   {
     id: "g2",
@@ -309,6 +312,9 @@ export const mockGrades: Grade[] = [
     status: "provisional",
     type: "internship",
     updatedAt: "2024-01-11",
+    evaluatorScores: [37, 38, 36],
+    advisorScore: 27,
+    documentationScore: 27,
   },
   {
     id: "g3",
@@ -318,6 +324,9 @@ export const mockGrades: Grade[] = [
     status: "final",
     type: "project",
     updatedAt: "2023-12-20",
+    evaluatorScores: [30, 31, 29],
+    advisorScore: 23,
+    documentationScore: 23.5,
   },
 ]
 
