@@ -18,6 +18,8 @@ export function AdvisorStudentsPage() {
   const clearProjectMutation = useClearProjectMutation()
   const requestRevisionMutation = useRequestRevisionMutation()
 
+  const stats = studentsQuery.data?.stats
+
   const items = React.useMemo(() => {
     const projects: AdvisorClearanceProject[] = studentsQuery.data?.items ?? []
     const term = searchTerm.trim().toLowerCase()
@@ -69,10 +71,10 @@ export function AdvisorStudentsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Students</p><p className="text-2xl font-bold">{stats.totalStudents}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Ready</p><p className="text-2xl font-bold">{stats.readyForClearance}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Cleared</p><p className="text-2xl font-bold">{stats.clearedProjects}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Revision</p><p className="text-2xl font-bold">{stats.revisionRequired}</p></CardContent></Card>
+        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Students</p><p className="text-2xl font-bold">{stats?.totalStudents ?? "—"}</p></CardContent></Card>
+        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Ready</p><p className="text-2xl font-bold">{stats?.readyForClearance ?? "—"}</p></CardContent></Card>
+        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Cleared</p><p className="text-2xl font-bold">{stats?.clearedProjects ?? "—"}</p></CardContent></Card>
+        <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Revision</p><p className="text-2xl font-bold">{stats?.revisionRequired ?? "—"}</p></CardContent></Card>
       </div>
 
       <Card>

@@ -1,7 +1,11 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
+import { useAdvisorProjects, useAdvisorProject, useClearProjectMutation, useRequestRevisionMutation } from '@/lib/hooks/useAdvisor'
+import type { AdvisorProjectDetail, AdvisorProjectItem } from '@/lib/types/advisor'
+import { DashboardEmptyState as EmptyState } from '@/components/dashboard/page-primitives'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -357,13 +361,14 @@ const StatCard = ({ title, value, icon: Icon, trend, color = 'blue' }: StatCardP
 )
 
 interface ProjectCardProps {
-  project: AdvisorProject
-  onViewDetails: (project: AdvisorProject) => void
-  onClearance: (project: AdvisorProject) => void
-  onMessage: (project: AdvisorProject) => void
+  project: AdvisorProjectItem
+  onView: (id: string) => void
+  onRevision: (project: AdvisorProjectItem) => void
+  onClear: (project: AdvisorProjectItem) => void
+  isBusy: boolean
 }
 
-const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: ProjectCardProps) => {
+const ProjectCard = ({ project, onView, onRevision, onClear, isBusy }: ProjectCardProps) => {
   const daysRemaining = getDaysRemaining(project.dueDate)
   const completedMilestones = project.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length
   const statusConfig = STATUS_CONFIG[project.status]
