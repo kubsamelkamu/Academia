@@ -18,6 +18,7 @@ import { TimelineCard } from "@/components/timeline/TimelineCard"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import {
   FileText,
+  FileCheck,
   Users,
   ClipboardCheck,
   Calculator,
@@ -32,9 +33,11 @@ import {
   ArrowRight,
   Bell,
   GraduationCap,
+  LayoutDashboard,
   Zap,
   Activity,
   ChevronRight,
+  MessageSquare,
   Shield,
   Star,
 } from "lucide-react"
@@ -46,8 +49,10 @@ import {
   mockEvaluations,
   mockComplaints,
   mockUsers,
+  mockGrades,
   ProjectSummary,
   Complaint,
+  Grade,
 } from "@/data/mockData"
 import { mockProjectTimelines, mockTimelineAlerts } from "@/data/timelineData"
 

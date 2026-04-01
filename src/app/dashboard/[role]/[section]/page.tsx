@@ -36,6 +36,11 @@ import {
   CoordinatorReportsPlaceholderPage,
   CoordinatorStudentsPlaceholderPage,
 } from "@/components/dashboard/coordinator/placeholder-pages"
+import EvaluatorAssignedProjectsPage from "@/app/dashboard/evaluator/assigned-projects/page"
+import EvaluatorEvaluationsPage from "@/app/dashboard/evaluator/evaluations/page"
+import EvaluatorSchedulePage from "@/app/dashboard/evaluator/schedule/page"
+import EvaluatorReportsPage from "@/app/dashboard/evaluator/reports/page"
+import EvaluatorMessagesPage from "@/app/dashboard/evaluator/messages/page"
 import { notFound, redirect } from "next/navigation"
 import { type ComponentType } from "react"
 
@@ -47,13 +52,6 @@ interface RoleSectionDashboardPageProps {
 }
 
 type SectionComponent = ComponentType
-
-import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
-import EvaluatorAssignedProjectsPage from "@/app/dashboard/evaluator/assigned-projects/page"
-import EvaluatorEvaluationsPage from "@/app/dashboard/evaluator/evaluations/page"
-import EvaluatorSchedulePage from "@/app/dashboard/evaluator/schedule/page"
-import EvaluatorReportsPage from "@/app/dashboard/evaluator/reports/page"
-import EvaluatorMessagesPage from "@/app/dashboard/evaluator/messages/page"
 
 const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>> = {
   department_head: {

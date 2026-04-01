@@ -234,9 +234,17 @@ export function AdvisorDashboard({ userName = "Advisor" }: AdvisorDashboardProps
       return
     }
 
-export function AdvisorDashboard({ advisorId = "u7" }: AdvisorDashboardProps) {
-  const router = useRouter()
-  const [now, setNow] = useState<Date>(new Date())
+    try {
+      await sendGroupMessageMutation.mutateAsync({
+        groupId: effectiveSelectedGroupId,
+        dto: { content: messageDraft.trim() },
+      })
+      setMessageDraft("")
+      toast.success("Message sent.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send message")
+    }
+  }
 
   async function handleCreateMeeting() {
     if (!effectiveMeetingProjectId || !meetingForm.title || !meetingForm.date || !meetingForm.time) {
