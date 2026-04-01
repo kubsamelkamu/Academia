@@ -338,41 +338,4 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: User,
     },
   ],
-  evaluator: [
-    {
-      title: "Dashboard",
-      href: "/dashboard/evaluator",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Assigned Projects",
-      href: "/dashboard/evaluator/assigned-projects",
-      icon: FolderKanban,
-    },
-    {
-      title: "Evaluations",
-      href: "/dashboard/evaluator/evaluations",
-      icon: CheckSquare,
-    },
-    {
-      title: "Schedule",
-      href: "/dashboard/evaluator/schedule",
-      icon: Calendar,
-    },
-    {
-      title: "Reports",
-      href: "/dashboard/evaluator/reports",
-      icon: FileText,
-    },
-    {
-      title: "Messages",
-      href: "/dashboard/evaluator/messages",
-      icon: MessageSquare,
-    },
-    {
-      title: "Profile",
-      href: "/dashboard/profile",
-      icon: User,
-    },
-  ],
 }
