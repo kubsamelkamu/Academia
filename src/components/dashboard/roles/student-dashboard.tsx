@@ -470,6 +470,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   }, [activeProject, activeProject?.status, myGroup?.status, projectDetailsQuery.data?.status])
   const nextDeadlineAnnouncement = useMemo(() => {
     const items = departmentAnnouncementsQuery.data?.items ?? []
+    // eslint-disable-next-line react-hooks/purity
     const nowMs = Date.now()
 
     const activeWithDeadline = items.filter((item) => {
@@ -509,7 +510,6 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   )
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUiSecondsRemaining(nextDeadlineAnnouncement?.secondsRemaining ?? null)
   }, [nextDeadlineAnnouncement?.secondsRemaining])
 

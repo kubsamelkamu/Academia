@@ -27,6 +27,12 @@ import type {
   AdvisorUpdateMeetingDto,
   AdvisorUploadDocumentDto,
 } from "@/lib/types/advisor";
+import type {
+  AdvisorAnnouncementItem,
+  CreateAdvisorAnnouncementDto,
+  UpdateAdvisorAnnouncementDto,
+  ListAdvisorAnnouncementsData,
+} from "@/types/announcements";
 
 type QueryParams = Record<string, string | number | boolean | undefined | null>;
 
@@ -265,6 +271,67 @@ const mockOverviewData: AdvisorDashboardOverview = {
  */
 export async function getAdvisorSummary(): Promise<AdvisorSummary> {
   const response = await apiClient.get<AdvisorSummary>("/projects/advisors/me/summary")
+  return response.data
+}
+
+// ── /project-groups/advisors/me/announcements ────────────────────────────────
+
+const ADVISOR_ANNOUNCEMENTS_BASE = "/project-groups/advisors/me/announcements"
+
+export async function listAdvisorProjectAnnouncements(params: {
+  projectId: string
+  page?: number
+  limit?: number
+}): Promise<ListAdvisorAnnouncementsData> {
+  const response = await apiClient.get<ListAdvisorAnnouncementsData>(ADVISOR_ANNOUNCEMENTS_BASE, {
+    params: {
+      projectId: params.projectId,
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
+    },
+  })
+  return response.data
+}
+
+export async function createAdvisorProjectAnnouncement(
+  dto: CreateAdvisorAnnouncementDto
+): Promise<AdvisorAnnouncementItem> {
+  const response = await apiClient.post<AdvisorAnnouncementItem>(ADVISOR_ANNOUNCEMENTS_BASE, dto)
+  return response.data
+}
+
+export async function getAdvisorProjectAnnouncementById(
+  announcementId: string,
+  projectId: string
+): Promise<AdvisorAnnouncementItem> {
+  const response = await apiClient.get<AdvisorAnnouncementItem>(
+    `${ADVISOR_ANNOUNCEMENTS_BASE}/${encodeURIComponent(announcementId)}`,
+    { params: { projectId } }
+  )
+  return response.data
+}
+
+export async function updateAdvisorProjectAnnouncement(
+  announcementId: string,
+  projectId: string,
+  dto: UpdateAdvisorAnnouncementDto
+): Promise<AdvisorAnnouncementItem> {
+  const response = await apiClient.patch<AdvisorAnnouncementItem>(
+    `${ADVISOR_ANNOUNCEMENTS_BASE}/${encodeURIComponent(announcementId)}`,
+    dto,
+    { params: { projectId } }
+  )
+  return response.data
+}
+
+export async function deleteAdvisorProjectAnnouncement(
+  announcementId: string,
+  projectId: string
+): Promise<{ deleted: boolean }> {
+  const response = await apiClient.delete<{ deleted: boolean }>(
+    `${ADVISOR_ANNOUNCEMENTS_BASE}/${encodeURIComponent(announcementId)}`,
+    { params: { projectId } }
+  )
   return response.data
 }
 

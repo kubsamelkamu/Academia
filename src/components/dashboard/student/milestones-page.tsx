@@ -233,6 +233,7 @@ export function StudentMilestonesPage() {
 
   useEffect(() => {
     const nextOverride = readProposalOverrideFromStorage(studentId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (nextOverride) setProposalOverride(nextOverride)
   }, [studentId])
 

@@ -19,6 +19,7 @@ import DepartmentHeadReportsPage from "@/components/dashboard/department-head/Re
 import { DepartmentHeadMessagesPage } from "@/components/dashboard/department-head/messages-page"
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
+import { StudentAnnouncementsPage } from "@/components/dashboard/student/announcements-page"
 import StudentDefensePage from "@/components/dashboard/student/defense-page"
 import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
 import { StudentMilestonesPage } from "@/components/dashboard/student/milestones-page"
@@ -91,6 +92,7 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     defense: StudentDefensePage,
     timeline: StudentTimelinePage,
     messages: StudentMessagesPage,
+    announcements: StudentAnnouncementsPage,
   },
   department_committee: {
     "assigned-projects": CommitteeAssignedProjectsPage,
@@ -128,7 +130,7 @@ const allowedSectionsByRole: Record<UserRole, string[]> = {
   department_head: ["invitations", "faculty", "review", "projects", "reports", "announcements", "messages", "settings", "group-leader-requests"],
   coordinator: ["projects", "students", "advisors", "defenses", "evaluations", "reports", "settings"],
   advisor: ["my-projects", "students", "evaluations", "schedule", "announcements", "messages"],
-  student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages"],
+  student: ["my-project", "team", "submissions", "milestones", "upload-documents", "defense", "timeline", "messages", "announcements"],
   department_committee: ["assigned-projects", "evaluations", "defense-schedule", "reports"],
   evaluator: ["assigned-projects", "evaluations", "schedule", "reports", "messages"],
 }

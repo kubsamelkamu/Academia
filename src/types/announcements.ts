@@ -34,6 +34,13 @@ export type AnnouncementItem = {
   attachmentMimeType: string | null
   attachmentSizeBytes: number | null
 
+  // Deadline / countdown fields (present on student endpoint responses)
+  deadlineAt: string | null
+  disableAfterDeadline: boolean
+  isExpired: boolean
+  isDisabled: boolean
+  secondsRemaining: number | null
+
   createdAt: string
   updatedAt: string
 
@@ -66,4 +73,58 @@ export type ListAnnouncementsData = {
 
 export type DeleteAnnouncementResult = {
   deleted: boolean
+}
+
+// ── Advisor-scoped announcement types ────────────────────────────────────────
+
+export type AdvisorAnnouncementItem = {
+  id: string
+  title: string
+  priority: AnnouncementPriority
+  message: string
+  attachmentType: AttachmentType
+  attachmentUrl: string | null
+  deadlineAt: string | null
+  disableAfterDeadline: boolean
+  isExpired: boolean
+  isDisabled: boolean
+  secondsRemaining: number | null
+  createdAt: string
+  updatedAt: string
+  createdBy: {
+    id: string
+    firstName: string
+    lastName: string
+    avatarUrl: string | null
+  }
+}
+
+export type CreateAdvisorAnnouncementDto = {
+  projectId: string
+  title: string
+  priority: AnnouncementPriority
+  message: string
+  attachmentUrl?: string
+  deadlineAt?: string
+  disableAfterDeadline?: boolean
+}
+
+export type UpdateAdvisorAnnouncementDto = {
+  title?: string
+  priority?: AnnouncementPriority
+  message?: string
+  attachmentUrl?: string
+  removeAttachment?: boolean
+  deadlineAt?: string
+  disableAfterDeadline?: boolean
+}
+
+export type ListAdvisorAnnouncementsData = {
+  items: AdvisorAnnouncementItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    pages: number
+  }
 }
