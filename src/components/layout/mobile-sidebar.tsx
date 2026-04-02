@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { useSidebarStore } from "@/store/sidebar-store"
 import { Sidebar } from "./sidebar"
 import { type UserRole } from "@/config/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, startTransition } from "react"
 import { usePathname } from "next/navigation"
 
 interface MobileSidebarProps {
@@ -35,7 +35,10 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
   useEffect(() => {
     if (!isOpen) return
-    close()
+    // Defer close so route + portal trees finish reconciling (avoids removeChild on null with React 19 / Radix).
+    startTransition(() => {
+      close()
+    })
   }, [close, isOpen, pathname])
 
   if (!isClient) {

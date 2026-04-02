@@ -1,7 +1,7 @@
 import { type UserRole } from "@/config/navigation"
 import { getDashboardRoleSlug, getRoleFromDashboardSlug } from "@/lib/auth/dashboard-role-paths"
 import { AdvisorEvaluationsPage } from "@/components/dashboard/advisor/evaluations-page"
-import { AdvisorMessagesPage } from "@/components/dashboard/advisor/messages-page"
+import { AdvisorMessagesRoute } from "@/components/dashboard/advisor/messages-route"
 import { AdvisorMyProjectsPage } from "@/components/dashboard/advisor/my-projects-page"
 import { AdvisorSchedulePage } from "@/components/dashboard/advisor/schedule-page"
 import { AdvisorStudentsPage } from "@/components/dashboard/advisor/students-page"
@@ -20,7 +20,7 @@ import { DepartmentHeadMessagesPage } from "@/components/dashboard/department-he
 import { DepartmentHeadSettingsPage } from "@/components/dashboard/department-head/settings-page"
 import { DepartmentHeadGroupLeaderRequestsPage } from "@/components/dashboard/department-head/group-leader-requests-page"
 import StudentDefensePage from "@/components/dashboard/student/defense-page"
-import { StudentMessagesPage } from "@/components/dashboard/student/messages-page"
+import { StudentMessagesRoute } from "@/components/dashboard/student/messages-route"
 import { StudentMilestonesPage } from "@/components/dashboard/student/milestones-page"
 import { StudentMyProjectPage } from "@/components/dashboard/student/my-project-page"
 import { StudentSubmissionsPage } from "@/components/dashboard/student/submissions-page"
@@ -80,7 +80,7 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     evaluations: AdvisorEvaluationsPage,
     schedule: AdvisorSchedulePage,
     announcements: AdvisorAnnouncementsPage,
-    messages: AdvisorMessagesPage,
+    messages: AdvisorMessagesRoute,
   },
   student: {
     "my-project": StudentMyProjectPage,
@@ -90,7 +90,7 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     "upload-documents": StudentUploadDocumentsPage,
     defense: StudentDefensePage,
     timeline: StudentTimelinePage,
-    messages: StudentMessagesPage,
+    messages: StudentMessagesRoute,
   },
   department_committee: {
     "assigned-projects": CommitteeAssignedProjectsPage,

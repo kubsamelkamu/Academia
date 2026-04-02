@@ -1,6 +1,6 @@
-import { AdvisorMessagesPage } from "@/components/dashboard/advisor/messages-page"
+import { AdvisorMessagesRoute } from "@/components/dashboard/advisor/messages-route"
 
 export default function Page() {
-  return <AdvisorMessagesPage />
+  return <AdvisorMessagesRoute />
 }
 

@@ -16,6 +16,13 @@ export async function getMyProjectGroupChatRoom(): Promise<ChatRoomMe> {
   return response.data
 }
 
+export async function getAdvisorProjectGroupChatRoom(projectId: string): Promise<ChatRoomMe> {
+  const response = await apiClient.get<ChatRoomMe>("/project-groups/advisors/me/chat-room", {
+    params: { projectId },
+  })
+  return response.data
+}
+
 export async function listChatRoomMessages(params: {
   roomId: string
   limit?: number
