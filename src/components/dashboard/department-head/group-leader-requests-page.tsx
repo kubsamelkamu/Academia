@@ -3,6 +3,7 @@ import { usePendingGroupLeaderRequests } from "@/lib/hooks/use-group-leader-requ
 import { useState } from "react";
 import DataTable, { Column } from "@/components/shared/DataTable";
 import { Loader, AlertCircle } from "lucide-react";
+import type { GroupLeaderRequestItem } from "@/types/group-leader-requests";
 
 export function DepartmentHeadGroupLeaderRequestsPage() {
   const [page, setPage] = useState(1);
@@ -33,28 +34,34 @@ export function DepartmentHeadGroupLeaderRequestsPage() {
     );
   }
 
-  type PendingGroupLeaderRequest = {
+  type PendingGroupLeaderRequestRow = {
     firstName: string
     lastName: string
     email: string
-    departmentName: string
     status: string
     createdAt: string
   }
 
   // Define columns for DataTable
-  const columns: Column<PendingGroupLeaderRequest>[] = [
+  const columns: Column<PendingGroupLeaderRequestRow>[] = [
     { key: "name", header: "Name", render: (row) => `${row.firstName} ${row.lastName}` },
     { key: "email", header: "Email", render: (row) => row.email },
-    { key: "department", header: "Department", render: (row) => row.departmentName },
     { key: "status", header: "Status", render: (row) => row.status },
     { key: "createdAt", header: "Requested At", render: (row) => new Date(row.createdAt).toLocaleString() },
   ];
 
-  // Type assertion to work around TS type error due to API envelope
-  const items = (data as { data?: { items?: PendingGroupLeaderRequest[]; pagination?: { pages?: number } } } | undefined)?.data?.items || [];
-  const pagination = (data as { data?: { items?: PendingGroupLeaderRequest[]; pagination?: { pages?: number } } } | undefined)?.data?.pagination;
-  const totalPages = pagination?.pages || 1;
+  const items: GroupLeaderRequestItem[] = data?.items ?? [];
+  const pendingOnly = items.filter(i => (i.status ?? "").toUpperCase() === "PENDING");
+
+  const rows: PendingGroupLeaderRequestRow[] = pendingOnly.map(i => ({
+    firstName: i.student?.firstName ?? "",
+    lastName: i.student?.lastName ?? "",
+    email: i.student?.email ?? "",
+    status: String(i.status ?? ""),
+    createdAt: i.createdAt,
+  }));
+
+  const totalPages = data?.pagination?.pages || 1;
 
   return (
     <div className="space-y-4">
@@ -67,7 +74,7 @@ export function DepartmentHeadGroupLeaderRequestsPage() {
           onChange={e => setSearch(e.target.value)}
         />
       </div>
-      <DataTable columns={columns} data={items} />
+      <DataTable columns={columns} data={rows} />
       <div className="flex items-center justify-between mt-4">
         <button
           className="btn btn-outline"

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,12 +28,13 @@ import {
   UserPlus,
   Mail,
   Calendar,
-  MessageSquare,
   FileText,
   AlertCircle,
+  Github,
+  Linkedin,
+  Globe,
   ChevronRight,
   Eye,
-  Star,
   RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -43,7 +44,7 @@ import {
   useApproveGroupLeaderRequest,
   useRejectGroupLeaderRequest,
 } from "@/lib/hooks/use-group-leader-requests"
-import { mockGroupManagerApplications, type GroupManagerApplication } from "@/data/mockData"
+import type { GroupLeaderRequestItem, GroupLeaderRequestsSummary } from "@/types/group-leader-requests"
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 type AppStatus = "pending" | "approved" | "rejected"
@@ -53,14 +54,19 @@ interface AppItem {
   id: string
   name: string
   email: string
+  avatarUrl?: string | null
   department?: string
   requestedAt: string
   status: AppStatus
-  /** Only present on mock items */
-  motivation?: string
-  proposedGroupName?: string
-  currentRole?: string
-  isMock: boolean
+  message?: string | null
+  profile?: {
+    bio: string | null
+    githubUrl: string | null
+    linkedinUrl: string | null
+    portfolioUrl: string | null
+    techStack: string[]
+    updatedAt: string | null
+  } | null
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
@@ -76,6 +82,18 @@ const STATUS_CFG: Record<AppStatus, { label: string; cls: string; dot: string; i
   pending:  { label: "Pending",  cls: "bg-amber-500/10 text-amber-600 border-amber-400/30",    dot: "bg-amber-500",   icon: Clock },
   approved: { label: "Approved", cls: "bg-primary/10 text-primary border-primary/20",           dot: "bg-primary",     icon: CheckCircle },
   rejected: { label: "Rejected", cls: "bg-destructive/10 text-destructive border-destructive/20", dot: "bg-destructive", icon: XCircle },
+}
+
+function toAppStatus(status: string | undefined): AppStatus {
+  switch ((status ?? "").toUpperCase()) {
+    case "APPROVED":
+      return "approved"
+    case "REJECTED":
+      return "rejected"
+    case "PENDING":
+    default:
+      return "pending"
+  }
 }
 
 /* ─── Application Card ───────────────────────────────────────────────── */
@@ -94,7 +112,7 @@ function AppCard({
       app.status === "pending" ? "border-border/70" : "border-border/40 opacity-80 hover:opacity-100"
     )}>
       <Avatar className="h-10 w-10 shrink-0">
-        <AvatarImage src={`https://avatar.vercel.sh/${app.name}`} />
+        <AvatarImage src={app.avatarUrl ?? `https://avatar.vercel.sh/${app.email}`} />
         <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{initials(app.name)}</AvatarFallback>
       </Avatar>
 
@@ -111,12 +129,6 @@ function AppCard({
           {app.department && <span className="flex items-center gap-1"><Users className="h-3 w-3" />{app.department}</span>}
           <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{fmtDate(app.requestedAt)}</span>
         </div>
-        {app.proposedGroupName && (
-          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-            <Star className="h-3 w-3 text-primary" />
-            Proposed group: <span className="font-medium text-foreground">{app.proposedGroupName}</span>
-          </p>
-        )}
       </div>
 
       <Button
@@ -142,15 +154,16 @@ function ReviewSheet({
   app: AppItem | null
   open: boolean
   onClose: () => void
-  onDecide: (id: string, decision: "approved" | "rejected", reason: string) => Promise<void>
+  onDecide: (id: string, decision: "approved" | "rejected", reason?: string) => Promise<void>
 }) {
   const [decision, setDecision] = useState<"approved" | "rejected" | null>(null)
   const [reason, setReason]     = useState("")
   const [loading, setLoading]   = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
 
   // Reset on open
   React.useEffect(() => {
-    if (open) { setDecision(null); setReason("") }
+    if (open) { setDecision(null); setReason(""); setShowProfile(false) }
   }, [open, app?.id])
 
   if (!app) return null
@@ -160,9 +173,14 @@ function ReviewSheet({
 
   const handleSubmit = async () => {
     if (!decision) { toast.error("Select a decision first"); return }
-    if (!reason.trim()) { toast.error("Please provide a reason for your decision"); return }
+
+    if (decision === "rejected" && !reason.trim()) {
+      toast.error("Please provide a rejection reason")
+      return
+    }
+
     setLoading(true)
-    await onDecide(app.id, decision, reason)
+    await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
     setLoading(false)
     onClose()
   }
@@ -174,7 +192,7 @@ function ReviewSheet({
         <SheetHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 shrink-0">
-              <AvatarImage src={`https://avatar.vercel.sh/${app.name}`} />
+              <AvatarImage src={app.avatarUrl ?? `https://avatar.vercel.sh/${app.email}`} />
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">{initials(app.name)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -205,12 +223,6 @@ function ReviewSheet({
                   <p className="text-sm font-medium">{app.department}</p>
                 </div>
               )}
-              {app.currentRole && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Current Role</p>
-                  <p className="text-sm font-medium capitalize">{app.currentRole.replace("_", " ")}</p>
-                </div>
-              )}
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Requested Role</p>
                 <p className="text-sm font-medium text-primary">Group Leader</p>
@@ -219,27 +231,110 @@ function ReviewSheet({
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Submitted</p>
                 <p className="text-sm font-medium">{fmtDate(app.requestedAt)}</p>
               </div>
-              {app.proposedGroupName && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Proposed Group</p>
-                  <p className="text-sm font-medium">{app.proposedGroupName}</p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Motivation */}
-          {app.motivation ? (
+          {/* Student profile (interactive) */}
+          <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Student Profile</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setShowProfile(v => !v)}
+              >
+                {showProfile ? "Hide" : "View"}
+              </Button>
+            </div>
+
+            {showProfile ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Bio</p>
+                  <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                    {app.profile?.bio?.trim() ? app.profile.bio : "No bio provided."}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Tech Stack</p>
+                  {app.profile?.techStack?.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {app.profile.techStack.slice(0, 12).map(t => (
+                        <Badge key={t} variant="outline" className="text-xs">
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No tech stack provided.</p>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Links</p>
+                  <div className="grid gap-1.5">
+                    <a
+                      href={app.profile?.githubUrl ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={cn(
+                        "text-sm flex items-center gap-2",
+                        app.profile?.githubUrl ? "text-primary hover:underline" : "text-muted-foreground pointer-events-none"
+                      )}
+                    >
+                      <Github className="h-4 w-4" />
+                      <span>{app.profile?.githubUrl ? "GitHub" : "GitHub not provided"}</span>
+                    </a>
+
+                    <a
+                      href={app.profile?.linkedinUrl ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={cn(
+                        "text-sm flex items-center gap-2",
+                        app.profile?.linkedinUrl ? "text-primary hover:underline" : "text-muted-foreground pointer-events-none"
+                      )}
+                    >
+                      <Linkedin className="h-4 w-4" />
+                      <span>{app.profile?.linkedinUrl ? "LinkedIn" : "LinkedIn not provided"}</span>
+                    </a>
+
+                    <a
+                      href={app.profile?.portfolioUrl ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={cn(
+                        "text-sm flex items-center gap-2",
+                        app.profile?.portfolioUrl ? "text-primary hover:underline" : "text-muted-foreground pointer-events-none"
+                      )}
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span>{app.profile?.portfolioUrl ? "Portfolio" : "Portfolio not provided"}</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                View bio, tech stack, and links.
+              </p>
+            )}
+          </div>
+
+          {app.message ? (
             <div className="rounded-xl border bg-muted/10 p-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5" /> Motivation Statement
+                <FileText className="h-3.5 w-3.5" /> Motivation Statement
               </p>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{app.motivation}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{app.message}</p>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed bg-muted/10 p-4 flex items-center gap-3 text-muted-foreground">
               <FileText className="h-5 w-5 shrink-0" />
-              <p className="text-sm">No motivation statement available for this application.</p>
+              <p className="text-sm">No motivation statement provided.</p>
             </div>
           )}
 
@@ -300,29 +395,31 @@ function ReviewSheet({
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    Decision Reason <span className="text-destructive">*</span>
-                  </label>
-                  <span className="text-xs text-muted-foreground">{reason.length}/500</span>
+              {decision === "rejected" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">
+                      Rejection Reason <span className="text-destructive">*</span>
+                    </label>
+                    <span className="text-xs text-muted-foreground">{reason.length}/500</span>
+                  </div>
+                  <Textarea
+                    value={reason}
+                    onChange={e => setReason(e.target.value.slice(0, 500))}
+                    rows={5}
+                    placeholder="Provide a clear reason for rejection. This will be shared with the student…"
+                    className="resize-none text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your reason helps maintain transparency and provides useful feedback to the student.
+                  </p>
                 </div>
-                <Textarea
-                  value={reason}
-                  onChange={e => setReason(e.target.value.slice(0, 500))}
-                  rows={5}
-                  placeholder="Provide a clear reason for your decision. This will be shared with the student…"
-                  className="resize-none text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your reason helps maintain transparency and provides useful feedback to the student.
-                </p>
-              </div>
+              )}
 
               <div className="pt-2">
                 <Button
                   className="w-full h-11 gap-2"
-                  disabled={loading || !decision || !reason.trim()}
+                  disabled={loading || !decision || (decision === "rejected" && !reason.trim())}
                   onClick={handleSubmit}
                 >
                   {loading
@@ -346,88 +443,79 @@ export default function CoordinatorApplicationsPage() {
   const [selected, setSelected] = useState<AppItem | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  /* Local state for mock items (status changes stay in memory) */
-  const [mockStatuses, setMockStatuses] = useState<Record<string, AppStatus>>(
-    Object.fromEntries(mockGroupManagerApplications.map(a => [a.id, a.status as AppStatus]))
-  )
+  const [page, setPage] = useState(1)
+  const limit = 20
 
   /* API hooks */
-  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = usePendingGroupLeaderRequests({ page: 1, search: "" })
+  const debouncedSearch = search.trim() || undefined
+  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = usePendingGroupLeaderRequests({
+    page,
+    limit,
+    search: debouncedSearch,
+  })
   const approveM = useApproveGroupLeaderRequest()
   const rejectM  = useRejectGroupLeaderRequest()
 
-  /* Build unified list */
-  const allItems: AppItem[] = useMemo(() => {
-    const mockItems: AppItem[] = mockGroupManagerApplications.map(a => ({
-      id: a.id,
-      name: a.studentName,
-      email: a.email,
-      requestedAt: a.requestedAt,
-      status: mockStatuses[a.id] ?? (a.status as AppStatus),
-      motivation: a.motivation,
-      proposedGroupName: a.proposedGroupName,
-      currentRole: a.currentRole,
-      isMock: true,
-    }))
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: any[] = (apiData as any)?.data?.items ?? []
-    const apiItems: AppItem[] = raw.map((r: { id: string; firstName?: string; lastName?: string; email: string; departmentName?: string; createdAt: string }) => ({
+  const apiItems: AppItem[] = useMemo(() => {
+    const raw = apiData?.items ?? []
+    return raw.map((r: GroupLeaderRequestItem) => ({
       id: r.id,
-      name: [r.firstName, r.lastName].filter(Boolean).join(" ") || r.email,
-      email: r.email,
-      department: r.departmentName,
+      name: [r.student?.firstName, r.student?.lastName].filter(Boolean).join(" ") || r.student?.email || "Unknown",
+      email: r.student?.email || "",
+      avatarUrl: r.student?.avatarUrl,
       requestedAt: r.createdAt,
-      status: "pending" as AppStatus,
-      isMock: false,
+      status: toAppStatus(r.status),
+      message: r.message,
+      profile: r.student?.profile ?? null,
     }))
-
-    /* Deduplicate (API items might overlap with mock by email) */
-    const seen = new Set(mockItems.map(m => m.email))
-    const uniqueApi = apiItems.filter(a => !seen.has(a.email))
-    return [...mockItems, ...uniqueApi]
-  }, [apiData, mockStatuses])
+  }, [apiData?.items])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return allItems.filter(a => {
+    return apiItems.filter(a => {
       const matchTab    = tab === "all" || a.status === tab
-      const matchSearch = !search || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q) || (a.proposedGroupName ?? "").toLowerCase().includes(q)
+      const matchSearch = !search || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
       return matchTab && matchSearch
     })
-  }, [allItems, tab, search])
+  }, [apiItems, tab, search])
 
-  const counts = useMemo(() => ({
-    all:      allItems.length,
-    pending:  allItems.filter(a => a.status === "pending").length,
-    approved: allItems.filter(a => a.status === "approved").length,
-    rejected: allItems.filter(a => a.status === "rejected").length,
-  }), [allItems])
+  const counts = useMemo(() => {
+    const summary: GroupLeaderRequestsSummary | undefined = apiData?.summary
+
+    const fromItems = {
+      pending: apiItems.filter(a => a.status === "pending").length,
+      approved: apiItems.filter(a => a.status === "approved").length,
+      rejected: apiItems.filter(a => a.status === "rejected").length,
+    }
+
+    const pending  = summary?.pending ?? fromItems.pending
+    const approved = summary?.approved ?? fromItems.approved
+    const rejected = summary?.rejected ?? fromItems.rejected
+    const all      = summary?.total ?? pending + approved + rejected
+
+    return { all, pending, approved, rejected }
+  }, [apiData?.summary, apiItems])
 
   /* Decision handler */
-  const handleDecide = async (id: string, decision: "approved" | "rejected", reason: string) => {
-    const item = allItems.find(a => a.id === id)
+  const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
+    const item = apiItems.find(a => a.id === id)
     if (!item) return
 
-    if (item.isMock) {
-      await new Promise(r => setTimeout(r, 800))
-      setMockStatuses(prev => ({ ...prev, [id]: decision }))
-      toast.success(decision === "approved" ? "Application Approved" : "Application Rejected", {
-        description: `${item.name}'s request has been ${decision}.`,
-      })
-    } else {
-      try {
-        if (decision === "approved") {
-          await approveM.mutateAsync({ id })
-          toast.success("Application Approved", { description: `${item.name} granted group leader role.` })
-        } else {
-          await rejectM.mutateAsync({ id, reason })
-          toast.success("Application Rejected", { description: `${item.name}'s request declined.` })
-        }
-        refetch()
-      } catch {
-        toast.error("Action failed", { description: "Please try again." })
+    try {
+      if (decision === "approved") {
+        await approveM.mutateAsync({ id })
+        toast.success("Application Approved", { description: `${item.name} granted group leader role.` })
+      } else {
+        await rejectM.mutateAsync({ id, reason: reason ?? "" })
+        toast.success("Application Rejected", { description: `${item.name}'s request declined.` })
       }
+      await refetch()
+    } catch {
+      toast.error("Action failed", { description: "Please try again." })
     }
   }
 
@@ -504,7 +592,7 @@ export default function CoordinatorApplicationsPage() {
 
       {/* Tabs + Search */}
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-start">
           <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
             <TabsTrigger value="pending"  className="text-xs gap-1.5 shrink-0">
               <Clock className="h-3.5 w-3.5" /> Pending
@@ -523,7 +611,7 @@ export default function CoordinatorApplicationsPage() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-64 sm:mx-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search name, email, group…"
@@ -534,18 +622,18 @@ export default function CoordinatorApplicationsPage() {
           </div>
         </div>
 
-        {["pending", "approved", "rejected", "all"].map(t => (
+        {['pending', 'approved', 'rejected', 'all'].map(t => (
           <TabsContent key={t} value={t} className="mt-4">
-            {apiLoading && t === "pending" && (
+            {apiLoading && (
               <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
                 <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
                 Loading live applications…
               </div>
             )}
-            {apiError && t === "pending" && (
+            {apiError && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 mb-3">
                 <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                Live data unavailable — showing mock applications only.
+                Unable to load applications right now. Please refresh and try again.
               </div>
             )}
             {filtered.length > 0 ? (
@@ -561,10 +649,14 @@ export default function CoordinatorApplicationsPage() {
               <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed text-center">
                 <UserPlus className="h-10 w-10 text-muted-foreground/30 mb-3" />
                 <p className="font-medium text-muted-foreground">
-                  {search ? "No matching applications" : `No ${t === "all" ? "" : t} applications`}
+                  {search
+                    ? "No matching applications"
+                    : `No ${t === "all" ? "" : t} applications`}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {search ? "Try adjusting your search" : "Applications will appear here when students submit them"}
+                  {search
+                    ? "Try adjusting your search"
+                    : "Applications will appear here when students submit them"}
                 </p>
               </div>
             )}

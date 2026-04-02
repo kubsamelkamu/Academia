@@ -813,7 +813,7 @@ export default function GroupsPage() {
           </Badge>
           <Link href="/dashboard/coordinator/groups/applications">
             <Button size="sm" className="gap-1.5 h-8 text-xs">
-              <UserPlus className="h-3.5 w-3.5" /> Applications
+              <UserPlus className="h-3.5 w-3.5" /> Group Leader Applications
             </Button>
           </Link>
         </div>

@@ -27,7 +27,7 @@ import type {
   CreateGroupLeaderRequestDto,
   GroupLeaderMeResponse,
   GroupLeaderRequestResponse,
-  GroupLeaderRequestsListResponse,
+  GroupLeaderRequestsListData,
 } from "@/types/group-leader-requests"
 
 /**
@@ -52,17 +52,17 @@ export async function getMyGroupLeaderRequest(): Promise<GroupLeaderMeResponse> 
 }
 
 /**
- * List pending group leader requests (for department head review).
+ * List group leader requests.
  * Query params: search, page, limit
  */
 export async function listPendingGroupLeaderRequests(params: {
   search?: string
   page?: number
   limit?: number
-} = {}): Promise<GroupLeaderRequestsListResponse> {
+} = {}): Promise<GroupLeaderRequestsListData> {
   const { search, page = 1, limit = 20 } = params
-  const response = await apiClient.get<GroupLeaderRequestsListResponse>(
-    "/group-leader-requests/pending",
+  const response = await apiClient.get<GroupLeaderRequestsListData>(
+    "/group-leader-requests",
     {
       params: {
         ...(search ? { search } : {}),
@@ -71,5 +71,8 @@ export async function listPendingGroupLeaderRequests(params: {
       },
     }
   )
-  return response.data
+  const data = response.data as unknown as GroupLeaderRequestsListData & { data?: GroupLeaderRequestsListData }
+  return (data && Array.isArray((data as GroupLeaderRequestsListData).items))
+    ? (data as GroupLeaderRequestsListData)
+    : (data.data ?? (data as GroupLeaderRequestsListData))
 }
