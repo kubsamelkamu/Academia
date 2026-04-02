@@ -2,13 +2,14 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 
-import { getMyProjectGroupChatRoom, listChatRoomMessages, listChatRoomPins } from "@/lib/api/chat"
+import { getAdvisorProjectGroupChatRoom, getMyProjectGroupChatRoom, listChatRoomMessages, listChatRoomPins } from "@/lib/api/chat"
 import type { ChatPin, ChatRoomMe, ListChatRoomMessagesResponse } from "@/types/chat"
 
 export function chatKeys() {
   return {
     root: ["chat"] as const,
     roomMe: () => [...chatKeys().root, "room", "me"] as const,
+    advisorRoomMe: (projectId: string) => [...chatKeys().root, "advisor-room", projectId] as const,
     roomMessages: (params: { roomId: string; limit: number; cursor?: string | null }) =>
       [...chatKeys().root, "rooms", params.roomId, "messages", params] as const,
     roomMessagesInfinite: (params: { roomId: string; limit: number }) =>
@@ -22,6 +23,21 @@ export function useMyChatRoom(params: { enabled: boolean }) {
     queryKey: chatKeys().roomMe(),
     queryFn: () => getMyProjectGroupChatRoom(),
     enabled: params.enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useAdvisorChatRoom(params: { projectId: string | null; enabled: boolean }) {
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : null
+
+  return useQuery<ChatRoomMe, Error>({
+    queryKey: chatKeys().advisorRoomMe(projectId ?? ""),
+    queryFn: () => {
+      if (!projectId) throw new Error("projectId is required")
+      return getAdvisorProjectGroupChatRoom(projectId)
+    },
+    enabled: params.enabled && Boolean(projectId),
     staleTime: 30_000,
     retry: false,
   })

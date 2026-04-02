@@ -1,27 +1,14 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
 import {
   Dialog,
   DialogContent,
@@ -51,6 +38,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
@@ -58,6 +50,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { useQueryClient } from "@tanstack/react-query"
 import { useMyGroupLeaderRequest } from "@/lib/hooks/use-group-leader-requests"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useProjectDetails } from "@/lib/hooks/use-projects"
 import {
   useCreateMyGroupAnnouncement,
   useDeleteMyGroupAnnouncement,
@@ -178,6 +171,10 @@ export function StudentMessagesPage() {
   const isApprovedGroupManager = groupLeaderMeQuery.data?.status === "APPROVED"
 
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
+  const projectDetailsQuery = useProjectDetails({
+    projectId: myProjectGroupQuery.data?.projectId ?? null,
+    enabled: Boolean(accessToken) && Boolean(myProjectGroupQuery.data?.projectId),
+  })
   const myChatRoomQuery = useMyChatRoom({ enabled: Boolean(accessToken) })
 
   const roomId = myChatRoomQuery.data?.roomId ?? null
@@ -420,6 +417,8 @@ export function StudentMessagesPage() {
 
   const messagesScrollRootRef = useRef<HTMLDivElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
+  /** Controlled menu id — avoids one Radix ContextMenu root per message (React 19 / portal removeChild crashes). */
+  const [openMessageActionsId, setOpenMessageActionsId] = useState<string | null>(null)
   const isAtBottomRef = useRef(false)
   const lastReadUpToMessageIdRef = useRef<string | null>(null)
 
@@ -595,35 +594,34 @@ export function StudentMessagesPage() {
     }
   }, [currentUser?.id, emitSocketWithTimeoutAck, findMessageInCache, invalidateRoomMessages, roomId, updateInfiniteMessagesCache])
   const [advisorInput, setAdvisorInput] = useState('')
-  const [advisorMessages, setAdvisorMessages] = useState<Message[]>([
-    {
-      id: 'am1',
-      senderId: 'advisor',
-      senderName: 'Dr. Sarah Chen',
-      senderAvatar: '/avatars/sarah.jpg',
-      content: 'Hi! I\'m your project advisor. Feel free to ask about your thesis, milestones, or schedule anytime.',
-      timestamp: '2024-07-23T09:00:00.000Z',
-      status: 'read'
-    },
-    {
-      id: 'am2',
-      senderId: 'current',
-      senderName: 'You',
-      content: 'Thank you. I\'ll reach out when I have questions.',
-      timestamp: '2024-07-24T09:15:00.000Z',
-      status: 'read'
-    },
-    {
-      id: 'am3',
-      senderId: 'advisor',
-      senderName: 'Dr. Sarah Chen',
-      senderAvatar: '/avatars/sarah.jpg',
-      content: 'Sounds good. Remember the design phase deliverable is due next Friday.',
-      timestamp: '2024-07-25T11:20:00.000Z',
-      status: 'delivered'
+  const hasAdvisorConversation = Boolean(roomId && myProjectGroupQuery.data)
+
+  const projectGroupParticipantIds = useMemo(() => {
+    const group = myProjectGroupQuery.data
+    if (!group) return new Set<string>()
+
+    return new Set<string>([
+      group.leader.id,
+      ...group.members.map((member) => member.user.id),
+    ])
+  }, [myProjectGroupQuery.data])
+
+  const advisorProfile = useMemo(() => {
+    const advisor = projectDetailsQuery.data?.advisor
+    const advisorName = [advisor?.firstName, advisor?.lastName].filter(Boolean).join(' ').trim() || advisor?.email || ''
+    const fallbackRoomName = projectDetailsQuery.data?.title || myProjectGroupQuery.data?.name || 'Advisor-supervised group chat'
+    const hasAdvisorIdentity = Boolean(advisor?.id)
+    const status: UserStatus = advisor?.id && onlineUserIds.includes(advisor.id) ? 'online' : 'offline'
+
+    return {
+      id: advisor?.id ?? null,
+      hasIdentity: hasAdvisorIdentity,
+      name: advisorName || fallbackRoomName,
+      role: hasAdvisorIdentity ? 'Project Advisor' : 'Advisor-supervised group room',
+      status: hasAdvisorIdentity ? status : 'offline',
+      avatarUrl: advisor?.avatarUrl ?? undefined,
     }
-  ])
-  const advisorProfile = { name: 'Dr. Sarah Chen', role: 'Project Advisor', status: 'online' as UserStatus }
+  }, [myProjectGroupQuery.data?.name, onlineUserIds, projectDetailsQuery.data?.advisor, projectDetailsQuery.data?.title])
 
   const conversations: Conversation[] = useMemo(() => {
     const group = myProjectGroupQuery.data
@@ -1508,12 +1506,7 @@ export function StudentMessagesPage() {
   }, [currentUser?.id, roomId, updateReadStateInCache])
 
   useEffect(() => {
-    const root = messagesScrollRootRef.current
-    if (!root) return
-
-    const viewport = root.querySelector<HTMLDivElement>(
-      '[data-slot="scroll-area-viewport"]'
-    )
+    const viewport = messagesScrollRootRef.current
     if (!viewport) return
 
     const thresholdPx = 24
@@ -1717,6 +1710,74 @@ export function StudentMessagesPage() {
     }
   }
 
+  const advisorMessages = useMemo(() => {
+    if (!roomId) return []
+    return messages[roomId] ?? []
+  }, [messages, roomId])
+
+  const inferredAdvisorParticipant = useMemo(() => {
+    for (let index = advisorMessages.length - 1; index >= 0; index -= 1) {
+      const message = advisorMessages[index]
+      if (!message) continue
+      if (message.senderId === 'current') continue
+      if (projectGroupParticipantIds.has(message.senderId)) continue
+
+      return {
+        id: message.senderId,
+        name: message.senderName,
+        avatarUrl: message.senderAvatar,
+      }
+    }
+
+    return null
+  }, [advisorMessages, projectGroupParticipantIds])
+
+  const resolvedAdvisorProfile = useMemo(() => {
+    if (advisorProfile.id) return advisorProfile
+    if (!inferredAdvisorParticipant) return advisorProfile
+
+    const inferredStatus: UserStatus = onlineUserIds.includes(inferredAdvisorParticipant.id) ? 'online' : 'offline'
+
+    return {
+      id: inferredAdvisorParticipant.id,
+      hasIdentity: true,
+      name: inferredAdvisorParticipant.name,
+      role: 'Project Advisor',
+      status: inferredStatus,
+      avatarUrl: inferredAdvisorParticipant.avatarUrl,
+    }
+  }, [advisorProfile, inferredAdvisorParticipant, onlineUserIds])
+
+  const advisorScopedMessages = useMemo(() => {
+    if (!resolvedAdvisorProfile.id) return []
+
+    const firstAdvisorIndex = advisorMessages.findIndex((message) => message.senderId === resolvedAdvisorProfile.id)
+    if (firstAdvisorIndex < 0) return []
+
+    return advisorMessages.filter((message, index) => {
+      if (index < firstAdvisorIndex) return false
+      return message.senderId === 'current' || message.senderId === resolvedAdvisorProfile.id
+    })
+  }, [advisorMessages, resolvedAdvisorProfile.id])
+
+  const handleAdvisorInputChange = (value: string) => {
+    setAdvisorInput(value)
+
+    if (!roomId) return
+    if (value.trim()) {
+      emitTypingStart()
+    } else {
+      emitTypingStop()
+    }
+  }
+
+  const handleSendAdvisorMessage = () => {
+    const text = advisorInput.trim()
+    if (!text) return
+    sendMessageWithOptionalAttachment({ text, attachment: null })
+    setAdvisorInput('')
+  }
+
   const handlePickAttachment = () => {
     if (isUploadingAttachment) return
     attachmentInputRef.current?.click()
@@ -1841,22 +1902,6 @@ export function StudentMessagesPage() {
       emoji: DEFAULT_EMOJI,
     })
   }, [roomId, setReactionOnMessage])
-
-  const handleSendAdvisorMessage = () => {
-    if (!advisorInput.trim()) return
-    setAdvisorMessages((prev) => [
-      ...prev,
-      {
-        id: `am-${Date.now()}`,
-        senderId: 'current',
-        senderName: 'You',
-        content: advisorInput.trim(),
-        timestamp: new Date().toISOString(),
-        status: 'sent'
-      }
-    ])
-    setAdvisorInput('')
-  }
 
   const disposeJitsiCall = useCallback(() => {
     if (!jitsiApiRef.current) return
@@ -2239,7 +2284,7 @@ export function StudentMessagesPage() {
         <TabsContent value="chats" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-3 h-[calc(100vh-280px)] min-h-[600px]">
             {/* Conversations List */}
-            <Card className="lg:col-span-1 flex flex-col">
+            <Card className="flex min-h-0 flex-col lg:col-span-1">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">Conversations</CardTitle>
@@ -2255,8 +2300,8 @@ export function StudentMessagesPage() {
                   />
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 p-0">
-                <ScrollArea className="h-full">
+              <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                   {filteredConversations.length > 0 ? (
                     filteredConversations.map((conv) => (
                       <div
@@ -2304,12 +2349,12 @@ export function StudentMessagesPage() {
                       <p className="mt-2 text-sm text-muted-foreground">No conversations found</p>
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
 
             {/* Chat Window */}
-            <Card className="lg:col-span-2 flex flex-col">
+            <Card className="flex min-h-0 flex-col lg:col-span-2">
               {effectiveSelectedConversation ? (
                 <>
                   {/* Chat Header */}
@@ -2403,68 +2448,71 @@ export function StudentMessagesPage() {
                   </CardHeader>
 
                   {/* Messages */}
-                  <CardContent className="flex-1 p-4">
-                    <div ref={messagesScrollRootRef} className="h-full">
-                      <ScrollArea className="h-full">
+                  <CardContent className="flex min-h-0 flex-1 flex-col p-4">
+                    <div
+                      ref={messagesScrollRootRef}
+                      className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                    >
                       <div className="space-y-4">
                         {messages[effectiveSelectedConversation.id]?.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`flex ${msg.senderId === 'current' ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div className={`flex gap-2 max-w-[70%] ${msg.senderId === 'current' ? 'flex-row-reverse' : ''}`}>
-                              {msg.senderId !== 'current' && (
-                                <Avatar className="h-8 w-8 mt-1">
-                                  {msg.senderAvatar ? (
-                                    <AvatarImage src={msg.senderAvatar} />
-                                  ) : (
-                                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                      {getInitials(msg.senderName)}
-                                    </AvatarFallback>
-                                  )}
-                                </Avatar>
-                              )}
-                              <div>
+                            <div
+                              key={msg.id}
+                              className={`flex ${msg.senderId === 'current' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div className={`flex gap-2 max-w-[70%] ${msg.senderId === 'current' ? 'flex-row-reverse' : ''}`}>
                                 {msg.senderId !== 'current' && (
-                                  <p className="text-xs font-medium mb-1 ml-1">{msg.senderName}</p>
+                                  <Avatar className="h-8 w-8 mt-1">
+                                    {msg.senderAvatar ? (
+                                      <AvatarImage src={msg.senderAvatar} />
+                                    ) : (
+                                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                        {getInitials(msg.senderName)}
+                                      </AvatarFallback>
+                                    )}
+                                  </Avatar>
                                 )}
-                                <ContextMenu>
-                                  <ContextMenuTrigger asChild>
+                                <div>
+                                  {msg.senderId !== 'current' && (
+                                    <p className="text-xs font-medium mb-1 ml-1">{msg.senderName}</p>
+                                  )}
+                                  <div
+                                    className={
+                                      "flex items-start gap-1 " +
+                                      (msg.senderId === "current" ? "flex-row-reverse" : "")
+                                    }
+                                  >
                                     <div
-                                      className={`p-3 rounded-lg ${
-                                        msg.senderId === 'current'
-                                          ? 'bg-primary text-primary-foreground'
-                                          : 'bg-muted'
+                                      className={`min-w-0 flex-1 rounded-lg p-3 ${
+                                        msg.senderId === "current"
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-muted"
                                       }`}
                                       onContextMenu={(e) => {
-                                        // Power shortcuts (optional):
-                                        // - Shift + Right click: reply-to toggle
-                                        // - Alt + Right click: default reaction toggle
-                                        // - Ctrl/Meta + Right click: edit (sender only)
-                                        // - Shift + Alt + Right click: delete (sender only)
-                                        // Plain right-click opens the menu.
                                         if (e.shiftKey && e.altKey) {
                                           e.preventDefault()
                                           void deleteMessage(msg.id)
                                           return
                                         }
-
                                         if (e.ctrlKey || e.metaKey) {
                                           e.preventDefault()
                                           void editMessage({ messageId: msg.id, fallbackText: msg.content })
                                           return
                                         }
-
                                         if (e.shiftKey) {
                                           e.preventDefault()
-                                          toggleReplyToMessage(msg.id, { senderName: msg.senderName, content: msg.content })
+                                          toggleReplyToMessage(msg.id, {
+                                            senderName: msg.senderName,
+                                            content: msg.content,
+                                          })
                                           return
                                         }
-
                                         if (e.altKey) {
                                           e.preventDefault()
                                           void toggleDefaultReactionOnMessage(msg.id)
+                                          return
                                         }
+                                        e.preventDefault()
+                                        setOpenMessageActionsId(msg.id)
                                       }}
                                     >
                                       {msg.replyTo && (
@@ -2488,23 +2536,30 @@ export function StudentMessagesPage() {
                                               onClick={(e) => {
                                                 e.preventDefault()
                                                 e.stopPropagation()
-                                                void downloadAttachment({ url: att.url, name: att.name, mimeType: att.mimeType })
+                                                void downloadAttachment({
+                                                  url: att.url,
+                                                  name: att.name,
+                                                  mimeType: att.mimeType,
+                                                })
                                               }}
                                               rel="noreferrer"
                                             >
                                               {att.mimeType?.startsWith("image/") ? (
-                                                <Image
+                                                <img
                                                   src={att.url}
                                                   alt={att.name}
                                                   width={32}
                                                   height={32}
                                                   className="rounded border object-cover"
+                                                  loading="lazy"
                                                 />
                                               ) : (
                                                 <Paperclip className="h-3 w-3" />
                                               )}
                                               <span className="truncate">{att.name}</span>
-                                              <span className="text-xs opacity-70">({formatBytes(att.sizeBytes)})</span>
+                                              <span className="text-xs opacity-70">
+                                                ({formatBytes(att.sizeBytes)})
+                                              </span>
                                             </a>
                                           ))}
                                         </div>
@@ -2517,7 +2572,9 @@ export function StudentMessagesPage() {
                                               key={r.emoji}
                                               className={
                                                 "inline-flex items-center gap-1 rounded-full bg-background/20 px-2 py-0.5 text-xs" +
-                                                (msg.reactions?.myReaction === r.emoji ? " ring-1 ring-border" : "")
+                                                (msg.reactions?.myReaction === r.emoji
+                                                  ? " ring-1 ring-border"
+                                                  : "")
                                               }
                                             >
                                               <span>{r.emoji}</span>
@@ -2527,126 +2584,168 @@ export function StudentMessagesPage() {
                                         </div>
                                       )}
                                     </div>
-                                  </ContextMenuTrigger>
-                                  <ContextMenuContent>
-                                    <ContextMenuItem
-                                      onSelect={() => {
-                                        toggleReplyToMessage(msg.id, { senderName: msg.senderName, content: msg.content })
+                                    <DropdownMenu
+                                      open={openMessageActionsId === msg.id}
+                                      onOpenChange={(open) => {
+                                        setOpenMessageActionsId((id) => {
+                                          if (open) return msg.id
+                                          return id === msg.id ? null : id
+                                        })
                                       }}
-                                      disabled={msg.id.startsWith('client-')}
                                     >
-                                      Reply
-                                      <ContextMenuShortcut>Shift+RClick</ContextMenuShortcut>
-                                    </ContextMenuItem>
-                                    <ContextMenuSub>
-                                      <ContextMenuSubTrigger inset disabled={msg.id.startsWith('client-')}>
-                                        React
-                                        <ContextMenuShortcut>Alt+RClick</ContextMenuShortcut>
-                                      </ContextMenuSubTrigger>
-                                      <ContextMenuSubContent>
-                                        <ContextMenuItem
+                                      <DropdownMenuTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className={
+                                          "h-7 w-7 shrink-0 " +
+                                          (msg.senderId === "current"
+                                            ? "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                                            : "")
+                                        }
+                                        aria-label="Reply to message"
+                                        onClick={() => {
+                                          toggleReplyToMessage(msg.id, {
+                                            senderName: msg.senderName,
+                                            content: msg.content,
+                                          })
+                                        }}
+                                        disabled={msg.id.startsWith("client-")}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start" className="min-w-[10rem]">
+                                        <DropdownMenuItem
                                           onSelect={() => {
-                                            void setReactionOnMessage({ messageId: msg.id, emoji: null })
+                                            toggleReplyToMessage(msg.id, {
+                                              senderName: msg.senderName,
+                                              content: msg.content,
+                                            })
                                           }}
-                                          disabled={msg.id.startsWith('client-') || !msg.reactions?.myReaction}
+                                          disabled={msg.id.startsWith("client-")}
                                         >
-                                          Remove reaction
-                                        </ContextMenuItem>
-                                        <ContextMenuSeparator />
-                                        <div className="grid grid-cols-5 gap-1 p-1">
-                                          {[
-                                            "😀",
-                                            "😂",
-                                            "😍",
-                                            "👍",
-                                            "🎉",
-                                            "🙏",
-                                            "😢",
-                                            "😡",
-                                            "😊",
-                                            "🤔",
-                                            "😮",
-                                            "🔥",
-                                            "💯",
-                                            "✅",
-                                            "❌",
-                                            "👏",
-                                            "🤝",
-                                            "💪",
-                                            "😎",
-                                            "❤️",
-                                          ].map((emoji) => (
-                                            <ContextMenuItem
-                                              key={emoji}
-                                              className="h-9 w-9 justify-center px-0 py-0"
+                                          Reply
+                                          <DropdownMenuShortcut>Shift+RClick</DropdownMenuShortcut>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSub>
+                                          <DropdownMenuSubTrigger
+                                            inset
+                                            disabled={msg.id.startsWith("client-")}
+                                          >
+                                            React
+                                            <DropdownMenuShortcut>Alt+RClick</DropdownMenuShortcut>
+                                          </DropdownMenuSubTrigger>
+                                          <DropdownMenuSubContent>
+                                            <DropdownMenuItem
                                               onSelect={() => {
-                                                void setReactionOnMessage({ messageId: msg.id, emoji })
+                                                void setReactionOnMessage({ messageId: msg.id, emoji: null })
                                               }}
-                                              disabled={msg.id.startsWith('client-')}
+                                              disabled={
+                                                msg.id.startsWith("client-") || !msg.reactions?.myReaction
+                                              }
                                             >
-                                              <span className="text-base leading-none">{emoji}</span>
-                                              {msg.reactions?.myReaction === emoji ? (
-                                                <Check className="absolute right-1 top-1 h-3 w-3 opacity-70" />
-                                              ) : null}
-                                            </ContextMenuItem>
-                                          ))}
-                                        </div>
-                                      </ContextMenuSubContent>
-                                    </ContextMenuSub>
-                                    <ContextMenuItem
-                                      onSelect={() => {
-                                        void editMessage({ messageId: msg.id, fallbackText: msg.content })
-                                      }}
-                                      disabled={msg.senderId !== 'current' || msg.id.startsWith('client-')}
+                                              Remove reaction
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <div className="grid grid-cols-5 gap-1 p-1">
+                                              {[
+                                                "😀",
+                                                "😂",
+                                                "😍",
+                                                "👍",
+                                                "🎉",
+                                                "🙏",
+                                                "😢",
+                                                "😡",
+                                                "😊",
+                                                "🤔",
+                                                "😮",
+                                                "🔥",
+                                                "💯",
+                                                "✅",
+                                                "❌",
+                                                "👏",
+                                                "🤝",
+                                                "💪",
+                                                "😎",
+                                                "❤️",
+                                              ].map((emoji) => (
+                                                <DropdownMenuItem
+                                                  key={emoji}
+                                                  className="relative h-9 w-9 justify-center px-0 py-0"
+                                                  onSelect={() => {
+                                                    void setReactionOnMessage({ messageId: msg.id, emoji })
+                                                  }}
+                                                  disabled={msg.id.startsWith("client-")}
+                                                >
+                                                  <span className="text-base leading-none">{emoji}</span>
+                                                  {msg.reactions?.myReaction === emoji ? (
+                                                    <Check className="absolute right-1 top-1 h-3 w-3 opacity-70" />
+                                                  ) : null}
+                                                </DropdownMenuItem>
+                                              ))}
+                                            </div>
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                        <DropdownMenuItem
+                                          onSelect={() => {
+                                            void editMessage({
+                                              messageId: msg.id,
+                                              fallbackText: msg.content,
+                                            })
+                                          }}
+                                          disabled={msg.senderId !== "current" || msg.id.startsWith("client-")}
+                                        >
+                                          Edit
+                                          <DropdownMenuShortcut>Ctrl+RClick</DropdownMenuShortcut>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          onSelect={() => {
+                                            void deleteMessage(msg.id)
+                                          }}
+                                          disabled={msg.senderId !== "current" || msg.id.startsWith("client-")}
+                                        >
+                                          Delete
+                                          <DropdownMenuShortcut>Shift+Alt+RClick</DropdownMenuShortcut>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                  <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground ${
+                                    msg.senderId === 'current' ? 'justify-end' : 'justify-start'
+                                  }`}>
+                                    <span>{formatMessageTime(msg.timestamp)}</span>
+                                    {msg.senderId === 'current' && (
+                                      <>
+                                        {msg.id.startsWith('client-') ? (
+                                          <Clock className="h-3 w-3" />
+                                        ) : msg.status === 'read' ? (
+                                          <CheckCheck className="h-3 w-3 text-primary" />
+                                        ) : msg.status === 'delivered' ? (
+                                          <Check className="h-3 w-3" />
+                                        ) : (
+                                          <Check className="h-3 w-3" />
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                  {msg.senderId === 'current' && msg.id === latestMyMessageId && (msg.readBy?.length ?? 0) > 0 && (
+                                    <div
+                                      className="mt-0.5 text-xs text-muted-foreground text-right"
+                                      title={`Seen by ${msg.readBy!.join(', ')}`}
                                     >
-                                      Edit
-                                      <ContextMenuShortcut>Ctrl+RClick</ContextMenuShortcut>
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                      variant="destructive"
-                                      onSelect={() => {
-                                        void deleteMessage(msg.id)
-                                      }}
-                                      disabled={msg.senderId !== 'current' || msg.id.startsWith('client-')}
-                                    >
-                                      Delete
-                                      <ContextMenuShortcut>Shift+Alt+RClick</ContextMenuShortcut>
-                                    </ContextMenuItem>
-                                  </ContextMenuContent>
-                                </ContextMenu>
-                                <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground ${
-                                  msg.senderId === 'current' ? 'justify-end' : 'justify-start'
-                                }`}>
-                                  <span>{formatMessageTime(msg.timestamp)}</span>
-                                  {msg.senderId === 'current' && (
-                                    <>
-                                      {msg.id.startsWith('client-') ? (
-                                        <Clock className="h-3 w-3" />
-                                      ) : msg.status === 'read' ? (
-                                        <CheckCheck className="h-3 w-3 text-primary" />
-                                      ) : msg.status === 'delivered' ? (
-                                        <Check className="h-3 w-3" />
-                                      ) : (
-                                        <Check className="h-3 w-3" />
-                                      )}
-                                    </>
+                                      Seen by {msg.readBy!.slice(0, 2).join(', ')}
+                                      {msg.readBy!.length > 2 ? ` +${msg.readBy!.length - 2}` : ''}
+                                    </div>
                                   )}
                                 </div>
-                                {msg.senderId === 'current' && msg.id === latestMyMessageId && (msg.readBy?.length ?? 0) > 0 && (
-                                  <div
-                                    className="mt-0.5 text-xs text-muted-foreground text-right"
-                                    title={`Seen by ${msg.readBy!.join(', ')}`}
-                                  >
-                                    Seen by {msg.readBy!.slice(0, 2).join(', ')}
-                                    {msg.readBy!.length > 2 ? ` +${msg.readBy!.length - 2}` : ''}
-                                  </div>
-                                )}
                               </div>
                             </div>
-                          </div>
                         ))}
                       </div>
-                      </ScrollArea>
                     </div>
                   </CardContent>
 
@@ -2682,11 +2781,11 @@ export function StudentMessagesPage() {
                           </p>
                           {queuedAttachment.mimeType?.startsWith("image/") ? (
                             <div className="relative mt-2 cursor-pointer" onClick={() => window.open(queuedAttachment.url, "_blank", "noopener,noreferrer")}>
-                              <Image
+                              <img
                                 src={queuedAttachment.url}
                                 alt={queuedAttachment.name}
-                                fill
-                                className="object-contain rounded-md border"
+                                className="max-h-32 w-auto rounded-md border object-contain"
+                                loading="lazy"
                               />
                             </div>
                           ) : null}
@@ -2806,81 +2905,92 @@ export function StudentMessagesPage() {
           </div>
         </TabsContent>
 
-        {/* Chat with Advisor - same layout as Chats */}
         <TabsContent value="advisor" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-3 h-[calc(100vh-280px)] min-h-[600px]">
             {/* Advisor conversation list (single item) */}
-            <Card className="lg:col-span-1 flex flex-col">
+            <Card className="flex min-h-0 flex-col lg:col-span-1">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">Chat with Advisor</CardTitle>
-                  <Badge variant="outline">1 conversation</Badge>
+                  <Badge variant="outline">{hasAdvisorConversation ? '1 conversation' : '0 conversations'}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Private conversation with your project advisor
+                  Advisor chat uses the same approved project-group room.
                 </p>
               </CardHeader>
-              <CardContent className="flex-1 p-0">
-                <ScrollArea className="h-full">
-                  <div className="flex items-start gap-3 p-4 cursor-default bg-muted/50 border-b">
-                    <div className="relative flex-shrink-0">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src="/avatars/sarah.jpg" />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {getInitials(advisorProfile.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(advisorProfile.status)} ring-2 ring-white`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium truncate">{advisorProfile.name}</p>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {advisorMessages.length > 0
-                            ? formatMessageTime(advisorMessages[advisorMessages.length - 1].timestamp)
-                            : '—'}
-                        </span>
+              <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                {hasAdvisorConversation ? (
+                  <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="flex items-start gap-3 p-4 cursor-default bg-muted/50 border-b">
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-10 w-10">
+                          {resolvedAdvisorProfile.avatarUrl ? <AvatarImage src={resolvedAdvisorProfile.avatarUrl} /> : null}
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(resolvedAdvisorProfile.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(resolvedAdvisorProfile.status)} ring-2 ring-white`} />
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-muted-foreground truncate">
-                          {advisorMessages.length > 0
-                            ? advisorMessages[advisorMessages.length - 1].content
-                            : 'Start a conversation with your advisor'}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium truncate">{resolvedAdvisorProfile.name}</p>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {advisorScopedMessages.length > 0
+                              ? formatMessageTime(advisorScopedMessages[advisorScopedMessages.length - 1].timestamp)
+                              : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-muted-foreground truncate">
+                            {advisorScopedMessages.length > 0
+                              ? advisorScopedMessages[advisorScopedMessages.length - 1].content
+                              : resolvedAdvisorProfile.hasIdentity
+                                ? 'No advisor messages yet in this shared room'
+                                : 'Advisor profile details are unavailable, and no advisor messages have been detected yet'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </ScrollArea>
+                ) : (
+                  <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                    No approved project-group chat room is available yet.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Advisor chat window */}
-            <Card className="lg:col-span-2 flex flex-col">
+            <Card className="flex min-h-0 flex-col lg:col-span-2">
+              {hasAdvisorConversation ? (
+                <>
               {/* Chat Header - matches Chats section */}
               <CardHeader className="border-b py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src="/avatars/sarah.jpg" />
+                        {resolvedAdvisorProfile.avatarUrl ? <AvatarImage src={resolvedAdvisorProfile.avatarUrl} /> : null}
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {getInitials(advisorProfile.name)}
+                          {getInitials(resolvedAdvisorProfile.name)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(advisorProfile.status)} ring-2 ring-white`} />
+                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${getStatusColor(resolvedAdvisorProfile.status)} ring-2 ring-white`} />
                     </div>
                     <div>
-                      <CardTitle className="text-base">{advisorProfile.name}</CardTitle>
+                      <CardTitle className="text-base">{resolvedAdvisorProfile.name}</CardTitle>
                       <p className="text-xs text-muted-foreground">
-                        {advisorProfile.status === 'online' ? 'Online' : advisorProfile.status}
+                        {resolvedAdvisorProfile.hasIdentity
+                          ? resolvedAdvisorProfile.status === 'online' ? 'Online' : resolvedAdvisorProfile.status
+                          : resolvedAdvisorProfile.role}
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="icon" onClick={() => alert(`Audio call initiated with ${advisorProfile.name}`)}>
+                    <Button variant="outline" size="icon" onClick={() => handleCall('audio')}>
                       <Phone className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => alert(`Video call initiated with ${advisorProfile.name}`)}>
+                    <Button variant="outline" size="icon" onClick={() => handleCall('video')}>
                       <Video className="h-4 w-4" />
                     </Button>
                     <DropdownMenu>
@@ -2899,30 +3009,28 @@ export function StudentMessagesPage() {
               </CardHeader>
 
               {/* Messages - matches Chats section */}
-              <CardContent className="flex-1 p-4">
-                <ScrollArea className="h-full">
+              <CardContent className="flex min-h-0 flex-1 flex-col p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                   <div className="space-y-4">
-                    {advisorMessages.map((msg) => (
+                    {advisorScopedMessages.length > 0 ? advisorScopedMessages.map((msg) => (
                       <div
                         key={msg.id}
                         className={`flex ${msg.senderId === 'current' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div className={`flex gap-2 max-w-[70%] ${msg.senderId === 'current' ? 'flex-row-reverse' : ''}`}>
-                          {msg.senderId !== 'current' && (
-                            <Avatar className="h-8 w-8 mt-1">
-                              {msg.senderAvatar ? (
-                                <AvatarImage src={msg.senderAvatar} />
-                              ) : (
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                  {getInitials(msg.senderName)}
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                          )}
-                          <div>
-                            {msg.senderId !== 'current' && (
-                              <p className="text-xs font-medium mb-1 ml-1">{msg.senderName}</p>
+                          <Avatar className="h-8 w-8 mt-1 shrink-0">
+                            {msg.senderAvatar ? (
+                              <AvatarImage src={msg.senderAvatar} />
+                            ) : (
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                {getInitials(msg.senderName)}
+                              </AvatarFallback>
                             )}
+                          </Avatar>
+                          <div>
+                            <p className={`text-xs font-medium mb-1 ${msg.senderId === 'current' ? 'mr-1 text-right' : 'ml-1'}`}>
+                              {msg.senderName}
+                            </p>
                             <div
                               className={`p-3 rounded-lg ${
                                 msg.senderId === 'current'
@@ -2945,12 +3053,13 @@ export function StudentMessagesPage() {
                                       rel="noreferrer"
                                     >
                                       {att.mimeType?.startsWith("image/") ? (
-                                        <Image
+                                        <img
                                           src={att.url}
                                           alt={att.name}
                                           width={32}
                                           height={32}
                                           className="rounded border object-cover"
+                                          loading="lazy"
                                         />
                                       ) : (
                                         <Paperclip className="h-3 w-3" />
@@ -2977,22 +3086,25 @@ export function StudentMessagesPage() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="flex min-h-[240px] items-center justify-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+                        Advisor messages will appear here once the advisor joins this room.
+                      </div>
+                    )}
                   </div>
-                </ScrollArea>
+                </div>
               </CardContent>
 
               {/* Message Input - matches Chats section */}
               <div className="p-4 border-t">
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon">
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
                   <Input
                     placeholder="Type your message..."
                     value={advisorInput}
-                    onChange={(e) => setAdvisorInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendAdvisorMessage()}
+                    onChange={(e) => handleAdvisorInputChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSendAdvisorMessage()
+                    }}
                     className="flex-1"
                   />
                   <Button variant="outline" size="icon">
@@ -3003,6 +3115,12 @@ export function StudentMessagesPage() {
                   </Button>
                 </div>
               </div>
+                </>
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  Your approved project-group chat room is not available yet.
+                </div>
+              )}
             </Card>
           </div>
         </TabsContent>
