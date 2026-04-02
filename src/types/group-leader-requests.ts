@@ -11,8 +11,19 @@ export interface CreateGroupLeaderRequestDto {
 export interface GroupLeaderRequestResponse {
   id: string
   status: GroupLeaderRequestStatus
-  createdAt: string
-  message: string | null
+
+  // Present on create request response
+  createdAt?: string
+  message?: string | null
+
+  // Present on approve/reject review responses
+  tenantId?: string
+  departmentId?: string
+  studentUserId?: string
+  reviewedByUserId?: string
+  reviewedAt?: string | null
+  rejectionReason?: string | null
+  updatedAt?: string
 }
 
 export type GroupLeaderMeNoRequest = {
@@ -32,15 +43,31 @@ export type GroupLeaderMeResponse = GroupLeaderMeNoRequest | GroupLeaderMeReques
 // List API types for pending/approved requests
 export interface GroupLeaderRequestItem {
   id: string
-  userId: string
-  firstName: string
-  lastName: string
-  email: string
-  departmentId: string
-  departmentName: string
   status: GroupLeaderRequestStatus
   createdAt: string // ISO date
   updatedAt: string // ISO date
+
+  reviewedAt: string | null
+  rejectionReason: string | null
+  message: string | null
+
+  student: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    avatarUrl: string | null
+    tenantId: string
+    departmentId: string
+    profile: {
+      bio: string | null
+      githubUrl: string | null
+      linkedinUrl: string | null
+      portfolioUrl: string | null
+      techStack: string[]
+      updatedAt: string | null
+    } | null
+  }
 }
 
 export interface GroupLeaderRequestsPagination {
@@ -50,7 +77,15 @@ export interface GroupLeaderRequestsPagination {
   pages: number
 }
 
+export interface GroupLeaderRequestsSummary {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+}
+
 export interface GroupLeaderRequestsListData {
+  summary?: GroupLeaderRequestsSummary
   items: GroupLeaderRequestItem[]
   pagination: GroupLeaderRequestsPagination
 }

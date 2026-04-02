@@ -7,7 +7,7 @@ import type {
   CreateGroupLeaderRequestDto,
   GroupLeaderMeResponse,
   GroupLeaderRequestResponse,
-  GroupLeaderRequestsListResponse,
+  GroupLeaderRequestsListData,
 } from "@/types/group-leader-requests"
 
 export function useApproveGroupLeaderRequest() {
@@ -59,9 +59,9 @@ export function useCreateGroupLeaderRequest() {
 
 export function groupLeaderRequestListKeys() {
   return {
-    root: ["group-leader-requests", "pending"] as const,
+    root: ["group-leader-requests", "list"] as const,
     list: (params: { search?: string; page?: number; limit?: number }) =>
-      ["group-leader-requests", "pending", params] as const,
+      ["group-leader-requests", "list", params] as const,
   }
 }
 
@@ -72,7 +72,7 @@ export function usePendingGroupLeaderRequests(params: {
   enabled?: boolean
 }) {
   const { search, page = 1, limit = 20, enabled = true } = params
-  return useQuery<GroupLeaderRequestsListResponse, Error>({
+  return useQuery<GroupLeaderRequestsListData, Error>({
     queryKey: groupLeaderRequestListKeys().list({ search, page, limit }),
     queryFn: () => listPendingGroupLeaderRequests({ search, page, limit }),
     enabled,
