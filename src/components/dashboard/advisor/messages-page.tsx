@@ -1321,7 +1321,7 @@ export function AdvisorMessagesPage() {
   }, [selectedProject])
 
   return (
-    <div className="flex h-auto min-h-[60vh] sm:h-[calc(100vh-8rem)] sm:min-h-[500px] flex-col sm:flex-row overflow-hidden rounded-lg border bg-background shadow-sm">
+    <div className="flex h-[calc(100dvh-8rem)] min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background shadow-sm sm:min-h-[500px] sm:flex-row">
 
       <div className="flex min-h-0 w-full sm:w-80 flex-shrink-0 flex-col border-b sm:border-b-0 sm:border-r">
         <div className="border-b p-4">
