@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react"
 
 function MessagesLoadingShell() {
   return (
-    <div className="flex h-[calc(100vh-8rem)] min-h-[500px] items-center justify-center rounded-lg border bg-background shadow-sm">
+    <div className="flex h-auto min-h-[60vh] sm:h-[calc(100vh-8rem)] sm:min-h-[500px] items-center justify-center rounded-lg border bg-background shadow-sm">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
   )

@@ -960,7 +960,7 @@ export function AdvisorMyProjectsPage() {
                       </div>
 
                       <Tabs defaultValue="overview" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
                           <TabsTrigger value="overview">Overview</TabsTrigger>
                           <TabsTrigger value="milestones">Milestones</TabsTrigger>
                           <TabsTrigger value="team">Team</TabsTrigger>

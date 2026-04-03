@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { useSidebarStore } from "@/store/sidebar-store"
 import { Sidebar } from "./sidebar"
 import { type UserRole } from "@/config/navigation"
-import { useEffect, useState, startTransition } from "react"
+import { useEffect, useRef, useState, startTransition } from "react"
 import { usePathname } from "next/navigation"
 
 interface MobileSidebarProps {
@@ -21,6 +21,7 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
   const [isClient, setIsClient] = useState(false)
   const { isOpen, close } = useSidebarStore()
   const pathname = usePathname()
+  const previousPathnameRef = useRef(pathname)
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -34,11 +35,19 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
   }, [])
 
   useEffect(() => {
-    if (!isOpen) return
+    const previousPathname = previousPathnameRef.current
+    if (previousPathname === pathname) {
+      return
+    }
+
+    previousPathnameRef.current = pathname
+
+    if (!isOpen) {
+      return
+    }
+
     // Defer close so route + portal trees finish reconciling (avoids removeChild on null with React 19 / Radix).
-    startTransition(() => {
-      close()
-    })
+    startTransition(() => close())
   }, [close, isOpen, pathname])
 
   if (!isClient) {

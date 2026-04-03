@@ -1321,9 +1321,9 @@ export function AdvisorMessagesPage() {
   }, [selectedProject])
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] min-h-[500px] overflow-hidden rounded-lg border bg-background shadow-sm">
+    <div className="flex h-auto min-h-[60vh] sm:h-[calc(100vh-8rem)] sm:min-h-[500px] flex-col sm:flex-row overflow-hidden rounded-lg border bg-background shadow-sm">
 
-      <div className="flex min-h-0 w-80 flex-shrink-0 flex-col border-r">
+      <div className="flex min-h-0 w-full sm:w-80 flex-shrink-0 flex-col border-b sm:border-b-0 sm:border-r">
         <div className="border-b p-4">
           <h2 className="mb-3 text-lg font-semibold">Group Chats</h2>
           <div className="relative">

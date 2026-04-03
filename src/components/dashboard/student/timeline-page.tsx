@@ -499,15 +499,16 @@ export function StudentTimelinePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="bg-muted/50 p-2 text-center text-sm font-medium">
-                    {day}
-                  </div>
-                ))}
-                
-                {/* Calendar days */}
-                {calendarCells.map((cell, i) => {
+              <div className="overflow-x-auto">
+                <div className="min-w-[42rem] grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="bg-muted/50 p-2 text-center text-sm font-medium">
+                      {day}
+                    </div>
+                  ))}
+                  
+                  {/* Calendar days */}
+                  {calendarCells.map((cell, i) => {
                   const dayNumber = cell.dayNumber
                   const isToday =
                     Boolean(dayNumber) &&
@@ -607,7 +608,8 @@ export function StudentTimelinePage() {
                       ) : null}
                     </div>
                   )
-                })}
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>

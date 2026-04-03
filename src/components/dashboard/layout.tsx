@@ -108,9 +108,9 @@ export default function DashboardLayout({
       </aside>
       <MobileSidebar user={shellUser} />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
         <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
-        <main className="flex-1 overflow-y-auto bg-muted/10 p-4 sm:p-6">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-muted/10 p-4 sm:p-6">
           <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
           {children}
         </main>
