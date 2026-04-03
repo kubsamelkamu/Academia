@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Users,
@@ -23,7 +24,6 @@ import {
   Download,
   Calendar,
   Search,
-  Filter,
   TrendingUp,
   Clock,
   CheckCircle,
@@ -62,6 +62,9 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/auth-store"
+import { useDepartmentProjectsOverview, useProjectDetails } from "@/lib/hooks/use-projects"
+import type { ProjectDetail } from "@/types/projects"
 
 function memberInitials(name: string) {
   return name
@@ -72,6 +75,107 @@ function memberInitials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+}
+
+function formatOptionalDate(value?: string | null) {
+  if (!value) {
+    return "—"
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+
+  return date.toLocaleDateString()
+}
+
+function formatAdvisorName(advisor: {
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+}) {
+  const fullName = [advisor.firstName, advisor.lastName].filter(Boolean).join(" ").trim()
+  return fullName || advisor.email || "Unassigned"
+}
+
+function normalizeMilestoneStatus(status?: string | null): "pending" | "in-progress" | "completed" {
+  const normalized = status?.trim().toLowerCase() ?? "pending"
+
+  if (normalized === "approved" || normalized === "completed") {
+    return "completed"
+  }
+
+  if (normalized === "submitted" || normalized === "in-progress" || normalized === "active") {
+    return "in-progress"
+  }
+
+  return "pending"
+}
+
+function formatUserName(user?: {
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+} | null) {
+  if (!user) {
+    return ""
+  }
+
+  return formatAdvisorName(user)
+}
+
+function mapProjectDetailToActiveProject(detail: ProjectDetail, fallback: Project): Project {
+  const studentMembers = (detail.members ?? []).filter((member) => member.role?.toUpperCase() === "STUDENT")
+  const groupMembers = studentMembers
+    .map((member) => formatUserName(member.user ?? member))
+    .filter(Boolean)
+  const groupMemberProfiles = studentMembers.reduce<{ name: string; avatarUrl?: string | null }[]>(
+    (result, member) => {
+      const resolvedMember = member.user ?? member
+      const name = formatUserName(resolvedMember)
+
+      if (!name) {
+        return result
+      }
+
+      result.push({
+        name,
+        avatarUrl: resolvedMember.avatarUrl ?? null,
+      })
+
+      return result
+    },
+    []
+  )
+
+  const technologies = detail.proposal?.projectGroup?.technologies?.filter(Boolean) ?? []
+  const milestones = (detail.milestones ?? []).map((milestone) => ({
+    name: milestone.title,
+    status: normalizeMilestoneStatus(milestone.status),
+    dueDate: milestone.dueDate,
+  }))
+  const latestDueDate = [...(detail.milestones ?? [])]
+    .sort((left, right) => new Date(right.dueDate).getTime() - new Date(left.dueDate).getTime())[0]?.dueDate
+
+  return {
+    ...fallback,
+    title: detail.title || fallback.title,
+    groupName: detail.proposal?.projectGroup?.name ?? fallback.groupName,
+    advisorName: formatAdvisorName(detail.advisor ?? {}),
+    status: detail.status.toLowerCase().replace(/_/g, "-") as Project["status"],
+    progress: fallback.progress,
+    startDate: detail.createdAt ?? fallback.startDate,
+    dueDate: latestDueDate ?? fallback.dueDate,
+    departmentId: detail.departmentId ?? fallback.departmentId,
+    departmentName: detail.department?.name ?? fallback.departmentName,
+    groupMembers: groupMembers.length > 0 ? groupMembers : fallback.groupMembers,
+    groupMemberProfiles: groupMemberProfiles.length > 0 ? groupMemberProfiles : fallback.groupMemberProfiles,
+    description:
+      detail.description ?? detail.proposal?.description ?? detail.proposal?.projectGroup?.objectives ?? fallback.description,
+    technologies,
+    milestones,
+  }
 }
 
 // Helper Components for better reusability and styling
@@ -133,6 +237,7 @@ interface Project {
   departmentId: string;
   departmentName: string;
   groupMembers: string[];
+  groupMemberProfiles?: { name: string; avatarUrl?: string | null }[];
   evaluators?: string[];
   budget?: number;
   category: string;
@@ -168,118 +273,6 @@ interface PastProject extends Project {
   students: string[];
   evaluatorNames: string[];
 }
-
-// Mock data
-const mockActiveProjects: Project[] = [
-  {
-    id: '1',
-    title: 'AI-Powered Student Assistant',
-    groupName: 'Group Alpha',
-    advisorName: 'Dr. Sarah Johnson',
-    status: 'active',
-    progress: 75,
-    startDate: '2024-01-15',
-    dueDate: '2024-05-30',
-    departmentId: 'dept1',
-    departmentName: 'Computer Science',
-    groupMembers: ['John Doe', 'Jane Smith', 'Bob Wilson'],
-    evaluators: ['Dr. Michael Chen', 'Prof. Emily Rodriguez'],
-    budget: 5000,
-    category: 'Artificial Intelligence',
-    tags: ['AI', 'Machine Learning', 'Education'],
-    lastActivity: '2024-03-15',
-    semester: 'Spring 2024',
-    description: "An AI-powered assistant to help students with coursework, reminders, and scheduling.",
-    technologies: ["Python", "TensorFlow", "React", "Node.js"],
-    milestones: [
-      { name: "Requirements Analysis", status: "completed", dueDate: "2024-02-15" },
-      { name: "System Design", status: "completed", dueDate: "2024-03-15" },
-      { name: "Prototype Development", status: "in-progress", dueDate: "2024-04-15" },
-      { name: "Testing & Deployment", status: "pending", dueDate: "2024-05-30" },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Blockchain-Based Voting System',
-    groupName: 'Group Beta',
-    advisorName: 'Prof. Michael Chen',
-    status: 'submitted',
-    progress: 90,
-    startDate: '2024-02-01',
-    dueDate: '2024-06-15',
-    departmentId: 'dept1',
-    departmentName: 'Computer Science',
-    groupMembers: ['Alice Brown', 'Charlie Davis'],
-    evaluators: ['Dr. Lisa Thompson', 'Prof. David Kim'],
-    budget: 7500,
-    category: 'Blockchain',
-    tags: ['Blockchain', 'Security', 'E-voting'],
-    lastActivity: '2024-03-14',
-    semester: 'Spring 2024',
-    description: "A secure blockchain-based voting system for academic institutions.",
-    technologies: ["Ethereum", "Solidity", "Web3.js", "React"],
-    milestones: [
-      { name: "Requirements Analysis", status: "completed", dueDate: "2024-02-28" },
-      { name: "System Design", status: "completed", dueDate: "2024-03-31" },
-      { name: "Smart Contract Development", status: "completed", dueDate: "2024-04-30" },
-      { name: "Testing & Deployment", status: "in-progress", dueDate: "2024-06-15" },
-    ],
-  },
-  {
-    id: '3',
-    title: 'Smart Campus IoT Platform',
-    groupName: 'Group Gamma',
-    advisorName: 'Dr. Emily Rodriguez',
-    status: 'active',
-    progress: 45,
-    startDate: '2024-03-01',
-    dueDate: '2024-07-30',
-    departmentId: 'dept1',
-    departmentName: 'Computer Science',
-    groupMembers: ['Eva Green', 'Frank White', 'Grace Lee'],
-    evaluators: ['Dr. Sarah Johnson'],
-    budget: 10000,
-    category: 'IoT',
-    tags: ['IoT', 'Smart Campus', 'Sensors'],
-    lastActivity: '2024-03-16',
-    semester: 'Spring 2024',
-    description: "An IoT platform for monitoring and managing campus resources in real time.",
-    technologies: ["Arduino", "Raspberry Pi", "MQTT", "React"],
-    milestones: [
-      { name: "Requirements Analysis", status: "completed", dueDate: "2024-03-15" },
-      { name: "System Design", status: "completed", dueDate: "2024-04-15" },
-      { name: "Hardware Development", status: "in-progress", dueDate: "2024-05-30" },
-      { name: "Integration & Testing", status: "pending", dueDate: "2024-07-30" },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Virtual Reality Lab Simulator',
-    groupName: 'Group Delta',
-    advisorName: 'Prof. David Kim',
-    status: 'on-hold',
-    progress: 30,
-    startDate: '2024-02-15',
-    dueDate: '2024-08-15',
-    departmentId: 'dept1',
-    departmentName: 'Computer Science',
-    groupMembers: ['Henry Ford', 'Ivy Chen'],
-    evaluators: ['Dr. Michael Chen'],
-    budget: 15000,
-    category: 'VR/AR',
-    tags: ['VR', 'Education', 'Simulation'],
-    lastActivity: '2024-03-10',
-    semester: 'Spring 2024',
-    description: "A virtual reality laboratory simulator to support science education and experiments.",
-    technologies: ["Unity", "C#", "Blender", "SteamVR"],
-    milestones: [
-      { name: "Requirements Analysis", status: "completed", dueDate: "2024-03-01" },
-      { name: "System Design", status: "in-progress", dueDate: "2024-04-15" },
-      { name: "3D Modeling", status: "in-progress", dueDate: "2024-05-30" },
-      { name: "Testing", status: "pending", dueDate: "2024-08-15" },
-    ],
-  }
-];
 
 const mockPastProjects: PastProject[] = [
   {
@@ -400,11 +393,19 @@ function ActiveProjectMemberDetailDialog({
   onClose: () => void
 }) {
   if (!project || !member) return null
-  const fellowMembers = project.groupMembers.filter((m) => m !== member)
+  const memberProfiles = project.groupMemberProfiles?.length
+    ? project.groupMemberProfiles
+    : project.groupMembers.map((name) => ({ name, avatarUrl: null }))
+  const activeMemberProfile = memberProfiles.find((item) => item.name === member)
+  const fellowMembers = memberProfiles.filter((item) => item.name !== member)
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{member} details</DialogTitle>
+          <DialogDescription>View active project member details.</DialogDescription>
+        </DialogHeader>
         <div className="relative h-[4.5rem] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
           <Button
             variant="ghost"
@@ -417,9 +418,12 @@ function ActiveProjectMemberDetailDialog({
             Back
           </Button>
           <div className="absolute -bottom-6 left-5">
-            <div className="h-12 w-12 rounded-full bg-primary/15 border-2 border-background flex items-center justify-center font-bold text-primary text-base shadow-sm">
-              {memberInitials(member)}
-            </div>
+            <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+              {activeMemberProfile?.avatarUrl ? <AvatarImage src={activeMemberProfile.avatarUrl} /> : null}
+              <AvatarFallback className="bg-primary/15 font-bold text-primary text-base">
+                {memberInitials(member)}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
 
@@ -440,7 +444,7 @@ function ActiveProjectMemberDetailDialog({
 
         {/* KPI strip (aligned with team detail page) */}
         <div className="px-5 py-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
             {[
               {
                 label: "Members",
@@ -458,24 +462,6 @@ function ActiveProjectMemberDetailDialog({
                 icon: Activity,
                 iconBg: "bg-primary/10",
                 iconColor: "text-primary",
-              },
-              {
-                label: "Semester",
-                value: project.semester ?? "—",
-                icon: Calendar,
-                iconBg: "bg-muted/80",
-                iconColor: "text-muted-foreground",
-              },
-              {
-                label: "Last Activity",
-                value: new Date(project.lastActivity).toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                }),
-                icon: Clock,
-                iconBg: "bg-muted/80",
-                iconColor: "text-muted-foreground",
               },
             ].map((k) => (
               <div
@@ -514,7 +500,7 @@ function ActiveProjectMemberDetailDialog({
                 { label: "Advisor",     value: project.advisorName },
                 { label: "Department",  value: project.departmentName },
                 { label: "Progress",    value: `${project.progress}%` },
-                { label: "Due date",     value: new Date(project.dueDate).toLocaleDateString() },
+                { label: "Due date",     value: formatOptionalDate(project.dueDate) },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -538,13 +524,16 @@ function ActiveProjectMemberDetailDialog({
                 <ul className="space-y-1.5">
                   {fellowMembers.map((m) => (
                     <li
-                      key={m}
+                      key={m.name}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
                     >
-                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-semibold text-primary">{memberInitials(m)}</span>
-                      </div>
-                      <span className="text-sm truncate">{m}</span>
+                      <Avatar className="h-7 w-7 shrink-0">
+                        {m.avatarUrl ? <AvatarImage src={m.avatarUrl} /> : null}
+                        <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+                          {memberInitials(m.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm truncate">{m.name}</span>
                     </li>
                   ))}
                 </ul>
@@ -579,6 +568,10 @@ function PastProjectMemberDetailDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{member} details</DialogTitle>
+          <DialogDescription>View completed project member details.</DialogDescription>
+        </DialogHeader>
         <div className="relative h-[4.5rem] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
           <Button
             variant="ghost"
@@ -728,8 +721,14 @@ function PastProjectMemberDetailDialog({
 }
 
 export default function ProjectsOverview() {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const overviewQuery = useDepartmentProjectsOverview({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
   const [searchTerm, setSearchTerm] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [selectedProject, setSelectedProject] = useState<PastProject | null>(null)
   const [showPastDetails, setShowPastDetails] = useState(false)
   const [activeTab, setActiveTab] = useState<"active" | "past">("active")
@@ -739,12 +738,35 @@ export default function ProjectsOverview() {
   const [selectedPastMemberName, setSelectedPastMemberName] = useState<string | null>(null)
   const [showProjectCommentDialog, setShowProjectCommentDialog] = useState(false)
   const [projectCommentText, setProjectCommentText] = useState("")
+  const activeProjectDetailsQuery = useProjectDetails({
+    projectId: showActiveDetails ? selectedActiveProject?.id : null,
+    enabled: showActiveDetails && Boolean(selectedActiveProject?.id),
+  })
 
-  // Get unique categories
-  const allProjects = [...mockActiveProjects, ...mockPastProjects];
-  const categories = ['all', ...new Set(allProjects.map(p => p.category))];
+  const departmentName = user?.departmentName ?? user?.department?.name ?? "Department"
+  const activeProjects = (overviewQuery.data?.projects ?? []).map((project) => ({
+    id: project.id,
+    title: project.projectName,
+    groupName: project.group.name,
+    advisorName: formatAdvisorName(project.advisor),
+    status: project.status.toLowerCase().replace(/_/g, "-") as Project["status"],
+    progress: project.milestoneProgressPercent,
+    startDate: "",
+    dueDate: "",
+    departmentId: departmentId ?? "",
+    departmentName,
+    groupMembers: [],
+    groupMemberProfiles: [],
+    evaluators: [],
+    category: "—",
+    tags: [],
+    lastActivity: "",
+    description: "",
+    technologies: [],
+  }))
+  const allProjects = [...activeProjects, ...mockPastProjects];
 
-  // Filter projects based on search and category
+  // Filter projects based on search
   const filterProjects = <T extends Project | PastProject>(projects: T[]): T[] => {
     return projects.filter((p) => {
       const matchesSearch = 
@@ -752,14 +774,12 @@ export default function ProjectsOverview() {
         p.groupName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.advisorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
-      
-      return matchesSearch && matchesCategory;
+
+      return matchesSearch;
     });
   };
 
-  const filteredActiveProjects = filterProjects(mockActiveProjects)
+  const filteredActiveProjects = filterProjects(activeProjects)
   const filteredPastProjects = filterProjects(mockPastProjects)
 
   const handleViewPastProject = (project: PastProject) => {
@@ -815,12 +835,18 @@ export default function ProjectsOverview() {
     })
   };
 
-  // Calculate statistics
-  const totalProjects = allProjects.length;
-  const activeCount = mockActiveProjects.length;
-  const completedCount = mockPastProjects.length;
-  const avgProgress = Math.round(mockActiveProjects.reduce((acc, p) => acc + p.progress, 0) / mockActiveProjects.length);
-  const totalBudget = allProjects.reduce((acc, p) => acc + (p.budget || 0), 0);
+  const totalProjectsValue = overviewQuery.data?.totalProjects ?? 0;
+  const activeProjectsValue = overviewQuery.data?.activeProjects ?? 0;
+  const completedProjectsValue = overviewQuery.data?.completedProjects ?? 0;
+  const cancelledProjectsValue = overviewQuery.data?.cancelledProjects ?? 0;
+
+  const renderOverviewValue = (value: number) => {
+    if (overviewQuery.isLoading) {
+      return "..."
+    }
+
+    return value
+  }
 
   const activeColumns: Column<Project>[] = [
     { 
@@ -850,9 +876,14 @@ export default function ProjectsOverview() {
       key: 'advisor', 
       header: 'Advisor', 
       render: (p) => (
-        <div className="min-w-[150px]">
-          <p className="font-medium truncate" title={p.advisorName}>{p.advisorName}</p>
-          <p className="text-xs text-muted-foreground truncate" title={p.departmentName}>{p.departmentName}</p>
+        <div className="min-w-[180px] flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
+            {memberInitials(p.advisorName)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate" title={p.advisorName}>{p.advisorName}</p>
+            <p className="text-xs text-muted-foreground truncate" title={p.departmentName}>{p.departmentName}</p>
+          </div>
         </div>
       )
     },
@@ -866,9 +897,6 @@ export default function ProjectsOverview() {
             <span className="font-medium">{p.progress}%</span>
           </div>
           <Progress value={p.progress} className="h-2" />
-          <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
-            Due: {new Date(p.dueDate).toLocaleDateString()}
-          </p>
         </div>
       )
     },
@@ -876,13 +904,6 @@ export default function ProjectsOverview() {
       key: 'status', 
       header: 'Status', 
       render: (p) => <StatusBadge status={p.status} /> 
-    },
-    { 
-      key: 'category', 
-      header: 'Category', 
-      render: (p) => (
-        <Badge variant="outline" className="whitespace-nowrap">{p.category}</Badge>
-      )
     },
     { 
       key: 'actions', 
@@ -1250,21 +1271,16 @@ export default function ProjectsOverview() {
   }
 
   const renderActiveProjectDetails = (project: Project) => {
+    const teamMembers = project.groupMemberProfiles?.length
+      ? project.groupMemberProfiles
+      : project.groupMembers.map((name) => ({ name, avatarUrl: null }))
+
     return (
       <div className="min-h-screen bg-muted/30 overflow-y-auto">
         <div className="border-b bg-background">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
-                <DashboardBackButton
-                  onClick={() => {
-                    setSelectedActiveMemberName(null)
-                    setShowProjectCommentDialog(false)
-                    setProjectCommentText("")
-                    setShowActiveDetails(false)
-                  }}
-                />
-                <div className="hidden sm:block h-10 w-px bg-border shrink-0" />
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="h-11 w-11 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
                     <FolderOpen className="h-5 w-5 text-muted-foreground" />
@@ -1286,13 +1302,7 @@ export default function ProjectsOverview() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Badge variant="outline" className="px-2.5 py-1 font-mono text-xs">
-                  ID {project.id}
-                </Badge>
                 <StatusBadge status={project.status} />
-                <Badge variant="secondary" className="px-2.5 py-1 font-normal">
-                  {project.category}
-                </Badge>
               </div>
             </div>
           </div>
@@ -1309,7 +1319,9 @@ export default function ProjectsOverview() {
                   Project overview
                 </CardTitle>
                 <CardDescription className="text-sm leading-relaxed">
-                  {project.description || "No description provided."}
+                  {activeProjectDetailsQuery.isLoading && !activeProjectDetailsQuery.data
+                    ? "Loading project details..."
+                    : project.description || "No description provided."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-5">
@@ -1318,13 +1330,11 @@ export default function ProjectsOverview() {
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Details</h4>
                     <DetailRow label="Advisor" value={project.advisorName} />
                     <DetailRow label="Department" value={project.departmentName} />
-                    <DetailRow label="Category" value={project.category} />
                     <DetailRow label="Budget" value={`$${project.budget?.toLocaleString() ?? "—"}`} />
                   </div>
                   <div className="rounded-lg border bg-muted/20 px-4 py-3">
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Timeline</h4>
-                    <DetailRow label="Start" value={new Date(project.startDate).toLocaleDateString()} />
-                    <DetailRow label="Due" value={new Date(project.dueDate).toLocaleDateString()} />
+                    <DetailRow label="Start" value={formatOptionalDate(project.startDate)} />
                     <DetailRow label="Status" value={<StatusBadge status={project.status} />} />
                     <DetailRow label="Progress" value={`${project.progress}%`} />
                   </div>
@@ -1338,31 +1348,34 @@ export default function ProjectsOverview() {
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                     <Users className="h-4 w-4 text-primary" />
                   </span>
-                  Team ({project.groupMembers.length})
+                  Team ({teamMembers.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 max-h-[320px] overflow-y-auto [scrollbar-width:thin]">
                 <div className="space-y-2">
-                  {project.groupMembers.map((member) => (
+                  {teamMembers.map((member) => (
                     <div
-                      key={member}
+                      key={member.name}
                       className={cn(
                         "flex items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 transition-colors hover:bg-muted/40",
                         "sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-x-3"
                       )}
                     >
-                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
-                        {memberInitials(member)}
-                      </div>
-                      <span className="text-sm font-medium truncate min-w-0" title={member}>
-                        {member}
+                      <Avatar className="h-9 w-9 shrink-0">
+                        {member.avatarUrl ? <AvatarImage src={member.avatarUrl} /> : null}
+                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                          {memberInitials(member.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium truncate min-w-0" title={member.name}>
+                        {member.name}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs gap-1.5 shrink-0 w-full sm:w-auto justify-center sm:justify-center"
-                        title={`View ${member}`}
-                        onClick={() => setSelectedActiveMemberName(member)}
+                        title={`View ${member.name}`}
+                        onClick={() => setSelectedActiveMemberName(member.name)}
                       >
                         <Eye className="h-3.5 w-3.5" /> View
                       </Button>
@@ -1541,7 +1554,11 @@ export default function ProjectsOverview() {
   }
 
   if (showActiveDetails && selectedActiveProject) {
-    return renderActiveProjectDetails(selectedActiveProject)
+    const activeProjectForDetails = activeProjectDetailsQuery.data
+      ? mapProjectDetailToActiveProject(activeProjectDetailsQuery.data, selectedActiveProject)
+      : selectedActiveProject
+
+    return renderActiveProjectDetails(activeProjectForDetails)
   }
 
   if (showPastDetails && selectedProject) {
@@ -1559,12 +1576,6 @@ export default function ProjectsOverview() {
               <Download className="mr-2 h-4 w-4" />
               Export Report
             </Button>
-            <Button className="btn-gradient" asChild>
-              <Link href="/dashboard/department-head/projects/new">
-                <FolderOpen className="mr-2 h-4 w-4" />
-                New Project
-              </Link>
-            </Button>
           </div>
         }
       />
@@ -1576,15 +1587,15 @@ export default function ProjectsOverview() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
-                <p className="text-3xl font-bold mt-2">{totalProjects}</p>
+                <p className="text-3xl font-bold mt-2">{renderOverviewValue(totalProjectsValue)}</p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <Badge className="text-xs bg-primary/10 text-primary whitespace-nowrap">
                     <Activity className="h-3 w-3 mr-1" />
-                    Active: {activeCount}
+                    Active: {renderOverviewValue(activeProjectsValue)}
                   </Badge>
                   <Badge variant="secondary" className="text-xs whitespace-nowrap">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Done: {completedCount}
+                    Done: {renderOverviewValue(completedProjectsValue)}
                   </Badge>
                 </div>
               </div>
@@ -1600,13 +1611,7 @@ export default function ProjectsOverview() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
-                <p className="text-3xl font-bold mt-2">{activeCount}</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">
-                    Avg progress: <span className="font-semibold text-foreground">{avgProgress}%</span>
-                  </span>
-                </div>
+                <p className="text-3xl font-bold mt-2">{renderOverviewValue(activeProjectsValue)}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
                 <Activity className="h-6 w-6 text-emerald-600" />
@@ -1620,13 +1625,7 @@ export default function ProjectsOverview() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-3xl font-bold mt-2">{completedCount}</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Award className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">
-                    Avg grade: <span className="font-semibold text-foreground">90%</span>
-                  </span>
-                </div>
+                <p className="text-3xl font-bold mt-2">{renderOverviewValue(completedProjectsValue)}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
                 <CheckCircle className="h-6 w-6 text-amber-600" />
@@ -1639,17 +1638,11 @@ export default function ProjectsOverview() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
-                <p className="text-3xl font-bold mt-2">${(totalBudget / 1000).toFixed(1)}K</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Users className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">
-                    {allProjects.reduce((acc, p) => acc + p.groupMembers.length, 0)} students
-                  </span>
-                </div>
+                <p className="text-sm font-medium text-muted-foreground">Cancelled Projects</p>
+                <p className="text-3xl font-bold mt-2">{renderOverviewValue(cancelledProjectsValue)}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <DollarSign className="h-6 w-6 text-primary" />
+                <Archive className="h-6 w-6 text-primary" />
               </div>
             </div>
           </CardContent>
@@ -1668,26 +1661,14 @@ export default function ProjectsOverview() {
           />
         </div>
         <div className="flex gap-2 shrink-0">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="min-w-[160px] h-9 text-sm bg-background border-0 shadow-sm">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat} className="text-sm">
-                  {cat === "all" ? "All Categories" : cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(searchTerm || categoryFilter !== "all") && (
+          {searchTerm && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSearchTerm(""); setCategoryFilter("all") }}
+              onClick={() => setSearchTerm("")}
               className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground"
             >
-              <Filter className="h-3.5 w-3.5 mr-1" /> Clear
+              Clear
             </Button>
           )}
         </div>
