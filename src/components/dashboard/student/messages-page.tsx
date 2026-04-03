@@ -2282,7 +2282,7 @@ export function StudentMessagesPage() {
         </TabsList>
 
         <TabsContent value="chats" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3 h-[calc(100vh-280px)] min-h-[600px]">
+          <div className="grid gap-4 lg:grid-cols-3 h-auto min-h-0 lg:h-[calc(100vh-280px)] lg:min-h-[600px]">
             {/* Conversations List */}
             <Card className="flex min-h-0 flex-col lg:col-span-1">
               <CardHeader className="pb-3">
@@ -2906,7 +2906,7 @@ export function StudentMessagesPage() {
         </TabsContent>
 
         <TabsContent value="advisor" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3 h-[calc(100vh-280px)] min-h-[600px]">
+          <div className="grid gap-4 lg:grid-cols-3 h-auto min-h-0 lg:h-[calc(100vh-280px)] lg:min-h-[600px]">
             {/* Advisor conversation list (single item) */}
             <Card className="flex min-h-0 flex-col lg:col-span-1">
               <CardHeader className="pb-3">

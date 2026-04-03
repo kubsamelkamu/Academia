@@ -916,7 +916,7 @@ export function StudentTeamPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{groupMembers.length}</div>
