@@ -5,13 +5,16 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { useMemo, useCallback, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useQueries } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth-store"
+import { getAdvisorProjectGroupChatRoom, listChatRoomMessages } from "@/lib/api/chat"
 import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
 import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
 import type { ApiAdvisorProject } from "@/lib/api/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -90,6 +93,42 @@ const formatDate = (iso: string) => {
     month: "short", 
     day: "numeric" 
   })
+}
+
+const formatRelativeTime = (iso?: string | null) => {
+  if (!iso) return ""
+
+  const timestamp = new Date(iso).getTime()
+  if (Number.isNaN(timestamp)) return ""
+
+  const diffMs = Date.now() - timestamp
+  const diffMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)))
+
+  if (diffMinutes < 1) return "Just now"
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+}
+
+const getSenderInitials = (name?: string | null) => {
+  if (!name) return "?"
+
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+
+  return initials || "?"
 }
 
 const getDaysRemaining = (dueDate: string) => {
@@ -398,6 +437,35 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     () => (projectsQuery.data ?? []).map(mapApiProject),
     [projectsQuery.data]
   )
+
+  const advisorProjects = projectsQuery.data ?? []
+
+  const chatRoomQueries = useQueries({
+    queries: advisorProjects.map((project) => ({
+      queryKey: ["chat", "advisor-dashboard", "room", project.id],
+      queryFn: () => getAdvisorProjectGroupChatRoom(project.id),
+      enabled: Boolean(project.id),
+      staleTime: 30_000,
+      retry: false,
+    })),
+  })
+
+  const latestMessageQueries = useQueries({
+    queries: advisorProjects.map((project, index) => {
+      const roomId = chatRoomQueries[index]?.data?.roomId ?? null
+
+      return {
+        queryKey: ["chat", "advisor-dashboard", "latest-message", project.id, roomId],
+        queryFn: () => {
+          if (!roomId) throw new Error("roomId is required")
+          return listChatRoomMessages({ roomId, limit: 3 })
+        },
+        enabled: Boolean(roomId),
+        staleTime: 5_000,
+        retry: false,
+      }
+    }),
+  })
   
   const pendingMilestones = useMemo(() => 
     myProjects.flatMap((p) => 
@@ -407,6 +475,36 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     ), 
     [myProjects]
   )
+
+  const recentMessages = useMemo(() => {
+    return advisorProjects
+      .flatMap((project, index) => {
+        const items = latestMessageQueries[index]?.data?.items ?? []
+
+        return items.map((message) => {
+          const senderName = `${message.sender.firstName} ${message.sender.lastName}`.trim() || "Unknown user"
+
+          return {
+            id: message.id,
+            sender: senderName,
+            senderAvatar: message.sender.avatarUrl,
+            content: message.text || message.attachment?.name || "Attachment sent",
+            timestamp: message.createdAt,
+            projectId: project.id,
+          }
+        })
+      })
+      .sort(
+        (left, right) =>
+          new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+      )
+      .slice(0, 3)
+  }, [advisorProjects, latestMessageQueries])
+
+  const isRecentMessagesLoading =
+    projectsQuery.isLoading ||
+    chatRoomQueries.some((query) => query.isLoading) ||
+    latestMessageQueries.some((query) => query.isLoading)
 
   const stats = useMemo(() => {
     const metrics = summaryQuery.data?.metrics
@@ -601,34 +699,52 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
                 <CardTitle className="font-display text-lg">Recent Messages</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-medium text-primary">
-                          {['M', 'J', 'A'][i-1]}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm truncate">
-                            {['Maria Garcia', 'John Smith', 'Alex Chen'][i-1]}
-                          </p>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {i*2}h ago
-                          </span>
+                {isRecentMessagesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="flex gap-3 rounded-lg bg-muted/20 p-3 animate-pulse">
+                        <div className="h-10 w-10 rounded-full bg-muted" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 w-1/3 rounded bg-muted" />
+                          <div className="h-4 w-full rounded bg-muted" />
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {[
-                            "Thank you for the feedback on our prototype!",
-                            "When is the next meeting scheduled?",
-                            "We've submitted the final report for review."
-                          ][i-1]}
-                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : recentMessages.length === 0 ? (
+                  <div className="rounded-lg bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                    No current messages available.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className="flex gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <Avatar className="h-10 w-10 flex-shrink-0">
+                          {message.senderAvatar ? (
+                            <AvatarImage src={message.senderAvatar} alt={message.sender} />
+                          ) : null}
+                          <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
+                            {getSenderInitials(message.sender)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-medium">{message.sender}</p>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                              {formatRelativeTime(message.timestamp)}
+                            </span>
+                          </div>
+                          <p className="truncate text-sm text-muted-foreground">
+                            {message.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 <Button asChild variant="outline" className="w-full">
                   <Link href="/dashboard/advisor/messages">
