@@ -98,19 +98,19 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-dvh overflow-hidden">
+    <div className="flex h-dvh overflow-hidden bg-background">
       <NotificationsRealtime />
       <ProjectGroupAnnouncementsRealtime />
       <DepartmentAnnouncementsRealtime />
       <ThemeCustomizer />
-      <aside className="hidden lg:block">
+      <aside className="hidden h-dvh shrink-0 overflow-hidden lg:block">
         <Sidebar user={shellUser} />
       </aside>
       <MobileSidebar user={shellUser} />
 
-      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-muted/10 p-4 sm:p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-muted/10 p-4 sm:p-6">
           <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
           {children}
         </main>

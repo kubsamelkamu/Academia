@@ -16,29 +16,57 @@ export type ProposalStatus =
   | "REJECTED"
   | (string & {})
 
+export interface ProposalParty {
+  id: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatarUrl?: string | null
+}
+
+export interface ProposalGroupMember {
+  user?: ProposalParty | null
+}
+
+export interface ProposalProjectGroup {
+  id: string
+  name?: string | null
+  leaderUserId?: string | null
+  leader?: ProposalParty | null
+  members?: ProposalGroupMember[] | null
+}
+
+export interface DepartmentProjectProposalsSummary {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+  draft: number
+}
+
+export interface DepartmentProjectProposalsResult {
+  items: ProjectProposal[]
+  summary: DepartmentProjectProposalsSummary
+}
+
 export interface ProjectProposal {
   id: string
   status: ProposalStatus
   titles?: string[]
   proposedTitles?: string[]
+  selectedTitleIndex?: number | null
   title?: string
   description?: string | null
-  documents: ProposalDocument[]
+  tenantId?: string | null
+  departmentId?: string | null
+  projectGroupId?: string | null
+  advisorId?: string | null
+  documents?: ProposalDocument[] | null
   feedback?: string | null
   submittedBy?: string | null
-  submitter?: {
-    id: string
-    firstName?: string
-    lastName?: string
-    email?: string
-  } | null
-  advisor?: {
-    id: string
-    firstName?: string
-    lastName?: string
-    email?: string
-    avatarUrl?: string | null
-  } | null
+  submitter?: ProposalParty | null
+  advisor?: ProposalParty | null
+  projectGroup?: ProposalProjectGroup | null
   submittedAt?: string | null
   createdAt?: string
   updatedAt?: string

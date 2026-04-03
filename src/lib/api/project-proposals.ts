@@ -1,5 +1,18 @@
 import apiClient from "@/lib/api/client"
-import type { CreateProjectProposalDraftDto, ProjectProposal } from "@/types/project-proposals"
+import type {
+  CreateProjectProposalDraftDto,
+  DepartmentProjectProposalsResult,
+  DepartmentProjectProposalsSummary,
+  ProjectProposal,
+} from "@/types/project-proposals"
+
+const EMPTY_SUMMARY: DepartmentProjectProposalsSummary = {
+  total: 0,
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+  draft: 0,
+}
 
 function extractProposalItems(payload: unknown): ProjectProposal[] {
   if (Array.isArray(payload)) return payload as ProjectProposal[]
@@ -8,6 +21,37 @@ function extractProposalItems(payload: unknown): ProjectProposal[] {
   const candidate = (payload as { items?: unknown }).items
   if (Array.isArray(candidate)) return candidate as ProjectProposal[]
   return []
+}
+
+function extractProposalSummary(payload: unknown): DepartmentProjectProposalsSummary {
+  if (!payload || typeof payload !== "object") {
+    return EMPTY_SUMMARY
+  }
+
+  const candidate = (payload as { summary?: unknown }).summary
+  if (!candidate || typeof candidate !== "object") {
+    return {
+      ...EMPTY_SUMMARY,
+      total: extractProposalItems(payload).length,
+    }
+  }
+
+  return {
+    total: Number((candidate as { total?: unknown }).total ?? 0),
+    pending: Number((candidate as { pending?: unknown }).pending ?? 0),
+    approved: Number((candidate as { approved?: unknown }).approved ?? 0),
+    rejected: Number((candidate as { rejected?: unknown }).rejected ?? 0),
+    draft: Number((candidate as { draft?: unknown }).draft ?? 0),
+  }
+}
+
+function extractDepartmentProposalResult(payload: unknown): DepartmentProjectProposalsResult {
+  const items = extractProposalItems(payload)
+
+  return {
+    items,
+    summary: extractProposalSummary(payload),
+  }
 }
 
 export async function createProposalDraft(dto: CreateProjectProposalDraftDto): Promise<ProjectProposal> {
@@ -74,4 +118,19 @@ export async function submitProposalForReview(proposalId: string): Promise<Proje
 export async function listMyGroupProposals(): Promise<ProjectProposal[]> {
   const response = await apiClient.get<unknown>("/projects/proposals/group")
   return extractProposalItems(response.data)
+}
+
+export async function listDepartmentProposals(departmentId: string): Promise<DepartmentProjectProposalsResult> {
+  const trimmedDepartmentId = departmentId.trim()
+  if (!trimmedDepartmentId) {
+    throw new Error("departmentId is required")
+  }
+
+  const response = await apiClient.get<unknown>("/projects/proposals", {
+    params: {
+      departmentId: trimmedDepartmentId,
+    },
+  })
+
+  return extractDepartmentProposalResult(response.data)
 }

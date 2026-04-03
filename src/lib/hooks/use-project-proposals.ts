@@ -4,15 +4,17 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   createProposalDraft,
   createProposalWithProposalPdf,
+  listDepartmentProposals,
   listMyGroupProposals,
   submitProposalForReview,
 } from "@/lib/api/project-proposals"
-import type { ProjectProposal } from "@/types/project-proposals"
+import type { DepartmentProjectProposalsResult, ProjectProposal } from "@/types/project-proposals"
 
 export function projectProposalKeys() {
   return {
     root: ["project-proposals"] as const,
     group: () => ["project-proposals", "group"] as const,
+    department: (departmentId: string) => ["project-proposals", "department", departmentId] as const,
   }
 }
 
@@ -22,6 +24,30 @@ export function useMyGroupProposals(enabled = true) {
     queryFn: () => listMyGroupProposals(),
     enabled,
     staleTime: 30_000,
+  })
+}
+
+export function useDepartmentProjectProposals(params: {
+  departmentId: string | null | undefined
+  enabled?: boolean
+}) {
+  const departmentId = params.departmentId?.trim() ? params.departmentId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(departmentId)
+
+  return useQuery<DepartmentProjectProposalsResult, Error>({
+    queryKey: enabled
+      ? projectProposalKeys().department(departmentId ?? "")
+      : projectProposalKeys().root,
+    queryFn: () => {
+      if (!departmentId) {
+        throw new Error("departmentId is required")
+      }
+
+      return listDepartmentProposals(departmentId)
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
   })
 }
 
