@@ -1281,6 +1281,15 @@ export default function ProjectsOverview() {
           <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+                <DashboardBackButton
+                  onClick={() => {
+                    setSelectedActiveMemberName(null)
+                    setShowProjectCommentDialog(false)
+                    setProjectCommentText("")
+                    setShowActiveDetails(false)
+                  }}
+                />
+                <div className="hidden sm:block h-10 w-px bg-border shrink-0" />
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="h-11 w-11 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0">
                     <FolderOpen className="h-5 w-5 text-muted-foreground" />

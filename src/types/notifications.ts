@@ -20,6 +20,7 @@ export type ListNotificationsParams = {
   status?: NotificationStatus
   limit?: number
   offset?: number
+  eventTypes?: string[]
 }
 
 export type ListNotificationsResponse = {

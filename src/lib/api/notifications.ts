@@ -11,8 +11,13 @@ import type {
 export async function listNotifications(
   params: ListNotificationsParams = {}
 ): Promise<ListNotificationsResponse> {
+  const normalizedParams = {
+    ...params,
+    eventTypes: params.eventTypes?.length ? params.eventTypes.join(",") : undefined,
+  }
+
   const response = await apiClient.get<ListNotificationsResponse>("/notifications", {
-    params,
+    params: normalizedParams,
   })
   return response.data
 }

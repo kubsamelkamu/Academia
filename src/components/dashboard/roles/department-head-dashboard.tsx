@@ -17,7 +17,6 @@ import {
   FolderOpen,
   ClipboardCheck,
   UserCheck,
-  RefreshCw,
   TrendingUp,
   Award,
   CheckCircle2,
@@ -28,12 +27,10 @@ import {
   Star,
   Activity,
   Clock,
-  Rocket,
   Zap,
   Target,
   Shield,
   Mail,
-  MapPin,
   Users2,
   GraduationCap,
   Grid3x3,
@@ -46,8 +43,14 @@ import {
   Send,
 } from "lucide-react"
 import { mockGrades } from "@/data/mockData"
+import {
+  DEPARTMENT_ACTIVITY_EVENT_TYPES,
+  normalizeDepartmentActivity,
+  type DepartmentActivityBadge,
+} from "@/lib/dashboard/department-activity"
+import { useNotificationsList } from "@/lib/hooks/use-notifications"
+import { useDepartmentProjectsOverview } from "@/lib/hooks/use-projects"
 import { useTenantUsers } from "@/lib/hooks/use-users"
-import { useBrowseProjectGroups } from "@/lib/hooks/use-project-groups"
 import { useTenantInvitationsList } from "@/lib/hooks/use-invitations"
 import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
@@ -69,14 +72,13 @@ type DepartmentUserRow = {
   department?: string
 }
 
-type ActivityItem = {
-  id: string
-  type: "submission" | "approval" | "comment" | "milestone" | "grade"
+type KpiCard = {
   title: string
-  description: string
-  user: string
-  time: string
-  status?: "pending" | "completed" | "warning"
+  value: number
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  href?: string
+  onClick?: () => void
+  sub?: string
 }
 
 // ============================================================================
@@ -94,19 +96,49 @@ function mapDashboardRoleLabel(roleName?: string): string {
   return roleName ?? "Unknown"
 }
 
+function getCurrentAcademicYearLabel(date = new Date()): string {
+  const year = date.getFullYear()
+  const startYear = date.getMonth() >= 7 ? year : year - 1
 
-const activityIcons: Record<ActivityItem["type"], React.ReactNode> = {
-  submission: <FileText className="h-3.5 w-3.5" />,
-  approval: <CheckCircle2 className="h-3.5 w-3.5" />,
-  comment: <MessageSquare className="h-3.5 w-3.5" />,
-  milestone: <Target className="h-3.5 w-3.5" />,
-  grade: <Award className="h-3.5 w-3.5" />,
+  return `AY ${startYear}-${startYear + 1}`
 }
 
-const activityStatusColor: Record<string, string> = {
-  completed: "text-emerald-600",
-  warning: "text-amber-600",
-  pending: "text-primary",
+function getActivityIcon(type: string): React.ComponentType<React.SVGProps<SVGSVGElement>> {
+  switch (type) {
+    case "PROPOSAL_SUBMITTED":
+    case "PROPOSAL_APPROVED":
+    case "PROPOSAL_REJECTED":
+    case "PROPOSAL_FEEDBACK_ADDED":
+      return FileText
+    case "PROJECT_GROUP_FORMED":
+      return Users2
+    case "MILESTONE_COMPLETED":
+      return Target
+    default:
+      return Activity
+  }
+}
+
+function getActivityToneClasses(badge: DepartmentActivityBadge): string {
+  switch (badge) {
+    case "pending":
+      return "text-amber-600"
+    case "completed":
+      return "text-emerald-600"
+    default:
+      return "text-primary"
+  }
+}
+
+function getActivityBadgeClasses(badge: DepartmentActivityBadge): string {
+  switch (badge) {
+    case "pending":
+      return "border-amber-200/70 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+    case "completed":
+      return "border-emerald-200/70 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+    default:
+      return "border-border bg-muted text-muted-foreground"
+  }
 }
 
 // ============================================================================
@@ -115,6 +147,7 @@ const activityStatusColor: Record<string, string> = {
 
 export function DepartmentHeadDashboard() {
   const authUser = useAuthStore((s) => s.user)
+  const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
   const [userSearchQuery, setUserSearchQuery] = useState("")
   const [userRoleFilter, setUserRoleFilter] = useState("all")
   const [usersPage, setUsersPage] = useState(1)
@@ -134,27 +167,41 @@ export function DepartmentHeadDashboard() {
   const {
     data: tenantUsers = [],
     isLoading: isUsersLoading,
-    isFetching: isUsersFetching,
-    refetch: refetchUsers,
   } = useTenantUsers()
-  
-  const { data: projectGroupsPage } = useBrowseProjectGroups({
-    enabled: true,
-    page: 1,
-    limit: 1,
+
+  const departmentOverviewQuery = useDepartmentProjectsOverview({
+    departmentId,
+    enabled: Boolean(departmentId),
   })
+  const activityFeedQuery = useNotificationsList(
+    {
+      limit: 5,
+      eventTypes: [...DEPARTMENT_ACTIVITY_EVENT_TYPES],
+    },
+    {
+      staleTime: 60_000,
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: true,
+    }
+  )
   
   const { data: pendingInvitations = [] } =
     useTenantInvitationsList({ status: "PENDING" })
 
   const departmentName = authUser?.departmentName ?? authUser?.department?.name ?? "Software Engineering"
   const universityName = authUser?.tenant?.name ?? "Haramaya University"
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
+  const academicYearLabel = getCurrentAcademicYearLabel()
+  const generatedAt = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
     year: "numeric",
-    month: "long",
-    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
   })
+    .format(new Date())
+    .replace(",", "")
 
   const pendingProjectGrades = mockGrades.filter((g) => g.status === "provisional")
   const approvedGrades = mockGrades.filter((g) => g.status === "final")
@@ -195,55 +242,16 @@ export function DepartmentHeadDashboard() {
     [dashboardUsers, userRoleFilter, userSearchQuery]
   )
 
-  const activities: ActivityItem[] = useMemo(
-    () => [
-    {
-      id: "1",
-      type: "submission",
-      title: "New project proposal submitted",
-        description: "Group 5 submitted their proposal for AI-Driven Healthcare System",
-      user: "Group 5",
-      time: "2 hours ago",
-      status: "pending",
-    },
-    {
-      id: "2",
-      type: "approval",
-      title: "Grade approval completed",
-      description: "Project grades for Group 3 have been approved",
-      user: "Dr. Sarah Johnson",
-      time: "5 hours ago",
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "comment",
-      title: "Feedback provided",
-      description: "Advisor provided feedback on Software Requirements Specification",
-      user: "Prof. Michael Chen",
-      time: "1 day ago",
-      status: "completed",
-    },
-    {
-      id: "4",
-      type: "milestone",
-      title: "Milestone achieved",
-      description: "Group 2 completed System Design Document",
-      user: "Group 2",
-      time: "2 days ago",
-      status: "completed",
-    },
-    {
-      id: "5",
-      type: "grade",
-      title: "Grades pending review",
-      description: "4 project grades awaiting department head approval",
-      user: "Coordinator",
-      time: "3 days ago",
-      status: "warning",
-    },
-    ],
-    []
+  const recentActivities = useMemo(
+    () => (activityFeedQuery.data?.notifications ?? []).slice(0, 5).map((notification) => {
+      const activity = normalizeDepartmentActivity(notification)
+
+      return {
+        ...activity,
+        href: undefined,
+      }
+    }),
+    [activityFeedQuery.data?.notifications]
   )
 
   const activeStudentsCount = tenantUsers.filter((u) => {
@@ -256,7 +264,8 @@ export function DepartmentHeadDashboard() {
     return (u.status ?? "").toUpperCase() === "ACTIVE" && role === "advisor"
   }).length
 
-  const activeProjectsCount = projectGroupsPage?.pagination.total ?? 0
+  const activeProjectsCount = departmentOverviewQuery.data?.activeProjects ?? 0
+  const activeAdvisorsKpiValue = departmentOverviewQuery.data?.activeAdvisors ?? activeAdvisorsCount
   const pendingApprovalsCount = pendingInvitations.length
 
   const usersTotalPages = Math.max(1, Math.ceil(filteredDashboardUsers.length / DASHBOARD_USERS_PAGE_SIZE))
@@ -323,32 +332,28 @@ export function DepartmentHeadDashboard() {
     })
   }, [])
 
-  const kpiCards = [
+  const kpiCards: KpiCard[] = [
     {
       title: "Active Students",
       value: activeStudentsCount,
-      sub: `+12% this semester`,
       icon: GraduationCap,
       href: "/dashboard/department-head/faculty",
     },
     {
       title: "Faculty Advisors",
-      value: activeAdvisorsCount,
-      sub: `${activeAdvisorsCount} currently active`,
+      value: activeAdvisorsKpiValue,
       icon: UserCheck,
       href: "/dashboard/department-head/faculty",
     },
     {
       title: "Active Projects",
       value: activeProjectsCount,
-      sub: `${completionRate.toFixed(0)}% completion rate`,
       icon: FolderOpen,
       href: "/dashboard/department-head/projects",
     },
     {
       title: "Pending Reviews",
       value: pendingApprovalsCount,
-      sub: pendingApprovalsCount > 0 ? "Requires your attention" : "All clear",
       icon: ClipboardCheck,
       href: undefined as string | undefined,
       onClick: () => setActiveTab("grades"),
@@ -374,23 +379,10 @@ export function DepartmentHeadDashboard() {
             {departmentName} · {universityName}
               </p>
             </div>
-        <div className="flex items-center gap-2 mt-1 sm:mt-0">
-          <span className="hidden sm:inline text-xs text-muted-foreground">{currentDate}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => refetchUsers()}
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isUsersFetching && "animate-spin")} />
-                Refresh
-              </Button>
-          <Button size="sm" className="gap-1.5" asChild>
-            <Link href="/dashboard/department-head/reports">
-              <Rocket className="h-3.5 w-3.5" />
-              Reports
-            </Link>
-              </Button>
+        <div className="mt-1 sm:mt-0">
+          <span className="inline-flex items-center rounded-md border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+            {generatedAt}
+          </span>
         </div>
       </div>
 
@@ -412,7 +404,7 @@ export function DepartmentHeadDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{card.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p>
+                {card.sub ? <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p> : null}
             </CardContent>
           </Card>
           )
@@ -563,7 +555,7 @@ export function DepartmentHeadDashboard() {
                       <CardDescription>Latest updates from your department</CardDescription>
                     </div>
                     <Button variant="ghost" size="sm" className="gap-1 text-xs h-7" asChild>
-                      <Link href="/dashboard/department-head/reports">
+                      <Link href="/dashboard/notifications">
                       View All
                         <ChevronRight className="h-3.5 w-3.5" />
                       </Link>
@@ -571,39 +563,70 @@ export function DepartmentHeadDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="overflow-y-auto max-h-72 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6 pb-4 pt-2 space-y-2">
-                  {activities.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="flex items-start gap-3 rounded-lg bg-muted/40 px-3 py-2.5"
-                    >
-                      <div className={cn(
-                        "mt-0.5 shrink-0",
-                        activityStatusColor[activity.status ?? "pending"]
-                      )}>
-                        {activityIcons[activity.type]}
+                  <div className="overflow-y-auto max-h-72 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6 pb-4 pt-2">
+                    {activityFeedQuery.isLoading && !activityFeedQuery.data ? (
+                      <div className="space-y-3">
+                        {[0, 1, 2].map((index) => (
+                          <div key={index} className="rounded-lg border bg-muted/30 px-3 py-3 animate-pulse">
+                            <div className="h-3 w-28 rounded bg-muted" />
+                            <div className="mt-2 h-4 w-3/4 rounded bg-muted" />
+                            <div className="mt-2 h-3 w-1/2 rounded bg-muted" />
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-tight">{activity.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{activity.description}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-muted-foreground">{activity.user}</span>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5" />
-                            {activity.time}
-                          </span>
+                    ) : activityFeedQuery.isError ? (
+                      <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                        Unable to load recent activity right now.
+                      </div>
+                    ) : recentActivities.length === 0 ? (
+                      <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                        No activity has been recorded for this feed yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Earlier
+                          </p>
+                          <div className="space-y-2">
+                            {recentActivities.map((activity) => {
+                              const Icon = getActivityIcon(activity.type)
+
+                              return (
+                                <div
+                                  key={activity.id}
+                                  className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-3"
+                                >
+                                  <div className={cn("mt-0.5 shrink-0", getActivityToneClasses(activity.badge))}>
+                                    <Icon className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold leading-tight">{activity.title}</p>
+                                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                                          {activity.description}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className={cn("shrink-0 capitalize text-[10px]", getActivityBadgeClasses(activity.badge))}>
+                                        {activity.badge}
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                                      <span className="truncate">{activity.context}</span>
+                                      <span className="flex items-center gap-1 shrink-0">
+                                        <Clock className="h-2.5 w-2.5" />
+                                        {activity.relativeTime || "Just now"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
-                      {activity.status && (
-                        <Badge
-                          variant={activity.status === "completed" ? "default" : activity.status === "warning" ? "outline" : "secondary"}
-                          className="capitalize text-[10px] shrink-0"
-                        >
-                          {activity.status}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -888,7 +911,6 @@ export function DepartmentHeadDashboard() {
                   { icon: Users, label: `${activeStudentsCount} Students` },
                   { icon: UserCheck, label: `${activeAdvisorsCount} Advisors` },
                   { icon: FolderOpen, label: `${activeProjectsCount} Active Projects` },
-                  { icon: MapPin, label: "Addis Ababa, Ethiopia" },
                 ].map(({ icon: Icon, label }) => (
                   <div key={label} className="flex items-center gap-2 text-sm">
                     <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -898,7 +920,7 @@ export function DepartmentHeadDashboard() {
                 </div>
               <div className="flex gap-2 pt-1">
                 <Badge variant="secondary" className="text-xs">Active</Badge>
-                <Badge variant="outline" className="text-xs">AY 2024–2025</Badge>
+                <Badge variant="outline" className="text-xs">{academicYearLabel}</Badge>
               </div>
             </CardContent>
           </Card>
