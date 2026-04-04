@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import {
+  AlertTriangle,
   ArrowLeft,
   BarChart3,
   BookOpen,
@@ -15,12 +16,19 @@ import {
   FileText,
   Filter,
   GraduationCap,
+  MessageSquare,
+  RefreshCw,
   Search,
   Users,
   XCircle,
 } from "lucide-react"
 import { toast } from "sonner"
-import { useDepartmentProjectProposals } from "@/lib/hooks/use-project-proposals"
+import {
+  useDepartmentProjectProposals,
+  useCreateProposalRejectionReminder,
+  useProjectProposalFeedbacks,
+  useUpdateProjectProposalStatus,
+} from "@/lib/hooks/use-project-proposals"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import type {
@@ -28,11 +36,13 @@ import type {
   ProjectProposal,
   ProposalDocument,
   ProposalParty,
+  ProjectProposalFeedback,
 } from "@/types/project-proposals"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -41,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
   SheetContent,
@@ -48,6 +59,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
 
 type TitleStatus = "pending" | "approved" | "rejected" | "draft"
 
@@ -67,7 +79,7 @@ type GroupSummary = {
 interface ProjectTitle {
   id: string
   title: string
-  description: string
+  description?: string
   groupId: string
   groupName: string
   managerName: string
@@ -118,6 +130,26 @@ function formatOptionalDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   })
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function formatDateTimeLocalMin(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
 }
 
 function daysAgo(value?: string | null) {
@@ -188,7 +220,7 @@ function mapProposalToTitle(proposal: ProjectProposal): ProjectTitle {
   return {
     id: proposal.id,
     title: proposal.title?.trim() || selectedTitle || proposedTitles[0] || "Untitled proposal",
-    description: proposal.description?.trim() || "No description provided.",
+    description: proposal.description?.trim() || undefined,
     groupId:
       proposal.projectGroupId?.trim() ||
       proposal.submitter?.id?.trim() ||
@@ -281,6 +313,112 @@ function openDocument(document: ProposalDocument) {
   window.open(document.url, "_blank", "noopener,noreferrer")
 }
 
+function ProposalFeedbackSection({
+  proposalId,
+  advisorName,
+  fallbackFeedback,
+  fallbackTimestamp,
+  enabled,
+}: {
+  proposalId: string
+  advisorName: string
+  fallbackFeedback?: string
+  fallbackTimestamp?: string | null
+  enabled: boolean
+}) {
+  const feedbackQuery = useProjectProposalFeedbacks({
+    proposalId,
+    enabled,
+  })
+
+  const feedbackItems = feedbackQuery.data ?? []
+  const fallbackItems: ProjectProposalFeedback[] =
+    !feedbackItems.length && fallbackFeedback
+      ? [
+          {
+            id: `proposal-feedback-fallback-${proposalId}`,
+            message: fallbackFeedback,
+            createdAt: fallbackTimestamp,
+            authorName: advisorName !== "Unassigned" ? advisorName : null,
+            authorRole: "Existing feedback",
+          },
+        ]
+      : []
+
+  const visibleFeedback = feedbackItems.length > 0 ? feedbackItems : fallbackItems
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <MessageSquare className="h-3.5 w-3.5" /> Feedback
+        </p>
+        {!feedbackQuery.isLoading && visibleFeedback.length > 0 && (
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+            {visibleFeedback.length} entr{visibleFeedback.length === 1 ? "y" : "ies"}
+          </Badge>
+        )}
+      </div>
+
+      {feedbackQuery.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div key={index} className="rounded-xl border bg-muted/20 px-4 py-3">
+              <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+              <div className="mt-3 h-3 w-full animate-pulse rounded bg-muted" />
+              <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      ) : feedbackQuery.isError ? (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Unable to load feedback right now</p>
+              <p className="mt-1 text-sm text-muted-foreground">{feedbackQuery.error.message}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => feedbackQuery.refetch()}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      ) : visibleFeedback.length > 0 ? (
+        <div className="space-y-2">
+          {visibleFeedback.map((feedback) => (
+            <div key={feedback.id} className="rounded-xl border bg-muted/20 px-4 py-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {feedback.authorName || feedback.authorEmail || "Reviewer"}
+                  </p>
+                  {feedback.authorRole && (
+                    <p className="text-xs text-muted-foreground">{feedback.authorRole}</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {formatDateTime(feedback.updatedAt ?? feedback.createdAt)}
+                </p>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/90">{feedback.message}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          No feedback has been added for this proposal yet.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ReviewSheet({
   title,
   open,
@@ -290,21 +428,149 @@ function ReviewSheet({
   open: boolean
   onClose: () => void
 }) {
+  const decisionMutation = useUpdateProjectProposalStatus()
+  const reminderMutation = useCreateProposalRejectionReminder()
+  const titleOptions = title?.proposedTitles.length ? title.proposedTitles : title ? [title.title] : []
+  const defaultApprovedTitleIndex =
+    title?.selectedTitleIndex !== null && title?.selectedTitleIndex !== undefined
+      ? Math.min(Math.max(title.selectedTitleIndex, 0), titleOptions.length - 1)
+      : 0
+  const [approvedTitleIndex, setApprovedTitleIndex] = useState(defaultApprovedTitleIndex)
+  const [rejectionFeedback, setRejectionFeedback] = useState("")
+  const [effectiveStatus, setEffectiveStatus] = useState<TitleStatus | null>(title?.status ?? null)
+  const [effectiveReviewNote, setEffectiveReviewNote] = useState<string | undefined>(title?.reviewNote)
+  const [reminderTitle, setReminderTitle] = useState("")
+  const [reminderMessage, setReminderMessage] = useState("")
+  const [reminderDeadlineAt, setReminderDeadlineAt] = useState("")
+  const [disableAfterDeadline, setDisableAfterDeadline] = useState(true)
+
+  React.useEffect(() => {
+    if (!title) return
+
+    setApprovedTitleIndex(defaultApprovedTitleIndex)
+    setRejectionFeedback(title.status === "rejected" ? title.reviewNote ?? "" : "")
+    setEffectiveStatus(title.status)
+    setEffectiveReviewNote(title.reviewNote)
+    setReminderTitle("")
+    setReminderMessage("")
+    setReminderDeadlineAt("")
+    setDisableAfterDeadline(true)
+  }, [defaultApprovedTitleIndex, title?.id, title?.reviewNote, title?.status])
+
   if (!title) return null
 
-  const statusConfig = STATUS_CFG[title.status]
+  const currentStatus = effectiveStatus ?? title.status
+  const statusConfig = STATUS_CFG[currentStatus]
+  const canCreateReminder = currentStatus === "rejected"
+
+  const handleApprove = async () => {
+    if (approvedTitleIndex < 0 || approvedTitleIndex > 2) {
+      toast.error("Select one of the proposed titles before approving.")
+      return
+    }
+
+    try {
+      await decisionMutation.mutateAsync({
+        proposalId: title.id,
+        dto: {
+          status: "APPROVED",
+          approvedTitleIndex,
+        },
+      })
+      toast.success("Proposal approved", {
+        description: "The selected title has been approved successfully.",
+      })
+      onClose()
+    } catch (error) {
+      toast.error("Unable to approve proposal", {
+        description: error instanceof Error ? error.message : "Try again.",
+      })
+    }
+  }
+
+  const handleReject = async () => {
+    const feedback = rejectionFeedback.trim()
+    if (!feedback) {
+      toast.error("Feedback is required when rejecting a proposal.")
+      return
+    }
+
+    try {
+      await decisionMutation.mutateAsync({
+        proposalId: title.id,
+        dto: {
+          status: "REJECTED",
+          feedback,
+        },
+      })
+      setEffectiveStatus("rejected")
+      setEffectiveReviewNote(feedback)
+      toast.success("Proposal rejected", {
+        description: "The rejection feedback has been sent. You can now schedule a reminder.",
+      })
+    } catch (error) {
+      toast.error("Unable to reject proposal", {
+        description: error instanceof Error ? error.message : "Try again.",
+      })
+    }
+  }
+
+  const handleCreateReminder = async () => {
+    const trimmedDeadline = reminderDeadlineAt.trim()
+    if (!trimmedDeadline) {
+      toast.error("Deadline is required for the reminder.")
+      return
+    }
+
+    const deadline = new Date(trimmedDeadline)
+    if (Number.isNaN(deadline.getTime())) {
+      toast.error("Enter a valid future deadline.")
+      return
+    }
+
+    if (deadline.getTime() <= Date.now()) {
+      toast.error("Reminder deadline must be in the future.")
+      return
+    }
+
+    try {
+      await reminderMutation.mutateAsync({
+        proposalId: title.id,
+        dto: {
+          deadlineAt: deadline.toISOString(),
+          ...(reminderTitle.trim() ? { title: reminderTitle.trim() } : {}),
+          ...(reminderMessage.trim() ? { message: reminderMessage.trim() } : {}),
+          disableAfterDeadline,
+        },
+      })
+      toast.success("Reminder created", {
+        description: "Students will receive the next deadline through their group announcements feed.",
+      })
+      setReminderTitle("")
+      setReminderMessage("")
+      setReminderDeadlineAt("")
+      setDisableAfterDeadline(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Try again."
+      toast.error("Unable to create reminder", {
+        description: message,
+      })
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className="w-full p-0 sm:max-w-lg">
+      <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl lg:max-w-2xl">
         <SheetHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <SheetTitle className="line-clamp-2 text-sm leading-snug">{title.title}</SheetTitle>
-              <SheetDescription className="mt-0.5 text-xs">
+              <SheetTitle className="line-clamp-3 break-words pr-4 text-sm leading-snug sm:text-base">
+                {title.title}
+              </SheetTitle>
+              <SheetDescription className="mt-0.5 break-words pr-4 text-xs sm:text-sm">
                 {title.groupName} · Advisor: {title.advisorName}
               </SheetDescription>
             </div>
@@ -315,7 +581,7 @@ function ReviewSheet({
         </SheetHeader>
 
         <div className="space-y-5 p-6">
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid gap-2 text-xs sm:grid-cols-2">
             {[
               { label: "Group", value: title.groupName },
               { label: "Submitted By", value: title.managerName },
@@ -324,7 +590,7 @@ function ReviewSheet({
             ].map((row) => (
               <div key={row.label} className="space-y-0.5 rounded-lg bg-muted/40 px-3 py-2">
                 <p className="text-muted-foreground">{row.label}</p>
-                <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                <p className="break-words text-sm font-semibold text-foreground">{row.value}</p>
               </div>
             ))}
           </div>
@@ -335,48 +601,58 @@ function ReviewSheet({
             </p>
             <div className="space-y-2 rounded-xl border bg-muted/20 px-4 py-3">
               {(title.proposedTitles.length ? title.proposedTitles : [title.title]).map((proposalTitle, index) => {
-                const isSelected = title.selectedTitleIndex === index
+                const isSelected = approvedTitleIndex === index
+                const isCommitteeSelected = title.selectedTitleIndex === index
 
                 return (
-                  <div key={`${title.id}-${proposalTitle}-${index}`} className="flex items-start gap-2 text-sm">
+                  <button
+                    key={`${title.id}-${proposalTitle}-${index}`}
+                    type="button"
+                    onClick={() => setApprovedTitleIndex(index)}
+                    className={cn(
+                      "flex w-full items-start gap-2 rounded-xl border px-3 py-3 text-left text-sm transition-colors",
+                      isSelected
+                        ? "border-primary/30 bg-primary/5"
+                        : "border-transparent hover:border-primary/15 hover:bg-background/70"
+                    )}
+                  >
                     <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
                       {index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="leading-relaxed">{proposalTitle}</p>
-                      {isSelected && (
-                        <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                          Selected by committee
-                        </span>
-                      )}
+                      <p className="break-words leading-relaxed">{proposalTitle}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {isSelected && (
+                          <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            Selected for approval
+                          </span>
+                        )}
+                        {isCommitteeSelected && (
+                          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground/80">
+                            Previously selected
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <BookOpen className="h-3.5 w-3.5" /> Description
-            </p>
+          {title.description && (
             <div className="rounded-xl border bg-muted/20 px-4 py-3">
-              <p className="text-sm leading-relaxed">{title.description}</p>
-            </div>
-          </div>
-
-          {title.reviewNote && (
-            <div
-              className={cn(
-                "rounded-xl border px-4 py-3 text-sm",
-                title.status === "rejected"
-                  ? "border-destructive/20 bg-destructive/5 text-destructive"
-                  : "border-primary/10 bg-primary/5 text-foreground"
-              )}
-            >
-              <span className="font-semibold">Feedback:</span> {title.reviewNote}
+              <p className="break-words text-sm leading-relaxed">{title.description}</p>
             </div>
           )}
+
+          <ProposalFeedbackSection
+            proposalId={title.id}
+            advisorName={title.advisorName}
+            fallbackFeedback={effectiveReviewNote}
+            fallbackTimestamp={title.submittedAt}
+            enabled={open}
+          />
 
           <Separator />
 
@@ -405,8 +681,106 @@ function ReviewSheet({
             )}
           </div>
 
-          <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-            Review actions are intentionally read-only in this first integration step. Approve, reject, and bulk review actions will be wired to backend endpoints next.
+          <div className="space-y-4 rounded-xl border border-dashed bg-muted/20 px-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor={`rejection-feedback-${title.id}`}>Rejection feedback</Label>
+              <Textarea
+                id={`rejection-feedback-${title.id}`}
+                value={rejectionFeedback}
+                onChange={(event) => setRejectionFeedback(event.target.value)}
+                placeholder="Explain what needs to be improved before the proposal can be approved..."
+                className="min-h-[120px] resize-none bg-background"
+              />
+              <p className="text-xs text-muted-foreground">
+                This field is used only when rejecting a proposal.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                className="gap-2"
+                onClick={handleApprove}
+                disabled={decisionMutation.isPending || reminderMutation.isPending || approvedTitleIndex < 0 || approvedTitleIndex > 2}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {decisionMutation.isPending ? "Saving..." : "Approve"}
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 hover:border-destructive hover:text-destructive"
+                onClick={handleReject}
+                disabled={decisionMutation.isPending || reminderMutation.isPending || !rejectionFeedback.trim()}
+              >
+                <XCircle className="h-4 w-4" />
+                {decisionMutation.isPending ? "Saving..." : "Reject"}
+              </Button>
+            </div>
+
+            {canCreateReminder && (
+              <div className="space-y-4 rounded-xl border bg-background px-4 py-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Create rejection reminder</p>
+                  <p className="text-xs text-muted-foreground">
+                    This reminder will appear in the student dashboard as the next deadline when the backend publishes it to group announcements.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor={`reminder-deadline-${title.id}`}>Deadline</Label>
+                    <Input
+                      id={`reminder-deadline-${title.id}`}
+                      type="datetime-local"
+                      value={reminderDeadlineAt}
+                      onChange={(event) => setReminderDeadlineAt(event.target.value)}
+                      min={formatDateTimeLocalMin()}
+                    />
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor={`reminder-title-${title.id}`}>Reminder title</Label>
+                    <Input
+                      id={`reminder-title-${title.id}`}
+                      value={reminderTitle}
+                      onChange={(event) => setReminderTitle(event.target.value)}
+                      placeholder="Optional title for the student-facing reminder"
+                    />
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor={`reminder-message-${title.id}`}>Reminder message</Label>
+                    <Textarea
+                      id={`reminder-message-${title.id}`}
+                      value={reminderMessage}
+                      onChange={(event) => setReminderMessage(event.target.value)}
+                      placeholder="Optional guidance for what the group should revise before the deadline"
+                      className="min-h-[100px] resize-none bg-background"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={`reminder-disable-${title.id}`}
+                    checked={disableAfterDeadline}
+                    onCheckedChange={setDisableAfterDeadline}
+                    disabled={reminderMutation.isPending}
+                  />
+                  <Label htmlFor={`reminder-disable-${title.id}`} className="cursor-pointer">
+                    Disable reminder after deadline
+                  </Label>
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleCreateReminder}
+                  disabled={decisionMutation.isPending || reminderMutation.isPending || !reminderDeadlineAt.trim()}
+                >
+                  {reminderMutation.isPending ? "Creating reminder..." : "Create reminder"}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </SheetContent>
@@ -502,10 +876,11 @@ function TitleRow({
 
       {expanded && (
         <div className="ml-9 space-y-3 border-t border-border/60 px-4 pb-4 pt-3">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</p>
-            <p className="text-sm leading-relaxed text-foreground/90">{title.description}</p>
-          </div>
+          {title.description && (
+            <div>
+              <p className="text-sm leading-relaxed text-foreground/90">{title.description}</p>
+            </div>
+          )}
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -893,7 +1268,7 @@ export default function CoordinatorTitleManagementPage() {
         title.groupName.toLowerCase().includes(query) ||
         title.managerName.toLowerCase().includes(query) ||
         title.advisorName.toLowerCase().includes(query) ||
-        title.description.toLowerCase().includes(query)
+        title.description?.toLowerCase().includes(query) || false
       const matchesStatus = statusFilter === "all" || title.status === statusFilter
       const matchesAdvisor = advisorFilter === "all" || title.advisorName === advisorFilter
 

@@ -36,6 +36,37 @@ export interface ProposalProjectGroup {
   members?: ProposalGroupMember[] | null
 }
 
+export interface ProjectProposalFeedback {
+  id: string
+  message: string
+  createdAt?: string | null
+  updatedAt?: string | null
+  authorName?: string | null
+  authorEmail?: string | null
+  authorRole?: string | null
+}
+
+export interface CreateProjectProposalRejectionReminderDto {
+  deadlineAt: string
+  title?: string
+  message?: string
+  disableAfterDeadline?: boolean
+}
+
+export interface ProjectProposalRejectionReminder {
+  id: string
+  proposalId: string
+  projectGroupId?: string | null
+  title?: string | null
+  message?: string | null
+  kind?: string | null
+  deadlineAt?: string | null
+  disableAfterDeadline?: boolean | null
+  expiredAt?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 export interface DepartmentProjectProposalsSummary {
   total: number
   pending: number
@@ -75,4 +106,11 @@ export interface ProjectProposal {
 export interface CreateProjectProposalDraftDto {
   titles: [string, string, string]
   description?: string
+}
+
+export interface UpdateProjectProposalStatusDto {
+  status: "APPROVED" | "REJECTED"
+  feedback?: string
+  advisorId?: string
+  approvedTitleIndex?: number
 }
