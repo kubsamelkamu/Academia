@@ -457,7 +457,9 @@ export default function CoordinatorApplicationsPage() {
   const rejectM  = useRejectGroupLeaderRequest()
 
   useEffect(() => {
-    setPage(1)
+    queueMicrotask(() => {
+      setPage(1)
+    })
   }, [debouncedSearch])
 
   const apiItems: AppItem[] = useMemo(() => {

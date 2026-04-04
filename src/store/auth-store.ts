@@ -436,15 +436,26 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      version: 2,
-      migrate: (persistedState) => {
-        const state = (persistedState as { tenantDomain?: string } | null) ?? null
-        return {
-          tenantDomain: state?.tenantDomain,
+      version: 3,
+      migrate: (persistedState, fromVersion) => {
+        if (fromVersion < 3) {
+          const state = (persistedState as { tenantDomain?: string } | null) ?? null
+          return {
+            tenantDomain: state?.tenantDomain,
+          }
+        }
+        return persistedState as {
+          tenantDomain?: string
+          accessToken?: string
+          refreshToken?: string
+          user?: AuthUser
         }
       },
       partialize: (state) => ({
         tenantDomain: state.tenantDomain,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        user: state.user,
       }),
     }
   )

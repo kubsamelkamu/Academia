@@ -167,39 +167,86 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
   ],
   advisor: [
     {
-      title: "Dashboard",
-      href: "/dashboard/advisor",
-      icon: LayoutDashboard,
+      title: "Advisor",
+      icon: Users,
+      children: [
+        {
+          title: "Dashboard",
+          href: "/dashboard/advisor",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "My Projects",
+          href: "/dashboard/advisor/my-projects",
+          icon: FolderKanban,
+        },
+        {
+          title: "Clear",
+          href: "/dashboard/advisor/students",
+          icon: GraduationCap,
+        },
+        {
+          title: "Evaluations",
+          href: "/dashboard/advisor/evaluations",
+          icon: ClipboardList,
+        },
+        {
+          title: "Schedule",
+          href: "/dashboard/advisor/schedule",
+          icon: Calendar,
+        },
+        {
+          title: "Messages",
+          href: "/dashboard/advisor/messages",
+          icon: FileText,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/advisor/announcements",
+          icon: Megaphone,
+        },
+      ],
     },
     {
-      title: "My Projects",
-      href: "/dashboard/advisor/my-projects",
-      icon: FolderKanban,
-    },
-    {
-      title: "Clear",
-      href: "/dashboard/advisor/students",
-      icon: GraduationCap,
-    },
-    {
-      title: "Evaluations",
-      href: "/dashboard/advisor/evaluations",
-      icon: ClipboardList,
-    },
-    {
-      title: "Schedule",
-      href: "/dashboard/advisor/schedule",
-      icon: Calendar,
-    },
-    {
-      title: "Messages",
-      href: "/dashboard/advisor/messages",
-      icon: FileText,
-    },
-    {
-      title: "Announcements",
-      href: "/dashboard/advisor/announcements",
-      icon: Megaphone,
+      title: "Evaluator",
+      icon: ClipboardCheck,
+      children: [
+        {
+          title: "Dashboard",
+          href: "/dashboard/advisor/evaluator",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Pending evaluations",
+          href: "/dashboard/advisor/evaluator/pending",
+          icon: Clock,
+        },
+        {
+          title: "Scheduled sessions",
+          href: "/dashboard/advisor/evaluator/scheduled",
+          icon: Calendar,
+        },
+        {
+          title: "Completed",
+          href: "/dashboard/advisor/evaluator/completed",
+          icon: CheckSquare,
+        },
+        {
+          title: "Projects",
+          href: "/dashboard/advisor/evaluator/projects",
+          icon: FolderKanban,
+        },
+        {
+          title: "Documents",
+          href: "/dashboard/advisor/evaluator/documents",
+          icon: FileText,
+        },
+        {
+          title: "Rubric",
+          href: "/dashboard/advisor/evaluator/rubric",
+          icon: BookOpen,
+        },
+      ],
     },
     {
       title: "Profile",

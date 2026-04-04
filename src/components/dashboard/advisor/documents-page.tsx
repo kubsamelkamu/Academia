@@ -1,29 +1,41 @@
- "use client"
+"use client"
 
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import PageHeader from "@/components/shared/PageHeader"
+import StatCard from "@/components/shared/StatCard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 import {
   Archive,
+  ArrowLeft,
+  BookOpen,
   CheckCircle,
+  ClipboardCheck,
   Download,
   Eye,
   File as FileIcon,
   FileText,
+  FolderKanban,
   Image as ImageIcon,
+  Layers,
   Search,
+  Shield,
   Upload,
   Video as VideoIcon,
 } from "lucide-react"
+
+import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 
 type DocumentStatus = "approved" | "pending_review" | "revision_required"
 
@@ -117,11 +129,11 @@ function fileIconFor(type: DocumentType) {
 function statusBadge(status: DocumentStatus) {
   switch (status) {
     case "approved":
-      return <Badge className="bg-success/10 text-success border-success/20">Approved</Badge>
+      return <Badge className="border-success/20 bg-success/10 text-success">Approved</Badge>
     case "pending_review":
-      return <Badge className="bg-warning/10 text-warning border-warning/20">Pending Review</Badge>
+      return <Badge className="border-warning/20 bg-warning/10 text-warning">Pending Review</Badge>
     case "revision_required":
-      return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Revision Required</Badge>
+      return <Badge className="border-destructive/20 bg-destructive/10 text-destructive">Revision Required</Badge>
     default:
       return <Badge variant="secondary">{status}</Badge>
   }
@@ -137,8 +149,11 @@ function formatDate(dateString: string) {
   })
 }
 
-export function AdvisorDocumentsPage() {
+export type AdvisorDocumentsPageVariant = "advisor" | "evaluator"
+
+export function AdvisorDocumentsPage({ variant = "advisor" }: { variant?: AdvisorDocumentsPageVariant }) {
   const router = useRouter()
+  const isEvaluator = variant === "evaluator"
   const [searchTerm, setSearchTerm] = React.useState("")
   const [filterType, setFilterType] = React.useState<"all" | DocumentType>("all")
   const [filterStatus, setFilterStatus] = React.useState<"all" | DocumentStatus>("all")
@@ -181,80 +196,91 @@ export function AdvisorDocumentsPage() {
     router.push(`/dashboard/advisor/reviews/${projectId}`)
   }
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+  const approvedCount = mockDocuments.filter((d) => d.status === "approved").length
+  const pendingCount = mockDocuments.filter((d) => d.status === "pending_review").length
+  const revisionCount = mockDocuments.filter((d) => d.status === "revision_required").length
+
+  const filtersInner = (
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+      <div className="relative flex-1">
+        <Search
+          className={cn(
+            "absolute left-3 text-muted-foreground",
+            isEvaluator ? "top-1/2 h-4 w-4 -translate-y-1/2" : "top-3 h-4 w-4",
+          )}
+          aria-hidden
+        />
+        <Input
+          placeholder={isEvaluator ? "Search name, project, or group…" : "Search documents, projects, or groups..."}
+          className="pl-9"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          aria-label="Search documents"
+        />
+      </div>
+      <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[300px]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Document Repository</h1>
-          <p className="text-sm text-muted-foreground">Review and manage project documents.</p>
+          <Label htmlFor="doc-filter-type" className="sr-only">
+            Type
+          </Label>
+          <Select value={filterType} onValueChange={(v) => setFilterType(v as "all" | DocumentType)}>
+            <SelectTrigger id="doc-filter-type" className="w-full">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="docx">Word</SelectItem>
+              <SelectItem value="image">Image</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+              <SelectItem value="zip">Archive</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/advisor">Back</Link>
-          </Button>
-          <Button asChild className="btn-gradient">
-            <Link href="/dashboard/advisor/upload">
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Document
-            </Link>
-          </Button>
+        <div>
+          <Label htmlFor="doc-filter-status" className="sr-only">
+            Status
+          </Label>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as "all" | DocumentStatus)}>
+            <SelectTrigger id="doc-filter-status" className="w-full">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="pending_review">Pending review</SelectItem>
+              <SelectItem value="revision_required">Revision required</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
+    </div>
+  )
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search documents, projects, or groups..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={filterType} onValueChange={(v) => setFilterType(v as "all" | DocumentType)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="pdf">PDF</SelectItem>
-                <SelectItem value="docx">Word Document</SelectItem>
-                <SelectItem value="image">Image</SelectItem>
-                <SelectItem value="video">Video</SelectItem>
-                <SelectItem value="zip">Archive</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as "all" | DocumentStatus)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="pending_review">Pending Review</SelectItem>
-                <SelectItem value="revision_required">Revision Required</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Documents table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Documents ({filteredDocuments.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
+  const documentsTable = (
+    <Card className={cn(isEvaluator && "overflow-hidden border-border/80 shadow-sm")}>
+      <CardHeader
+        className={cn(
+          isEvaluator && "border-b border-border/50 bg-muted/10",
+          !isEvaluator && "pb-3",
+        )}
+      >
+        <CardTitle className="text-lg">
+          Documents ({filteredDocuments.length}
+          {isEvaluator && (searchTerm.trim() || filterType !== "all" || filterStatus !== "all") ? " filtered" : ""})
+        </CardTitle>
+        {isEvaluator ? (
+          <CardDescription>Preview and download — approve/revise from the advisor documents area.</CardDescription>
+        ) : null}
+      </CardHeader>
+      <CardContent className={cn(isEvaluator && "p-0")}>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Document</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Uploaded By</TableHead>
+                <TableHead>Uploaded by</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Size</TableHead>
                 <TableHead>Uploaded</TableHead>
@@ -267,9 +293,9 @@ export function AdvisorDocumentsPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {fileIconFor(doc.type)}
-                      <div>
-                        <p className="font-medium">{doc.name}</p>
-                        <p className="text-sm text-muted-foreground">{doc.description}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium leading-snug">{doc.name}</p>
+                        <p className="line-clamp-2 text-sm text-muted-foreground">{doc.description}</p>
                       </div>
                     </div>
                   </TableCell>
@@ -299,19 +325,32 @@ export function AdvisorDocumentsPage() {
                   <TableCell className="text-sm text-muted-foreground">{formatDate(doc.uploadedAt)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleView(doc)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(isEvaluator && "h-9 w-9 rounded-lg")}
+                        onClick={() => handleView(doc)}
+                        aria-label="View document"
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDownload(doc)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(isEvaluator && "h-9 w-9 rounded-lg")}
+                        onClick={() => handleDownload(doc)}
+                        aria-label="Download"
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      {doc.status === "pending_review" && (
+                      {!isEvaluator && doc.status === "pending_review" ? (
                         <>
                           <Button
                             variant="outline"
                             size="sm"
                             className="text-success hover:text-success"
                             onClick={() => handleApprove()}
+                            aria-label="Approve"
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>
@@ -324,29 +363,234 @@ export function AdvisorDocumentsPage() {
                             Revision
                           </Button>
                         </>
-                      )}
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredDocuments.length === 0 && (
+              {filteredDocuments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
-                    No documents found.
+                  <TableCell colSpan={7} className="py-14 text-center">
+                    <p className="font-medium text-foreground">No documents match</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {isEvaluator ? "Clear search or filters to see the full library." : "Try adjusting filters."}
+                    </p>
+                    {isEvaluator ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => {
+                          setSearchTerm("")
+                          setFilterType("all")
+                          setFilterStatus("all")
+                        }}
+                      >
+                        Reset filters
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
-              )}
+              ) : null}
             </TableBody>
           </Table>
-        </CardContent>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  if (isEvaluator) {
+    return (
+      <div className="flex w-full min-w-0 flex-col gap-6 pb-10 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-4">
+            <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5 text-muted-foreground" asChild>
+              <Link href="/dashboard/advisor/evaluator">
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                Evaluator overview
+              </Link>
+            </Button>
+            <PageHeader
+              title="Document library"
+              description="Cross-project files for review while you evaluate — same repository as the advisor hub, tuned for read-only evaluator workflow."
+            />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button variant="default" size="sm" className="btn-gradient gap-2 shadow-md shadow-primary/20" asChild>
+              <Link href="/dashboard/advisor/evaluator/rubric">
+                <BookOpen className="h-4 w-4" aria-hidden />
+                Open rubric
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href="/dashboard/advisor/evaluator/pending">
+                <ClipboardCheck className="h-4 w-4" aria-hidden />
+                Pending queue
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href="/dashboard/advisor/evaluator/projects">
+                <FolderKanban className="h-4 w-4" aria-hidden />
+                Projects
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <section aria-label="Summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total files"
+            value={mockDocuments.length}
+            subtitle="Demo repository"
+            icon={FileText}
+            iconClassName="bg-primary/10 text-primary"
+          />
+          <StatCard
+            title="Approved"
+            value={approvedCount}
+            subtitle="Ready reference"
+            icon={CheckCircle}
+            iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          />
+          <StatCard
+            title="Pending review"
+            value={pendingCount}
+            subtitle="May need advisor action"
+            icon={Eye}
+            iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          />
+          <StatCard
+            title="Showing"
+            value={filteredDocuments.length}
+            subtitle={searchTerm.trim() || filterType !== "all" || filterStatus !== "all" ? "After filters" : "All rows"}
+            icon={Search}
+            iconClassName="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          />
+        </section>
+
+        <section
+          aria-label="Document review guide"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-12 xl:gap-5"
+        >
+          <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-primary/[0.07] via-background to-background p-5 shadow-sm sm:col-span-2 xl:col-span-7">
+            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" aria-hidden />
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Layers className="h-5 w-5" aria-hidden />
+              </span>
+              <div className="min-w-0 space-y-2 text-sm text-muted-foreground">
+                <p className="font-semibold text-foreground">Suggested reading order</p>
+                <p>
+                  Charter or proposal first, then UI artifacts, then deep PDFs. Watch videos once you know what should
+                  appear on screen. When you land from a pending card, narrow by <strong className="text-foreground">project</strong>{" "}
+                  and status so “approved reference” files are not mixed with in-flight advisor review.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm xl:col-span-5">
+            <div className="flex items-start gap-3">
+              <Shield className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p className="font-semibold text-foreground">Sensitivity &amp; scope</p>
+                <p>
+                  Treat uploads as student records—no off-channel sharing. Demo downloads only toast; production should log
+                  or watermark. If a file is older than the latest milestone, say so in rubric comments instead of assuming
+                  it is current.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/20 p-5 sm:col-span-2 xl:col-span-12">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                <strong className="text-foreground">Status column:</strong> pending review = artifact may still change—note
+                timestamps before citing. Revision required = known gaps; avoid scoring the same gap on multiple rubric
+                lines.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button variant="secondary" size="sm" className="gap-2 rounded-full" asChild>
+                  <Link href="/dashboard/advisor/evaluator/rubric">
+                    <BookOpen className="h-4 w-4 shrink-0" aria-hidden />
+                    {RUBRIC_TOTAL_MAX_PERCENT}% rubric
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2 rounded-full" asChild>
+                  <Link href="/dashboard/advisor/evaluator/pending">
+                    <ClipboardCheck className="h-4 w-4 shrink-0" aria-hidden />
+                    Pending queue
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="min-w-0 space-y-6">
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="border-b border-border/50 bg-muted/10 pb-3">
+              <CardTitle className="text-base">Find documents</CardTitle>
+              <CardDescription>Filter by name, type, or review status.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-5">{filtersInner}</CardContent>
+          </Card>
+          {documentsTable}
+          <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/15 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Advisor-owned:</span> upload, approve, and revision routing live
+              in the advisor shell.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/advisor/documents">
+                  <FileText className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                  Advisor hub
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/advisor/upload">
+                  <Upload className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                  Upload
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Document Repository</h1>
+          <p className="text-sm text-muted-foreground">Review and manage project documents.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/advisor">Back</Link>
+          </Button>
+          <Button asChild className="btn-gradient">
+            <Link href="/dashboard/advisor/upload">
+              <Upload className="mr-2 h-4 w-4" aria-hidden />
+              Upload Document
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-4">{filtersInner}</CardContent>
       </Card>
 
-      {/* Statistics */}
+      {documentsTable}
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <FileText className="h-6 w-6 text-primary" />
               </div>
               <div>
@@ -359,13 +603,11 @@ export function AdvisorDocumentsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-success/10 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
                 <CheckCircle className="h-6 w-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {mockDocuments.filter((d) => d.status === "approved").length}
-                </p>
+                <p className="text-2xl font-bold">{approvedCount}</p>
                 <p className="text-sm text-muted-foreground">Approved</p>
               </div>
             </div>
@@ -374,13 +616,11 @@ export function AdvisorDocumentsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
                 <Eye className="h-6 w-6 text-warning" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {mockDocuments.filter((d) => d.status === "pending_review").length}
-                </p>
+                <p className="text-2xl font-bold">{pendingCount}</p>
                 <p className="text-sm text-muted-foreground">Pending Review</p>
               </div>
             </div>
@@ -389,13 +629,11 @@ export function AdvisorDocumentsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
                 <FileIcon className="h-6 w-6 text-destructive" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {mockDocuments.filter((d) => d.status === "revision_required").length}
-                </p>
+                <p className="text-2xl font-bold">{revisionCount}</p>
                 <p className="text-sm text-muted-foreground">Revision Required</p>
               </div>
             </div>
@@ -407,4 +645,3 @@ export function AdvisorDocumentsPage() {
 }
 
 export default AdvisorDocumentsPage
-

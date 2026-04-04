@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { submitTenantVerificationDocument } from "@/lib/api/tenant-verification"
@@ -120,6 +121,7 @@ export function VerifyInstitutionPanel({ variant = "page" }: { variant?: VerifyI
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
   const fetchMe = useAuthStore((s) => s.fetchMe)
+  const authHydrated = useAuthStoreHydrated()
 
   const didRefreshOnMount = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -134,10 +136,11 @@ export function VerifyInstitutionPanel({ variant = "page" }: { variant?: VerifyI
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!authHydrated) return
     if (!accessToken && !isLoading) {
       router.replace("/login")
     }
-  }, [accessToken, isLoading, router])
+  }, [accessToken, authHydrated, isLoading, router])
 
   useEffect(() => {
     if (!accessToken || !user) {

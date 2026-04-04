@@ -1,7 +1,8 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
 import { DashboardHeader } from "@/components/layout/dashboard-header"
@@ -9,7 +10,6 @@ import { ThemeCustomizer } from "@/components/providers/theme-customizer"
 import { useAuthStore } from "@/store/auth-store"
 import { getPrimaryRoleFromBackendRoles } from "@/lib/auth/dashboard-role-paths"
 import { useNotificationsUnreadCount } from "@/lib/hooks/use-notifications"
-import { DepartmentHeadVerificationRouteGuard } from "@/components/dashboard/department-head-verification-route-guard"
 import { TenantEnforcementNotice } from "@/components/notifications/tenant-enforcement-notice"
 import { NotificationsRealtime } from "@/components/notifications/notifications-realtime"
 import { ProjectGroupAnnouncementsRealtime } from "@/components/realtime/project-group-announcements-realtime"
@@ -28,6 +28,19 @@ export default function DashboardLayout({
 
   const primaryRole = useMemo(() => getPrimaryRoleFromBackendRoles(user?.roles), [user?.roles])
   const shouldFetchMeRef = useRef(false)
+  const [authHydrated, setAuthHydrated] = useState(false)
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      queueMicrotask(() => {
+        setAuthHydrated(true)
+      })
+      return
+    }
+    return useAuthStore.persist.onFinishHydration(() => {
+      setAuthHydrated(true)
+    })
+  }, [])
 
   const { data: unreadCount } = useNotificationsUnreadCount({
     enabled: Boolean(accessToken),
@@ -37,10 +50,11 @@ export default function DashboardLayout({
   })
 
   useEffect(() => {
+    if (!authHydrated) return
     if (!accessToken && !isLoading) {
       router.replace("/login")
     }
-  }, [accessToken, isLoading, router])
+  }, [authHydrated, accessToken, isLoading, router])
 
   useEffect(() => {
     if (!accessToken || !user) {
@@ -85,6 +99,14 @@ export default function DashboardLayout({
     }
   }, [primaryRole, user])
 
+  if (!authHydrated) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    )
+  }
+
   if (!accessToken) {
     return null
   }
@@ -98,20 +120,36 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <div className="flex h-dvh max-h-dvh min-h-0 w-full overflow-hidden bg-background">
       <NotificationsRealtime />
       <ProjectGroupAnnouncementsRealtime />
       <DepartmentAnnouncementsRealtime />
       <ThemeCustomizer />
-      <aside className="hidden h-dvh shrink-0 overflow-hidden lg:block">
+      <aside
+        className="hidden h-dvh max-h-dvh min-h-0 shrink-0 overflow-hidden lg:flex lg:flex-col"
+        aria-label="Main navigation"
+      >
         <Sidebar user={shellUser} />
       </aside>
       <MobileSidebar user={shellUser} />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <DashboardHeader user={shellUser} notificationCount={unreadCount?.count ?? 0} />
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-muted/10 p-4 sm:p-6">
-          <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
+        <main
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-muted/10",
+            pathname.startsWith("/dashboard/advisor/evaluator")
+              ? "p-0"
+              : "p-4 sm:p-6",
+          )}
+        >
+          <div
+            className={cn(
+              pathname.startsWith("/dashboard/advisor/evaluator") && "px-4 pt-4 sm:px-6 sm:pt-5",
+            )}
+          >
+            <TenantEnforcementNotice role={shellUser.role} isAuthenticated={Boolean(accessToken)} />
+          </div>
           {children}
         </main>
       </div>
