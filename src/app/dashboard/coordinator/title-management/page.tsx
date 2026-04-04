@@ -84,6 +84,12 @@ interface ProjectTitle {
   groupName: string
   managerName: string
   memberCount: number
+  members: Array<{
+    id: string
+    name: string
+    email?: string
+    role?: string
+  }>
   advisorName: string
   submittedAt?: string | null
   status: TitleStatus
@@ -207,6 +213,48 @@ function collectMemberNames(proposal: ProjectProposal) {
   return Array.from(names)
 }
 
+function collectGroupMembers(proposal: ProjectProposal) {
+  const members = new Map<string, { id: string; name: string; email?: string; role?: string }>()
+
+  const leader = proposal.projectGroup?.leader
+  if (leader?.id) {
+    const leaderName = formatPersonName(leader)
+    members.set(leader.id, {
+      id: leader.id,
+      name: leaderName || leader.email || "Group leader",
+      email: leader.email,
+      role: "Leader",
+    })
+  }
+
+  for (const member of proposal.projectGroup?.members ?? []) {
+    const person = member.user
+    if (!person?.id) {
+      continue
+    }
+
+    const existing = members.get(person.id)
+    members.set(person.id, {
+      id: person.id,
+      name: formatPersonName(person) || person.email || "Group member",
+      email: person.email,
+      role: existing?.role ?? "Member",
+    })
+  }
+
+  const submitter = proposal.submitter
+  if (submitter?.id && !members.has(submitter.id)) {
+    members.set(submitter.id, {
+      id: submitter.id,
+      name: formatPersonName(submitter) || submitter.email || "Submitter",
+      email: submitter.email,
+      role: "Submitter",
+    })
+  }
+
+  return Array.from(members.values())
+}
+
 function mapProposalToTitle(proposal: ProjectProposal): ProjectTitle {
   const proposedTitles = (proposal.proposedTitles ?? proposal.titles ?? [])
     .map((title) => title.trim())
@@ -215,6 +263,7 @@ function mapProposalToTitle(proposal: ProjectProposal): ProjectTitle {
   const selectedTitle =
     selectedIndex !== null && selectedIndex >= 0 ? proposedTitles[selectedIndex] : undefined
   const memberNames = collectMemberNames(proposal)
+  const members = collectGroupMembers(proposal)
   const submitterName = formatPersonName(proposal.submitter) || proposal.submittedBy || "Unknown submitter"
 
   return {
@@ -229,6 +278,7 @@ function mapProposalToTitle(proposal: ProjectProposal): ProjectTitle {
     groupName: proposal.projectGroup?.name?.trim() || submitterName,
     managerName: submitterName,
     memberCount: memberNames.length || 1,
+    members,
     advisorName: formatPersonName(proposal.advisor) || "Unassigned",
     submittedAt: proposal.createdAt ?? proposal.updatedAt ?? proposal.submittedAt,
     status: normalizeStatus(proposal.status),
@@ -595,6 +645,37 @@ function ReviewSheet({
             ))}
           </div>
 
+          <div className="space-y-2">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Users className="h-3.5 w-3.5" /> Group Members
+            </p>
+            {title.members.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {title.members.map((member) => (
+                  <div key={member.id} className="rounded-xl border bg-muted/20 px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-foreground">{member.name}</p>
+                        {member.email && (
+                          <p className="break-all text-xs text-muted-foreground">{member.email}</p>
+                        )}
+                      </div>
+                      {member.role && (
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {member.role}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                Group member details are not available for this proposal.
+              </div>
+            )}
+          </div>
+
           <div className="space-y-1.5">
             <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <BookOpen className="h-3.5 w-3.5" /> Proposed Titles
@@ -925,10 +1006,11 @@ function GroupCard({
   const approvedCount = titles.filter((title) => title.status === "approved").length
   const rejectedCount = titles.filter((title) => title.status === "rejected").length
   const draftCount = titles.filter((title) => title.status === "draft").length
-  const latestSubmittedAt = titles
-    .map((title) => title.submittedAt)
-    .sort((left, right) => toTimestamp(right) - toTimestamp(left))[0]
+  const featuredTitle = titles[0] ?? null
+  const featuredStatus = featuredTitle ? STATUS_CFG[featuredTitle.status] : null
+  const latestSubmittedAt = featuredTitle?.submittedAt
   const documentsCount = titles.reduce((total, title) => total + title.documents.length, 0)
+  const featuredDocumentsCount = featuredTitle?.documents.length ?? 0
   const titlesTotalPages = Math.max(1, Math.ceil(titles.length / GROUP_TITLES_PER_PAGE))
   const safeTitlesPage = Math.min(currentTitlesPage, titlesTotalPages)
   const visibleTitles = titles.slice(
@@ -952,21 +1034,26 @@ function GroupCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold">{groupName}</h3>
-            {pendingCount > 0 && (
-              <Badge variant="outline" className="border-primary/20 bg-primary/10 text-xs text-primary">
-                {pendingCount} pending
+            {featuredStatus && (
+              <Badge variant="outline" className={`text-xs ${featuredStatus.cls}`}>
+                {featuredStatus.label}
               </Badge>
             )}
           </div>
           <div className="mt-1 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" /> {memberCount} members · {managerName}
+              <Clock className="h-3 w-3" /> {daysAgo(latestSubmittedAt)}
             </span>
             <span className="flex items-center gap-1">
-              <BookOpen className="h-3 w-3" /> Advisor: {advisorName}
+              <Users className="h-3 w-3" /> {memberCount} member{memberCount === 1 ? "" : "s"}
             </span>
+            {featuredDocumentsCount > 0 && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                {featuredDocumentsCount} document{featuredDocumentsCount === 1 ? "" : "s"}
+              </span>
+            )}
             <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Updated {daysAgo(latestSubmittedAt)}
+              <GraduationCap className="h-3 w-3" /> {groupName}
             </span>
           </div>
         </div>
