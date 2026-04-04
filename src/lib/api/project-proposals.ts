@@ -1,9 +1,13 @@
 import apiClient from "@/lib/api/client"
 import type {
+  CreateProjectProposalRejectionReminderDto,
   CreateProjectProposalDraftDto,
   DepartmentProjectProposalsResult,
   DepartmentProjectProposalsSummary,
   ProjectProposal,
+  ProjectProposalFeedback,
+  ProjectProposalRejectionReminder,
+  UpdateProjectProposalStatusDto,
 } from "@/types/project-proposals"
 
 const EMPTY_SUMMARY: DepartmentProjectProposalsSummary = {
@@ -52,6 +56,81 @@ function extractDepartmentProposalResult(payload: unknown): DepartmentProjectPro
     items,
     summary: extractProposalSummary(payload),
   }
+}
+
+function asNullableString(value: unknown): string | null {
+  if (typeof value !== "string") return null
+
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
+function extractFeedbackAuthorName(value: unknown): string | null {
+  if (!value || typeof value !== "object") {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const firstName = asNullableString(record.firstName)
+  const lastName = asNullableString(record.lastName)
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
+
+  return (
+    fullName ||
+    asNullableString(record.fullName) ||
+    asNullableString(record.name) ||
+    asNullableString(record.email)
+  )
+}
+
+function normalizeProposalFeedback(raw: unknown, index: number): ProjectProposalFeedback | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null
+  }
+
+  const record = raw as Record<string, unknown>
+  const message =
+    asNullableString(record.message) ||
+    asNullableString(record.feedback) ||
+    asNullableString(record.comment) ||
+    asNullableString(record.content) ||
+    asNullableString(record.note) ||
+    asNullableString(record.text)
+
+  if (!message) {
+    return null
+  }
+
+  const author =
+    (record.author && typeof record.author === "object" ? record.author : null) ||
+    (record.createdBy && typeof record.createdBy === "object" ? record.createdBy : null) ||
+    (record.user && typeof record.user === "object" ? record.user : null)
+
+  return {
+    id: asNullableString(record.id) || `proposal-feedback-${index}`,
+    message,
+    createdAt: asNullableString(record.createdAt) || asNullableString(record.timestamp),
+    updatedAt: asNullableString(record.updatedAt),
+    authorName: extractFeedbackAuthorName(author) || asNullableString(record.authorName),
+    authorEmail:
+      (author && typeof author === "object" ? asNullableString((author as Record<string, unknown>).email) : null) ||
+      asNullableString(record.authorEmail),
+    authorRole:
+      (author && typeof author === "object" ? asNullableString((author as Record<string, unknown>).role) : null) ||
+      asNullableString(record.authorRole),
+  }
+}
+
+function extractProposalFeedbackItems(payload: unknown): ProjectProposalFeedback[] {
+  const items = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)
+      ? (payload as { items: unknown[] }).items
+      : []
+
+  return items
+    .map((item, index) => normalizeProposalFeedback(item, index))
+    .filter((item): item is ProjectProposalFeedback => Boolean(item))
 }
 
 export async function createProposalDraft(dto: CreateProjectProposalDraftDto): Promise<ProjectProposal> {
@@ -133,4 +212,109 @@ export async function listDepartmentProposals(departmentId: string): Promise<Dep
   })
 
   return extractDepartmentProposalResult(response.data)
+}
+
+export async function listProposalFeedbacks(proposalId: string): Promise<ProjectProposalFeedback[]> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const response = await apiClient.get<unknown>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/feedbacks`
+  )
+
+  return extractProposalFeedbackItems(response.data)
+}
+
+export async function updateProposalStatus(
+  proposalId: string,
+  dto: UpdateProjectProposalStatusDto
+): Promise<ProjectProposal> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const status = String(dto.status ?? "").trim().toUpperCase()
+  if (status !== "APPROVED" && status !== "REJECTED") {
+    throw new Error("status must be APPROVED or REJECTED")
+  }
+
+  const payload: UpdateProjectProposalStatusDto = {
+    status,
+  }
+
+  if (status === "APPROVED") {
+    if (
+      typeof dto.approvedTitleIndex !== "number" ||
+      Number.isNaN(dto.approvedTitleIndex) ||
+      dto.approvedTitleIndex < 0 ||
+      dto.approvedTitleIndex > 2
+    ) {
+      throw new Error("approvedTitleIndex must be 0, 1, or 2 when approving")
+    }
+
+    payload.approvedTitleIndex = dto.approvedTitleIndex
+  }
+
+  if (status === "REJECTED") {
+    const feedback = dto.feedback?.trim()
+    if (!feedback) {
+      throw new Error("feedback is required when rejecting")
+    }
+
+    payload.feedback = feedback
+  }
+
+  if (dto.advisorId?.trim()) {
+    payload.advisorId = dto.advisorId.trim()
+  }
+
+  const response = await apiClient.put<ProjectProposal>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/status`,
+    payload
+  )
+
+  return response.data
+}
+
+export async function createProposalRejectionReminder(
+  proposalId: string,
+  dto: CreateProjectProposalRejectionReminderDto
+): Promise<ProjectProposalRejectionReminder> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const deadlineAt = dto.deadlineAt?.trim()
+  if (!deadlineAt) {
+    throw new Error("deadlineAt is required")
+  }
+
+  const payload: CreateProjectProposalRejectionReminderDto = {
+    deadlineAt,
+  }
+
+  const title = dto.title?.trim()
+  if (title) {
+    payload.title = title
+  }
+
+  const message = dto.message?.trim()
+  if (message) {
+    payload.message = message
+  }
+
+  if (typeof dto.disableAfterDeadline === "boolean") {
+    payload.disableAfterDeadline = dto.disableAfterDeadline
+  }
+
+  const response = await apiClient.post<ProjectProposalRejectionReminder>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/rejection-reminder`,
+    payload
+  )
+
+  return response.data
 }
