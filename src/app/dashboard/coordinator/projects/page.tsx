@@ -43,6 +43,7 @@ import type { ProjectProposal, ProposalParty } from '@/types/project-proposals'
 
 type AssignmentProject = ProjectSummary & {
   projectId?: string
+  isLegacyApprovedWithoutProject?: boolean
   advisorId?: string
   advisorName?: string
   advisorAvatarUrl?: string | null
@@ -106,6 +107,17 @@ function buildProjectLookupKey(title?: string | null, groupName?: string | null)
   return `${normalizeProjectLookupValue(title)}::${normalizeProjectLookupValue(groupName)}`
 }
 
+function resolveProposalDisplayTitle(proposal: ProjectProposal) {
+  const proposedTitles = (proposal.proposedTitles ?? proposal.titles ?? [])
+    .map((title) => title.trim())
+    .filter(Boolean)
+  const selectedIndex = proposal.selectedTitleIndex ?? null
+  const selectedTitle =
+    selectedIndex !== null && selectedIndex >= 0 ? proposedTitles[selectedIndex] : undefined
+
+  return proposal.title?.trim() || selectedTitle || proposedTitles[0] || 'Untitled proposal'
+}
+
 function collectProposalMemberNames(proposal: ProjectProposal) {
   const names = new Set<string>()
 
@@ -132,12 +144,13 @@ function collectProposalMemberNames(proposal: ProjectProposal) {
 function mapApprovedProposalToAssignmentProject(
   proposal: ProjectProposal,
   advisors: AdvisorOption[],
-  projectId: string | undefined,
   override?: AssignmentOverride
 ): AssignmentProject {
+  const projectId = proposal.project?.id?.trim() || undefined
   const advisorFromProposal = proposal.advisor
-  const advisorFromDirectory = proposal.advisorId
-    ? advisors.find((advisor) => advisor.id === proposal.advisorId)
+  const advisorUserId = proposal.project?.advisorId?.trim() || proposal.advisorId?.trim() || ''
+  const advisorFromDirectory = advisorUserId
+    ? advisors.find((advisor) => advisor.id === advisorUserId)
     : undefined
   const advisorName =
     override?.advisorName ||
@@ -150,10 +163,11 @@ function mapApprovedProposalToAssignmentProject(
   return {
     id: proposal.id,
     projectId,
-    title: proposal.title?.trim() || proposal.proposedTitles?.[0]?.trim() || 'Untitled proposal',
-    status: 'approved',
+    isLegacyApprovedWithoutProject: !projectId,
+    title: resolveProposalDisplayTitle(proposal),
+    status: proposal.project?.status?.trim().toLowerCase().replace(/_/g, '-') || 'approved',
     groupName: proposal.projectGroup?.name?.trim() || 'Student Group',
-    advisorId: override?.advisorId ?? proposal.advisorId?.trim() ?? '',
+    advisorId: override?.advisorId ?? advisorUserId,
     advisorName,
     advisorAvatarUrl,
     memberNames: collectProposalMemberNames(proposal),
@@ -293,6 +307,7 @@ function ProjectCard({
   const evaluators = mockUsers.filter(u => u.role === 'evaluator' && project.evaluatorIds.includes(u.id))
   const isAssigned = Boolean(project.advisorName)
   const isComplete = project.status === 'completed'
+  const isLegacyApprovedWithoutProject = Boolean(project.isLegacyApprovedWithoutProject)
   const visibleMembers = project.memberNames?.slice(0, 4) ?? []
   const remainingMembers = Math.max((project.memberNames?.length ?? 0) - visibleMembers.length, 0)
 
@@ -416,19 +431,34 @@ function ProjectCard({
       {/* Action */}
       <div className="flex items-center justify-between gap-2 pt-1">
         <Badge
-          variant={isComplete ? 'secondary' : isAssigned ? 'outline' : 'destructive'}
+          variant={
+            isLegacyApprovedWithoutProject
+              ? 'secondary'
+              : isComplete
+                ? 'secondary'
+                : isAssigned
+                  ? 'outline'
+                  : 'destructive'
+          }
           className="text-xs"
         >
-          {isComplete ? 'Completed' : isAssigned ? 'Assigned' : 'Needs Assignment'}
+          {isLegacyApprovedWithoutProject
+            ? 'Legacy Item'
+            : isComplete
+              ? 'Completed'
+              : isAssigned
+                ? 'Assigned'
+                : 'Needs Assignment'}
         </Badge>
         <Button
           variant="outline"
           size="sm"
           className="h-8 gap-1.5 text-xs hover:border-primary hover:text-primary"
+          disabled={isLegacyApprovedWithoutProject}
           onClick={() => onAssign(project)}
         >
           <UserPlus className="h-3.5 w-3.5" />
-          {isAssigned ? 'Reassign' : 'Assign Team'}
+          {isLegacyApprovedWithoutProject ? 'Legacy Item' : isAssigned ? 'Reassign' : 'Assign Team'}
         </Button>
       </div>
     </div>
@@ -473,35 +503,17 @@ export default function ProjectsPage() {
   }, [departmentAdvisorsQuery.data])
   const evaluators = mockUsers.filter(u => u.role === 'evaluator')
 
-  const overviewProjectsByKey = useMemo(() => {
-    const entries = new Map<string, string>()
-
-    for (const project of overviewQuery.data?.projects ?? []) {
-      const key = buildProjectLookupKey(project.projectName, project.group?.name)
-      if (key !== '::' && !entries.has(key)) {
-        entries.set(key, project.id)
-      }
-    }
-
-    return entries
-  }, [overviewQuery.data?.projects])
-
   const projects = useMemo<AssignmentProject[]>(() => {
     return (proposalsQuery.data?.items ?? [])
       .filter((proposal) => String(proposal.status ?? '').trim().toUpperCase() === 'APPROVED')
       .map((proposal) => {
-        const proposalTitle = proposal.title?.trim() || proposal.proposedTitles?.[0]?.trim() || 'Untitled proposal'
-        const proposalGroupName = proposal.projectGroup?.name?.trim() || 'Student Group'
-        const projectId = overviewProjectsByKey.get(buildProjectLookupKey(proposalTitle, proposalGroupName))
-
         return mapApprovedProposalToAssignmentProject(
           proposal,
           advisors,
-          projectId,
           assignmentOverrides[proposal.id]
         )
       })
-  }, [advisors, assignmentOverrides, overviewProjectsByKey, proposalsQuery.data?.items])
+  }, [advisors, assignmentOverrides, proposalsQuery.data?.items])
 
   const handleAssign = useCallback(async (advisorId: string, evaluatorIds: string[]) => {
     const advisor = advisors.find(u => u.id === advisorId)
@@ -513,7 +525,7 @@ export default function ProjectsPage() {
 
     if (!dialogProject.projectId) {
       toast.error('Advisor assignment is unavailable for this card yet.', {
-        description: 'This approved proposal does not currently map to a real project record.',
+        description: 'This is a legacy approved proposal with no linked project record yet.',
       })
       return
     }
@@ -571,7 +583,7 @@ export default function ProjectsPage() {
   // Stats
   const stats = useMemo(() => ({
     total: projects.length,
-    inProgress: projects.filter(p => p.status === 'approved').length,
+    inProgress: projects.filter(p => p.status === 'active' || p.status === 'approved').length,
     completed: projects.filter(p => p.status === 'completed').length,
     unassigned: projects.filter(p => !p.advisorName).length,
     needsEvaluator: projects.filter(p => p.evaluatorIds.length === 0).length,
@@ -604,7 +616,7 @@ export default function ProjectsPage() {
   // Advisor workload
   const advisorWorkload = useMemo(() => advisors.map(a => {
     const assigned = projects.filter(p => p.advisorId === a.id)
-    const inProgress = assigned.filter(p => p.status === 'approved').length
+    const inProgress = assigned.filter(p => p.status === 'active' || p.status === 'approved').length
     const completed = assigned.filter(p => p.status === 'completed').length
     const avgProg = assigned.length > 0
       ? Math.round(assigned.reduce((s, p) => s + (p.progress ?? 0), 0) / assigned.length)
@@ -698,6 +710,7 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
