@@ -12,10 +12,10 @@ export function ThemeRouteSync() {
 
   useEffect(() => {
     const isDashboard = pathname?.startsWith("/dashboard") ?? false
-    const desiredTheme = isDashboard ? dashboardMode : "light"
-
-    if (theme !== desiredTheme) {
-      setTheme(desiredTheme)
+    // Only force the dashboard theme preference on dashboard routes.
+    // Marketing and auth pages respect the user's own next-themes preference.
+    if (isDashboard && theme !== dashboardMode) {
+      setTheme(dashboardMode)
     }
   }, [dashboardMode, pathname, setTheme, theme])
 

@@ -290,17 +290,6 @@ function AnnouncementEditForm({
   const [actionLabelError, setActionLabelError] = useState<string | null>(null)
   const [actionUrlError, setActionUrlError] = useState<string | null>(null)
 
-  useEffect(() => {
-    setTitle(announcement.title)
-    setMessage(announcement.message)
-    setActionType(announcement.actionType)
-    setActionLabel(announcement.actionLabel ?? "")
-    setActionUrl(announcement.actionUrl ?? "")
-    setDeadlineAtLocal(toLocalInputValue(announcement.deadlineAt ?? null))
-    setDeadlineError(null)
-    setActionLabelError(null)
-    setActionUrlError(null)
-  }, [announcement.id, announcement.title, announcement.message, announcement.actionType, announcement.actionLabel, announcement.actionUrl, announcement.deadlineAt])
   const handleSubmit = async () => {
     if (!departmentId) {
       toast.error("Department context is missing")
