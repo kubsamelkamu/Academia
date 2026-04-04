@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -456,10 +456,6 @@ export default function CoordinatorApplicationsPage() {
   const approveM = useApproveGroupLeaderRequest()
   const rejectM  = useRejectGroupLeaderRequest()
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
-
   const apiItems: AppItem[] = useMemo(() => {
     const raw = apiData?.items ?? []
     return raw.map((r: GroupLeaderRequestItem) => ({
@@ -616,7 +612,13 @@ export default function CoordinatorApplicationsPage() {
             <Input
               placeholder="Search name, email, group…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value
+                const prevDebounced = search.trim() || undefined
+                const nextDebounced = v.trim() || undefined
+                setSearch(v)
+                if (prevDebounced !== nextDebounced) setPage(1)
+              }}
               className="pl-9 h-9 text-sm"
             />
           </div>
