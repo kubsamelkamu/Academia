@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -16,6 +16,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import {
   UserPlus,
   Search,
+  Archive,
   FolderKanban,
   GraduationCap,
   Users,
@@ -32,24 +33,159 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { mockUsers, mockProjects, type ProjectSummary } from '@/data/mockData'
+import { mockUsers, type ProjectSummary } from '@/data/mockData'
 import { useEffect } from 'react'
+import { useAuthStore } from '@/store/auth-store'
+import { useAssignProjectAdvisor, useDepartmentProjectAdvisors, useDepartmentProjectsOverview } from '@/lib/hooks/use-projects'
+import { useDepartmentProjectProposals } from '@/lib/hooks/use-project-proposals'
+import type { DepartmentProjectAdvisorDirectoryItem } from '@/types/projects'
+import type { ProjectProposal, ProposalParty } from '@/types/project-proposals'
 
 type AssignmentProject = ProjectSummary & {
+  projectId?: string
+  isLegacyApprovedWithoutProject?: boolean
   advisorId?: string
   advisorName?: string
+  advisorAvatarUrl?: string | null
+  memberNames?: string[]
   evaluatorIds: string[]
+}
+
+type AssignmentOverride = {
+  advisorId?: string
+  advisorName?: string
+  advisorAvatarUrl?: string | null
+  evaluatorIds: string[]
+}
+
+type AdvisorOption = {
+  id: string
+  userId: string
+  name: string
+  email: string
+  avatarUrl?: string | null
+  loadLimit: number
+  currentLoad: number
+}
+
+function formatAdvisorName(advisor: DepartmentProjectAdvisorDirectoryItem) {
+  const firstName = advisor.user?.firstName?.trim() ?? ''
+  const lastName = advisor.user?.lastName?.trim() ?? ''
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
+  return fullName || advisor.user?.email?.trim() || 'Advisor'
+}
+
+function formatProposalPersonName(person?: ProposalParty | null) {
+  if (!person) return ''
+
+  const firstName = person.firstName?.trim() ?? ''
+  const lastName = person.lastName?.trim() ?? ''
+  return [firstName, lastName].filter(Boolean).join(' ').trim() || person.email?.trim() || ''
+}
+
+function initialsFromName(value?: string | null) {
+  const parts = String(value ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (parts.length === 0) {
+    return '?'
+  }
+
+  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('')
+}
+
+function normalizeProjectLookupValue(value?: string | null) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function buildProjectLookupKey(title?: string | null, groupName?: string | null) {
+  return `${normalizeProjectLookupValue(title)}::${normalizeProjectLookupValue(groupName)}`
+}
+
+function resolveProposalDisplayTitle(proposal: ProjectProposal) {
+  const proposedTitles = (proposal.proposedTitles ?? proposal.titles ?? [])
+    .map((title) => title.trim())
+    .filter(Boolean)
+  const selectedIndex = proposal.selectedTitleIndex ?? null
+  const selectedTitle =
+    selectedIndex !== null && selectedIndex >= 0 ? proposedTitles[selectedIndex] : undefined
+
+  return proposal.title?.trim() || selectedTitle || proposedTitles[0] || 'Untitled proposal'
+}
+
+function collectProposalMemberNames(proposal: ProjectProposal) {
+  const names = new Set<string>()
+
+  const leaderName = formatProposalPersonName(proposal.projectGroup?.leader)
+  if (leaderName) {
+    names.add(leaderName)
+  }
+
+  for (const member of proposal.projectGroup?.members ?? []) {
+    const memberName = formatProposalPersonName(member.user)
+    if (memberName) {
+      names.add(memberName)
+    }
+  }
+
+  const submitterName = formatProposalPersonName(proposal.submitter)
+  if (!names.size && submitterName) {
+    names.add(submitterName)
+  }
+
+  return Array.from(names)
+}
+
+function mapApprovedProposalToAssignmentProject(
+  proposal: ProjectProposal,
+  advisors: AdvisorOption[],
+  override?: AssignmentOverride
+): AssignmentProject {
+  const projectId = proposal.project?.id?.trim() || undefined
+  const advisorFromProposal = proposal.advisor
+  const advisorUserId = proposal.project?.advisorId?.trim() || proposal.advisorId?.trim() || ''
+  const advisorFromDirectory = advisorUserId
+    ? advisors.find((advisor) => advisor.id === advisorUserId)
+    : undefined
+  const advisorName =
+    override?.advisorName ||
+    formatProposalPersonName(advisorFromProposal) ||
+    advisorFromDirectory?.name ||
+    ''
+  const advisorAvatarUrl =
+    override?.advisorAvatarUrl ?? advisorFromProposal?.avatarUrl ?? advisorFromDirectory?.avatarUrl ?? null
+
+  return {
+    id: proposal.id,
+    projectId,
+    isLegacyApprovedWithoutProject: !projectId,
+    title: resolveProposalDisplayTitle(proposal),
+    status: proposal.project?.status?.trim().toLowerCase().replace(/_/g, '-') || 'approved',
+    groupName: proposal.projectGroup?.name?.trim() || 'Student Group',
+    advisorId: override?.advisorId ?? advisorUserId,
+    advisorName,
+    advisorAvatarUrl,
+    memberNames: collectProposalMemberNames(proposal),
+    evaluatorIds: override?.evaluatorIds ?? [],
+    progress: undefined,
+  }
 }
 
 /* ─── Assignment Dialog ─────────────────────────────────────────────────── */
 interface AssignmentDialogProps {
   project: AssignmentProject
+  advisors: AdvisorOption[]
   onClose: () => void
   onAssign: (advisorId: string, evaluatorIds: string[]) => void
   open: boolean
 }
 
-function AssignmentDialog({ project, onClose, onAssign, open }: AssignmentDialogProps) {
+function AssignmentDialog({ project, advisors, onClose, onAssign, open }: AssignmentDialogProps) {
   const [selectedAdvisor, setSelectedAdvisor] = useState(project.advisorId || '')
   const [selectedEvaluators, setSelectedEvaluators] = useState<string[]>(project.evaluatorIds || [])
 
@@ -67,8 +203,6 @@ function AssignmentDialog({ project, onClose, onAssign, open }: AssignmentDialog
       setSelectedEvaluators(prevEvaluatorsRef.current)
     }
   }, [open])
-
-  const advisors = mockUsers.filter(u => u.role === 'advisor')
   const evaluators = mockUsers.filter(u => u.role === 'evaluator')
 
   const toggleEvaluator = (id: string) => {
@@ -100,10 +234,13 @@ function AssignmentDialog({ project, onClose, onAssign, open }: AssignmentDialog
               {advisors.map(a => (
                 <SelectItem key={a.id} value={a.id}>
                   <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                      {a.name.charAt(0)}
-                    </div>
-                  {a.name}
+                    <Avatar className="h-6 w-6 shrink-0">
+                      {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                        {a.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{a.name}</span>
                   </div>
                 </SelectItem>
               ))}
@@ -170,9 +307,12 @@ function ProjectCard({
   const evaluators = mockUsers.filter(u => u.role === 'evaluator' && project.evaluatorIds.includes(u.id))
   const isAssigned = Boolean(project.advisorName)
   const isComplete = project.status === 'completed'
+  const isLegacyApprovedWithoutProject = Boolean(project.isLegacyApprovedWithoutProject)
+  const visibleMembers = project.memberNames?.slice(0, 4) ?? []
+  const remainingMembers = Math.max((project.memberNames?.length ?? 0) - visibleMembers.length, 0)
 
   return (
-    <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20 space-y-4">
+    <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md space-y-4">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -187,6 +327,37 @@ function ProjectCard({
         <StatusBadge status={project.status} />
       </div>
 
+      {project.memberNames && project.memberNames.length > 0 && (
+        <div className="rounded-xl border border-border/60 bg-muted/[0.35] px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Group Members</p>
+            <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {project.memberNames.length} member{project.memberNames.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {visibleMembers.map((member) => (
+              <div
+                key={`${project.id}-${member}`}
+                className="inline-flex max-w-full items-center gap-2 rounded-full border bg-background px-2.5 py-1 text-xs text-foreground shadow-sm transition-colors group-hover:border-primary/15"
+              >
+                <Avatar className="h-6 w-6 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+                    {initialsFromName(member)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">{member}</span>
+              </div>
+            ))}
+            {remainingMembers > 0 && (
+              <div className="inline-flex items-center rounded-full border border-dashed bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                +{remainingMembers} more
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Progress */}
       {project.progress !== undefined && (
         <div className="space-y-1.5">
@@ -200,31 +371,59 @@ function ProjectCard({
 
       {/* Advisor & Evaluators */}
       <div className="grid gap-2 sm:grid-cols-2 text-sm">
-        <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
-          <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
           {isAssigned ? (
-            <span className="truncate font-medium">{project.advisorName}</span>
+            <div className="flex items-center gap-2.5">
+              <Avatar className="h-9 w-9 shrink-0 ring-2 ring-background shadow-sm">
+                {project.advisorAvatarUrl ? <AvatarImage src={project.advisorAvatarUrl} alt={project.advisorName} /> : null}
+                <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                  {initialsFromName(project.advisorName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Advisor</p>
+                <p className="truncate font-medium text-foreground">{project.advisorName}</p>
+              </div>
+            </div>
           ) : (
-            <span className="text-muted-foreground italic">No advisor yet</span>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Users className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Advisor</p>
+                <p className="text-muted-foreground italic">No advisor yet</p>
+              </div>
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 rounded-lg bg-muted/40 px-3 py-2">
-          <Star className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
           {evaluators.length > 0 ? (
-            <div className="flex items-center gap-1 min-w-0">
-              <div className="flex -space-x-1.5 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex -space-x-2 shrink-0">
                 {evaluators.slice(0, 3).map(e => (
-                  <Avatar key={e.id} className="h-5 w-5 border-2 border-card">
-                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{e.name.charAt(0)}</AvatarFallback>
+                  <Avatar key={e.id} className="h-7 w-7 border-2 border-card shadow-sm">
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{initialsFromName(e.name)}</AvatarFallback>
                   </Avatar>
                 ))}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {evaluators.length} evaluator{evaluators.length !== 1 ? 's' : ''}
-              </span>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Evaluators</p>
+                <p className="text-xs text-foreground">
+                  {evaluators.length} evaluator{evaluators.length !== 1 ? 's' : ''}
+                </p>
+              </div>
             </div>
           ) : (
-            <span className="text-muted-foreground italic text-xs">No evaluators</span>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Star className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Evaluators</p>
+                <p className="text-muted-foreground italic text-xs">No evaluators</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -232,19 +431,34 @@ function ProjectCard({
       {/* Action */}
       <div className="flex items-center justify-between gap-2 pt-1">
         <Badge
-          variant={isComplete ? 'secondary' : isAssigned ? 'outline' : 'destructive'}
+          variant={
+            isLegacyApprovedWithoutProject
+              ? 'secondary'
+              : isComplete
+                ? 'secondary'
+                : isAssigned
+                  ? 'outline'
+                  : 'destructive'
+          }
           className="text-xs"
         >
-          {isComplete ? 'Completed' : isAssigned ? 'Assigned' : 'Needs Assignment'}
+          {isLegacyApprovedWithoutProject
+            ? 'Legacy Item'
+            : isComplete
+              ? 'Completed'
+              : isAssigned
+                ? 'Assigned'
+                : 'Needs Assignment'}
         </Badge>
         <Button
           variant="outline"
           size="sm"
           className="h-8 gap-1.5 text-xs hover:border-primary hover:text-primary"
+          disabled={isLegacyApprovedWithoutProject}
           onClick={() => onAssign(project)}
         >
           <UserPlus className="h-3.5 w-3.5" />
-          {isAssigned ? 'Reassign' : 'Assign Team'}
+          {isLegacyApprovedWithoutProject ? 'Legacy Item' : isAssigned ? 'Reassign' : 'Assign Team'}
         </Button>
       </div>
     </div>
@@ -253,37 +467,98 @@ function ProjectCard({
 
 /* ─── Page ──────────────────────────────────────────────────────────────── */
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<AssignmentProject[]>(() =>
-    mockProjects.map(p => ({
-      ...p,
-      advisorId: p.advisorId || '',
-      advisorName: p.advisorName || '',
-      evaluatorIds: p.evaluatorIds || [],
-    }))
-  )
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const overviewQuery = useDepartmentProjectsOverview({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+  const departmentAdvisorsQuery = useDepartmentProjectAdvisors({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+  const proposalsQuery = useDepartmentProjectProposals({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+  const assignProjectAdvisorMutation = useAssignProjectAdvisor()
+  const [assignmentOverrides, setAssignmentOverrides] = useState<Record<string, AssignmentOverride>>({})
   const [dialogProject, setDialogProject] = useState<AssignmentProject | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [advisorFilter, setAdvisorFilter] = useState('all')
 
-  const advisors = mockUsers.filter(u => u.role === 'advisor')
+  const advisors = useMemo<AdvisorOption[]>(() => {
+    return (departmentAdvisorsQuery.data ?? []).map((advisor) => ({
+      id: advisor.userId,
+      userId: advisor.userId,
+      name: formatAdvisorName(advisor),
+      email: advisor.user?.email?.trim() || '',
+      avatarUrl: advisor.user?.avatarUrl ?? null,
+      loadLimit: advisor.loadLimit ?? 0,
+      currentLoad: advisor.currentLoad ?? 0,
+    }))
+  }, [departmentAdvisorsQuery.data])
   const evaluators = mockUsers.filter(u => u.role === 'evaluator')
 
-  const handleAssign = useCallback((advisorId: string, evaluatorIds: string[]) => {
-    const advisor = mockUsers.find(u => u.id === advisorId)
+  const projects = useMemo<AssignmentProject[]>(() => {
+    return (proposalsQuery.data?.items ?? [])
+      .filter((proposal) => String(proposal.status ?? '').trim().toUpperCase() === 'APPROVED')
+      .map((proposal) => {
+        return mapApprovedProposalToAssignmentProject(
+          proposal,
+          advisors,
+          assignmentOverrides[proposal.id]
+        )
+      })
+  }, [advisors, assignmentOverrides, proposalsQuery.data?.items])
+
+  const handleAssign = useCallback(async (advisorId: string, evaluatorIds: string[]) => {
+    const advisor = advisors.find(u => u.id === advisorId)
     const advisorName = advisor?.name || 'Unknown'
-    setProjects(prev =>
-      prev.map(p =>
-        p.id === dialogProject?.id ? { ...p, advisorId, advisorName, evaluatorIds } : p
-      )
-    )
-    toast.success('Team Assigned', {
-      description: `${advisorName} + ${evaluatorIds.length} evaluator(s) → "${dialogProject?.title}"`,
+    const advisorAvatarUrl = advisor?.avatarUrl ?? null
+    if (!dialogProject) {
+      return
+    }
+
+    if (!dialogProject.projectId) {
+      toast.error('Advisor assignment is unavailable for this card yet.', {
+        description: 'This is a legacy approved proposal with no linked project record yet.',
+      })
+      return
+    }
+
+    try {
+      await assignProjectAdvisorMutation.mutateAsync({
+        projectId: dialogProject.projectId,
+        dto: { advisorId },
+      })
+    } catch (error) {
+      toast.error('Failed to save advisor assignment', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+      return
+    }
+
+    setAssignmentOverrides((prev) => ({
+      ...prev,
+      [dialogProject.id]: {
+        advisorId,
+        advisorName,
+        advisorAvatarUrl,
+        evaluatorIds,
+      },
+    }))
+    toast.success('Advisor assignment saved', {
+      description: evaluatorIds.length > 0
+        ? `${advisorName} was assigned. Evaluator selections remain local on this page.`
+        : `${advisorName} was assigned to "${dialogProject.title}".`,
     })
     setDialogOpen(false)
     setDialogProject(null)
-  }, [dialogProject])
+  }, [advisors, assignProjectAdvisorMutation, dialogProject])
 
   const openAssign = (p: AssignmentProject) => {
     setDialogProject({ ...p })
@@ -297,6 +572,7 @@ export default function ProjectsPage() {
         !search ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
         (p.groupName || '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.memberNames || []).some((member) => member.toLowerCase().includes(search.toLowerCase())) ||
         (p.advisorName || '').toLowerCase().includes(search.toLowerCase())
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       const matchAdvisor = advisorFilter === 'all' || p.advisorId === advisorFilter
@@ -307,16 +583,40 @@ export default function ProjectsPage() {
   // Stats
   const stats = useMemo(() => ({
     total: projects.length,
-    inProgress: projects.filter(p => p.status === 'in_progress').length,
+    inProgress: projects.filter(p => p.status === 'active' || p.status === 'approved').length,
     completed: projects.filter(p => p.status === 'completed').length,
     unassigned: projects.filter(p => !p.advisorName).length,
     needsEvaluator: projects.filter(p => p.evaluatorIds.length === 0).length,
   }), [projects])
 
+  const activeProjectsValue = overviewQuery.data?.activeProjects ?? 0
+  const completedProjectsValue = overviewQuery.data?.completedProjects ?? 0
+  const approvedProposalsValue = useMemo(() => {
+    return (proposalsQuery.data?.items ?? []).filter((proposal) => {
+      return String(proposal.status ?? '').trim().toUpperCase() === 'APPROVED'
+    }).length
+  }, [proposalsQuery.data?.items])
+
+  const needsAdvisorProposalsValue = useMemo(() => {
+    return (proposalsQuery.data?.items ?? []).filter((proposal) => {
+      const status = String(proposal.status ?? '').trim().toUpperCase()
+      const advisorId = proposal.advisorId?.trim()
+      return status === 'APPROVED' && !advisorId
+    }).length
+  }, [proposalsQuery.data?.items])
+
+  const renderMetricValue = (value: number, loading: boolean) => {
+    if (loading) {
+      return '...'
+    }
+
+    return value
+  }
+
   // Advisor workload
   const advisorWorkload = useMemo(() => advisors.map(a => {
     const assigned = projects.filter(p => p.advisorId === a.id)
-    const inProgress = assigned.filter(p => p.status === 'in_progress').length
+    const inProgress = assigned.filter(p => p.status === 'active' || p.status === 'approved').length
     const completed = assigned.filter(p => p.status === 'completed').length
     const avgProg = assigned.length > 0
       ? Math.round(assigned.reduce((s, p) => s + (p.progress ?? 0), 0) / assigned.length)
@@ -365,10 +665,10 @@ export default function ProjectsPage() {
       {/* KPI Row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Total Projects',    value: stats.total,         icon: FolderKanban,   bg: 'bg-primary/10',      color: 'text-primary' },
-          { label: 'In Progress',       value: stats.inProgress,    icon: Clock,          bg: 'bg-primary/[0.06]',  color: 'text-primary/80' },
-          { label: 'Completed',         value: stats.completed,     icon: CheckCircle2,   bg: 'bg-muted',           color: 'text-foreground' },
-          { label: 'Needs Advisor',     value: stats.unassigned,    icon: AlertTriangle,  bg: 'bg-destructive/10',  color: 'text-destructive' },
+          { label: 'Active Projects',   value: renderMetricValue(activeProjectsValue, overviewQuery.isLoading), icon: FolderKanban, bg: 'bg-primary/10',     color: 'text-primary' },
+          { label: 'Completed Projects', value: renderMetricValue(completedProjectsValue, overviewQuery.isLoading), icon: CheckCircle2, bg: 'bg-muted',          color: 'text-foreground' },
+          { label: 'Approved Proposal Titles', value: renderMetricValue(approvedProposalsValue, proposalsQuery.isLoading), icon: Archive,       bg: 'bg-primary/[0.06]', color: 'text-primary/80' },
+          { label: 'Needs Advisor',     value: renderMetricValue(needsAdvisorProposalsValue, proposalsQuery.isLoading), icon: AlertTriangle,  bg: 'bg-destructive/10',  color: 'text-destructive' },
           { label: 'Needs Evaluator',   value: stats.needsEvaluator,icon: Star,           bg: 'bg-destructive/10',  color: 'text-destructive' },
         ].map(s => (
           <Card key={s.label} className="group border-none shadow-sm transition-all hover:shadow-md">
@@ -378,7 +678,7 @@ export default function ProjectsPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold tracking-tight">{s.value}</p>
-                <p className="text-xs text-muted-foreground truncate">{s.label}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -410,7 +710,8 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
@@ -423,7 +724,17 @@ export default function ProjectsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Advisors</SelectItem>
                   {advisors.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5 shrink-0">
+                          {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
+                          <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+                            {a.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{a.name}</span>
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -490,6 +801,7 @@ export default function ProjectsPage() {
                       <div className="space-y-2.5">
                         <div className="flex items-center gap-2.5">
                           <Avatar className="h-8 w-8 shrink-0">
+                            {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
                             <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                               {a.name.charAt(0)}
                             </AvatarFallback>
@@ -608,6 +920,7 @@ export default function ProjectsPage() {
           {dialogProject && (
             <AssignmentDialog
               project={dialogProject}
+              advisors={advisors}
             onClose={() => { setDialogOpen(false); setDialogProject(null) }}
               onAssign={handleAssign}
               open={dialogOpen}

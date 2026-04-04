@@ -1,6 +1,16 @@
-import { useQuery } from "@tanstack/react-query"
-import { getDepartmentProjectsOverview, getProjectDetails } from "@/lib/api/projects"
-import type { DepartmentProjectsOverview, ProjectDetail } from "@/types/projects"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  assignProjectAdvisor,
+  getDepartmentProjectAdvisors,
+  getDepartmentProjectsOverview,
+  getProjectDetails,
+} from "@/lib/api/projects"
+import type {
+  AssignProjectAdvisorDto,
+  DepartmentProjectAdvisorDirectoryItem,
+  DepartmentProjectsOverview,
+  ProjectDetail,
+} from "@/types/projects"
 
 export function projectKeys() {
   return {
@@ -8,6 +18,8 @@ export function projectKeys() {
     details: (projectId: string) => [...projectKeys().root, "details", projectId] as const,
     departmentOverview: (departmentId: string) =>
       [...projectKeys().root, "department-overview", departmentId] as const,
+    departmentAdvisors: (departmentId: string) =>
+      [...projectKeys().root, "department-advisors", departmentId] as const,
   }
 }
 
@@ -48,5 +60,41 @@ export function useDepartmentProjectsOverview(params: {
     enabled,
     staleTime: 30_000,
     retry: false,
+  })
+}
+
+export function useDepartmentProjectAdvisors(params: {
+  departmentId: string | null | undefined
+  enabled?: boolean
+}) {
+  const departmentId = params.departmentId?.trim() ? params.departmentId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(departmentId)
+
+  return useQuery<DepartmentProjectAdvisorDirectoryItem[], Error>({
+    queryKey: enabled
+      ? projectKeys().departmentAdvisors(departmentId ?? "")
+      : projectKeys().root,
+    queryFn: () => {
+      if (!departmentId) throw new Error("departmentId is required")
+      return getDepartmentProjectAdvisors(departmentId)
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useAssignProjectAdvisor() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ProjectDetail, Error, {
+    projectId: string
+    dto: AssignProjectAdvisorDto
+  }>({
+    mutationFn: ({ projectId, dto }) => assignProjectAdvisor(projectId, dto),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectKeys().root })
+      await queryClient.invalidateQueries({ queryKey: ["project-proposals"] })
+    },
   })
 }
