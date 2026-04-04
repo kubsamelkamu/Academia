@@ -123,6 +123,27 @@ export type DepartmentOverviewProjectAdvisor = {
   avatarUrl?: string | null
 }
 
+export type DepartmentProjectAdvisorDirectoryItem = {
+  id: string
+  userId: string
+  departmentId: string
+  loadLimit?: number | null
+  currentLoad?: number | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  user?: {
+    id: string
+    firstName?: string | null
+    lastName?: string | null
+    email?: string | null
+    avatarUrl?: string | null
+  } | null
+}
+
+export type AssignProjectAdvisorDto = {
+  advisorId: string
+}
+
 export type DepartmentOverviewProject = {
   id: string
   projectName: string

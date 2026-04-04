@@ -253,11 +253,18 @@ function ConvRow({
 }) {
   const tc = TAG_CONFIG[conv.tag]
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
       className={cn(
-        "w-full rounded-xl border p-3.5 text-left transition-all group",
+        "w-full rounded-xl border p-3.5 text-left transition-all group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         active
           ? "border-primary/40 bg-primary/5"
           : conv.unread > 0
@@ -324,7 +331,7 @@ function ConvRow({
           </div>
         </div>
       </div>
-    </button>
+    </div>
   )
 }
 
