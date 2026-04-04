@@ -167,6 +167,13 @@ const StatusBadge = ({ status }: { status: EvaluationStatus }) => {
   )
 }
 
+/** Maps mockData evaluation ids (e1…) to this page's demo detail rows (eval-1…). */
+const MOCK_EVALUATION_ID_ALIASES: Record<string, string> = {
+  e1: "eval-1",
+  e2: "eval-2",
+  e3: "eval-3",
+}
+
 const RubricItem = ({ item }: { item: RubricItem }) => {
   const percentage = (item.score / item.max) * 100
   
@@ -206,7 +213,16 @@ const RubricItem = ({ item }: { item: RubricItem }) => {
   )
 }
 
-export function AdvisorEvaluationDetailPage({ evaluationId }: { evaluationId: string }) {
+export function AdvisorEvaluationDetailPage({
+  evaluationId,
+  evaluationsListHref = "/dashboard/advisor/evaluations",
+  evaluationsListLabel = "Back to Evaluations",
+}: {
+  evaluationId: string
+  /** Where the primary “back” action should go (e.g. evaluator completed vs advisor evaluations list). */
+  evaluationsListHref?: string
+  evaluationsListLabel?: string
+}) {
   const [evaluation, setEvaluation] = React.useState<EvaluationDetail | null>(null)
   const [overallComment, setOverallComment] = React.useState("")
   const [grade, setGrade] = React.useState("")
@@ -214,8 +230,8 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: { evaluationId: st
   const [isRequestingRevision, setIsRequestingRevision] = React.useState(false)
 
   React.useEffect(() => {
-    // Simulate data fetching
-    const found = mockEvaluations.find((e) => e.id === evaluationId) ?? null
+    const resolvedId = MOCK_EVALUATION_ID_ALIASES[evaluationId] ?? evaluationId
+    const found = mockEvaluations.find((e) => e.id === resolvedId) ?? null
     setEvaluation(found)
     if (found?.feedback) {
       setOverallComment(found.feedback)
@@ -254,9 +270,9 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: { evaluationId: st
             No evaluation exists with ID: {evaluationId}. The evaluation may have been removed or you may have followed an invalid link.
           </p>
           <Button asChild>
-            <Link href="/dashboard/advisor/evaluations">
+            <Link href={evaluationsListHref}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Evaluations
+              {evaluationsListLabel}
             </Link>
           </Button>
         </div>
@@ -276,7 +292,7 @@ export function AdvisorEvaluationDetailPage({ evaluationId }: { evaluationId: st
           description={`Review and provide feedback for ${evaluation.studentName}'s submission`}
         />
         <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/advisor/evaluations">
+          <Link href={evaluationsListHref}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Link>

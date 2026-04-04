@@ -36,10 +36,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
       return nativeRemoveChild.call(this, child) as T
     }
 
-    // Hydrate user session from stored token (client-side only).
-    void useAuthStore.getState().bootstrap()
+    // Run after zustand persist rehydrates so accessToken/user from storage exist (v3+).
+    const runBootstrap = () => void useAuthStore.getState().bootstrap()
+    const unsubHydration = useAuthStore.persist.onFinishHydration(() => {
+      runBootstrap()
+    })
+    if (useAuthStore.persist.hasHydrated()) {
+      runBootstrap()
+    }
 
     return () => {
+      unsubHydration()
       Node.prototype.removeChild = nativeRemoveChild
       removeChildGuardPatchedRef.current = false
     }

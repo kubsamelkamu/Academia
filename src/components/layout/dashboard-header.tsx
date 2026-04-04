@@ -80,7 +80,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
 
   return (
     <motion.header
-      className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 shadow-sm"
+      className="z-40 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/95 sm:px-6"
       initial={{ y: -64, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}

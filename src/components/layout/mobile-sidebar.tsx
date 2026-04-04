@@ -56,12 +56,14 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
-      <SheetContent side="left" className="w-72 p-0 sm:max-w-sm">
+      <SheetContent side="left" className="flex h-full w-72 flex-col gap-0 overflow-hidden p-0 sm:max-w-sm">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <SheetDescription className="sr-only">
           Main navigation menu for the application
         </SheetDescription>
-        <Sidebar user={user} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Sidebar user={user} />
+        </div>
       </SheetContent>
     </Sheet>
   )

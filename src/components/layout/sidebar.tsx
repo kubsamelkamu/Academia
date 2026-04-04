@@ -81,7 +81,7 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <motion.div
-      className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="flex h-full min-h-0 w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       initial={{ x: -64, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
@@ -113,7 +113,7 @@ export function Sidebar({ user }: SidebarProps) {
         <p className="mt-1 text-xs text-muted-foreground">Academic Project Management</p>
       </motion.div>
 
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-3 py-4">
         <nav className="flex flex-col gap-1" aria-label="Sidebar navigation">
           {sidebarNav.map((item: NavItem, index) => {
             const Icon = item.icon
@@ -290,7 +290,7 @@ export function Sidebar({ user }: SidebarProps) {
       </ScrollArea>
 
       <motion.div
-        className="border-t border-sidebar-border p-4"
+        className="shrink-0 border-t border-sidebar-border p-4"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}

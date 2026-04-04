@@ -2,6 +2,18 @@ import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from "axios"
 import { useAuthStore } from "@/store/auth-store"
 import { isRateLimitMessage } from "@/lib/api/errors"
 
+/**
+ * Only treat 401 as "session is dead" when the identity endpoint rejects the token.
+ * Other routes (notifications, advisor APIs, project groups, chat, etc.) often return 401 with
+ * demo tokens, partial backends, or missing role wiring — clearing auth + redirecting to /login
+ * then felt like random logouts (e.g. advisor evaluator → View project).
+ */
+function shouldForceSessionTerminationOn401(config: InternalAxiosRequestConfig | undefined): boolean {
+  if (!config) return false
+  const combined = `${config.baseURL ?? ""}${config.url ?? ""}`.toLowerCase()
+  return combined.includes("/auth/me")
+}
+
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001/api/v1",
   headers: {
@@ -79,7 +91,7 @@ apiClient.interceptors.response.use(
 
       // For invalid credentials on auth endpoints, let the caller handle the error
       // (e.g., show an inline message on the login page) instead of hard redirect.
-      if (!isAuthEndpoint) {
+      if (!isAuthEndpoint && shouldForceSessionTerminationOn401(error.config)) {
         const authStore = useAuthStore.getState()
         authStore.logout()
 
