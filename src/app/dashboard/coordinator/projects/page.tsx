@@ -16,6 +16,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import {
   UserPlus,
   Search,
+  Archive,
   FolderKanban,
   GraduationCap,
   Users,
@@ -34,6 +35,8 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { mockUsers, mockProjects, type ProjectSummary } from '@/data/mockData'
 import { useEffect } from 'react'
+import { useAuthStore } from '@/store/auth-store'
+import { useDepartmentProjectsOverview } from '@/lib/hooks/use-projects'
 
 type AssignmentProject = ProjectSummary & {
   advisorId?: string
@@ -253,6 +256,13 @@ function ProjectCard({
 
 /* ─── Page ──────────────────────────────────────────────────────────────── */
 export default function ProjectsPage() {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const overviewQuery = useDepartmentProjectsOverview({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
   const [projects, setProjects] = useState<AssignmentProject[]>(() =>
     mockProjects.map(p => ({
       ...p,
@@ -313,6 +323,18 @@ export default function ProjectsPage() {
     needsEvaluator: projects.filter(p => p.evaluatorIds.length === 0).length,
   }), [projects])
 
+  const activeProjectsValue = overviewQuery.data?.activeProjects ?? 0
+  const completedProjectsValue = overviewQuery.data?.completedProjects ?? 0
+  const cancelledProjectsValue = overviewQuery.data?.cancelledProjects ?? 0
+
+  const renderOverviewValue = (value: number) => {
+    if (overviewQuery.isLoading) {
+      return '...'
+    }
+
+    return value
+  }
+
   // Advisor workload
   const advisorWorkload = useMemo(() => advisors.map(a => {
     const assigned = projects.filter(p => p.advisorId === a.id)
@@ -365,9 +387,9 @@ export default function ProjectsPage() {
       {/* KPI Row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Total Projects',    value: stats.total,         icon: FolderKanban,   bg: 'bg-primary/10',      color: 'text-primary' },
-          { label: 'In Progress',       value: stats.inProgress,    icon: Clock,          bg: 'bg-primary/[0.06]',  color: 'text-primary/80' },
-          { label: 'Completed',         value: stats.completed,     icon: CheckCircle2,   bg: 'bg-muted',           color: 'text-foreground' },
+          { label: 'Active Projects',   value: renderOverviewValue(activeProjectsValue),    icon: FolderKanban, bg: 'bg-primary/10',     color: 'text-primary' },
+          { label: 'Completed',         value: renderOverviewValue(completedProjectsValue), icon: CheckCircle2, bg: 'bg-muted',          color: 'text-foreground' },
+          { label: 'Cancelled',         value: renderOverviewValue(cancelledProjectsValue), icon: Archive,       bg: 'bg-primary/[0.06]', color: 'text-primary/80' },
           { label: 'Needs Advisor',     value: stats.unassigned,    icon: AlertTriangle,  bg: 'bg-destructive/10',  color: 'text-destructive' },
           { label: 'Needs Evaluator',   value: stats.needsEvaluator,icon: Star,           bg: 'bg-destructive/10',  color: 'text-destructive' },
         ].map(s => (

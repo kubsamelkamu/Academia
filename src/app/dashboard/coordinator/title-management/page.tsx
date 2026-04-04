@@ -3,13 +3,10 @@
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  AlertTriangle,
   ArrowLeft,
   BarChart3,
   BookOpen,
   CheckCircle2,
-  ChevronsLeft,
-  ChevronsRight,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -45,12 +42,6 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-} from "@/components/ui/pagination"
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -61,6 +52,7 @@ import {
 type TitleStatus = "pending" | "approved" | "rejected" | "draft"
 
 const GROUP_TITLES_PER_PAGE = 5
+const GROUPS_PER_PAGE = 1
 
 type GroupSummary = {
   groupId: string
@@ -304,7 +296,7 @@ function ReviewSheet({
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-lg">
+      <SheetContent side="right" className="w-full p-0 sm:max-w-lg">
         <SheetHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
@@ -443,7 +435,7 @@ function TitleRow({
           : "border-border/60 bg-card hover:border-primary/15 hover:bg-muted/20"
       )}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
         <div
           className={cn(
             "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
@@ -482,7 +474,7 @@ function TitleRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5 sm:self-start">
           <Button
             variant="outline"
             size="sm"
@@ -568,7 +560,6 @@ function GroupCard({
     (safeTitlesPage - 1) * GROUP_TITLES_PER_PAGE,
     safeTitlesPage * GROUP_TITLES_PER_PAGE
   )
-  const titlesPaginationItems = buildPagination(safeTitlesPage, titlesTotalPages)
 
   React.useEffect(() => {
     if (currentTitlesPage > titlesTotalPages) {
@@ -578,7 +569,7 @@ function GroupCard({
 
   return (
     <Card className="overflow-hidden border border-border/60 bg-card shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
-      <div className="flex items-start gap-4 border-b bg-gradient-to-r from-muted/50 via-muted/20 to-transparent px-5 py-4">
+      <div className="flex flex-col gap-4 border-b bg-gradient-to-r from-muted/50 via-muted/20 to-transparent px-5 py-4 sm:flex-row sm:items-start">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
           <GraduationCap className="h-5 w-5 text-primary" />
         </div>
@@ -605,8 +596,8 @@ function GroupCard({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="flex flex-wrap justify-end gap-1">
+        <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-1 sm:justify-end">
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
               {titles.length} proposal{titles.length === 1 ? "" : "s"}
             </span>
@@ -667,76 +658,31 @@ function GroupCard({
             <p className="text-xs text-muted-foreground">
               Showing <span className="font-medium text-foreground">{(safeTitlesPage - 1) * GROUP_TITLES_PER_PAGE + 1}</span> to <span className="font-medium text-foreground">{Math.min(safeTitlesPage * GROUP_TITLES_PER_PAGE, titles.length)}</span> of <span className="font-medium text-foreground">{titles.length}</span> proposals
             </p>
-            <Pagination className="mx-0 w-auto justify-start sm:justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentTitlesPage(1)}
-                    disabled={safeTitlesPage === 1}
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                </PaginationItem>
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentTitlesPage((page) => Math.max(1, page - 1))}
-                    disabled={safeTitlesPage === 1}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                </PaginationItem>
-                {titlesPaginationItems.map((item, index) => {
-                  if (item === "ellipsis") {
-                    return (
-                      <PaginationItem key={`${groupId}-ellipsis-${index}`}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )
-                  }
-
-                  return (
-                    <PaginationItem key={`${groupId}-${item}`}>
-                      <Button
-                        variant={safeTitlesPage === item ? "default" : "outline"}
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setCurrentTitlesPage(item)}
-                      >
-                        {item}
-                      </Button>
-                    </PaginationItem>
-                  )
-                })}
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentTitlesPage((page) => Math.min(titlesTotalPages, page + 1))}
-                    disabled={safeTitlesPage === titlesTotalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </PaginationItem>
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentTitlesPage(titlesTotalPages)}
-                    disabled={safeTitlesPage === titlesTotalPages}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setCurrentTitlesPage((page) => Math.max(1, page - 1))}
+                disabled={safeTitlesPage === 1}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {safeTitlesPage} / {titlesTotalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setCurrentTitlesPage((page) => Math.min(titlesTotalPages, page + 1))}
+                disabled={safeTitlesPage === titlesTotalPages}
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -820,7 +766,7 @@ function WorkflowPipeline({ summary }: { summary: DepartmentProjectProposalsSumm
 
   return (
     <Card className="overflow-hidden border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
-      <CardContent className="space-y-5 p-5">
+      <CardContent className="space-y-5 overflow-x-hidden p-5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">Title Approval Workflow</p>
@@ -845,12 +791,12 @@ function WorkflowPipeline({ summary }: { summary: DepartmentProjectProposalsSumm
                 <div className={cn("flex h-full min-h-[280px] flex-1 flex-col overflow-hidden rounded-2xl border shadow-sm transition-colors", state.card)}>
                   <div className={cn("h-1.5 w-full", state.rail)} />
                   <div className="flex flex-1 flex-col p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
                         <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl", state.iconWrap)}>
                           <step.icon className="h-5 w-5" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                             Step {index + 1}
                           </p>
@@ -925,7 +871,6 @@ export default function CoordinatorTitleManagementPage() {
   const [statusFilter, setStatusFilter] = useState<TitleStatus | "all">("all")
   const [advisorFilter, setAdvisorFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
-  const [groupsPerPage, setGroupsPerPage] = useState("6")
 
   const titles = useMemo(() => {
     return (proposalsQuery.data?.items ?? []).map(mapProposalToTitle)
@@ -997,17 +942,12 @@ export default function CoordinatorTitleManagementPage() {
       })
   }, [filteredTitles])
 
-  const groupsPerPageValue = Number(groupsPerPage)
-  const totalPages = Math.max(1, Math.ceil(groups.length / groupsPerPageValue))
+  const totalPages = Math.max(1, Math.ceil(groups.length / GROUPS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const paginatedGroups = useMemo(() => {
-    const startIndex = (safeCurrentPage - 1) * groupsPerPageValue
-    return groups.slice(startIndex, startIndex + groupsPerPageValue)
-  }, [groups, groupsPerPageValue, safeCurrentPage])
-  const paginationItems = useMemo(
-    () => buildPagination(safeCurrentPage, totalPages),
-    [safeCurrentPage, totalPages]
-  )
+    const startIndex = (safeCurrentPage - 1) * GROUPS_PER_PAGE
+    return groups.slice(startIndex, startIndex + GROUPS_PER_PAGE)
+  }, [groups, safeCurrentPage])
 
   const advisorBreakdown = useMemo(() => {
     const buckets = new Map<string, number>()
@@ -1064,7 +1004,7 @@ export default function CoordinatorTitleManagementPage() {
 
   React.useEffect(() => {
     setCurrentPage(1)
-  }, [search, statusFilter, advisorFilter, groupsPerPage])
+  }, [search, statusFilter, advisorFilter])
 
   React.useEffect(() => {
     if (currentPage > totalPages) {
@@ -1073,277 +1013,219 @@ export default function CoordinatorTitleManagementPage() {
   }, [currentPage, totalPages])
 
   return (
-    <div className="animate-fade-in space-y-6 pb-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/coordinator">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-              Title Management
-            </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Review project title proposals submitted by each student group in {departmentLabel}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
-        </div>
-      </div>
-
-      {!departmentId ? (
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Your account does not currently expose a department id, so coordinator proposals cannot be loaded yet.
-          </CardContent>
-        </Card>
-      ) : proposalsQuery.isLoading ? (
-        <LoadingState />
-      ) : proposalsQuery.isError ? (
-        <Card className="border-none shadow-sm">
-          <CardContent className="space-y-4 p-6">
+    <div className="space-y-6 pb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/coordinator">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
             <div>
-              <p className="font-medium text-foreground">Failed to load project proposals</p>
-              <p className="text-sm text-muted-foreground">{proposalsQuery.error.message}</p>
+              <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
+                Title Management
+              </h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Review project title proposals submitted by each student group in {departmentLabel}
+              </p>
             </div>
-            <Button onClick={() => proposalsQuery.refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {kpi.map((item) => (
-              <Card key={item.label} className="group border-none shadow-sm transition-all hover:shadow-md">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${item.bg} transition-transform group-hover:scale-110`}
-                  >
-                    <item.icon className={`h-5 w-5 ${item.color}`} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0" />
+        </div>
+
+        {!departmentId ? (
+          <Card className="border-none shadow-sm">
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              Your account does not currently expose a department id, so coordinator proposals cannot be loaded yet.
+            </CardContent>
+          </Card>
+        ) : proposalsQuery.isLoading ? (
+          <LoadingState />
+        ) : proposalsQuery.isError ? (
+          <Card className="border-none shadow-sm">
+            <CardContent className="space-y-4 p-6">
+              <div>
+                <p className="font-medium text-foreground">Failed to load project proposals</p>
+                <p className="text-sm text-muted-foreground">{proposalsQuery.error.message}</p>
+              </div>
+              <Button onClick={() => proposalsQuery.refetch()}>Retry</Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {kpi.map((item) => (
+                <Card key={item.label} className="group border-none shadow-sm transition-all hover:shadow-md">
+                  <CardContent className="flex min-w-0 items-center gap-3 p-4">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${item.bg}`}
+                    >
+                      <item.icon className={`h-5 w-5 ${item.color}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-2xl font-bold tracking-tight">{item.value}</p>
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <WorkflowPipeline summary={summary} />
+
+            <Card className="border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
+              <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Proposal Queue</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {groups.length} group{groups.length === 1 ? "" : "s"} across {filteredTitles.length} visible proposal{filteredTitles.length === 1 ? "" : "s"}. Pending groups are pinned first.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                    {summary.pending} pending review
+                  </span>
+                  <span className="rounded-full bg-muted px-3 py-1">
+                    {summary.approved} approved
+                  </span>
+                  <span className="rounded-full bg-destructive/10 px-3 py-1 text-destructive">
+                    {summary.rejected} rejected
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search title, group, submitter, advisor, or description…"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-10 pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as TitleStatus | "all")}>
+                <SelectTrigger className="h-10 w-full sm:w-44 sm:shrink-0">
+                  <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+                <SelectTrigger className="h-10 w-full sm:w-52 sm:shrink-0">
+                  <BarChart3 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <SelectValue placeholder="Advisor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Advisors</SelectItem>
+                  {advisors.map((advisor) => (
+                    <SelectItem key={advisor} value={advisor}>
+                      {advisor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(search || statusFilter !== "all" || advisorFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 shrink-0 text-xs"
+                  onClick={clearFilters}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            <div className="-mt-1 flex flex-col gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                Showing group <span className="font-medium text-foreground">{groups.length === 0 ? 0 : safeCurrentPage}</span> of <span className="font-medium text-foreground">{groups.length}</span>
+              </p>
+              <p className="text-xs">One project group is shown per page to keep the review area compact.</p>
+            </div>
+
+            {groups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+                <FileText className="mb-3 h-10 w-10 text-muted-foreground/30" />
+                <p className="font-medium text-muted-foreground">No proposals match your filters</p>
+                <p className="mt-1 text-xs text-muted-foreground">Try adjusting the search or filter criteria</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paginatedGroups.map((group) => (
+                  <GroupCard key={group.groupId} {...group} onReview={openSheet} />
+                ))}
+              </div>
+            )}
+
+            {groups.length > 0 && totalPages > 1 && (
+              <Card className="border border-border/60 shadow-sm">
+                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Page <span className="font-medium text-foreground">{safeCurrentPage}</span> of <span className="font-medium text-foreground">{totalPages}</span>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold tracking-tight">{item.value}</p>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={safeCurrentPage === 1}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5"
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={safeCurrentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-
-          <WorkflowPipeline summary={summary} />
-
-          <Card className="border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 shadow-sm">
-            <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Proposal Queue</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {groups.length} group{groups.length === 1 ? "" : "s"} across {filteredTitles.length} visible proposal{filteredTitles.length === 1 ? "" : "s"}. Pending groups are pinned first.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
-                  {summary.pending} pending review
-                </span>
-                <span className="rounded-full bg-muted px-3 py-1">
-                  {summary.approved} approved
-                </span>
-                <span className="rounded-full bg-destructive/10 px-3 py-1 text-destructive">
-                  {summary.rejected} rejected
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search title, group, submitter, advisor, or description…"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="h-10 pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as TitleStatus | "all")}>
-              <SelectTrigger className="h-10 w-44 shrink-0">
-                <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
-              <SelectTrigger className="h-10 w-52 shrink-0">
-                <BarChart3 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                <SelectValue placeholder="Advisor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Advisors</SelectItem>
-                {advisors.map((advisor) => (
-                  <SelectItem key={advisor} value={advisor}>
-                    {advisor}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {(search || statusFilter !== "all" || advisorFilter !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-10 shrink-0 text-xs"
-                onClick={clearFilters}
-              >
-                Clear
-              </Button>
             )}
-          </div>
 
-          <div className="-mt-1 flex flex-col gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              Showing <span className="font-medium text-foreground">{groups.length === 0 ? 0 : (safeCurrentPage - 1) * groupsPerPageValue + 1}</span> to <span className="font-medium text-foreground">{Math.min(safeCurrentPage * groupsPerPageValue, groups.length)}</span> of <span className="font-medium text-foreground">{groups.length}</span> groups
-            </p>
-            <div className="flex items-center gap-2">
-              <span>Groups per page</span>
-              <Select value={groupsPerPage} onValueChange={setGroupsPerPage}>
-                <SelectTrigger className="h-8 w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="6">6</SelectItem>
-                  <SelectItem value="8">8</SelectItem>
-                  <SelectItem value="12">12</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            {advisorBreakdown.length > 0 && (
+              <Card className="border-none shadow-sm">
+                <CardHeader className="pb-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <BarChart3 className="h-4 w-4 text-primary" /> Proposals by Advisor
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2 p-4 pt-0">
+                  {advisorBreakdown.map(([advisor, count]) => {
+                    const percent = Math.round((count / Math.max(titles.length, 1)) * 100)
 
-          {groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
-              <FileText className="mb-3 h-10 w-10 text-muted-foreground/30" />
-              <p className="font-medium text-muted-foreground">No proposals match your filters</p>
-              <p className="mt-1 text-xs text-muted-foreground">Try adjusting the search or filter criteria</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {paginatedGroups.map((group) => (
-                <GroupCard key={group.groupId} {...group} onReview={openSheet} />
-              ))}
-            </div>
-          )}
-
-          {groups.length > 0 && totalPages > 1 && (
-            <Card className="border border-border/60 shadow-sm">
-              <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Page <span className="font-medium text-foreground">{safeCurrentPage}</span> of <span className="font-medium text-foreground">{totalPages}</span>
-                </div>
-                <Pagination className="mx-0 w-auto justify-start sm:justify-end">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setCurrentPage(1)}
-                        disabled={safeCurrentPage === 1}
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                        disabled={safeCurrentPage === 1}
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                    {paginationItems.map((item, index) => {
-                      if (item === "ellipsis") {
-                        return (
-                          <PaginationItem key={`ellipsis-${index}`}>
-                            <PaginationEllipsis />
-                          </PaginationItem>
-                        )
-                      }
-
-                      return (
-                        <PaginationItem key={item}>
-                          <Button
-                            variant={safeCurrentPage === item ? "default" : "outline"}
-                            size="icon"
-                            onClick={() => setCurrentPage(item)}
-                          >
-                            {item}
-                          </Button>
-                        </PaginationItem>
-                      )
-                    })}
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                        disabled={safeCurrentPage === totalPages}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                    <PaginationItem>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setCurrentPage(totalPages)}
-                        disabled={safeCurrentPage === totalPages}
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </CardContent>
-            </Card>
-          )}
-
-          {advisorBreakdown.length > 0 && (
-            <Card className="border-none shadow-sm">
-              <CardHeader className="pb-2">
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  <BarChart3 className="h-4 w-4 text-primary" /> Proposals by Advisor
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-2 p-4 pt-0">
-                {advisorBreakdown.map(([advisor, count]) => {
-                  const percent = Math.round((count / Math.max(titles.length, 1)) * 100)
-
-                  return (
-                    <div key={advisor} className="flex items-center gap-3">
-                      <span className="w-44 truncate text-sm text-muted-foreground">{advisor}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary/60" style={{ width: `${percent}%` }} />
+                    return (
+                      <div key={advisor} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <span className="w-full text-sm text-muted-foreground sm:w-44 sm:truncate">{advisor}</span>
+                        <div className="h-1.5 w-full flex-1 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-primary/60" style={{ width: `${percent}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold text-primary sm:w-5 sm:text-right">{count}</span>
                       </div>
-                      <span className="w-5 text-right text-xs font-semibold text-primary">{count}</span>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
 
-      <ReviewSheet title={sheetTitle} open={sheetOpen} onClose={() => setSheetOpen(false)} />
-    </div>
+        <ReviewSheet title={sheetTitle} open={sheetOpen} onClose={() => setSheetOpen(false)} />
+      </div>
   )
 }
