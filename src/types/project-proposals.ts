@@ -36,6 +36,19 @@ export interface ProposalProjectGroup {
   members?: ProposalGroupMember[] | null
 }
 
+export interface ProposalProjectRef {
+  id: string
+  status?: string | null
+  advisorId?: string | null
+}
+
+export interface ProposalTransitionSummary {
+  proposalId?: string | null
+  projectId?: string | null
+  advisorId?: string | null
+  action?: string | null
+}
+
 export interface ProjectProposalFeedback {
   id: string
   message: string
@@ -97,6 +110,8 @@ export interface ProjectProposal {
   submittedBy?: string | null
   submitter?: ProposalParty | null
   advisor?: ProposalParty | null
+  project?: ProposalProjectRef | null
+  transitionSummary?: ProposalTransitionSummary | null
   projectGroup?: ProposalProjectGroup | null
   submittedAt?: string | null
   createdAt?: string
