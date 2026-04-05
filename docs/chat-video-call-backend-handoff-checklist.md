@@ -1,11 +1,13 @@
-# Backend Handoff Checklist — Group Chat Video Call Presence
+# Backend Handoff Checklist — Project Group Chat Video Call Presence
 
 This checklist is derived from the realtime contract in `docs/chat-video-call-realtime-contract.md` and is designed for fast backend implementation.
 
 ## 1) Implementation scope
 
 - Namespace: `/chat`
-- Audience: approved project-group members only
+- Audience:
+  - approved project-group members
+  - assigned advisors for the linked project group
 - Fan-out room: `chat_room_<roomId>`
 - Feature in scope: video call presence only (not media transport; Jitsi handles media)
 
@@ -28,8 +30,8 @@ Implement these handlers in the `/chat` namespace:
   - `meetingRoomName` (string)
   - `at` (string; informational only)
 - Validate access:
-  - user belongs to approved `projectGroupId`
-  - `roomId` maps to same project group
+  - user belongs to approved `projectGroupId`, or is the assigned advisor for the linked project
+  - `roomId` maps to the same project group
 - Behavior:
   - initialize call state for room if missing
   - mark call as active
@@ -102,6 +104,10 @@ Broadcast payload:
 ### 2.4 `call:end`
 
 - Perform same auth + access validation.
+- Restrict force-end to allowed users such as:
+  - call starter
+  - assigned advisor
+  - project-group leader
 - Force end active call for room (clear participant set + active state).
 - Broadcast `call:ended` (even if already ended, keep idempotent semantics).
 
@@ -184,10 +190,11 @@ For each `call:*` emit from client:
 
 - [ ] user authenticated
 - [ ] payload shape valid
-- [ ] user member of approved project group
+- [ ] user is an approved project-group member or assigned advisor for the linked project group
 - [ ] `roomId` belongs to project group
 - [ ] `meetingRoomName` is present on `call:start`
 - [ ] `meetingRoomName` matches active session when provided on `join/leave/end`
+- [ ] `call:end` is restricted to authorized force-end roles
 - [ ] ignore client `at` for authority (use server time)
 - [ ] operation idempotent under duplicate emits
 
@@ -228,6 +235,7 @@ Suggested error codes:
 5. `call:leave` from last participant emits ended state.
 6. `call:end` clears keys and emits `call:ended`.
 7. unauthorized or cross-group user is rejected.
+8. assigned advisor can start, join, leave, and force-end a supervised project-group call.
 
 ### 8.2 Integration tests (Socket + Redis)
 
@@ -238,6 +246,8 @@ Suggested error codes:
 3. User B disconnects abruptly -> count updates to 1.
 4. User A leaves -> `call:ended` broadcast and keys removed.
 5. Duplicate network retries (`call:join` twice) keep stable count.
+6. Advisor joins an active project-group call and receives the same `meetingRoomName`.
+7. Advisor force-ends a call and all participants receive `call:ended`.
 
 ### 8.3 E2E scenarios (frontend + backend)
 

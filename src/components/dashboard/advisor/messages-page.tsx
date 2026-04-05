@@ -13,6 +13,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,6 +45,7 @@ import {
   Loader2,
   FolderKanban,
   MoreVertical,
+  Video,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
@@ -59,9 +67,22 @@ import {
   useInfiniteChatRoomMessages,
 } from "@/lib/hooks/use-chat"
 import { acquireChatSocket, releaseChatSocket } from "@/lib/realtime/chat-socket"
+import {
+  type JitsiApiOptions,
+  type JitsiCallPhase,
+  type JitsiExternalApi,
+  loadJitsiExternalApi,
+} from "@/lib/realtime/jitsi-loader"
 import type {
   ChatMessage,
   ChatMessageAttachment,
+  CallEndEmitPayload,
+  CallEndedPayload,
+  CallJoinEmitPayload,
+  CallLeaveEmitPayload,
+  CallParticipantChangedPayload,
+  CallStartEmitPayload,
+  CallStartedPayload,
   ListChatRoomMessagesResponse,
   MessageDeletedPayload,
   MessageEditedPayload,
@@ -387,6 +408,48 @@ export function AdvisorMessagesPage() {
   const typingUserIdsRef = useRef<Set<string>>(new Set())
   const [typingUserIds, setTypingUserIds] = useState<string[]>([])
 
+  // ── Video call (Jitsi + call presence) ───────────────────────────────────
+
+  const [callPhase, setCallPhase] = useState<JitsiCallPhase>("idle")
+  const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false)
+  const [videoCallError, setVideoCallError] = useState<string | null>(null)
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null)
+  const [hasMicrophone, setHasMicrophone] = useState<boolean | null>(null)
+  const [deviceCheckError, setDeviceCheckError] = useState<string | null>(null)
+  const [isCheckingDevices, setIsCheckingDevices] = useState(false)
+  const [isGroupCallOngoing, setIsGroupCallOngoing] = useState(false)
+  const [groupCallParticipantCount, setGroupCallParticipantCount] = useState<number | null>(null)
+  const [, setGroupCallStartedByUserId] = useState<string | null>(null)
+  const [activeMeetingRoomName, setActiveMeetingRoomName] = useState<string | null>(null)
+  const jitsiContainerRef = useRef<HTMLDivElement | null>(null)
+  const jitsiApiRef = useRef<JitsiExternalApi | null>(null)
+  const suppressConferenceLeaveRef = useRef(false)
+
+  const normalizedTenant = useMemo(() => {
+    const value = (tenantDomain ?? "academia").toLowerCase().trim()
+    return value.replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-")
+  }, [tenantDomain])
+
+  const jitsiRoomName = useMemo(() => {
+    if (!projectGroupId) return null
+    const normalizedGroup = projectGroupId.toLowerCase().replace(/[^a-z0-9-]/g, "-")
+    return `academia-${normalizedTenant}-${normalizedGroup}`.slice(0, 128)
+  }, [normalizedTenant, projectGroupId])
+
+  const effectiveMeetingRoomName = useMemo(() => {
+    return activeMeetingRoomName ?? jitsiRoomName
+  }, [activeMeetingRoomName, jitsiRoomName])
+
+  const waitingForSessionRoom = useMemo(() => {
+    return isGroupCallOngoing && !activeMeetingRoomName
+  }, [activeMeetingRoomName, isGroupCallOngoing])
+
+  const jitsiDisplayName = useMemo(() => {
+    const fullName = `${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`.trim()
+    if (fullName) return fullName
+    return currentUser?.email ?? "Advisor"
+  }, [currentUser?.email, currentUser?.firstName, currentUser?.lastName])
+
   useEffect(() => {
     if (!accessToken || !projectGroupId || !roomId) {
       socketRef.current?.disconnect?.()
@@ -396,6 +459,11 @@ export function AdvisorMessagesPage() {
       setOnlineUserIds([])
       typingUserIdsRef.current.clear()
       setTypingUserIds([])
+
+      setIsGroupCallOngoing(false)
+      setGroupCallParticipantCount(null)
+      setGroupCallStartedByUserId(null)
+      setActiveMeetingRoomName(null)
       return
     }
 
@@ -547,6 +615,51 @@ export function AdvisorMessagesPage() {
       })
     }
 
+    const handleCallStarted = (payload: unknown) => {
+      const raw = payload as CallStartedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+
+      setIsGroupCallOngoing(true)
+      if (typeof raw.meetingRoomName === "string" && raw.meetingRoomName.trim().length > 0) {
+        setActiveMeetingRoomName(raw.meetingRoomName)
+      }
+      if (typeof raw.startedByUserId === "string") setGroupCallStartedByUserId(raw.startedByUserId)
+      if (typeof raw.participantCount === "number") setGroupCallParticipantCount(raw.participantCount)
+    }
+
+    const handleCallParticipantChanged = (payload: unknown) => {
+      const raw = payload as CallParticipantChangedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+      if (typeof raw.participantCount !== "number") return
+
+      if (typeof raw.meetingRoomName === "string" && raw.meetingRoomName.trim().length > 0) {
+        setActiveMeetingRoomName(raw.meetingRoomName)
+      }
+
+      setGroupCallParticipantCount(raw.participantCount)
+      setIsGroupCallOngoing(raw.participantCount > 0)
+      if (raw.participantCount <= 0) setGroupCallStartedByUserId(null)
+    }
+
+    const handleCallEnded = (payload: unknown) => {
+      const raw = payload as CallEndedPayload
+      if (!raw || typeof raw !== "object") return
+      if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
+
+      suppressConferenceLeaveRef.current = true
+      disposeJitsiCall()
+
+      setIsGroupCallOngoing(false)
+      setGroupCallParticipantCount(null)
+      setGroupCallStartedByUserId(null)
+      setActiveMeetingRoomName(null)
+      setIsVideoDialogOpen(false)
+      setCallPhase("idle")
+      setVideoCallError(null)
+    }
+
     const joinRoom = () => {
       socket.emit(
         "chat:join",
@@ -585,6 +698,11 @@ export function AdvisorMessagesPage() {
       setOnlineUserIds([])
       typingUserIdsRef.current.clear()
       setTypingUserIds([])
+
+      setIsGroupCallOngoing(false)
+      setGroupCallParticipantCount(null)
+      setGroupCallStartedByUserId(null)
+      setActiveMeetingRoomName(null)
     }
 
     socket.on("presence:update", handlePresenceUpdate)
@@ -595,6 +713,9 @@ export function AdvisorMessagesPage() {
     socket.on("typing:update", handleTypingUpdate)
     socket.on("reaction:updated", handleReactionUpdated)
     socket.on("reaction:removed", handleReactionRemoved)
+    socket.on("call:started", handleCallStarted)
+    socket.on("call:participantChanged", handleCallParticipantChanged)
+    socket.on("call:ended", handleCallEnded)
     socket.on("connect", handleConnect)
     socket.on("disconnect", handleDisconnect)
 
@@ -609,6 +730,9 @@ export function AdvisorMessagesPage() {
       socket.off("typing:update", handleTypingUpdate)
       socket.off("reaction:updated", handleReactionUpdated)
       socket.off("reaction:removed", handleReactionRemoved)
+      socket.off("call:started", handleCallStarted)
+      socket.off("call:participantChanged", handleCallParticipantChanged)
+      socket.off("call:ended", handleCallEnded)
       socket.off("connect", handleConnect)
       socket.off("disconnect", handleDisconnect)
       releaseChatSocket(socket)
@@ -622,10 +746,251 @@ export function AdvisorMessagesPage() {
     reconcileClientMessageIdInCache,
     roomId,
     tenantDomain,
+    disposeJitsiCall,
     updateInfiniteMessageById,
     updateInfiniteMessagesCache,
     updateReadStateInCache,
   ])
+
+  const disposeJitsiCall = useCallback(() => {
+    if (!jitsiApiRef.current) return
+    try {
+      jitsiApiRef.current.dispose()
+    } catch {
+      // no-op
+    }
+    jitsiApiRef.current = null
+  }, [])
+
+  const resetVideoCallUi = useCallback(() => {
+    setIsVideoDialogOpen(false)
+    setCallPhase("idle")
+    setVideoCallError(null)
+  }, [])
+
+  const emitCallPresence = useCallback(
+    (eventName: "call:start" | "call:join" | "call:leave" | "call:end", meetingRoomName?: string) => {
+      if (!roomId || !projectGroupId) return
+      const socket = socketRef.current
+      if (!socket) return
+
+      const resolvedMeetingRoomName = meetingRoomName ?? effectiveMeetingRoomName
+      if (!resolvedMeetingRoomName) return
+
+      const payload: CallStartEmitPayload | CallJoinEmitPayload | CallLeaveEmitPayload | CallEndEmitPayload = {
+        roomId,
+        projectGroupId,
+        meetingRoomName: resolvedMeetingRoomName,
+        at: new Date().toISOString(),
+      }
+
+      socket.emit(eventName, payload)
+    },
+    [effectiveMeetingRoomName, projectGroupId, roomId]
+  )
+
+  const leaveVideoCall = useCallback(() => {
+    emitCallPresence("call:leave")
+    suppressConferenceLeaveRef.current = true
+    setCallPhase("ending")
+    disposeJitsiCall()
+    resetVideoCallUi()
+  }, [disposeJitsiCall, emitCallPresence, resetVideoCallUi])
+
+  const forceEndVideoCall = useCallback(() => {
+    emitCallPresence("call:end")
+    suppressConferenceLeaveRef.current = true
+    setCallPhase("ending")
+    disposeJitsiCall()
+    resetVideoCallUi()
+  }, [disposeJitsiCall, emitCallPresence, resetVideoCallUi])
+
+  const detectMediaDevices = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+      setHasCamera(null)
+      setHasMicrophone(null)
+      setDeviceCheckError("Device detection is not supported in this browser")
+      return
+    }
+
+    try {
+      setIsCheckingDevices(true)
+      setDeviceCheckError(null)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const cameraAvailable = devices.some((device) => device.kind === "videoinput")
+      const micAvailable = devices.some((device) => device.kind === "audioinput")
+
+      setHasCamera(cameraAvailable)
+      setHasMicrophone(micAvailable)
+    } catch {
+      setHasCamera(null)
+      setHasMicrophone(null)
+      setDeviceCheckError("Unable to detect camera/microphone. You can still try joining.")
+    } finally {
+      setIsCheckingDevices(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isVideoDialogOpen || callPhase !== "prejoin") return
+    void detectMediaDevices()
+  }, [callPhase, detectMediaDevices, isVideoDialogOpen])
+
+  const joinVideoCall = useCallback(async () => {
+    if (waitingForSessionRoom) {
+      setVideoCallError("Call session is syncing. Please wait a moment and try Join call again.")
+      return
+    }
+
+    const meetingRoomName = effectiveMeetingRoomName
+    if (!meetingRoomName) {
+      toast.error("Chat room is not ready for video call")
+      return
+    }
+    if (!projectGroupId) {
+      toast.error("Project group not found")
+      return
+    }
+
+    const joiningExistingCall = Boolean(isGroupCallOngoing && activeMeetingRoomName)
+
+    try {
+      setVideoCallError(null)
+      setCallPhase("joining")
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+
+      const parentNode = jitsiContainerRef.current
+      if (!parentNode) {
+        throw new Error("Video container is not ready")
+      }
+
+      const ExternalApi = await loadJitsiExternalApi()
+      const options: JitsiApiOptions = {
+        roomName: meetingRoomName,
+        parentNode,
+        width: "100%",
+        height: "100%",
+        userInfo: {
+          displayName: jitsiDisplayName,
+          email: currentUser?.email,
+          avatarURL: currentUser?.avatarUrl ?? undefined,
+        },
+        configOverwrite: {
+          prejoinPageEnabled: false,
+          enableWelcomePage: false,
+          startWithVideoMuted: hasCamera === false,
+          startWithAudioMuted: hasMicrophone === false,
+        },
+      }
+
+      disposeJitsiCall()
+      const api = new ExternalApi("meet.jit.si", options)
+      jitsiApiRef.current = api
+      suppressConferenceLeaveRef.current = false
+
+      const joinTimeout = window.setTimeout(() => {
+        if (jitsiApiRef.current !== api) return
+        setVideoCallError("Call join timed out. Please try again.")
+        setCallPhase("prejoin")
+        try {
+          api.dispose()
+        } catch {
+          // no-op
+        }
+        if (jitsiApiRef.current === api) {
+          jitsiApiRef.current = null
+        }
+      }, 90000)
+
+      const clearJoinTimeout = () => {
+        window.clearTimeout(joinTimeout)
+      }
+
+      api.addListener("videoConferenceJoined", () => {
+        clearJoinTimeout()
+        setCallPhase("live")
+        setIsGroupCallOngoing(true)
+        setGroupCallParticipantCount((prev) => (typeof prev === "number" && prev > 0 ? prev : 1))
+        setGroupCallStartedByUserId((prev) => prev ?? currentUser?.id ?? null)
+        if (!joiningExistingCall) {
+          emitCallPresence("call:start", meetingRoomName)
+        }
+        emitCallPresence("call:join", meetingRoomName)
+      })
+
+      api.addListener("readyToClose", () => {
+        clearJoinTimeout()
+        if (suppressConferenceLeaveRef.current) return
+        leaveVideoCall()
+      })
+
+      api.addListener("videoConferenceLeft", () => {
+        clearJoinTimeout()
+        if (suppressConferenceLeaveRef.current) return
+        leaveVideoCall()
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to start video call"
+      setVideoCallError(message)
+      setCallPhase("prejoin")
+      toast.error(message)
+    }
+  }, [
+    activeMeetingRoomName,
+    currentUser?.avatarUrl,
+    currentUser?.email,
+    currentUser?.id,
+    disposeJitsiCall,
+    effectiveMeetingRoomName,
+    emitCallPresence,
+    leaveVideoCall,
+    hasCamera,
+    hasMicrophone,
+    isGroupCallOngoing,
+    jitsiDisplayName,
+    projectGroupId,
+    waitingForSessionRoom,
+  ])
+
+  const openVideoPrejoin = useCallback(() => {
+    if (!selectedProject) {
+      toast.error("Select a project group first")
+      return
+    }
+
+    setVideoCallError(
+      waitingForSessionRoom ? "Active call session is syncing from server. Join will be enabled shortly." : null
+    )
+    setIsVideoDialogOpen(true)
+    setCallPhase("prejoin")
+  }, [selectedProject, waitingForSessionRoom])
+
+  const handleVideoDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setIsVideoDialogOpen(true)
+        if (callPhase === "idle") setCallPhase("prejoin")
+        return
+      }
+
+      if (callPhase === "live" || callPhase === "joining") {
+        leaveVideoCall()
+        return
+      }
+
+      resetVideoCallUi()
+    },
+    [callPhase, leaveVideoCall, resetVideoCallUi]
+  )
+
+  useEffect(() => {
+    return () => {
+      disposeJitsiCall()
+    }
+  }, [disposeJitsiCall])
 
   // ── Typing ────────────────────────────────────────────────────────────────
 
@@ -1321,7 +1686,8 @@ export function AdvisorMessagesPage() {
   }, [selectedProject])
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background shadow-sm sm:min-h-[500px] sm:flex-row">
+    <>
+      <div className="flex h-[calc(100dvh-8rem)] min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background shadow-sm sm:min-h-[500px] sm:flex-row">
 
       <div className="flex min-h-0 w-full sm:w-80 flex-shrink-0 flex-col border-b sm:border-b-0 sm:border-r">
         <div className="border-b p-4">
@@ -1438,28 +1804,46 @@ export function AdvisorMessagesPage() {
               </div>
             </div>
 
-            {/* Member avatars */}
-            <div className="flex -space-x-2">
-              {groupMembersForHeader.slice(0, 5).map((member) => {
-                const name = `${member.firstName} ${member.lastName}`.trim() || member.email
-                const isOnline = onlineUserIds.includes(member.id)
-                return (
-                  <div key={member.id} className="relative" title={name}>
-                    <Avatar className="h-8 w-8 border-2 border-background">
-                      {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={name} />}
-                      <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
-                    </Avatar>
-                    {isOnline && (
-                      <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background bg-green-500" />
-                    )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!roomId || chatRoomQuery.isLoading}
+                onClick={() => {
+                  if (callPhase === "live") {
+                    setIsVideoDialogOpen(true)
+                    return
+                  }
+                  openVideoPrejoin()
+                }}
+                title="Video call"
+              >
+                <Video className="h-4 w-4" />
+              </Button>
+
+              {/* Member avatars */}
+              <div className="flex -space-x-2">
+                {groupMembersForHeader.slice(0, 5).map((member) => {
+                  const name = `${member.firstName} ${member.lastName}`.trim() || member.email
+                  const isOnline = onlineUserIds.includes(member.id)
+                  return (
+                    <div key={member.id} className="relative" title={name}>
+                      <Avatar className="h-8 w-8 border-2 border-background">
+                        {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={name} />}
+                        <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
+                      </Avatar>
+                      {isOnline && (
+                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background bg-green-500" />
+                      )}
+                    </div>
+                  )
+                })}
+                {groupMembersForHeader.length > 5 && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
+                    +{groupMembersForHeader.length - 5}
                   </div>
-                )
-              })}
-              {groupMembersForHeader.length > 5 && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                  +{groupMembersForHeader.length - 5}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -1486,6 +1870,31 @@ export function AdvisorMessagesPage() {
 
           {chatRoomQuery.isSuccess && roomId && (
             <>
+              {(callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
+                <div className="mx-4 mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">
+                    {waitingForSessionRoom ? "Video call is syncing..." : "Video call in progress"}
+                    {typeof groupCallParticipantCount === "number" && groupCallParticipantCount > 0
+                      ? ` • ${groupCallParticipantCount} participant${groupCallParticipantCount > 1 ? "s" : ""}`
+                      : ""}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={waitingForSessionRoom}
+                    onClick={() => {
+                      if (callPhase === "live") {
+                        setIsVideoDialogOpen(true)
+                        return
+                      }
+                      openVideoPrejoin()
+                    }}
+                  >
+                    {callPhase === "live" ? "Return to call" : "Join call"}
+                  </Button>
+                </div>
+              )}
+
               {/* ── Message list ── */}
               <div ref={messagesScrollRootRef} className="relative min-h-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full min-h-0 px-4 py-2">
@@ -1946,6 +2355,125 @@ export function AdvisorMessagesPage() {
           )}
         </div>
       )}
-    </div>
+      </div>
+
+      <Dialog open={isVideoDialogOpen} onOpenChange={handleVideoDialogOpenChange}>
+        <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden h-[85vh]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Group video call</DialogTitle>
+            <DialogDescription>
+              Join and manage your project group video call session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold">Group video call</p>
+                <p className="text-xs text-muted-foreground">{selectedProject?.group.name ?? "Project Group"}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {isGroupCallOngoing && (
+                  <Button variant="destructive" size="sm" onClick={forceEndVideoCall}>
+                    End for everyone
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={leaveVideoCall}>
+                  Leave call
+                </Button>
+              </div>
+            </div>
+
+            {callPhase === "prejoin" && (
+              <div className="flex flex-1 items-center justify-center px-6">
+                <div className="w-full max-w-md space-y-4 rounded-lg border bg-card p-6">
+                  <div className="space-y-1">
+                    <h3 className="text-base font-semibold">Ready to join?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      This call is for your current project group. You can return to chat anytime.
+                    </p>
+                    {videoCallError && <p className="text-sm text-destructive">{videoCallError}</p>}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Room</span>
+                    <span className="font-mono text-xs">{effectiveMeetingRoomName ?? "Not ready"}</span>
+                  </div>
+
+                  <div className="space-y-2 rounded-md border px-3 py-2">
+                    <p className="text-xs font-medium">Device status</p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Camera</span>
+                      <span>
+                        {isCheckingDevices
+                          ? "Checking..."
+                          : hasCamera === true
+                            ? "Available"
+                            : hasCamera === false
+                              ? "Not detected"
+                              : "Unknown"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Microphone</span>
+                      <span>
+                        {isCheckingDevices
+                          ? "Checking..."
+                          : hasMicrophone === true
+                            ? "Available"
+                            : hasMicrophone === false
+                              ? "Not detected"
+                              : "Unknown"}
+                      </span>
+                    </div>
+
+                    {hasCamera === false && (
+                      <p className="text-xs text-muted-foreground">
+                        No camera detected. You can still join in audio-only mode.
+                      </p>
+                    )}
+
+                    {hasMicrophone === false && (
+                      <p className="text-xs text-muted-foreground">
+                        No microphone detected. You can still join as a listener.
+                      </p>
+                    )}
+
+                    {deviceCheckError && <p className="text-xs text-muted-foreground">{deviceCheckError}</p>}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    {isGroupCallOngoing && (
+                      <Button variant="destructive" onClick={forceEndVideoCall}>
+                        End for everyone
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={resetVideoCallUi}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => void joinVideoCall()}
+                      disabled={!effectiveMeetingRoomName || waitingForSessionRoom}
+                    >
+                      Join call
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={callPhase === "joining" || callPhase === "live" ? "relative flex-1" : "hidden"}>
+              <div ref={jitsiContainerRef} className="h-full w-full bg-black" />
+              {callPhase === "joining" && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-white">
+                  <div className="rounded-md border border-white/20 bg-black/25 px-4 py-2 text-sm">
+                    Joining call...
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
