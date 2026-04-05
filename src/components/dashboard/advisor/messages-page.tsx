@@ -20,16 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Paperclip,
   Search,
   Send,
@@ -118,6 +108,8 @@ interface DisplayMessage {
 }
 
 const COMMON_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "👏"]
+const SHOW_ADVISOR_VIDEO_UI = true
+const ENABLE_ADVISOR_VIDEO_CALL = true
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -407,6 +399,7 @@ export function AdvisorMessagesPage() {
   const isTypingRef = useRef(false)
   const typingUserIdsRef = useRef<Set<string>>(new Set())
   const [typingUserIds, setTypingUserIds] = useState<string[]>([])
+  const [openMessageActionsId, setOpenMessageActionsId] = useState<string | null>(null)
 
   // ── Video call (Jitsi + call presence) ───────────────────────────────────
 
@@ -424,6 +417,7 @@ export function AdvisorMessagesPage() {
   const jitsiContainerRef = useRef<HTMLDivElement | null>(null)
   const jitsiApiRef = useRef<JitsiExternalApi | null>(null)
   const suppressConferenceLeaveRef = useRef(false)
+  const programmaticVideoDialogCloseRef = useRef(false)
 
   const normalizedTenant = useMemo(() => {
     const value = (tenantDomain ?? "academia").toLowerCase().trim()
@@ -449,6 +443,38 @@ export function AdvisorMessagesPage() {
     if (fullName) return fullName
     return currentUser?.email ?? "Advisor"
   }, [currentUser?.email, currentUser?.firstName, currentUser?.lastName])
+
+  const disposeSpecificJitsiCall = useCallback((api: JitsiExternalApi | null) => {
+    if (!api) return
+
+    try {
+      api.dispose()
+    } catch {
+      const container = jitsiContainerRef.current
+      if (container) {
+        try {
+          container.replaceChildren()
+        } catch {
+          // no-op
+        }
+      }
+    }
+  }, [])
+
+  const disposeJitsiCall = useCallback(() => {
+    const api = jitsiApiRef.current
+    if (!api) return
+
+    jitsiApiRef.current = null
+    disposeSpecificJitsiCall(api)
+  }, [disposeSpecificJitsiCall])
+
+  const resetVideoCallUi = useCallback(() => {
+    programmaticVideoDialogCloseRef.current = true
+    setIsVideoDialogOpen(false)
+    setCallPhase("idle")
+    setVideoCallError(null)
+  }, [])
 
   useEffect(() => {
     if (!accessToken || !projectGroupId || !roomId) {
@@ -616,6 +642,7 @@ export function AdvisorMessagesPage() {
     }
 
     const handleCallStarted = (payload: unknown) => {
+      if (!ENABLE_ADVISOR_VIDEO_CALL) return
       const raw = payload as CallStartedPayload
       if (!raw || typeof raw !== "object") return
       if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
@@ -629,6 +656,7 @@ export function AdvisorMessagesPage() {
     }
 
     const handleCallParticipantChanged = (payload: unknown) => {
+      if (!ENABLE_ADVISOR_VIDEO_CALL) return
       const raw = payload as CallParticipantChangedPayload
       if (!raw || typeof raw !== "object") return
       if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
@@ -644,6 +672,7 @@ export function AdvisorMessagesPage() {
     }
 
     const handleCallEnded = (payload: unknown) => {
+      if (!ENABLE_ADVISOR_VIDEO_CALL) return
       const raw = payload as CallEndedPayload
       if (!raw || typeof raw !== "object") return
       if (typeof raw.roomId !== "string" || raw.roomId !== roomId) return
@@ -655,9 +684,7 @@ export function AdvisorMessagesPage() {
       setGroupCallParticipantCount(null)
       setGroupCallStartedByUserId(null)
       setActiveMeetingRoomName(null)
-      setIsVideoDialogOpen(false)
-      setCallPhase("idle")
-      setVideoCallError(null)
+      resetVideoCallUi()
     }
 
     const joinRoom = () => {
@@ -713,9 +740,11 @@ export function AdvisorMessagesPage() {
     socket.on("typing:update", handleTypingUpdate)
     socket.on("reaction:updated", handleReactionUpdated)
     socket.on("reaction:removed", handleReactionRemoved)
-    socket.on("call:started", handleCallStarted)
-    socket.on("call:participantChanged", handleCallParticipantChanged)
-    socket.on("call:ended", handleCallEnded)
+    if (ENABLE_ADVISOR_VIDEO_CALL) {
+      socket.on("call:started", handleCallStarted)
+      socket.on("call:participantChanged", handleCallParticipantChanged)
+      socket.on("call:ended", handleCallEnded)
+    }
     socket.on("connect", handleConnect)
     socket.on("disconnect", handleDisconnect)
 
@@ -730,9 +759,11 @@ export function AdvisorMessagesPage() {
       socket.off("typing:update", handleTypingUpdate)
       socket.off("reaction:updated", handleReactionUpdated)
       socket.off("reaction:removed", handleReactionRemoved)
-      socket.off("call:started", handleCallStarted)
-      socket.off("call:participantChanged", handleCallParticipantChanged)
-      socket.off("call:ended", handleCallEnded)
+      if (ENABLE_ADVISOR_VIDEO_CALL) {
+        socket.off("call:started", handleCallStarted)
+        socket.off("call:participantChanged", handleCallParticipantChanged)
+        socket.off("call:ended", handleCallEnded)
+      }
       socket.off("connect", handleConnect)
       socket.off("disconnect", handleDisconnect)
       releaseChatSocket(socket)
@@ -751,22 +782,6 @@ export function AdvisorMessagesPage() {
     updateInfiniteMessagesCache,
     updateReadStateInCache,
   ])
-
-  const disposeJitsiCall = useCallback(() => {
-    if (!jitsiApiRef.current) return
-    try {
-      jitsiApiRef.current.dispose()
-    } catch {
-      // no-op
-    }
-    jitsiApiRef.current = null
-  }, [])
-
-  const resetVideoCallUi = useCallback(() => {
-    setIsVideoDialogOpen(false)
-    setCallPhase("idle")
-    setVideoCallError(null)
-  }, [])
 
   const emitCallPresence = useCallback(
     (eventName: "call:start" | "call:join" | "call:leave" | "call:end", meetingRoomName?: string) => {
@@ -895,11 +910,7 @@ export function AdvisorMessagesPage() {
         if (jitsiApiRef.current !== api) return
         setVideoCallError("Call join timed out. Please try again.")
         setCallPhase("prejoin")
-        try {
-          api.dispose()
-        } catch {
-          // no-op
-        }
+        disposeSpecificJitsiCall(api)
         if (jitsiApiRef.current === api) {
           jitsiApiRef.current = null
         }
@@ -944,6 +955,7 @@ export function AdvisorMessagesPage() {
     currentUser?.email,
     currentUser?.id,
     disposeJitsiCall,
+    disposeSpecificJitsiCall,
     effectiveMeetingRoomName,
     emitCallPresence,
     leaveVideoCall,
@@ -976,6 +988,11 @@ export function AdvisorMessagesPage() {
         return
       }
 
+      if (programmaticVideoDialogCloseRef.current) {
+        programmaticVideoDialogCloseRef.current = false
+        return
+      }
+
       if (callPhase === "live" || callPhase === "joining") {
         leaveVideoCall()
         return
@@ -991,6 +1008,29 @@ export function AdvisorMessagesPage() {
       disposeJitsiCall()
     }
   }, [disposeJitsiCall])
+
+  useEffect(() => {
+    if (!openMessageActionsId) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest("[data-message-actions-root='true']")) return
+      setOpenMessageActionsId(null)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMessageActionsId(null)
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [openMessageActionsId])
 
   // ── Typing ────────────────────────────────────────────────────────────────
 
@@ -1026,7 +1066,6 @@ export function AdvisorMessagesPage() {
   const lastReadUpToMessageIdRef = useRef<string | null>(null)
   const isAtBottomRef = useRef(false)
   const [isAtBottom, setIsAtBottom] = useState(false)
-  const [openMessageActionsId, setOpenMessageActionsId] = useState<string | null>(null)
   const messagesScrollRootRef = useRef<HTMLDivElement | null>(null)
   const pendingTopPaginationScrollRef = useRef<{
     prevScrollHeight: number
@@ -1805,21 +1844,23 @@ export function AdvisorMessagesPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={!roomId || chatRoomQuery.isLoading}
-                onClick={() => {
-                  if (callPhase === "live") {
-                    setIsVideoDialogOpen(true)
-                    return
-                  }
-                  openVideoPrejoin()
-                }}
-                title="Video call"
-              >
-                <Video className="h-4 w-4" />
-              </Button>
+              {SHOW_ADVISOR_VIDEO_UI && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={!roomId || chatRoomQuery.isLoading}
+                  onClick={() => {
+                    if (callPhase === "live") {
+                      setIsVideoDialogOpen(true)
+                      return
+                    }
+                    openVideoPrejoin()
+                  }}
+                  title="Video call"
+                >
+                  <Video className="h-4 w-4" />
+                </Button>
+              )}
 
               {/* Member avatars */}
               <div className="flex -space-x-2">
@@ -1870,7 +1911,7 @@ export function AdvisorMessagesPage() {
 
           {chatRoomQuery.isSuccess && roomId && (
             <>
-              {(callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
+              {ENABLE_ADVISOR_VIDEO_CALL && (callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
                 <div className="mx-4 mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
                   <p className="text-xs text-muted-foreground">
                     {waitingForSessionRoom ? "Video call is syncing..." : "Video call in progress"}
@@ -2038,51 +2079,53 @@ export function AdvisorMessagesPage() {
                                   )}
                                 </div>
 
-                                <DropdownMenu
-                                  open={openMessageActionsId === msg.id}
-                                  onOpenChange={(open) => {
-                                    setOpenMessageActionsId((id) => {
-                                      if (open) return msg.id
-                                      return id === msg.id ? null : id
-                                    })
-                                  }}
-                                >
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className={
-                                        "h-7 w-7 shrink-0 " +
-                                        (isMine
-                                          ? "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
-                                          : "")
-                                      }
-                                      aria-label="Message actions"
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent className="w-48" align="start">
-                                    <DropdownMenuItem
-                                      onSelect={() =>
-                                        toggleReplyTo(msg.id, {
-                                          senderName: msg.senderName,
-                                          content: msg.content || msg.attachments?.[0]?.name,
-                                        })
-                                      }
-                                    >
-                                      <Reply className="mr-2 h-4 w-4" />
-                                      Reply
-                                    </DropdownMenuItem>
+                                <div className="relative shrink-0" data-message-actions-root="true">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={
+                                      "h-7 w-7 shrink-0 " +
+                                      (isMine
+                                        ? "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                                        : "")
+                                    }
+                                    aria-label="Message actions"
+                                    onClick={() => {
+                                      setOpenMessageActionsId((id) => (id === msg.id ? null : msg.id))
+                                    }}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
 
-                                    <DropdownMenuSub>
-                                      <DropdownMenuSubTrigger>
-                                        <SmilePlus className="mr-2 h-4 w-4" />
-                                        React
-                                      </DropdownMenuSubTrigger>
-                                      <DropdownMenuSubContent>
-                                        <div className="flex flex-wrap gap-1 p-1">
+                                  {openMessageActionsId === msg.id && (
+                                    <div
+                                      className={
+                                        "absolute z-20 mt-1 w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-md " +
+                                        (isMine ? "right-0" : "left-0")
+                                      }
+                                    >
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                        onClick={() => {
+                                          setOpenMessageActionsId(null)
+                                          toggleReplyTo(msg.id, {
+                                            senderName: msg.senderName,
+                                            content: msg.content || msg.attachments?.[0]?.name,
+                                          })
+                                        }}
+                                      >
+                                        <Reply className="mr-2 h-4 w-4" />
+                                        Reply
+                                      </button>
+
+                                      <div className="my-1 rounded-sm px-2 py-1.5">
+                                        <div className="mb-2 flex items-center text-xs text-muted-foreground">
+                                          <SmilePlus className="mr-2 h-4 w-4" />
+                                          React
+                                        </div>
+                                        <div className="flex flex-wrap gap-1">
                                           {COMMON_EMOJIS.map((emoji) => (
                                             <button
                                               key={emoji}
@@ -2091,6 +2134,7 @@ export function AdvisorMessagesPage() {
                                                 msg.reactions?.myReaction === emoji ? "bg-primary/10" : ""
                                               }`}
                                               onClick={() => {
+                                                setOpenMessageActionsId(null)
                                                 void setReactionOnMessage({ messageId: msg.id, emoji })
                                               }}
                                             >
@@ -2099,47 +2143,64 @@ export function AdvisorMessagesPage() {
                                           ))}
                                         </div>
                                         {msg.reactions?.myReaction && (
-                                          <DropdownMenuItem
-                                            onSelect={() =>
+                                          <button
+                                            type="button"
+                                            className="mt-2 flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                            onClick={() => {
+                                              setOpenMessageActionsId(null)
                                               void setReactionOnMessage({ messageId: msg.id, emoji: null })
-                                            }
+                                            }}
                                           >
                                             Remove my reaction
-                                          </DropdownMenuItem>
+                                          </button>
                                         )}
-                                      </DropdownMenuSubContent>
-                                    </DropdownMenuSub>
+                                      </div>
 
-                                    <DropdownMenuItem onSelect={() => void togglePinMessage(msg.id)}>
-                                      <Pin className="mr-2 h-4 w-4" />
-                                      {msg.isPinned ? "Unpin" : "Pin"}
-                                    </DropdownMenuItem>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                        onClick={() => {
+                                          setOpenMessageActionsId(null)
+                                          void togglePinMessage(msg.id)
+                                        }}
+                                      >
+                                        <Pin className="mr-2 h-4 w-4" />
+                                        {msg.isPinned ? "Unpin" : "Pin"}
+                                      </button>
 
-                                    {msg.senderId === "current" && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          onSelect={() =>
-                                            void editMessage({
-                                              messageId: msg.id,
-                                              fallbackText: msg.content,
-                                            })
-                                          }
-                                        >
-                                          <Pencil className="mr-2 h-4 w-4" />
-                                          Edit
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          variant="destructive"
-                                          onSelect={() => void deleteMessage(msg.id)}
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      {msg.senderId === "current" && (
+                                        <>
+                                          <div className="my-1 h-px bg-border" />
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                            onClick={() => {
+                                              setOpenMessageActionsId(null)
+                                              void editMessage({
+                                                messageId: msg.id,
+                                                fallbackText: msg.content,
+                                              })
+                                            }}
+                                          >
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                                            onClick={() => {
+                                              setOpenMessageActionsId(null)
+                                              void deleteMessage(msg.id)
+                                            }}
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Reactions */}
@@ -2357,6 +2418,7 @@ export function AdvisorMessagesPage() {
       )}
       </div>
 
+      {SHOW_ADVISOR_VIDEO_UI && isVideoDialogOpen ? (
       <Dialog open={isVideoDialogOpen} onOpenChange={handleVideoDialogOpenChange}>
         <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden h-[85vh]">
           <DialogHeader className="sr-only">
@@ -2474,6 +2536,7 @@ export function AdvisorMessagesPage() {
           </div>
         </DialogContent>
       </Dialog>
+      ) : null}
     </>
   )
 }
