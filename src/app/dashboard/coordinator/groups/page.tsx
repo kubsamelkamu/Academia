@@ -811,6 +811,11 @@ export default function GroupsPage() {
           <Badge variant="outline" className="bg-muted text-muted-foreground text-xs">
             {allStudents.length} students
           </Badge>
+          <Link href="/dashboard/coordinator/groups/approvals">
+            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs border-primary/20 text-primary hover:bg-primary/10">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Group Approval
+            </Button>
+          </Link>
           <Link href="/dashboard/coordinator/groups/applications">
             <Button size="sm" className="gap-1.5 h-8 text-xs">
               <UserPlus className="h-3.5 w-3.5" /> Group Leader Applications

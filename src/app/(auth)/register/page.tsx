@@ -57,6 +57,11 @@ const containerVariants = {
   },
 };
 
+const formCardVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 20 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
+
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
@@ -164,16 +169,17 @@ export default function RegisterPage() {
         <div className="grid items-stretch gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
           <motion.div className="order-2 space-y-5 sm:space-y-6 lg:order-1" variants={itemVariants}>
             <motion.div
-              className={cn(SIGN_IN_MAGIC_CARD_SHELL, AUTH_GLASS_PANEL, 'p-5 sm:p-6')}
-              whileHover={SIGN_IN_MAGIC_HOVER}
+              className="group relative overflow-hidden rounded-2xl border border-[#E84813]/20 bg-slate-900/40 p-5 shadow-xl backdrop-blur-xl sm:p-6 dark:border-[#E84813]/20 dark:bg-slate-900/60"
             >
-              <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-[#E84813] opacity-90" />
               <div className="relative z-[1]">
-                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 sm:text-lg dark:text-slate-100">
-                  <CheckCircle2 className={cn('h-5 w-5 shrink-0', AUTH_ACCENT_ICON)} />
+                <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-white sm:text-lg">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E84813]/20 border border-[#E84813]/30">
+                    <CheckCircle2 className="h-4 w-4 text-[#E84813]" />
+                  </span>
                   Why choose Academia?
                 </h3>
-                <ul className="space-y-3 text-sm sm:text-base">
+                <ul className="space-y-2.5">
                   {[
                     'Streamlined project management',
                     'Automated defense scheduling',
@@ -183,18 +189,19 @@ export default function RegisterPage() {
                   ].map((benefit, index) => (
                     <motion.li
                       key={benefit}
-                      className="flex gap-3 text-slate-700 dark:text-slate-200"
-                      initial={{ opacity: 0, x: -16 }}
+                      className="flex items-start gap-3 text-sm text-slate-100 sm:text-[0.9375rem]"
+                      initial={{ opacity: 0, x: -14 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15 + index * 0.08 }}
                     >
-                      <CheckCircle2 className={cn('mt-0.5 h-4 w-4 shrink-0', AUTH_ACCENT_ICON)} />
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E84813]/20 border border-[#E84813]/30">
+                        <CheckCircle2 className="h-3 w-3 text-[#E84813]" />
+                      </span>
                       {benefit}
                     </motion.li>
                   ))}
                 </ul>
               </div>
-              <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
             </motion.div>
 
             <motion.div
@@ -213,28 +220,34 @@ export default function RegisterPage() {
             </motion.div>
           </motion.div>
 
-          <motion.div className="order-1 lg:order-2" variants={itemVariants}>
-            <motion.div className={SIGN_IN_MAGIC_CARD_SHELL} whileHover={SIGN_IN_MAGIC_HOVER}>
-              <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
-              <Card className={cn(AUTH_GLASS_FORM, 'relative z-[1] gap-0 border-0 py-0 shadow-2xl ring-0')}>
-                <CardHeader className="space-y-3 px-5 pb-4 pt-6 sm:px-6 sm:pt-8">
-                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+          <motion.div 
+            className="order-1 lg:order-2" 
+            variants={formCardVariants}
+            whileHover={{ y: -6 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            <div className="relative overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_60px_-15px_rgba(16,185,129,0.25)] backdrop-blur-2xl dark:border-emerald-500/20 dark:bg-slate-900/95">
+              <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
+              <div className="px-6 pb-7 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
+                <div className="mb-6 text-center">
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
                     <span className={stepChipClass(step === 1)}>1 · Department</span>
                     <ArrowRight className="hidden h-4 w-4 text-slate-400 sm:block" aria-hidden />
                     <span className={stepChipClass(step === 2)}>2 · Account</span>
                   </div>
-                  <CardTitle className="flex items-center justify-center gap-2 text-center text-xl sm:text-2xl">
-                    <GraduationCap className={cn('h-6 w-6 shrink-0', AUTH_ACCENT_ICON)} />
+                  <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
+                    <GraduationCap className="h-5 w-5 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 sm:text-2xl dark:text-slate-100">
                     Register your department
-                  </CardTitle>
-                  <CardDescription className="text-center text-slate-600 dark:text-slate-300">
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     {step === 1
                       ? 'Choose your department and code (Haramaya University).'
                       : 'Create the department head account.'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="px-5 pb-6 sm:px-6 sm:pb-8">
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
+                  </p>
+                </div>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
                     <input type="hidden" {...register('universityName')} />
 
                     {step === 1 ? (
@@ -457,15 +470,13 @@ export default function RegisterPage() {
                     Already have an account?{' '}
                     <Link
                       href="/login"
-                      className="font-medium text-sky-700 underline-offset-4 hover:text-sky-600 hover:underline dark:text-sky-400 dark:hover:text-sky-300"
+                      className="font-medium text-emerald-600 underline-offset-4 hover:text-emerald-700 hover:underline dark:text-emerald-400 dark:hover:text-emerald-300"
                     >
                       Sign in
                     </Link>
                   </p>
-                </CardContent>
-              </Card>
-              <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
-            </motion.div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </motion.div>
