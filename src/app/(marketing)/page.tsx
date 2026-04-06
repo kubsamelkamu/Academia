@@ -345,9 +345,9 @@ export default function HomePage() {
               </Badge>
             </motion.div>
 
-            <h1 className="mb-8 px-4 text-4xl font-black leading-[1.1] tracking-tighter text-white [text-shadow:0_2px_28px_rgba(0,0,0,0.55)] sm:px-0 sm:text-6xl lg:text-7xl xl:text-8xl">
-              Academic Project{" "}
-              <span className="inline-block whitespace-normal bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#F6A090] bg-clip-text text-transparent drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)] md:whitespace-nowrap">
+            <h1 className="mb-8 px-4 text-4xl font-black leading-[1.1] tracking-tighter text-white sm:px-0 sm:text-6xl lg:text-7xl xl:text-8xl">
+              <span className="[text-shadow:0_2px_28px_rgba(0,0,0,0.55)]">Academic Project</span>{" "}
+              <span className="inline-block whitespace-normal text-[#ED5F45] md:whitespace-nowrap">
                 Management Excellence.
               </span>
             </h1>
