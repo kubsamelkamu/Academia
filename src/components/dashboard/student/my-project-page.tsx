@@ -20,8 +20,16 @@ import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-studen
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useProjectDetails } from "@/lib/hooks/use-projects"
+import {
+  addDays,
+  getActiveMilestoneTemplate,
+  getLatestLinkedProposal,
+  getLatestProposal,
+  isProposalMilestoneName,
+  normalizeMilestoneName,
+  toProposalMilestoneState,
+} from "@/lib/student-milestone-helpers"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
-import type { ProjectProposal } from "@/types/project-proposals"
 
 // ----------------------------------------------------------------------
 // Types & Interfaces
@@ -110,68 +118,6 @@ const StatusBadge = ({ status }: { status: string }) => {
   )
 }
 
-const normalizeMilestoneName = (value: string): string =>
-  value.trim().toLowerCase().replace(/\s+/g, " ")
-
-function isProposalMilestoneName(name: string): boolean {
-  const normalized = normalizeMilestoneName(name)
-  return normalized.includes("proposal") || normalized.includes("project title")
-}
-
-function toProposalMilestoneStatus(proposals: ProjectProposal[] | null | undefined):
-  | "pending"
-  | "submitted"
-  | "approved"
-  | null {
-  const items = proposals ?? []
-  if (!items.length) return null
-
-  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
-
-  const sorted = items
-    .slice()
-    .sort((a, b) => {
-      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
-      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
-    })
-
-  const latest = sorted[0]
-  const status = normalizeStatus(latest?.status)
-
-  if (status === "APPROVED") return "approved"
-  if (status === "SUBMITTED") return "submitted"
-  return "pending"
-}
-
-function getLatestProposal(proposals: ProjectProposal[] | null | undefined): ProjectProposal | null {
-  const items = proposals ?? []
-  if (!items.length) return null
-
-  const sorted = items
-    .slice()
-    .sort((a, b) => {
-      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
-      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
-    })
-
-  return sorted[0] ?? null
-}
-
-function addDays(baseDate: string, daysToAdd: number): string {
-  const date = new Date(baseDate)
-  if (Number.isNaN(date.getTime())) return baseDate
-  const next = new Date(date)
-  next.setDate(next.getDate() + Math.max(0, daysToAdd))
-  return next.toISOString().split("T")[0]
-}
-
-function getActiveMilestoneTemplate(templates: MilestoneTemplate[]): MilestoneTemplate | null {
-  if (!templates.length) return null
-  return templates.find((t) => t.isActive) ?? templates[0]
-}
-
 const mapStudentMilestoneStatus = (status: string): Milestone["status"] => {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
@@ -249,6 +195,11 @@ export function StudentMyProjectPage() {
     studentId,
   })
 
+  const latestLinkedProposal = useMemo(
+    () => getLatestLinkedProposal(myGroupProposalsQuery.data),
+    [myGroupProposalsQuery.data]
+  )
+
   const activeProject = useMemo(() => {
     const items = projectsData?.items ?? []
     if (!items.length) return null
@@ -261,7 +212,7 @@ export function StudentMyProjectPage() {
   }, [projectsData?.items])
 
   const resolvedProjectId =
-    activeProject?.id ?? myGroupData?.projectId ?? null
+    latestLinkedProposal?.project?.id?.trim() || activeProject?.id || myGroupData?.projectId || null
 
   const { data: projectMilestonesData } = useProjectMilestones({
     projectId: resolvedProjectId,
@@ -305,7 +256,7 @@ export function StudentMyProjectPage() {
   }, [milestoneBaseDate, templatesData?.templates])
 
   const mergedBackendMilestones = useMemo<Milestone[]>(() => {
-    const proposalStatus = toProposalMilestoneStatus(myGroupProposalsQuery.data)
+    const proposalStatus = toProposalMilestoneState(myGroupProposalsQuery.data)?.status ?? null
 
     const projectMilestonesByName = new Map(
       (projectMilestonesData?.items ?? []).map((milestone) => [

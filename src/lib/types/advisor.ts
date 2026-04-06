@@ -40,6 +40,72 @@ export interface AdvisorMilestone {
   documentUrl?: string;
 }
 
+export interface AdvisorMilestoneReviewQueueProject {
+  id: string;
+  title: string;
+  status?: string | null;
+}
+
+export interface AdvisorMilestoneReviewQueueGroup {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+}
+
+export interface AdvisorMilestoneReviewQueueMilestone {
+  id: string;
+  title?: string | null;
+  status?: string | null;
+  submittedAt?: string | null;
+  dueDate?: string | null;
+}
+
+export interface AdvisorMilestoneReviewQueueSubmission {
+  id: string;
+  status?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  createdAt?: string | null;
+}
+
+export interface AdvisorMilestoneReviewQueueLatestFeedback {
+  id: string;
+  message?: string | null;
+  attachmentUrl?: string | null;
+  createdAt?: string | null;
+}
+
+export interface AdvisorMilestoneReviewQueueReview {
+  feedbackCount: number;
+  latestFeedback?: AdvisorMilestoneReviewQueueLatestFeedback | null;
+}
+
+export interface AdvisorMilestoneReviewQueueItem {
+  project: AdvisorMilestoneReviewQueueProject;
+  group: AdvisorMilestoneReviewQueueGroup;
+  milestone: AdvisorMilestoneReviewQueueMilestone;
+  latestSubmission: AdvisorMilestoneReviewQueueSubmission;
+  review: AdvisorMilestoneReviewQueueReview;
+}
+
+export interface AdvisorMilestoneSubmissionFeedbackAuthor {
+  id?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface AdvisorMilestoneSubmissionFeedbackItem {
+  id: string;
+  message?: string | null;
+  authorRole?: string | null;
+  createdAt?: string | null;
+  attachmentFileName?: string | null;
+  attachmentUrl?: string | null;
+  author?: AdvisorMilestoneSubmissionFeedbackAuthor | null;
+}
+
 export interface AdvisorDashboardOverview {
   stats: AdvisorStats;
   recentProposals: AdvisorProjectProposal[];
