@@ -22,6 +22,9 @@ import {
   getMyGroupJoinRequests,
   getMyProjectGroup,
   getProjectGroupDetails,
+  listSubmittedProjectGroupsForReview,
+  approveSubmittedProjectGroupReview,
+  rejectSubmittedProjectGroupReview,
 } from "@/lib/api/project-groups"
 import type {
   AvailableStudentsPage,
@@ -44,6 +47,10 @@ import type {
   ProjectGroup,
   ProjectGroupDetails,
   ProjectGroupMe,
+  ProjectGroupReviewStatus,
+  ProjectGroupReviewListData,
+  ProjectGroupReviewDecisionResult,
+  DecideProjectGroupReviewDto,
 } from "@/types/project-groups"
 import type {
   AnnouncementDetails,
@@ -61,6 +68,8 @@ export function projectGroupKeys() {
       [...projectGroupKeys().root, "available-students", params] as const,
     browse: (params: { page: number; limit: number; search?: string }) =>
       [...projectGroupKeys().root, "browse", params] as const,
+    reviewList: (params: { status: ProjectGroupReviewStatus; page: number; limit: number; search?: string }) =>
+      [...projectGroupKeys().root, "review", "submitted", params] as const,
     details: (groupId: string) => [...projectGroupKeys().root, "details", groupId] as const,
     joinRequestsMe: (params: { page: number; limit: number; status?: MyProjectGroupJoinRequestStatus | string }) =>
       [...projectGroupKeys().root, "join-requests", "me", params] as const,
@@ -142,6 +151,63 @@ export function useBrowseProjectGroups(params: {
   })
 }
 
+
+export function useSubmittedProjectGroupsForReview(params: {
+  enabled?: boolean
+  status?: ProjectGroupReviewStatus
+  page: number
+  limit: number
+  search?: string
+}) {
+  const status = params.status?.trim() ? params.status.trim() : "ALL"
+  const search = params.search?.trim() ? params.search.trim() : undefined
+
+  return useQuery<ProjectGroupReviewListData, Error>({
+    queryKey: projectGroupKeys().reviewList({
+      status,
+      page: params.page,
+      limit: params.limit,
+      ...(search ? { search } : null),
+    }),
+    queryFn: () =>
+      listSubmittedProjectGroupsForReview({
+        status,
+        page: params.page,
+        limit: params.limit,
+        search,
+      }),
+    enabled: params.enabled ?? true,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    retry: false,
+  })
+}
+
+export function useApproveSubmittedProjectGroupReview() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ProjectGroupReviewDecisionResult, Error, { groupId: string }>({
+    mutationFn: ({ groupId }) => approveSubmittedProjectGroupReview(groupId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectGroupKeys().root })
+    },
+  })
+}
+
+export function useRejectSubmittedProjectGroupReview() {
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    ProjectGroupReviewDecisionResult,
+    Error,
+    { groupId: string; dto?: DecideProjectGroupReviewDto }
+  >({
+    mutationFn: ({ groupId, dto }) => rejectSubmittedProjectGroupReview(groupId, dto ?? {}),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectGroupKeys().root })
+    },
+  })
+}
 export function useCreateProjectGroupInvitation() {
   return useMutation<CreateProjectGroupInvitationResult, Error, CreateProjectGroupInvitationDto>({
     mutationFn: (dto) => createProjectGroupInvitation(dto),
@@ -362,3 +428,4 @@ export function useDeleteMyGroupAnnouncement() {
     },
   })
 }
+

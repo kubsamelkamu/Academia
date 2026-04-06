@@ -193,6 +193,95 @@ export type ProjectGroupDetails = {
   isJoinable: boolean
 }
 
+export type ProjectGroupReviewStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED" | string
+
+export type ProjectGroupReviewAvailableStatus = {
+  value: ProjectGroupReviewStatus
+  label: string
+  total: number
+}
+
+export type ProjectGroupReviewFilters = {
+  appliedStatus: ProjectGroupReviewStatus
+  availableStatuses: ProjectGroupReviewAvailableStatus[]
+}
+
+export type ProjectGroupReviewSummary = {
+  pending: number
+  approved: number
+  rejected: number
+  all: number
+}
+
+export type ProjectGroupReviewLeader = {
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status?: string
+  departmentId?: string
+}
+
+export type ProjectGroupReviewMemberUser = {
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status?: string
+  departmentId?: string
+}
+
+export type ProjectGroupReviewMember = {
+  id: string
+  joinedAt: string
+  user: ProjectGroupReviewMemberUser
+}
+
+export type ProjectGroupReviewItem = {
+  id: string
+  name: string
+  status: string
+  reviewStatus: ProjectGroupReviewStatus
+  submittedAt: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
+  leader: ProjectGroupReviewLeader
+  members: ProjectGroupReviewMember[]
+  memberCount: number
+  minGroupSize: number
+  maxGroupSize: number
+  createdAt: string
+}
+
+export type ProjectGroupReviewPagination = {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export type ProjectGroupReviewListData = {
+  filters: ProjectGroupReviewFilters
+  summary: ProjectGroupReviewSummary
+  items: ProjectGroupReviewItem[]
+  pagination: ProjectGroupReviewPagination
+}
+
+export type DecideProjectGroupReviewDto = {
+  reason?: string
+}
+
+export type ProjectGroupReviewDecisionResult = {
+  id: string
+  status: string
+  reviewStatus?: string
+  reviewedAt?: string | null
+  rejectionReason?: string | null
+}
 export type CreateProjectGroupJoinRequestDto = {
   /** Optional message from the student; will be trimmed by the backend (max length 1000). */
   message?: string
@@ -329,3 +418,4 @@ export type ReopenMyProjectGroupResult = {
     submittedAt: null
   }
 }
+

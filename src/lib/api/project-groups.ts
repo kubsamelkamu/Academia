@@ -22,6 +22,10 @@ import type {
   ProjectGroupMe,
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
+  ProjectGroupReviewStatus,
+  ProjectGroupReviewListData,
+  DecideProjectGroupReviewDto,
+  ProjectGroupReviewDecisionResult,
 } from "@/types/project-groups"
 import type {
   AnnouncementDetails,
@@ -204,6 +208,63 @@ export async function browseProjectGroups(params: {
   return response.data
 }
 
+
+export async function listSubmittedProjectGroupsForReview(params: {
+  status?: ProjectGroupReviewStatus
+  page?: number
+  limit?: number
+  search?: string
+} = {}): Promise<ProjectGroupReviewListData> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const status = params.status?.trim() ? params.status.trim() : undefined
+  const search = params.search?.trim() ? params.search.trim() : undefined
+
+  const response = await apiClient.get<ProjectGroupReviewListData>("/project-groups/review/submitted", {
+    params: {
+      page,
+      limit,
+      ...(status ? { status } : null),
+      ...(search ? { search } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function approveSubmittedProjectGroupReview(
+  groupId: string
+): Promise<ProjectGroupReviewDecisionResult> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const response = await apiClient.post<ProjectGroupReviewDecisionResult>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/approve`
+  )
+
+  return response.data
+}
+
+export async function rejectSubmittedProjectGroupReview(
+  groupId: string,
+  dto: DecideProjectGroupReviewDto = {}
+): Promise<ProjectGroupReviewDecisionResult> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const reason = dto.reason?.trim()
+
+  const response = await apiClient.post<ProjectGroupReviewDecisionResult>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/reject`,
+    reason ? { reason } : {}
+  )
+
+  return response.data
+}
 export async function getProjectGroupDetails(groupId: string): Promise<ProjectGroupDetails> {
   const trimmed = groupId.trim()
   if (!trimmed) {
@@ -476,3 +537,4 @@ export async function cancelProjectGroupJoinRequest(requestId: string): Promise<
 
   return response.data
 }
+
