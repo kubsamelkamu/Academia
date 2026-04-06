@@ -1,5 +1,6 @@
 import apiClient from "@/lib/api/client"
 import type {
+  StudentMilestoneSubmission,
   StudentProjectMilestone,
   StudentProjectMilestonesResult,
   StudentProjectsListResult,
@@ -127,4 +128,27 @@ export async function listProjectMilestones(projectId: string): Promise<StudentP
     .filter((item): item is StudentProjectMilestone => Boolean(item))
 
   return { items }
+}
+
+export async function uploadMilestoneSubmission(params: {
+  milestoneId: string
+  file: File
+}): Promise<StudentMilestoneSubmission> {
+  const milestoneId = params.milestoneId.trim()
+  if (!milestoneId) throw new Error("milestoneId is required")
+
+  const formData = new FormData()
+  formData.append("file", params.file)
+
+  const response = await apiClient.post<StudentMilestoneSubmission>(
+    `/projects/milestones/${encodeURIComponent(milestoneId)}/submissions`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  )
+
+  return response.data
 }

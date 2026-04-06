@@ -23,6 +23,20 @@ export interface StudentProjectMilestone {
   feedback?: string | null
 }
 
+export interface StudentMilestoneSubmission {
+  id: string
+  milestoneId?: string | null
+  status?: string | null
+  fileName?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  fileUrl?: string | null
+  filePublicId?: string | null
+  resourceType?: string | null
+  approvedAt?: string | null
+  createdAt?: string | null
+}
+
 export interface StudentProjectsListResult {
   items: StudentProjectSummary[]
 }

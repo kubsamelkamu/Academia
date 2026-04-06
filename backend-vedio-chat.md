@@ -1,11 +1,16 @@
 
-# Frontend Chat Video Call Presence — Backend Implementation Guide
+# Chat Video Call Presence — Backend Notes (Deprecated)
 
-This document describes what is now implemented in backend for group chat video call presence.
+This file is kept for historical context, but it was **out of sync** with the current frontend contract.
+
+Use the canonical backend guide instead:
+- `docs/chat-video-call-backend-implementation-guide.md`
+
+Key contract requirement: backend must support a session-room field called **`meetingRoomName`** and broadcast it (at least in `call:started`).
 
 ## 1) Status
 
-Implemented and ready behind feature flag.
+Do not implement from this file alone; follow the canonical guide above.
 
 Scope is presence signaling only:
 - start/join/leave/end call state
@@ -40,7 +45,8 @@ Expected payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
-  "at": "ISO-8601 (optional/informational)"
+  "meetingRoomName": "string",
+  "at": "ISO-8601"
 }
 ```
 
@@ -58,8 +64,9 @@ Expected payload:
 ```json
 {
   "roomId": "string",
-  "projectGroupId": "string (optional but validated if provided)",
-  "at": "ISO-8601 (optional/informational)"
+  "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
+  "at": "ISO-8601"
 }
 ```
 
@@ -75,8 +82,9 @@ Expected payload:
 ```json
 {
   "roomId": "string",
-  "projectGroupId": "string (optional but validated if provided)",
-  "at": "ISO-8601 (optional/informational)"
+  "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
+  "at": "ISO-8601"
 }
 ```
 
@@ -93,8 +101,9 @@ Expected payload:
 ```json
 {
   "roomId": "string",
-  "projectGroupId": "string (optional but validated if provided)",
-  "at": "ISO-8601 (optional/informational)"
+  "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
+  "at": "ISO-8601"
 }
 ```
 
@@ -110,6 +119,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string",
   "startedByUserId": "string",
   "startedAt": "server ISO timestamp",
   "participantCount": 1
@@ -121,6 +131,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string (optional)",
   "participantCount": 2
 }
 ```
@@ -130,6 +141,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string (optional)",
   "endedByUserId": "string",
   "endedAt": "server ISO timestamp"
 }
@@ -180,6 +192,7 @@ Typical reasons:
 
 - Backend uses server time for `startedAt` and `endedAt`.
 - Client `at` is informational only.
+- `meetingRoomName` is the session-room identifier; backend should broadcast it in `call:started` so late joiners sync to the correct Jitsi room.
 - Duplicate emits are handled idempotently for participant counting.
 - On abrupt disconnect (tab close/network drop), backend auto-applies leave logic and emits updated call state.
 
@@ -188,6 +201,13 @@ Typical reasons:
 - `chat:call:<roomId>` (HASH metadata)
 - `chat:call:<roomId>:participants` (SET)
 - `chat:call:user:<userId>:rooms` (SET reverse index for disconnect cleanup)
+
+## 11) Advisor support
+
+The current product requirement includes advisors video-calling with each supervised project group.
+Authorization for `call:*` should allow:
+- approved project-group members
+- the assigned/supervising advisor for that project group
 
 ## 10) Frontend integration checklist
 

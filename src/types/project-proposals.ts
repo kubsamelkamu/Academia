@@ -9,6 +9,15 @@ export interface ProposalDocument {
   originalName?: string | null
 }
 
+export interface ProposalDocumentAttachment {
+  fileName?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  url?: string | null
+  publicId?: string | null
+  resourceType?: string | null
+}
+
 export type ProposalStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -38,8 +47,60 @@ export interface ProposalProjectGroup {
 
 export interface ProposalProjectRef {
   id: string
+  title?: string | null
+  description?: string | null
   status?: string | null
   advisorId?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  advisor?: ProposalParty | null
+  milestones?: ProposalProjectMilestone[] | null
+}
+
+export interface ProposalMilestoneSubmissionFeedback {
+  id: string
+  submissionId?: string | null
+  authorRole?: string | null
+  message?: string | null
+  attachmentFileName?: string | null
+  attachmentMimeType?: string | null
+  attachmentSizeBytes?: number | null
+  attachmentUrl?: string | null
+  attachmentPublicId?: string | null
+  attachmentResourceType?: string | null
+  createdAt?: string | null
+  author?: ProposalParty | null
+}
+
+export interface ProposalMilestoneSubmission {
+  id: string
+  milestoneId?: string | null
+  status?: string | null
+  fileName?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  fileUrl?: string | null
+  filePublicId?: string | null
+  resourceType?: string | null
+  approvedAt?: string | null
+  createdAt?: string | null
+  uploadedBy?: ProposalParty | null
+  approvedBy?: ProposalParty | null
+  feedbacks?: ProposalMilestoneSubmissionFeedback[] | null
+}
+
+export interface ProposalProjectMilestone {
+  id: string
+  projectId?: string | null
+  title?: string | null
+  description?: string | null
+  dueDate?: string | null
+  status?: string | null
+  submittedAt?: string | null
+  feedback?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  submissions?: ProposalMilestoneSubmission[] | null
 }
 
 export interface ProposalTransitionSummary {

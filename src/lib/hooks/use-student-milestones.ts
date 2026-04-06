@@ -1,11 +1,14 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   listProjectMilestones,
   listStudentProjects,
+  uploadMilestoneSubmission,
 } from "@/lib/api/student-milestones"
+import { projectProposalKeys } from "@/lib/hooks/use-project-proposals"
 import type {
+  StudentMilestoneSubmission,
   StudentProjectMilestonesResult,
   StudentProjectsListResult,
 } from "@/types/student-milestones"
@@ -53,5 +56,21 @@ export function useProjectMilestones(params: {
     queryFn: () => listProjectMilestones(projectId),
     enabled,
     staleTime: 30_000,
+  })
+}
+
+export function useUploadMilestoneSubmission() {
+  const queryClient = useQueryClient()
+
+  return useMutation<StudentMilestoneSubmission, Error, {
+    milestoneId: string
+    file: File
+  }>({
+    mutationFn: ({ milestoneId, file }) => uploadMilestoneSubmission({ milestoneId, file }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: studentMilestonesKeys().root })
+      await queryClient.invalidateQueries({ queryKey: projectProposalKeys().root })
+      await queryClient.invalidateQueries({ queryKey: ["projects"] })
+    },
   })
 }

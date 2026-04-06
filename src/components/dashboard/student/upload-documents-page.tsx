@@ -12,16 +12,23 @@ import { toast } from "sonner"
 
 import { useDocumentTemplatesList } from "@/lib/hooks/use-document-templates"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
-import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
+import { useUploadMilestoneSubmission } from "@/lib/hooks/use-student-milestones"
 import {
   useCreateProposalWithPdf,
   useMyGroupProposals,
   useSubmitProposalForReview,
 } from "@/lib/hooks/use-project-proposals"
 import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import {
+  getActiveMilestoneTemplate,
+  getLatestLinkedProposal,
+  isProposalMilestoneName,
+  normalizeMilestoneName,
+  toProposalMilestoneState,
+} from "@/lib/student-milestone-helpers"
 import { useAuthStore } from "@/store/auth-store"
 import type { DepartmentDocumentTemplate, DocumentTemplateType } from "@/types/document-templates"
-import type { ProjectProposal } from "@/types/project-proposals"
+import type { ProjectProposal, ProposalProjectMilestone } from "@/types/project-proposals"
 
 type MilestoneStatus = "pending" | "submitted" | "approved"
 
@@ -86,52 +93,22 @@ function formatFileSize(sizeBytes: number | null | undefined) {
   return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
-function normalizeMilestoneName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ")
-}
-
-function isProposalMilestoneName(name: string): boolean {
-  const normalized = normalizeMilestoneName(name)
-  return normalized.includes("proposal") || normalized.includes("project title")
-}
-
-function toProposalMilestoneState(proposals: ProjectProposal[] | null | undefined): {
-  status: MilestoneStatus
-  submittedAt?: string
-} | null {
-  const items = proposals ?? []
-  if (!items.length) return null
-
-  const normalizeStatus = (value: unknown) => String(value ?? "").trim().toUpperCase()
-
-  const sorted = items
-    .slice()
-    .sort((a, b) => {
-      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
-      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
-    })
-
-  const latest = sorted[0]
-  const latestStatus = normalizeStatus(latest?.status)
-  const latestSubmittedAt = latest?.submittedAt ?? latest?.updatedAt ?? latest?.createdAt ?? undefined
-
-  if (latestStatus === "APPROVED") {
-    return { status: "approved", submittedAt: latestSubmittedAt }
-  }
-
-  if (latestStatus === "SUBMITTED") {
-    return { status: "submitted", submittedAt: latestSubmittedAt }
-  }
-
-  return { status: "pending" }
-}
-
 function mapBackendStatus(status: string): MilestoneStatus {
   const normalized = status.trim().toLowerCase()
   if (normalized === "approved" || normalized === "completed") return "approved"
   if (normalized === "submitted") return "submitted"
   return "pending"
+}
+
+function isAllowedMilestoneFile(file: File | null): boolean {
+  if (!file) return false
+  const name = file.name.toLowerCase()
+  return (
+    file.type === "application/pdf" ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    name.endsWith(".pdf") ||
+    name.endsWith(".docx")
+  )
 }
 
 function titleToMilestoneKey(title: string): string {
@@ -164,6 +141,7 @@ export function StudentUploadDocumentsPage() {
   const projectTitle = myProjectGroupQuery.data?.name?.trim() || ""
   const [title, setTitle] = useState("")
   const [milestone, setMilestone] = useState("")
+  const [milestoneFile, setMilestoneFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const hasRedirectedRef = useRef(false)
@@ -188,27 +166,30 @@ export function StudentUploadDocumentsPage() {
     page: 1,
     limit: 100,
   })
+  const latestLinkedProposal = useMemo(
+    () => getLatestLinkedProposal(myGroupProposalsQuery.data),
+    [myGroupProposalsQuery.data]
+  )
 
-  const { data: projectsData } = useStudentProjects({
-    departmentId,
-    studentId,
-  })
+  const projectMilestones = latestLinkedProposal?.project?.milestones ?? []
 
-  const activeProject = useMemo(() => {
-    const items = projectsData?.items ?? []
-    if (!items.length) return null
-
+  const targetMilestone = useMemo<ProposalProjectMilestone | null>(() => {
+    if (!milestone) return null
     return (
-      items.find((project) => project.status.toLowerCase() === "in-progress") ??
-      items.find((project) => project.status.toLowerCase() === "active") ??
-      items[0]
+      projectMilestones.find((item) => titleToMilestoneKey(item.title ?? "") === milestone) ?? null
     )
-  }, [projectsData?.items])
+  }, [milestone, projectMilestones])
 
-  const { data: projectMilestonesData } = useProjectMilestones({
-    projectId: activeProject?.id,
-    enabled: Boolean(activeProject?.id),
-  })
+  const latestSubmission = targetMilestone?.submissions?.[0] ?? null
+  const feedbacks = latestSubmission?.feedbacks ?? []
+  const hasFeedback = feedbacks.length > 0
+  const isApproved =
+    targetMilestone?.status === "APPROVED" || latestSubmission?.status === "APPROVED"
+  const canUploadFirst = !latestSubmission
+  const canResubmit = Boolean(latestSubmission && hasFeedback && !isApproved)
+  const waitingForReview = Boolean(latestSubmission && !hasFeedback && !isApproved)
+  const canSubmitMilestone = canUploadFirst || canResubmit
+  const uploadMilestoneSubmissionMutation = useUploadMilestoneSubmission()
 
   const prerequisiteCheck = useMemo(() => {
     if (!milestone) return null
@@ -222,7 +203,7 @@ export function StudentUploadDocumentsPage() {
       .sort((a, b) => a.sequence - b.sequence)
 
     const projectMilestonesByName = new Map(
-      (projectMilestonesData?.items ?? []).map((item) => [normalizeMilestoneName(item.title), item])
+      projectMilestones.map((item) => [normalizeMilestoneName(item.title ?? ""), item])
     )
 
     const proposalMilestoneState = toProposalMilestoneState(myGroupProposalsQuery.data)
@@ -253,7 +234,7 @@ export function StudentUploadDocumentsPage() {
     const blockingMilestoneNumber =
       orderedTemplateMilestones[previousIndex].sequence ?? previousIndex + 1
     return { blocked: true, blockingMilestoneNumber }
-  }, [milestone, milestoneTemplatesData?.templates, myGroupProposalsQuery.data, projectMilestonesData?.items])
+  }, [milestone, milestoneTemplatesData?.templates, myGroupProposalsQuery.data, projectMilestones])
 
   useEffect(() => {
     if (hasRedirectedRef.current) return
@@ -267,6 +248,27 @@ export function StudentUploadDocumentsPage() {
     )
     router.replace("/dashboard/student/milestones")
   }, [prerequisiteCheck, router])
+
+  useEffect(() => {
+    if (isProposalFlow) return
+    if (hasRedirectedRef.current) return
+    if (!milestone) return
+    if (!targetMilestone) return
+
+    if (isApproved) {
+      hasRedirectedRef.current = true
+      toast.info("This milestone is already approved.")
+      router.replace("/dashboard/student/milestones")
+      return
+    }
+
+    if (waitingForReview) {
+      hasRedirectedRef.current = true
+      toast.info("This milestone is awaiting advisor review.")
+      router.replace("/dashboard/student/milestones")
+      return
+    }
+  }, [isApproved, isProposalFlow, milestone, router, targetMilestone, waitingForReview])
 
   const milestoneLabel = useMemo(() => milestoneKeyToLabel(milestone), [milestone])
 
@@ -312,16 +314,45 @@ export function StudentUploadDocumentsPage() {
   }, [recommendedType, templatesQuery.data?.templates])
 
   const handleSubmit = async () => {
-    if (!title.trim() || !milestone) {
-      toast.error("Document title and milestone are required")
+    if (!milestone) {
+      toast.error("Milestone is required")
+      return
+    }
+
+    if (!targetMilestone?.id) {
+      toast.error("Unable to resolve milestone submission target")
+      return
+    }
+
+    if (!milestoneFile) {
+      toast.error("A file is required")
+      return
+    }
+
+    if (!isAllowedMilestoneFile(milestoneFile)) {
+      toast.error("Only PDF and DOCX files are allowed")
+      return
+    }
+
+    if (!canSubmitMilestone) {
+      toast.error("This milestone cannot be uploaded right now")
       return
     }
 
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    setIsSubmitting(false)
-    toast.success("Document uploaded successfully")
-    router.push("/dashboard/student/submissions")
+    try {
+      await uploadMilestoneSubmissionMutation.mutateAsync({
+        milestoneId: targetMilestone.id,
+        file: milestoneFile,
+      })
+      toast.success(canResubmit ? "Milestone resubmitted successfully" : "Milestone submitted successfully")
+      router.push("/dashboard/student/submissions")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed"
+      toast.error(message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleUploadProposal = async () => {
@@ -571,9 +602,14 @@ export function StudentUploadDocumentsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="document-file">File</Label>
-                <Input id="document-file" type="file" accept=".pdf,.doc,.docx,.zip" />
+                <Input
+                  id="document-file"
+                  type="file"
+                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                  onChange={(e) => setMilestoneFile(e.target.files?.[0] ?? null)}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Accepted formats: PDF, DOC, DOCX, ZIP (max 50MB)
+                  Accepted formats: PDF, DOCX
                 </p>
               </div>
 
@@ -663,10 +699,39 @@ export function StudentUploadDocumentsPage() {
                 </div>
               ) : null}
 
+              {!isProposalFlow && targetMilestone ? (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">Current milestone state</p>
+                    <Badge variant="outline">{targetMilestone.status ?? "PENDING"}</Badge>
+                    {isApproved ? <Badge>Approved</Badge> : null}
+                    {canResubmit ? <Badge variant="secondary">Feedback Received</Badge> : null}
+                    {waitingForReview ? <Badge variant="secondary">Awaiting Advisor Review</Badge> : null}
+                  </div>
+                  {latestSubmission?.fileName ? (
+                    <p className="text-sm text-muted-foreground">
+                      Latest submission: {latestSubmission.fileName}
+                    </p>
+                  ) : null}
+                  {feedbacks[0]?.message ? (
+                    <p className="text-sm text-muted-foreground">
+                      Latest feedback: {feedbacks[0].message}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="flex justify-end">
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || uploadMilestoneSubmissionMutation.isPending || !canSubmitMilestone}
+                >
                   <Upload className="h-4 w-4 mr-2" />
-                  {isSubmitting ? "Uploading..." : "Upload Document"}
+                  {isSubmitting || uploadMilestoneSubmissionMutation.isPending
+                    ? "Uploading..."
+                    : canResubmit
+                      ? "Resubmit"
+                      : "Upload Submission"}
                 </Button>
               </div>
             </div>
