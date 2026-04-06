@@ -1,8 +1,9 @@
 "use client"
 
-import { GraduationCap, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Youtube, Send, ArrowUp } from "lucide-react"
+import { GraduationCap, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Youtube, Send, ArrowUp, Github, Instagram } from "lucide-react"
 import Link from "next/link"
 import { useState, type FormEvent } from "react"
+import { motion } from "framer-motion"
 
 export function Footer() {
   const [email, setEmail] = useState("")
@@ -18,87 +19,73 @@ export function Footer() {
   }
 
   return (
-    <footer className="relative border-t border-border/40 bg-gradient-to-b from-background to-background/80 backdrop-blur-sm">
-      {/* Animated gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-50 pointer-events-none" />
-      
-      {/* Back to top button */}
-      <button 
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="absolute -top-5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group"
-      >
-        <ArrowUp className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
-      </button>
+    <footer className="relative bg-[#0B0F19] text-white overflow-hidden border-t border-white/5">
+      {/* Wave Divider with Emerald Tone */}
+      <div className="absolute top-0 left-0 w-full overflow-hidden leading-0 transform rotate-180 opacity-50">
+        <svg className="relative block w-[calc(100%+1.3px)] h-[40px] fill-background" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+          <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"></path>
+        </svg>
+      </div>
 
-      <div className="relative container mx-auto px-4 pt-16 pb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 mb-12">
-          {/* Brand Section - Enhanced */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="group">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary/30 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500" />
-                  <div className="relative bg-gradient-to-br from-primary to-primary/80 p-2.5 rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-300">
-                    <GraduationCap className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    Academia
-                  </h3>
-                  <p className="text-xs text-muted-foreground tracking-wide">Academic Excellence</p>
-                </div>
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-emerald-500 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[300px] h-[300px] rounded-full bg-teal-500 blur-[100px]" />
+      </div>
+
+      <div className="relative w-full px-6 pt-16 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+          {/* Brand Section */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-[#ED5F45] p-2.5 rounded-2xl">
+                <GraduationCap className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-black text-2xl tracking-tighter text-[#ED5F45]">
+                  Academia
+                </h3>
+                <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">Academic Excellence</p>
               </div>
             </div>
             
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-slate-400 text-sm leading-relaxed font-medium">
               Streamlining academic project management for universities worldwide.
               Empowering educators and students with cutting-edge technology.
             </p>
             
-            {/* Social links with improved styling */}
-            <div className="flex space-x-3">
+            <div className="flex gap-4">
               {[
-                { icon: Facebook, href: "#", label: "Facebook", color: "hover:bg-[#1877f2]" },
-                { icon: Twitter, href: "#", label: "Twitter", color: "hover:bg-[#1da1f2]" },
-                { icon: Linkedin, href: "#", label: "LinkedIn", color: "hover:bg-[#0a66c2]" },
-                { icon: Youtube, href: "#", label: "YouTube", color: "hover:bg-[#ff0000]" }
+                { icon: Twitter, href: "#" },
+                { icon: Linkedin, href: "#" },
+                { icon: Instagram, href: "#" },
+                { icon: Github, href: "#" }
               ].map((social, idx) => (
-                <a
+                <motion.a
                   key={idx}
                   href={social.href}
-                  aria-label={social.label}
-                  className="text-muted-foreground hover:text-white transition-all duration-300 p-2 rounded-lg hover:scale-110 hover:shadow-lg"
-                  style={{ transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = social.color.split("hover:bg-")[1]
-                    e.currentTarget.style.transform = "translateY(-3px)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent"
-                    e.currentTarget.style.transform = "translateY(0)"
-                  }}
+                  whileHover={{ y: -5, color: "#ED5F45", borderColor: "#ED5F45/30" }}
+                  whileTap={{ scale: 0.9 }}
+                  className="text-slate-500 hover:bg-white/5 p-2 rounded-xl border border-white/5 transition-all backdrop-blur-sm"
                 >
                   <social.icon className="h-5 w-5" />
-                </a>
+                </motion.a>
               ))}
             </div>
           </div>
 
-          {/* Product Section - Enhanced */}
+          {/* Ecosystem Links */}
           <div>
-            <h4 className="font-semibold mb-6 text-foreground relative inline-block">
-              Product
-              <div className="absolute -bottom-2 left-0 w-8 h-0.5 bg-gradient-to-r from-primary to-primary/40 rounded-full" />
+            <h4 className="font-bold text-lg mb-6 text-white">
+              Ecosystem
             </h4>
-            <ul className="space-y-3.5 text-sm">
-              {["Features", "About", "Contact", "Docs"].map((item, idx) => (
-                <li key={idx}>
+            <ul className="space-y-3">
+              {["Features", "Pricing", "About", "Contact"].map((item) => (
+                <li key={item}>
                   <Link 
                     href={`/${item.toLowerCase()}`} 
-                    className="text-muted-foreground hover:text-primary transition-all duration-300 hover:translate-x-2 inline-flex items-center gap-2 group"
+                    className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
                   >
-                    <span className="w-0 group-hover:w-1 h-1 bg-primary rounded-full transition-all duration-300" />
+                    <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
                     {item}
                   </Link>
                 </li>
@@ -106,54 +93,31 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Support Section - Enhanced with interactive cards */}
+          {/* Resources Links */}
           <div>
-            <h4 className="font-semibold mb-6 text-foreground relative inline-block">
-              Support
-              <div className="absolute -bottom-2 left-0 w-8 h-0.5 bg-gradient-to-r from-primary to-primary/40 rounded-full" />
+            <h4 className="font-bold text-lg mb-6 text-white">
+              Resources
             </h4>
-            <ul className="space-y-4 text-sm">
-              <li>
-                <a 
-                  href="mailto:support@academia.et" 
-                  className="text-muted-foreground hover:text-primary transition-all duration-300 flex items-center gap-3 group hover:translate-x-1"
-                >
-                  <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <Mail className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="group-hover:underline">support@academia.et</span>
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="tel:+1234567890" 
-                  className="text-muted-foreground hover:text-primary transition-all duration-300 flex items-center gap-3 group hover:translate-x-1"
-                >
-                  <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <Phone className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="group-hover:underline">+1 (234) 567-8900</span>
-                </a>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-primary/10 flex-shrink-0 mt-0.5">
-                  <MapPin className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm text-muted-foreground leading-relaxed">
-                  123 Academic Way<br />University City, UC 12345
-                </span>
-              </li>
+            <ul className="space-y-3">
+              {["Docs", "Community", "Privacy", "Terms"].map((item) => (
+                <li key={item}>
+                  <Link 
+                    href={`/${item.toLowerCase()}`} 
+                    className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
+                    {item}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Newsletter Section - Enhanced with better UX */}
-          <div>
-            <h4 className="font-semibold mb-6 text-foreground relative inline-block">
-              Stay Updated
-              <div className="absolute -bottom-2 left-0 w-8 h-0.5 bg-gradient-to-r from-primary to-primary/40 rounded-full" />
-            </h4>
-            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              Get the latest updates on academic innovations and platform features.
+          {/* Newsletter Section */}
+          <div className="bg-white/5 backdrop-blur-md p-6 rounded-3xl border border-white/5">
+            <h4 className="font-bold text-lg mb-2 text-white">Stay Updated</h4>
+            <p className="text-slate-400 text-xs mb-4 leading-relaxed">
+              Get the latest updates on academic innovations.
             </p>
             <form onSubmit={handleSubscribe} className="space-y-3">
               <div className="relative group">
@@ -161,53 +125,49 @@ export function Footer() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  placeholder="name@university.edu"
                   required
-                  className="w-full px-4 py-2.5 text-sm border border-input rounded-xl bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 pr-10"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#ED5F45]/50 transition-all text-sm"
                 />
-                <Send className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               </div>
-              <button 
+              <motion.button 
                 type="submit"
-                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground text-sm font-medium py-2.5 px-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full bg-[#ED5F45] hover:opacity-90 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-[#ED5F45]/20 transition-all flex items-center justify-center gap-2 text-sm"
               >
-                <span className="relative z-10">Subscribe</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-              </button>
+                Subscribe <Send className="h-4 w-4" />
+              </motion.button>
               
-              {/* Success message */}
               {isSubscribed && (
-                <div className="text-xs text-green-600 dark:text-green-400 text-center animate-in fade-in slide-in-from-top-2">
-                  ✓ Thanks for subscribing!
-                </div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-[10px] font-bold text-[#ED5F45] text-center mt-2"
+                >
+                  Subscribed successfully!
+                </motion.div>
               )}
             </form>
           </div>
         </div>
 
-        {/* Bottom Section - Enhanced */}
-        <div className="pt-8 border-t border-border/60">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              © 2026 Academia. All rights reserved. | Made with{" "}
-              <span className="inline-block animate-pulse text-red-500">❤️</span>{" "}
-              for academic excellence
-            </p>
-            <div className="flex items-center gap-6 text-sm">
-              <Link 
-                href="/privacy" 
-                className="text-muted-foreground hover:text-primary transition-all duration-300 hover:translate-y-[-2px] inline-block"
-              >
-                Privacy Policy
-              </Link>
-              <Link 
-                href="/terms" 
-                className="text-muted-foreground hover:text-primary transition-all duration-300 hover:translate-y-[-2px] inline-block"
-              >
-                Terms of Service
-              </Link>
-            </div>
+        {/* Bottom Bar */}
+        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
+            <Mail className="h-3.5 w-3.5" />
+            <span>support@academia.et</span>
+            <span className="w-1 h-1 rounded-full bg-white/10" />
+            <span>© 2026 Academia</span>
           </div>
+          
+          <button 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="group flex items-center gap-2 text-[#ED5F45] hover:opacity-80 transition-all font-bold text-xs uppercase tracking-widest"
+          >
+            Back to top
+            <ArrowUp className="h-3.5 w-3.5 group-hover:-translate-y-1 transition-transform" />
+          </button>
         </div>
       </div>
     </footer>
