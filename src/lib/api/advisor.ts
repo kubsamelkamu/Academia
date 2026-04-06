@@ -9,6 +9,7 @@ import type {
   AdvisorDashboardOverview,
   AdvisorDocumentDetail,
   AdvisorDocumentsResponse,
+  AdvisorSubmittedDocumentsResponse,
   AdvisorEvaluationDetail,
   AdvisorEvaluationsResponse,
   AdvisorGroupMessagesResponse,
@@ -541,6 +542,13 @@ export async function getAdvisorDocuments(params?: QueryParams): Promise<Advisor
   const response = await apiClient.get<AdvisorDocumentsResponse>("/advisor/documents", {
     params: cleanParams(params),
   });
+  return response.data;
+}
+
+export async function getAdvisorSubmittedDocuments(): Promise<AdvisorSubmittedDocumentsResponse> {
+  const response = await apiClient.get<AdvisorSubmittedDocumentsResponse>(
+    "/projects/advisors/me/submitted-documents"
+  );
   return response.data;
 }
 

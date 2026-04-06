@@ -15,7 +15,10 @@ import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
 import { useAdvisorReviewQueue } from "@/lib/hooks/use-advisor-review-queue"
 import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
 import type { ApiAdvisorProject } from "@/lib/api/advisor"
-import type { AdvisorMilestoneReviewQueueItem, AdvisorMilestoneSubmissionFeedbackItem } from "@/lib/types/advisor"
+import type {
+  AdvisorMilestoneReviewQueueItem,
+  AdvisorMilestoneSubmissionFeedbackItem,
+} from "@/lib/types/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -23,14 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -49,10 +45,10 @@ import {
   RefreshCw,
   Upload,
   Users,
-  Video,
   Calendar,
   Bell,
   AlertCircle,
+  Video,
 } from "lucide-react"
 
 // Types
@@ -467,43 +463,17 @@ const ProjectCard = React.memo(({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/documents`}>
-              <Eye className="mr-2 h-4 w-4" /> Documents
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/upload`}>
-              <Upload className="mr-2 h-4 w-4" /> Upload
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/messages?group=${project.id}`}>
-              <MessageSquare className="mr-2 h-4 w-4" /> Message
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/advisor/announcements">
-              <Bell className="mr-2 h-4 w-4" /> Announcements
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/schedule?project=${project.id}`}>
-              <Video className="mr-2 h-4 w-4" /> Meeting
-            </Link>
-          </Button>
-          {canClearForEvaluation && (
+        {canClearForEvaluation ? (
+          <div className="flex justify-end pt-2">
             <Button 
               variant="default" 
               size="sm" 
               onClick={() => onClearForEvaluation(project)}
-              className="ml-auto"
             >
               <CheckCircle className="mr-2 h-4 w-4" /> Clear for Evaluation
             </Button>
-          )}
-        </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -829,7 +799,7 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="projects" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="milestones" className="relative">
             Reviews
@@ -838,6 +808,9 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
                 {stats.pendingReviews}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="documents" onClick={() => router.push("/dashboard/advisor/documents")}>
+            Documents
           </TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
         </TabsList>

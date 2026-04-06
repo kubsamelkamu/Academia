@@ -37,9 +37,11 @@ import { mockUsers, type ProjectSummary } from '@/data/mockData'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useAssignProjectAdvisor, useDepartmentProjectAdvisors, useDepartmentProjectsOverview } from '@/lib/hooks/use-projects'
+import { useCoordinatorAdvisorOverview } from '@/lib/hooks/use-coordinator-analytics'
 import { useDepartmentProjectProposals } from '@/lib/hooks/use-project-proposals'
 import type { DepartmentProjectAdvisorDirectoryItem } from '@/types/projects'
 import type { ProjectProposal, ProposalParty } from '@/types/project-proposals'
+import type { CoordinatorAdvisorOverviewAdvisor } from '@/types/advisor-analytics'
 
 type AssignmentProject = ProjectSummary & {
   projectId?: string
@@ -117,6 +119,34 @@ function resolveProposalDisplayTitle(proposal: ProjectProposal) {
 
   return proposal.title?.trim() || selectedTitle || proposedTitles[0] || 'Untitled proposal'
 }
+
+function buildVisiblePageNumbers(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, totalPages]
+  }
+
+  if (currentPage >= totalPages - 2) {
+    return [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+  }
+
+  return [1, currentPage - 1, currentPage, currentPage + 1, totalPages]
+}
+
+function formatAnalyticsAdvisorName(advisor: CoordinatorAdvisorOverviewAdvisor) {
+  const fullName = advisor.fullName?.trim() ?? ''
+  if (fullName) return fullName
+
+  const firstName = advisor.firstName?.trim() ?? ''
+  const lastName = advisor.lastName?.trim() ?? ''
+  return [firstName, lastName].filter(Boolean).join(' ').trim() || advisor.email.trim() || 'Advisor'
+}
+
+const PROJECT_ASSIGNMENTS_PAGE_SIZE = 6
+const ADVISOR_WORKLOAD_PAGE_SIZE = 5
 
 function collectProposalMemberNames(proposal: ProjectProposal) {
   const names = new Set<string>()
@@ -469,6 +499,14 @@ function ProjectCard({
 export default function ProjectsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
+  const [assignmentOverrides, setAssignmentOverrides] = useState<Record<string, AssignmentOverride>>({})
+  const [dialogProject, setDialogProject] = useState<AssignmentProject | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [advisorFilter, setAdvisorFilter] = useState('all')
+  const [projectPage, setProjectPage] = useState(1)
+  const [advisorWorkloadPage, setAdvisorWorkloadPage] = useState(1)
   const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const overviewQuery = useDepartmentProjectsOverview({
     departmentId,
@@ -482,13 +520,13 @@ export default function ProjectsPage() {
     departmentId,
     enabled: Boolean(accessToken) && Boolean(departmentId),
   })
+  const advisorOverviewQuery = useCoordinatorAdvisorOverview({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    page: advisorWorkloadPage,
+    limit: ADVISOR_WORKLOAD_PAGE_SIZE,
+  })
   const assignProjectAdvisorMutation = useAssignProjectAdvisor()
-  const [assignmentOverrides, setAssignmentOverrides] = useState<Record<string, AssignmentOverride>>({})
-  const [dialogProject, setDialogProject] = useState<AssignmentProject | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [advisorFilter, setAdvisorFilter] = useState('all')
 
   const advisors = useMemo<AdvisorOption[]>(() => {
     return (departmentAdvisorsQuery.data ?? []).map((advisor) => ({
@@ -580,6 +618,14 @@ export default function ProjectsPage() {
     })
   }, [projects, search, statusFilter, advisorFilter])
 
+  useEffect(() => {
+    setProjectPage(1)
+  }, [search, statusFilter, advisorFilter])
+
+  useEffect(() => {
+    setAdvisorWorkloadPage(1)
+  }, [departmentId])
+
   // Stats
   const stats = useMemo(() => ({
     total: projects.length,
@@ -614,15 +660,67 @@ export default function ProjectsPage() {
   }
 
   // Advisor workload
-  const advisorWorkload = useMemo(() => advisors.map(a => {
-    const assigned = projects.filter(p => p.advisorId === a.id)
-    const inProgress = assigned.filter(p => p.status === 'active' || p.status === 'approved').length
-    const completed = assigned.filter(p => p.status === 'completed').length
-    const avgProg = assigned.length > 0
-      ? Math.round(assigned.reduce((s, p) => s + (p.progress ?? 0), 0) / assigned.length)
-      : 0
-    return { ...a, assigned: assigned.length, inProgress, completed, avgProg }
-  }), [advisors, projects])
+  const advisorWorkload = useMemo(() => {
+    const analyticsAdvisors = advisorOverviewQuery.data?.advisors ?? []
+
+    if (analyticsAdvisors.length > 0) {
+      return analyticsAdvisors.map((advisor) => ({
+        id: advisor.advisorId,
+        name: formatAnalyticsAdvisorName(advisor),
+        email: advisor.email,
+        avatarUrl: advisor.avatarUrl,
+        loadLimit: advisor.loadLimit,
+        currentLoad: advisor.currentLoad,
+        assigned: advisor.metrics.totalProjectsAdvising,
+        inProgress: advisor.metrics.activeProjectsCount,
+        completed: advisor.metrics.completedProjectsCount,
+        avgProg: advisor.metrics.overallProjectProgress,
+      }))
+    }
+
+    return advisors.map((advisor) => ({
+      ...advisor,
+      assigned: advisor.currentLoad,
+      inProgress: advisor.currentLoad,
+      completed: 0,
+      avgProg: 0,
+    }))
+  }, [advisorOverviewQuery.data?.advisors, advisors])
+
+  const totalProjectPages = Math.max(1, Math.ceil(filtered.length / PROJECT_ASSIGNMENTS_PAGE_SIZE))
+  const safeProjectPage = Math.min(projectPage, totalProjectPages)
+  const visibleProjectPageNumbers = buildVisiblePageNumbers(safeProjectPage, totalProjectPages)
+  const paginatedProjects = useMemo(() => {
+    const startIndex = (safeProjectPage - 1) * PROJECT_ASSIGNMENTS_PAGE_SIZE
+    return filtered.slice(startIndex, startIndex + PROJECT_ASSIGNMENTS_PAGE_SIZE)
+  }, [filtered, safeProjectPage])
+  const projectRangeStart = filtered.length === 0 ? 0 : (safeProjectPage - 1) * PROJECT_ASSIGNMENTS_PAGE_SIZE + 1
+  const projectRangeEnd = filtered.length === 0
+    ? 0
+    : Math.min((safeProjectPage - 1) * PROJECT_ASSIGNMENTS_PAGE_SIZE + paginatedProjects.length, filtered.length)
+
+  const advisorWorkloadPagination = advisorOverviewQuery.data?.pagination
+  const fallbackAdvisorWorkloadTotalPages = Math.max(1, Math.ceil(advisorWorkload.length / ADVISOR_WORKLOAD_PAGE_SIZE))
+  const safeAdvisorWorkloadPage = Math.min(advisorWorkloadPage, fallbackAdvisorWorkloadTotalPages)
+  const displayedAdvisorWorkload = advisorWorkloadPagination
+    ? advisorWorkload
+    : advisorWorkload.slice(
+        (safeAdvisorWorkloadPage - 1) * ADVISOR_WORKLOAD_PAGE_SIZE,
+        safeAdvisorWorkloadPage * ADVISOR_WORKLOAD_PAGE_SIZE
+      )
+  const advisorWorkloadCurrentPage = advisorWorkloadPagination?.page ?? safeAdvisorWorkloadPage
+  const advisorWorkloadTotalPages = advisorWorkloadPagination?.totalPages ?? fallbackAdvisorWorkloadTotalPages
+  const visibleAdvisorWorkloadPageNumbers = buildVisiblePageNumbers(advisorWorkloadCurrentPage, advisorWorkloadTotalPages)
+  const advisorWorkloadTotalItems = advisorWorkloadPagination?.totalItems ?? advisorWorkload.length
+  const advisorWorkloadRangeStart = advisorWorkloadTotalItems === 0
+    ? 0
+    : (advisorWorkloadCurrentPage - 1) * ADVISOR_WORKLOAD_PAGE_SIZE + 1
+  const advisorWorkloadRangeEnd = advisorWorkloadTotalItems === 0
+    ? 0
+    : Math.min(
+        (advisorWorkloadCurrentPage - 1) * ADVISOR_WORKLOAD_PAGE_SIZE + displayedAdvisorWorkload.length,
+        advisorWorkloadTotalItems
+      )
 
   // Evaluator workload
   const evaluatorWorkload = useMemo(() => evaluators.map(e => {
@@ -763,10 +861,65 @@ export default function ProjectsPage() {
               <p className="text-xs text-muted-foreground mt-1">Try adjusting the search or filter criteria</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {filtered.map(p => (
-                <ProjectCard key={p.id} project={p} onAssign={openAssign} />
-              ))}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {projectRangeStart}-{projectRangeEnd} of {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+                </span>
+                <span>
+                  Page {safeProjectPage} of {totalProjectPages}
+                </span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {paginatedProjects.map(p => (
+                  <ProjectCard key={p.id} project={p} onAssign={openAssign} />
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Project assignment pages
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safeProjectPage <= 1}
+                    onClick={() => setProjectPage((value) => Math.max(value - 1, 1))}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {visibleProjectPageNumbers.map((pageNumber, index) => {
+                      const previousPage = visibleProjectPageNumbers[index - 1]
+                      const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1
+
+                      return (
+                        <React.Fragment key={pageNumber}>
+                          {showGap && <span className="px-1 text-xs text-muted-foreground">...</span>}
+                          <Button
+                            variant={pageNumber === safeProjectPage ? 'default' : 'outline'}
+                            size="sm"
+                            className="min-w-9 px-0"
+                            onClick={() => setProjectPage(pageNumber)}
+                          >
+                            {pageNumber}
+                          </Button>
+                        </React.Fragment>
+                      )
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safeProjectPage >= totalProjectPages}
+                    onClick={() => setProjectPage((value) => Math.min(value + 1, totalProjectPages))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -795,53 +948,121 @@ export default function ProjectsPage() {
                   <CardDescription>Projects per advisor</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {advisorWorkload.map((a, i) => (
-                    <div key={a.id}>
-                      {i > 0 && <Separator className="mb-4" />}
-                      <div className="space-y-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="h-8 w-8 shrink-0">
-                            {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                              {a.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{a.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{a.email}</p>
-                          </div>
-                        </div>
-
-                        {/* Stats pills */}
-                        <div className="flex flex-wrap gap-1.5">
-                          <div className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium">
-                            {a.assigned} total
-                          </div>
-                          <div className="rounded-full bg-muted text-foreground px-2.5 py-0.5 text-xs font-medium">
-                            {a.inProgress} active
-                          </div>
-                          <div className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-xs">
-                            {a.completed} done
-                          </div>
-                        </div>
-
-                        {/* Progress bar */}
-                        {a.assigned > 0 && (
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-muted-foreground">Avg progress</span>
-                              <span className="font-medium">{a.avgProg}%</span>
-                            </div>
-                            <Progress value={a.avgProg} className="h-1.5" />
-                          </div>
-                        )}
-
-                        {a.assigned === 0 && (
-                          <p className="text-xs text-muted-foreground italic">No projects assigned</p>
-                        )}
+                  {advisorOverviewQuery.isLoading && advisorWorkload.length === 0 ? (
+                    Array.from({ length: 2 }).map((_, index) => (
+                      <div key={index} className="space-y-2.5">
+                        {index > 0 && <Separator className="mb-4" />}
+                        <div className="h-8 w-full rounded bg-muted animate-pulse" />
+                        <div className="h-5 w-2/3 rounded bg-muted animate-pulse" />
+                        <div className="h-2 w-full rounded bg-muted animate-pulse" />
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : advisorWorkload.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No advisor workload data available.</p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          Showing {advisorWorkloadRangeStart}-{advisorWorkloadRangeEnd} of {advisorWorkloadTotalItems} advisor{advisorWorkloadTotalItems !== 1 ? 's' : ''}
+                        </span>
+                        <span>
+                          Page {advisorWorkloadCurrentPage} of {advisorWorkloadTotalPages}
+                        </span>
+                      </div>
+
+                      {displayedAdvisorWorkload.map((a, i) => (
+                        <div key={a.id}>
+                          {i > 0 && <Separator className="mb-4" />}
+                          <div className="space-y-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <Avatar className="h-8 w-8 shrink-0">
+                                {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                                  {a.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{a.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{a.email}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              <div className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium">
+                                {a.assigned} total
+                              </div>
+                              <div className="rounded-full bg-muted text-foreground px-2.5 py-0.5 text-xs font-medium">
+                                {a.inProgress} active
+                              </div>
+                              <div className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-xs">
+                                {a.completed} done
+                              </div>
+                            </div>
+
+                            {a.assigned > 0 ? (
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Avg progress</span>
+                                  <span className="font-medium">{a.avgProg}%</span>
+                                </div>
+                                <Progress value={a.avgProg} className="h-1.5" />
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic">No projects assigned</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="flex flex-col gap-3 rounded-xl border bg-card px-3 py-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={advisorWorkloadCurrentPage <= 1 || advisorOverviewQuery.isLoading}
+                            onClick={() => setAdvisorWorkloadPage((value) => Math.max(value - 1, 1))}
+                          >
+                            Previous
+                          </Button>
+                          <div className="flex items-center gap-1">
+                            {visibleAdvisorWorkloadPageNumbers.map((pageNumber, index) => {
+                              const previousPage = visibleAdvisorWorkloadPageNumbers[index - 1]
+                              const showGap = index > 0 && previousPage !== undefined && pageNumber - previousPage > 1
+
+                              return (
+                                <React.Fragment key={pageNumber}>
+                                  {showGap && <span className="px-1 text-xs text-muted-foreground">...</span>}
+                                  <Button
+                                    variant={pageNumber === advisorWorkloadCurrentPage ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="min-w-9 px-0"
+                                    disabled={advisorOverviewQuery.isLoading}
+                                    onClick={() => setAdvisorWorkloadPage(pageNumber)}
+                                  >
+                                    {pageNumber}
+                                  </Button>
+                                </React.Fragment>
+                              )
+                            })}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={advisorWorkloadCurrentPage >= advisorWorkloadTotalPages || advisorOverviewQuery.isLoading}
+                            onClick={() => setAdvisorWorkloadPage((value) => Math.min(value + 1, advisorWorkloadTotalPages))}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+
+                      {advisorOverviewQuery.error && (
+                        <p className="text-xs text-muted-foreground">
+                          Live advisor workload could not be refreshed. Showing fallback values.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

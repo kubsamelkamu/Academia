@@ -340,6 +340,73 @@ export interface AdvisorDocumentsResponse {
   };
 }
 
+export interface AdvisorSubmittedDocumentAuthor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatarUrl: string | null;
+}
+
+export interface AdvisorSubmittedDocumentProjectRef {
+  id: string;
+  title: string;
+  status: string;
+}
+
+export interface AdvisorSubmittedDocumentGroupRef {
+  id: string;
+  name: string;
+}
+
+export interface AdvisorSubmittedDocumentMilestoneRef {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string;
+  status: string;
+  submittedAt: string | null;
+}
+
+export interface AdvisorSubmittedDocumentReviewSummary {
+  feedbackCount: number;
+  latestFeedbackAt: string | null;
+  latestFeedbackMessage: string | null;
+  latestFeedbackAttachmentUrl: string | null;
+  latestFeedbackAttachmentFileName: string | null;
+  latestFeedbackAuthorRole: string | null;
+  latestFeedbackAuthor: AdvisorSubmittedDocumentAuthor | null;
+}
+
+export interface AdvisorSubmittedDocumentItem {
+  submissionId: string;
+  documentName: string;
+  status: string;
+  submissionStatus: string;
+  sizeBytes: number;
+  mimeType: string;
+  fileUrl: string;
+  filePublicId: string;
+  resourceType: string;
+  uploadedAt: string;
+  approvedAt: string | null;
+  project: AdvisorSubmittedDocumentProjectRef;
+  group: AdvisorSubmittedDocumentGroupRef;
+  milestone: AdvisorSubmittedDocumentMilestoneRef;
+  uploadedBy: AdvisorSubmittedDocumentAuthor;
+  review: AdvisorSubmittedDocumentReviewSummary;
+}
+
+export interface AdvisorSubmittedDocumentsResponse {
+  summary: {
+    totalSubmittedDocuments: number;
+    approved: number;
+    pendingReview: number;
+    revisionRequested: number;
+  };
+  documents: AdvisorSubmittedDocumentItem[];
+}
+
 export interface AdvisorMeetingAttendee {
   id: string;
   name: string;

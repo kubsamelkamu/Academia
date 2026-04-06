@@ -11,6 +11,7 @@ import {
   getAdvisorDashboardOverview,
   getAdvisorDocumentById,
   getAdvisorDocuments,
+  getAdvisorSubmittedDocuments,
   getAdvisorEvaluationById,
   getAdvisorEvaluations,
   getAdvisorGroupMessages,
@@ -54,6 +55,7 @@ export const advisorKeys = {
   evaluations: (params?: AdvisorListParams) => ["advisor", "evaluations", params ?? {}] as const,
   evaluation: (evaluationId?: string) => ["advisor", "evaluation", evaluationId ?? ""] as const,
   documents: (params?: AdvisorListParams) => ["advisor", "documents", params ?? {}] as const,
+  submittedDocuments: () => ["advisor", "submitted-documents"] as const,
   document: (documentId?: string) => ["advisor", "document", documentId ?? ""] as const,
   schedule: (params?: AdvisorListParams) => ["advisor", "schedule", params ?? {}] as const,
   announcements: (params?: AdvisorListParams) => ["advisor", "announcements", params ?? {}] as const,
@@ -126,6 +128,15 @@ export function useAdvisorDocuments(params?: AdvisorListParams) {
   return useQuery({
     queryKey: advisorKeys.documents(params),
     queryFn: () => getAdvisorDocuments(params),
+    staleTime: 1000 * 30,
+    retry: 1,
+  });
+}
+
+export function useAdvisorSubmittedDocuments() {
+  return useQuery({
+    queryKey: advisorKeys.submittedDocuments(),
+    queryFn: getAdvisorSubmittedDocuments,
     staleTime: 1000 * 30,
     retry: 1,
   });
