@@ -182,10 +182,6 @@ function GroupReviewSheet({
   const {
     data: details,
     isLoading: detailLoading,
-    isError: detailError,
-    error: detailErrorObj,
-    refetch,
-    isFetching,
   } = useProjectGroupDetails({
     enabled: open && Boolean(app?.id),
     groupId: app?.id ?? null,
@@ -261,21 +257,6 @@ function GroupReviewSheet({
             <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground flex items-center gap-2">
               <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
               Loading project group detail...
-            </div>
-          ) : null}
-
-          {detailError && !details ? (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-2">
-              <div className="flex items-start gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium">Unable to load full group detail.</p>
-                  <p className="text-xs mt-1">{detailErrorObj?.message || "Please try again."}</p>
-                </div>
-              </div>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => refetch()} disabled={isFetching}>
-                <RefreshCw className={cn("h-3.5 w-3.5 mr-1", isFetching && "animate-spin")} /> Retry
-              </Button>
             </div>
           ) : null}
 
