@@ -246,7 +246,7 @@ function GroupReviewSheet({
                 </Badge>
               </div>
               <SheetDescription className="text-xs">
-                Group Review � Submitted {fmtDate(app.submittedAt)}
+                Group Review • Submitted {fmtDate(app.submittedAt)}
               </SheetDescription>
             </div>
           </div>
