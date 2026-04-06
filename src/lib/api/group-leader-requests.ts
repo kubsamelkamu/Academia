@@ -62,7 +62,7 @@ export async function listPendingGroupLeaderRequests(params: {
 } = {}): Promise<GroupLeaderRequestsListData> {
   const { search, page = 1, limit = 20 } = params
   const response = await apiClient.get<GroupLeaderRequestsListData>(
-    "/group-leader-requests",
+    "/group-leader-requests/pending",
     {
       params: {
         ...(search ? { search } : {}),

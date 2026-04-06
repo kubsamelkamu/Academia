@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { CheckCircle2, Info, Key, Mail, Shield } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InvitationOnboardingStepper, type InvitationOnboardingStep } from "@/components/auth/invitation-onboarding-stepper"
+import { AuthTiltCard } from "@/components/auth/auth-tilt-card"
 import {
   AUTH_CTA_CARD_CLASS,
   AUTH_GLASS_FORM,
@@ -213,11 +214,11 @@ export function InvitationOnboardingShell({
           <h1
             className={cn(
               "mb-2 text-3xl font-bold tracking-tight sm:text-4xl",
-              currentStep === "login"
-                ? withGlassStyle
-                  ? AUTH_WELCOME_HEADLINE_CLASS
-                  : AUTH_GREEN_HEADLINE_CLASS
-                : cn("bg-clip-text text-transparent", theme.heroTitleGradient)
+              withGlassStyle
+                ? AUTH_WELCOME_HEADLINE_CLASS
+                : currentStep === "login"
+                  ? AUTH_GREEN_HEADLINE_CLASS
+                  : cn("bg-clip-text text-transparent", theme.heroTitleGradient)
             )}
           >
             {theme.heroTitle}
@@ -225,9 +226,7 @@ export function InvitationOnboardingShell({
           <p
             className={cn(
               "mx-auto max-w-2xl text-lg sm:text-xl",
-              withGlassStyle && currentStep === "login"
-                ? "text-white/90 drop-shadow-md"
-                : "text-gray-600"
+              withGlassStyle ? "text-white/90 drop-shadow-md" : "text-gray-600"
             )}
           >
             {theme.heroSubtitle}
@@ -237,60 +236,75 @@ export function InvitationOnboardingShell({
         <div className="grid items-start gap-8 lg:grid-cols-2">
           <motion.div className="order-2 space-y-6 lg:order-1" variants={itemVariants}>
             {withGlassStyle ? (
-              <motion.div
-                className={cn(SIGN_IN_MAGIC_CARD_SHELL, infoPanelClass)}
-                whileHover={SIGN_IN_MAGIC_HOVER}
-              >
-                <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
-                <div className="relative z-[1]">{infoPanelInner}</div>
-                <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
-              </motion.div>
+              <AuthTiltCard>
+                <motion.div
+                  className={cn(SIGN_IN_MAGIC_CARD_SHELL, infoPanelClass)}
+                  whileHover={SIGN_IN_MAGIC_HOVER}
+                >
+                  <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
+                  <div className="relative z-[1]">{infoPanelInner}</div>
+                  <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
+                </motion.div>
+              </AuthTiltCard>
             ) : (
               <div className={infoPanelClass}>{infoPanelInner}</div>
             )}
 
-            <motion.div
-              className={cn(withGlassStyle ? SIGN_IN_MAGIC_CARD_SHELL : "", calloutClass)}
-              whileHover={withGlassStyle ? SIGN_IN_MAGIC_HOVER : { scale: 1.02 }}
-              transition={withGlassStyle ? undefined : { type: "spring", stiffness: 300 }}
-            >
-              {withGlassStyle ? <div className={SIGN_IN_MAGIC_AURA} aria-hidden /> : null}
-              <div className={withGlassStyle ? "relative z-[1]" : undefined}>
+            {withGlassStyle ? (
+              <AuthTiltCard>
+                <motion.div
+                  className={cn(SIGN_IN_MAGIC_CARD_SHELL, calloutClass)}
+                  whileHover={SIGN_IN_MAGIC_HOVER}
+                >
+                  <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
+                  <div className="relative z-[1]">
+                    {theme.calloutIcon}
+                    <h3 className="mb-2 text-lg font-semibold">{theme.calloutTitle}</h3>
+                    <p className="text-white/90">{theme.calloutBody}</p>
+                  </div>
+                  <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
+                </motion.div>
+              </AuthTiltCard>
+            ) : (
+              <motion.div
+                className={calloutClass}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
                 {theme.calloutIcon}
                 <h3 className="mb-2 text-lg font-semibold">{theme.calloutTitle}</h3>
-                <p className={withGlassStyle ? "text-white/90" : "text-white/80"}>
-                  {theme.calloutBody}
-                </p>
-              </div>
-              {withGlassStyle ? <div className={SIGN_IN_MAGIC_SHINE} aria-hidden /> : null}
-            </motion.div>
+                <p className="text-white/80">{theme.calloutBody}</p>
+              </motion.div>
+            )}
           </motion.div>
 
           <motion.div className="order-1 lg:order-2" variants={itemVariants}>
             {withGlassStyle ? (
-              <motion.div className={SIGN_IN_MAGIC_CARD_SHELL} whileHover={SIGN_IN_MAGIC_HOVER}>
-                <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
-                <Card
-                  className={cn(
-                    AUTH_GLASS_FORM,
-                    "relative z-[1] gap-0 border-0 py-6 shadow-2xl ring-0"
-                  )}
-                >
-                  <CardHeader className="space-y-1 pb-4">
-                    <div className="pb-2">
-                      <InvitationOnboardingStepper currentStep={currentStep} showDescription={false} />
-                    </div>
-                    <CardTitle className="text-2xl font-bold text-center">{title}</CardTitle>
-                    {description ? (
-                      <CardDescription className="text-center text-slate-600 dark:text-slate-300">
-                        {description}
-                      </CardDescription>
-                    ) : null}
-                  </CardHeader>
-                  <CardContent>{children}</CardContent>
-                </Card>
-                <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
-              </motion.div>
+              <AuthTiltCard>
+                <motion.div className={SIGN_IN_MAGIC_CARD_SHELL} whileHover={SIGN_IN_MAGIC_HOVER}>
+                  <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
+                  <Card
+                    className={cn(
+                      AUTH_GLASS_FORM,
+                      "relative z-[1] gap-0 border-0 py-6 shadow-2xl ring-0"
+                    )}
+                  >
+                    <CardHeader className="space-y-1 pb-4">
+                      <div className="pb-2">
+                        <InvitationOnboardingStepper currentStep={currentStep} showDescription={false} />
+                      </div>
+                      <CardTitle className="text-2xl font-bold text-center">{title}</CardTitle>
+                      {description ? (
+                        <CardDescription className="text-center text-slate-600 dark:text-slate-300">
+                          {description}
+                        </CardDescription>
+                      ) : null}
+                    </CardHeader>
+                    <CardContent>{children}</CardContent>
+                  </Card>
+                  <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
+                </motion.div>
+              </AuthTiltCard>
             ) : (
               <Card
                 className="border-white/20 bg-white/80 shadow-xl backdrop-blur-sm"

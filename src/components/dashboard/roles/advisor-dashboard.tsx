@@ -8,9 +8,17 @@ import { useRouter } from "next/navigation"
 import { useQueries } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth-store"
 import { getAdvisorProjectGroupChatRoom, listChatRoomMessages } from "@/lib/api/chat"
+import { useAdvisorAddMilestoneFeedback } from "@/lib/hooks/use-advisor-add-milestone-feedback"
+import { useAdvisorApproveMilestoneSubmission } from "@/lib/hooks/use-advisor-approve-milestone-submission"
+import { useAdvisorMilestoneFeedbacks } from "@/lib/hooks/use-advisor-milestone-feedbacks"
 import { useAdvisorProjects } from "@/lib/hooks/use-advisor-projects"
+import { useAdvisorReviewQueue } from "@/lib/hooks/use-advisor-review-queue"
 import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
 import type { ApiAdvisorProject } from "@/lib/api/advisor"
+import type {
+  AdvisorMilestoneReviewQueueItem,
+  AdvisorMilestoneSubmissionFeedbackItem,
+} from "@/lib/types/advisor"
 
 import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
@@ -18,20 +26,29 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import {
+  AlertTriangle,
   CheckCircle,
   Clock,
+  Download,
   Eye,
+  ExternalLink,
+  FileText,
   FolderOpen,
   MessageSquare,
+  Paperclip,
+  RefreshCw,
   Upload,
   Users,
-  Video,
   Calendar,
   Bell,
   AlertCircle,
+  Video,
 } from "lucide-react"
 
 // Types
@@ -56,6 +73,19 @@ interface AdvisorProject {
   progress: number
   milestones: ProjectMilestone[]
   lastUpdated?: string
+}
+
+interface AdvisorReviewQueueEntry {
+  id: string
+  queueItem: AdvisorMilestoneReviewQueueItem
+  project: AdvisorProject
+  milestone: ProjectMilestone
+  feedbackCount: number
+  actionLabel: string
+  submissionId: string
+  submissionFileName: string
+  submissionUrl?: string
+  latestFeedbackPreview?: string
 }
 
 // Constants
@@ -92,6 +122,21 @@ const formatDate = (iso: string) => {
     year: "numeric", 
     month: "short", 
     day: "numeric" 
+  })
+}
+
+const formatDateTime = (iso?: string | null) => {
+  if (!iso) return "Unknown"
+
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "Unknown"
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   })
 }
 
@@ -208,9 +253,58 @@ const mapApiProject = (project: ApiAdvisorProject): AdvisorProject => ({
   })),
 })
 
+const mapReviewQueueItem = (item: AdvisorMilestoneReviewQueueItem): AdvisorReviewQueueEntry => {
+  const milestone: ProjectMilestone = {
+    id: item.milestone.id,
+    name: item.milestone.title?.trim() || item.latestSubmission.fileName?.trim() || "Milestone Submission",
+    dueDate:
+      item.milestone.dueDate ??
+      item.milestone.submittedAt ??
+      item.latestSubmission.createdAt ??
+      new Date().toISOString(),
+    status: normalizeMilestoneStatus(item.milestone.status ?? item.latestSubmission.status),
+    submittedAt: item.latestSubmission.createdAt ?? item.milestone.submittedAt ?? undefined,
+    feedback: item.review.latestFeedback?.message?.trim() || undefined,
+  }
+
+  const project: AdvisorProject = {
+    id: item.project.id,
+    title: item.project.title,
+    groupName: item.group.name?.trim() || "Project Group",
+    advisorId: "me",
+    status: normalizeProjectStatus(item.project.status),
+    progress: 0,
+    milestones: [milestone],
+    lastUpdated: item.latestSubmission.createdAt ?? item.milestone.submittedAt ?? undefined,
+  }
+
+  const feedbackCount = Number(item.review.feedbackCount ?? 0)
+
+  return {
+    id: `${item.milestone.id}:${item.latestSubmission.id}`,
+    queueItem: item,
+    project,
+    milestone,
+    feedbackCount,
+    actionLabel: feedbackCount > 0 ? "Continue Review" : "Review Submission",
+    submissionId: item.latestSubmission.id,
+    submissionFileName: item.latestSubmission.fileName?.trim() || "Submission file",
+    submissionUrl: item.latestSubmission.fileUrl?.trim() || undefined,
+    latestFeedbackPreview: item.review.latestFeedback?.message?.trim() || undefined,
+  }
+}
+
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message
   return "Something went wrong while loading advisor dashboard data."
+}
+
+const getFeedbackAuthorName = (feedback: AdvisorMilestoneSubmissionFeedbackItem) => {
+  const firstName = feedback.author?.firstName?.trim() ?? ""
+  const lastName = feedback.author?.lastName?.trim() ?? ""
+  const fullName = `${firstName} ${lastName}`.trim()
+
+  return fullName || feedback.author?.email?.trim() || feedback.authorRole?.trim() || "Advisor"
 }
 
 // Sub-components
@@ -369,43 +463,17 @@ const ProjectCard = React.memo(({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/documents`}>
-              <Eye className="mr-2 h-4 w-4" /> Documents
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/projects/${project.id}/upload`}>
-              <Upload className="mr-2 h-4 w-4" /> Upload
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/messages?group=${project.id}`}>
-              <MessageSquare className="mr-2 h-4 w-4" /> Message
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/advisor/announcements">
-              <Bell className="mr-2 h-4 w-4" /> Announcements
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/advisor/schedule?project=${project.id}`}>
-              <Video className="mr-2 h-4 w-4" /> Meeting
-            </Link>
-          </Button>
-          {canClearForEvaluation && (
+        {canClearForEvaluation ? (
+          <div className="flex justify-end pt-2">
             <Button 
               variant="default" 
               size="sm" 
               onClick={() => onClearForEvaluation(project)}
-              className="ml-auto"
             >
               <CheckCircle className="mr-2 h-4 w-4" /> Clear for Evaluation
             </Button>
-          )}
-        </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -422,8 +490,15 @@ interface AdvisorDashboardProps {
 export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: AdvisorDashboardProps) {
   const router = useRouter()
   const [now, setNow] = useState<Date>(new Date())
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
+  const [feedbackDraft, setFeedbackDraft] = useState("")
+  const [feedbackFile, setFeedbackFile] = useState<File | null>(null)
+  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false)
   const summaryQuery = useAdvisorSummary()
   const projectsQuery = useAdvisorProjects()
+  const reviewQueueQuery = useAdvisorReviewQueue()
+  const addFeedbackMutation = useAdvisorAddMilestoneFeedback()
+  const approveSubmissionMutation = useAdvisorApproveMilestoneSubmission()
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -467,14 +542,42 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     }),
   })
   
-  const pendingMilestones = useMemo(() => 
-    myProjects.flatMap((p) => 
-      p.milestones
-        .filter((m) => m.status === "submitted")
-        .map((m) => ({ project: p, milestone: m }))
-    ), 
-    [myProjects]
+  const pendingMilestones = useMemo(
+    () => (reviewQueueQuery.data ?? []).map(mapReviewQueueItem),
+    [reviewQueueQuery.data]
   )
+
+  const selectedReview = useMemo(() => {
+    if (!pendingMilestones.length) return null
+    return pendingMilestones.find((item) => item.id === selectedReviewId) ?? pendingMilestones[0]
+  }, [pendingMilestones, selectedReviewId])
+
+  const feedbackHistoryQuery = useAdvisorMilestoneFeedbacks({
+    milestoneId: selectedReview?.milestone.id,
+    submissionId: selectedReview?.submissionId,
+    enabled: Boolean(selectedReview),
+  })
+
+  useEffect(() => {
+    setFeedbackDraft("")
+    setFeedbackFile(null)
+    setIsApproveDialogOpen(false)
+  }, [selectedReview?.id])
+
+  useEffect(() => {
+    if (!pendingMilestones.length) {
+      setSelectedReviewId((current) => (current === null ? current : null))
+      return
+    }
+
+    setSelectedReviewId((current) => {
+      if (current && pendingMilestones.some((item) => item.id === current)) {
+        return current
+      }
+
+      return pendingMilestones[0].id
+    })
+  }, [pendingMilestones])
 
   const recentMessages = useMemo(() => {
     return advisorProjects
@@ -550,6 +653,87 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     // Here you would typically update the backend
   }, [])
 
+  const handleOpenSubmission = useCallback((entry: AdvisorReviewQueueEntry) => {
+    if (!entry.submissionUrl) {
+      toast.info("Submission file is not available yet")
+      return
+    }
+
+    window.open(entry.submissionUrl, "_blank", "noopener,noreferrer")
+  }, [])
+
+  const handleDownloadSubmission = useCallback((entry: AdvisorReviewQueueEntry) => {
+    if (!entry.submissionUrl) {
+      toast.info("Download is not available for this submission")
+      return
+    }
+
+    const anchor = document.createElement("a")
+    anchor.href = entry.submissionUrl
+    anchor.target = "_blank"
+    anchor.rel = "noreferrer"
+    anchor.download = entry.submissionFileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  }, [])
+
+  const handleAddFeedback = useCallback(async () => {
+    const message = feedbackDraft.trim()
+
+    if (!selectedReview) {
+      toast.error("Select a submission first")
+      return
+    }
+
+    if (!message) {
+      toast.error("Feedback message is required")
+      return
+    }
+
+    try {
+      await addFeedbackMutation.mutateAsync({
+        milestoneId: selectedReview.milestone.id,
+        submissionId: selectedReview.submissionId,
+        message,
+        file: feedbackFile,
+      })
+
+      setFeedbackDraft("")
+      setFeedbackFile(null)
+      toast.success("Feedback sent", {
+        description: `${selectedReview.project.groupName} • ${selectedReview.milestone.name}`,
+      })
+    } catch (error) {
+      toast.error("Failed to send feedback", {
+        description: getErrorMessage(error),
+      })
+    }
+  }, [addFeedbackMutation, feedbackDraft, feedbackFile, selectedReview])
+
+  const handleApproveSubmission = useCallback(async () => {
+    if (!selectedReview) {
+      toast.error("Select a submission first")
+      return
+    }
+
+    try {
+      await approveSubmissionMutation.mutateAsync({
+        milestoneId: selectedReview.milestone.id,
+        submissionId: selectedReview.submissionId,
+      })
+
+      setIsApproveDialogOpen(false)
+      toast.success("Submission approved", {
+        description: `${selectedReview.project.groupName} • ${selectedReview.milestone.name}`,
+      })
+    } catch (error) {
+      toast.error("Failed to approve submission", {
+        description: getErrorMessage(error),
+      })
+    }
+  }, [approveSubmissionMutation, selectedReview])
+
   const authUser = useAuthStore((state) => state.user)
   const displayName = authUser ? `${authUser.firstName ?? ""} ${authUser.lastName ?? ""}`.trim() : "Advisor"
 
@@ -571,11 +755,11 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
         </div>
       </div>
 
-      {(summaryQuery.error || projectsQuery.error) && (
+      {(summaryQuery.error || projectsQuery.error || reviewQueueQuery.error) && (
         <Card className="border-destructive/40">
           <CardContent className="py-4">
             <p className="text-sm text-destructive">
-              {getErrorMessage(summaryQuery.error ?? projectsQuery.error)}
+              {getErrorMessage(summaryQuery.error ?? projectsQuery.error ?? reviewQueueQuery.error)}
             </p>
           </CardContent>
         </Card>
@@ -615,7 +799,7 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="projects" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="milestones" className="relative">
             Reviews
@@ -624,6 +808,9 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
                 {stats.pendingReviews}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="documents" onClick={() => router.push("/dashboard/advisor/documents")}>
+            Documents
           </TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
         </TabsList>
@@ -667,30 +854,353 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
               </p>
             </CardHeader>
             <CardContent>
-              {pendingMilestones.length === 0 ? (
+              {reviewQueueQuery.isLoading ? (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4 animate-pulse" />
+                  <p className="text-lg font-medium text-muted-foreground">Loading reviews</p>
+                  <p className="text-sm text-muted-foreground mt-1">Fetching milestone submissions awaiting your review.</p>
+                </div>
+              ) : pendingMilestones.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
                   <p className="text-lg font-medium text-muted-foreground">All caught up!</p>
                   <p className="text-sm text-muted-foreground mt-1">No pending milestones to review.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {pendingMilestones.map(({ project, milestone }) => (
-                    <div key={`${project.id}:${milestone.id}`} className="group">
-                      <MilestoneItem
-                        milestone={milestone}
-                        project={project}
-                        onApprove={handleApproveMilestone}
-                        onRequestRevision={handleRequestRevision}
-                        showActions={true}
-                      />
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                      <div className="space-y-3">
+                        {pendingMilestones.map((entry) => {
+                          const isSelected = selectedReview?.id === entry.id
+
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              onClick={() => setSelectedReviewId(entry.id)}
+                              className={`w-full rounded-lg border text-left transition-colors ${
+                                isSelected
+                                  ? "border-primary bg-primary/5 shadow-sm"
+                                  : "border-border bg-transparent hover:bg-muted/20"
+                              }`}
+                            >
+                              <div className="group">
+                                <MilestoneItem
+                                  milestone={entry.milestone}
+                                  project={entry.project}
+                                  onApprove={handleApproveMilestone}
+                                  onRequestRevision={handleRequestRevision}
+                                  showActions={false}
+                                />
+                              </div>
+                              <div className="px-4 pb-4">
+                                <div className="flex flex-col gap-3 rounded-lg border bg-background/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="min-w-0 space-y-1">
+                                    <p className="text-sm font-medium text-foreground">{entry.project.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {entry.feedbackCount} feedback entr{entry.feedbackCount === 1 ? "y" : "ies"}
+                                      {entry.latestFeedbackPreview ? ` • ${entry.latestFeedbackPreview}` : ""}
+                                    </p>
+                                  </div>
+                                  <Button variant={isSelected ? "default" : "outline"} size="sm" className="shrink-0">
+                                    {entry.actionLabel}
+                                  </Button>
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <Card className="h-fit xl:sticky xl:top-4">
+                        <CardHeader>
+                          <CardTitle className="font-display text-lg">Review Detail</CardTitle>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedReview
+                              ? `${selectedReview.project.groupName} • ${selectedReview.milestone.name}`
+                              : "Select a submission to inspect its latest version."}
+                          </p>
+                        </CardHeader>
+                        <CardContent>
+                          {selectedReview ? (
+                            <div className="space-y-5">
+                              <div className="rounded-lg border bg-muted/20 p-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <FileText className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-medium text-foreground">{selectedReview.submissionFileName}</p>
+                                      <StatusBadge status={selectedReview.milestone.status} />
+                                    </div>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                      Latest submission for {selectedReview.project.title}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                  <div className="rounded-md border bg-background px-3 py-2">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Submitted</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">
+                                      {selectedReview.milestone.submittedAt ? formatDate(selectedReview.milestone.submittedAt) : "Unknown"}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-md border bg-background px-3 py-2">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Feedback Count</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">{selectedReview.feedbackCount}</p>
+                                  </div>
+                                  <div className="rounded-md border bg-background px-3 py-2">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Milestone</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">{selectedReview.milestone.name}</p>
+                                  </div>
+                                  <div className="rounded-md border bg-background px-3 py-2">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Group</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">{selectedReview.project.groupName}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-foreground">Submission Access</h3>
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                  <Button
+                                    onClick={() => handleOpenSubmission(selectedReview)}
+                                    className="flex-1"
+                                    disabled={!selectedReview.submissionUrl}
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" /> Open Submission
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => handleDownloadSubmission(selectedReview)}
+                                    className="flex-1"
+                                    disabled={!selectedReview.submissionUrl}
+                                  >
+                                    <Download className="mr-2 h-4 w-4" /> Download Submission
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3 rounded-lg border p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <h3 className="text-sm font-semibold text-foreground">Approval</h3>
+                                  <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                    Final action
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  Approving this submission will mark the milestone as approved and remove it from the active review queue after refresh.
+                                </p>
+                                <div className="flex justify-end">
+                                  <Button
+                                    onClick={() => setIsApproveDialogOpen(true)}
+                                    disabled={approveSubmissionMutation.isPending}
+                                  >
+                                    Approve Submission
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3 rounded-lg border p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <h3 className="text-sm font-semibold text-foreground">Add Feedback</h3>
+                                  <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                    Attachment optional
+                                  </Badge>
+                                </div>
+                                <Textarea
+                                  value={feedbackDraft}
+                                  onChange={(event) => setFeedbackDraft(event.target.value)}
+                                  placeholder="Write advisor feedback for this submission..."
+                                  rows={4}
+                                  disabled={addFeedbackMutation.isPending}
+                                />
+                                <div className="space-y-2">
+                                  <Input
+                                    type="file"
+                                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    onChange={(event) => setFeedbackFile(event.target.files?.[0] ?? null)}
+                                    disabled={addFeedbackMutation.isPending}
+                                  />
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-xs text-muted-foreground">
+                                      Attach an optional PDF or DOCX review note.
+                                    </p>
+                                    {feedbackFile ? (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => setFeedbackFile(null)}
+                                        disabled={addFeedbackMutation.isPending}
+                                      >
+                                        Remove file
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                  {feedbackFile ? (
+                                    <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                      Selected: {feedbackFile.name}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-xs text-muted-foreground">
+                                    Send feedback now with or without an attachment.
+                                  </p>
+                                  <Button
+                                    onClick={handleAddFeedback}
+                                    disabled={addFeedbackMutation.isPending || !feedbackDraft.trim()}
+                                  >
+                                    {addFeedbackMutation.isPending ? "Sending..." : "Send Feedback"}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 rounded-lg border border-dashed p-4">
+                                <h3 className="text-sm font-semibold text-foreground">Latest Feedback Preview</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedReview.latestFeedbackPreview || "No feedback has been added yet for this submission."}
+                                </p>
+                              </div>
+
+                              <div className="space-y-3 rounded-lg border p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <h3 className="text-sm font-semibold text-foreground">Feedback History</h3>
+                                  {!feedbackHistoryQuery.isLoading && !feedbackHistoryQuery.isError ? (
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                      {(feedbackHistoryQuery.data ?? []).length} entr{(feedbackHistoryQuery.data ?? []).length === 1 ? "y" : "ies"}
+                                    </Badge>
+                                  ) : null}
+                                </div>
+
+                                {feedbackHistoryQuery.isLoading ? (
+                                  <div className="space-y-2">
+                                    {Array.from({ length: 2 }).map((_, index) => (
+                                      <div key={index} className="rounded-xl border bg-muted/20 px-4 py-3">
+                                        <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+                                        <div className="mt-3 h-3 w-full animate-pulse rounded bg-muted" />
+                                        <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-muted" />
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : feedbackHistoryQuery.isError ? (
+                                  <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+                                    <div className="flex items-start gap-3">
+                                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-foreground">Unable to load feedback history</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">{feedbackHistoryQuery.error.message}</p>
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 gap-1.5"
+                                        onClick={() => feedbackHistoryQuery.refetch()}
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        Retry
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (feedbackHistoryQuery.data ?? []).length > 0 ? (
+                                  <div className="space-y-2">
+                                    {(feedbackHistoryQuery.data ?? []).map((feedback) => (
+                                      <div key={feedback.id} className="rounded-xl border bg-muted/20 px-4 py-3">
+                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-foreground">
+                                              {getFeedbackAuthorName(feedback)}
+                                            </p>
+                                            {feedback.authorRole ? (
+                                              <p className="text-xs text-muted-foreground">{feedback.authorRole}</p>
+                                            ) : null}
+                                          </div>
+                                          <p className="text-xs text-muted-foreground">
+                                            {formatDateTime(feedback.createdAt)}
+                                          </p>
+                                        </div>
+                                        <p className="mt-3 text-sm leading-relaxed text-foreground/90">
+                                          {feedback.message?.trim() || "No message provided."}
+                                        </p>
+                                        {feedback.attachmentUrl ? (
+                                          <div className="mt-3">
+                                            <Button asChild variant="outline" size="sm" className="h-8 gap-1.5">
+                                              <a href={feedback.attachmentUrl} target="_blank" rel="noreferrer">
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                                {feedback.attachmentFileName?.trim() || "Open attachment"}
+                                              </a>
+                                            </Button>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                                    No feedback history has been added for this submission yet.
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-2 rounded-lg border border-dashed p-4">
+                                <h3 className="text-sm font-semibold text-foreground">Next Integration Step</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Feedback submission and approval actions will attach to this selected review panel next.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+                              Select a review item to inspect the current submission.
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+        <Dialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
+          <DialogContent className="sm:max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle>Approve Submission?</DialogTitle>
+              <DialogDescription>
+                {selectedReview
+                  ? `This will approve ${selectedReview.milestone.name} for ${selectedReview.project.groupName} and remove it from the active review queue.`
+                  : "This will approve the selected submission and remove it from the active review queue."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
+              <p>
+                {selectedReview
+                  ? `Submission: ${selectedReview.submissionFileName}`
+                  : "Select a submission before approving."}
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsApproveDialogOpen(false)}
+                disabled={approveSubmissionMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApproveSubmission}
+                disabled={approveSubmissionMutation.isPending || !selectedReview}
+              >
+                {approveSubmissionMutation.isPending ? "Approving..." : "Confirm Approval"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <TabsContent value="communication">
           <div className="grid gap-4 md:grid-cols-2">

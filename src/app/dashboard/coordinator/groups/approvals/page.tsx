@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
+import { listPendingGroupLeaderRequests, approveGroupLeaderRequest, rejectGroupLeaderRequest } from "@/lib/api/group-leader-requests"
+import type { GroupLeaderRequestsSummary } from "@/types/group-leader-requests"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -461,71 +463,77 @@ export default function GroupApprovalPage() {
   const [tab, setTab] = useState<ApprovalTab>("pending")
   const [selected, setSelected] = useState<ProjectGroupReviewItem | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [page, setPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+  
+  const [data, setData] = useState<GroupAppItem[]>(MOCK_GROUPS)
+  const [summary, setSummary] = useState<GroupLeaderRequestsSummary | null>(null)
 
-  const limit = 20
-  const apiStatus = TAB_TO_STATUS[tab]
-  const searchParam = search.trim() || undefined
-
-  const {
-    data: apiData,
-    isLoading: apiLoading,
-    isError: apiError,
-    error: apiErrorObj,
-    refetch,
-    isFetching,
-  } = useSubmittedProjectGroupsForReview({
-    enabled: true,
-    status: apiStatus,
-    page,
-    limit,
-    search: searchParam,
-  })
-
-  const approveMutation = useApproveSubmittedProjectGroupReview()
-  const rejectMutation = useRejectSubmittedProjectGroupReview()
-
-  const deciding = approveMutation.isPending || rejectMutation.isPending
-
-  const items = apiData?.items ?? []
-  const counts = useMemo(() => {
-    if (apiData?.summary) return apiData.summary
-
-    const pending = items.filter((item) => toAppStatus(item.reviewStatus ?? item.status) === "pending").length
-    const approved = items.filter((item) => toAppStatus(item.reviewStatus ?? item.status) === "approved").length
-    const rejected = items.filter((item) => toAppStatus(item.reviewStatus ?? item.status) === "rejected").length
-
-    return {
-      pending,
-      approved,
-      rejected,
-      all: items.length,
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await listPendingGroupLeaderRequests({ limit: 50 })
+        if (res.summary) setSummary(res.summary)
+        if (res.items && res.items.length > 0) {
+          setData(res.items.map(req => ({
+            id: req.id,
+            groupName: `${req.student.firstName} ${req.student.lastName}'s Group`,
+            domain: "Leadership",
+            requestedAt: req.createdAt,
+            status: req.status.toLowerCase() as AppStatus,
+            members: [{ id: req.student.id, name: `${req.student.firstName} ${req.student.lastName}`, email: req.student.email, role: "leader" }],
+            projectIdea: req.message || "No project details provided.",
+            motivation: req.message || "No motivation provided.",
+            advisorPreference: "Not stated"
+          })))
+        } else if (res.items && res.items.length === 0) {
+          setData([])
+        }
+      } catch (err) {
+        toast.error("Failed to load requests from backend")
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [apiData?.summary, items])
+    loadData()
+  }, [])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return data.filter(g => {
+      const matchTab = tab === "all" || g.status === tab
+      const matchSearch = !search || g.groupName.toLowerCase().includes(q) || g.domain.toLowerCase().includes(q)
+      return matchTab && matchSearch
+    })
+  }, [data, tab, search])
+
+  const counts = {
+    all: summary ? summary.total : data.length,
+    pending: summary ? summary.pending : data.filter(g => g.status === "pending").length,
+    approved: summary ? summary.approved : data.filter(g => g.status === "approved").length,
+    rejected: summary ? summary.rejected : data.filter(g => g.status === "rejected").length,
+  }
 
   const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
     try {
       if (decision === "approved") {
-        await approveMutation.mutateAsync({ groupId: id })
-        toast.success("Group approved", { description: "The group has been approved successfully." })
+        await approveGroupLeaderRequest(id)
       } else {
-        await rejectMutation.mutateAsync({
-          groupId: id,
-          dto: { reason: reason?.trim() || "Rejected by coordinator" },
-        })
-        toast.success("Group rejected", { description: "The group has been rejected successfully." })
+        await rejectGroupLeaderRequest(id, reason || "Rejected")
       }
-
-      await refetch()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Please try again."
-      toast.error("Action failed", { description: message })
+      setData(prev => prev.map(g => g.id === id ? { ...g, status: decision } : g))
+      setSummary(prev => {
+        if (!prev) return prev
+        const decisionKey = decision as "approved" | "rejected"
+        return {
+          ...prev,
+          pending: Math.max(0, prev.pending - 1),
+          [decisionKey]: prev[decisionKey] + 1
+        }
+      })
+      toast.success(`Request ${decision === "approved" ? "Approved" : "Rejected"} successfully`)
+    } catch(err) {
+      toast.error("Failed to record decision")
     }
-  }
-
-  const openReview = (group: ProjectGroupReviewItem) => {
-    setSelected(group)
-    setSheetOpen(true)
   }
 
   const pagination = apiData?.pagination

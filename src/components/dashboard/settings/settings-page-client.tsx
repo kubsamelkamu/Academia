@@ -3,14 +3,13 @@
 import { useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  DashboardKpiGrid,
   DashboardPageHeader,
   DashboardSectionCard,
 } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, Building2, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
+import { Building2, ShieldCheck } from "lucide-react"
 import { type UserRole } from "@/config/navigation"
 import { DepartmentHeadSettingsPageContent } from "@/components/dashboard/department-head/settings-page"
 import { UniversitySettingsForm } from "@/components/dashboard/department-head/university-settings"
@@ -100,11 +99,8 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
   const [policies, setPolicies] = useState<PolicyToggle[]>(initialPolicies)
   const [rules, setRules] = useState<NotificationRule[]>(initialRules)
 
-  const enabledPolicies = useMemo(() => policies.filter((item) => item.enabled).length, [policies])
-  const enabledRules = useMemo(() => rules.filter((item) => item.enabled).length, [rules])
-
   const showGovernance = role === "department_head" || role === "coordinator"
-  const showDepartment = role === "department_head"
+  const showDepartment = role === "department_head" || role === "coordinator"
   const showUniversity = role === "department_head"
   const showVerification = role === "department_head"
 
@@ -223,15 +219,6 @@ export function SettingsPageClient({ role }: { role: UserRole }) {
 
         {showGovernance ? (
           <TabsContent value="governance">
-            <DashboardKpiGrid
-              items={[
-                { title: "Policies Enabled", value: `${enabledPolicies}`, note: "Active governance controls", icon: ShieldCheck },
-                { title: "Notification Rules", value: `${enabledRules}`, note: "Escalation and digest policies", icon: Bell },
-                { title: "Role Overrides", value: "2", note: "Custom department permissions", icon: Users },
-                { title: "Preference Profiles", value: "2", note: "Saved department presets", icon: SlidersHorizontal },
-              ]}
-            />
-
             <DashboardSectionCard
               className="mt-4"
               title="Project Group Size"

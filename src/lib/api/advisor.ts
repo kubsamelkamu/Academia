@@ -9,6 +9,7 @@ import type {
   AdvisorDashboardOverview,
   AdvisorDocumentDetail,
   AdvisorDocumentsResponse,
+  AdvisorSubmittedDocumentsResponse,
   AdvisorEvaluationDetail,
   AdvisorEvaluationsResponse,
   AdvisorGroupMessagesResponse,
@@ -16,7 +17,9 @@ import type {
   AdvisorMessage,
   AdvisorMessageGroup,
   AdvisorMessageGroupsResponse,
+  AdvisorMilestoneSubmissionFeedbackItem,
   AdvisorMilestoneStatusDto,
+  AdvisorMilestoneReviewQueueItem,
   AdvisorProjectDetail,
   AdvisorProjectsResponse,
   AdvisorReviewDocumentDto,
@@ -199,11 +202,147 @@ export interface ApiAdvisorProject {
   }
 }
 
+function isReviewQueueItemArray(value: unknown): value is AdvisorMilestoneReviewQueueItem[] {
+  return Array.isArray(value)
+}
+
+function isReviewQueueEnvelope(
+  value: unknown
+): value is { items?: AdvisorMilestoneReviewQueueItem[] | null } {
+  return typeof value === "object" && value !== null && "items" in value
+}
+
+function isMilestoneSubmissionFeedbackArray(
+  value: unknown
+): value is AdvisorMilestoneSubmissionFeedbackItem[] {
+  return Array.isArray(value)
+}
+
+function isMilestoneSubmissionFeedbackEnvelope(
+  value: unknown
+): value is { items?: AdvisorMilestoneSubmissionFeedbackItem[] | null } {
+  return typeof value === "object" && value !== null && "items" in value
+}
+
 /**
  * Fetches the full project list for the currently authenticated advisor.
  */
 export async function getAdvisorProjects(): Promise<ApiAdvisorProject[]> {
   const response = await apiClient.get<ApiAdvisorProject[]>("/projects/advisors/me/projects")
+  return response.data
+}
+
+/**
+ * Fetches milestone submissions currently waiting for review by the authenticated advisor.
+ */
+export async function getAdvisorMilestoneReviewQueue(): Promise<AdvisorMilestoneReviewQueueItem[]> {
+  const response = await apiClient.get<AdvisorMilestoneReviewQueueItem[] | { items?: AdvisorMilestoneReviewQueueItem[] }>(
+    "/projects/advisors/me/milestone-review-queue"
+  )
+
+  if (isReviewQueueItemArray(response.data)) {
+    return response.data
+  }
+
+  if (isReviewQueueEnvelope(response.data)) {
+    return response.data.items ?? []
+  }
+
+  return []
+}
+
+export async function listAdvisorMilestoneSubmissionFeedbacks(
+  milestoneId: string,
+  submissionId: string
+): Promise<AdvisorMilestoneSubmissionFeedbackItem[]> {
+  const trimmedMilestoneId = milestoneId.trim()
+  const trimmedSubmissionId = submissionId.trim()
+
+  if (!trimmedMilestoneId) {
+    throw new Error("milestoneId is required")
+  }
+
+  if (!trimmedSubmissionId) {
+    throw new Error("submissionId is required")
+  }
+
+  const response = await apiClient.get<
+    AdvisorMilestoneSubmissionFeedbackItem[] | { items?: AdvisorMilestoneSubmissionFeedbackItem[] }
+  >(
+    `/projects/milestones/${encodeURIComponent(trimmedMilestoneId)}/submissions/${encodeURIComponent(trimmedSubmissionId)}/feedbacks`
+  )
+
+  if (isMilestoneSubmissionFeedbackArray(response.data)) {
+    return response.data
+  }
+
+  if (isMilestoneSubmissionFeedbackEnvelope(response.data)) {
+    return response.data.items ?? []
+  }
+
+  return []
+}
+
+export async function addAdvisorMilestoneSubmissionFeedback(
+  milestoneId: string,
+  submissionId: string,
+  message: string,
+  file?: File | null
+) {
+  const trimmedMilestoneId = milestoneId.trim()
+  const trimmedSubmissionId = submissionId.trim()
+  const trimmedMessage = message.trim()
+
+  if (!trimmedMilestoneId) {
+    throw new Error("milestoneId is required")
+  }
+
+  if (!trimmedSubmissionId) {
+    throw new Error("submissionId is required")
+  }
+
+  if (!trimmedMessage) {
+    throw new Error("message is required")
+  }
+
+  const formData = new FormData()
+  formData.append("message", trimmedMessage)
+  if (file) {
+    formData.append("file", file)
+  }
+
+  const response = await apiClient.post(
+    `/projects/milestones/${encodeURIComponent(trimmedMilestoneId)}/submissions/${encodeURIComponent(trimmedSubmissionId)}/feedbacks`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  )
+
+  return response.data
+}
+
+export async function approveAdvisorMilestoneSubmission(
+  milestoneId: string,
+  submissionId: string
+) {
+  const trimmedMilestoneId = milestoneId.trim()
+  const trimmedSubmissionId = submissionId.trim()
+
+  if (!trimmedMilestoneId) {
+    throw new Error("milestoneId is required")
+  }
+
+  if (!trimmedSubmissionId) {
+    throw new Error("submissionId is required")
+  }
+
+  const response = await apiClient.put(
+    `/projects/milestones/${encodeURIComponent(trimmedMilestoneId)}/submissions/${encodeURIComponent(trimmedSubmissionId)}/approve`
+  )
+
   return response.data
 }
 
@@ -403,6 +542,13 @@ export async function getAdvisorDocuments(params?: QueryParams): Promise<Advisor
   const response = await apiClient.get<AdvisorDocumentsResponse>("/advisor/documents", {
     params: cleanParams(params),
   });
+  return response.data;
+}
+
+export async function getAdvisorSubmittedDocuments(): Promise<AdvisorSubmittedDocumentsResponse> {
+  const response = await apiClient.get<AdvisorSubmittedDocumentsResponse>(
+    "/projects/advisors/me/submitted-documents"
+  );
   return response.data;
 }
 

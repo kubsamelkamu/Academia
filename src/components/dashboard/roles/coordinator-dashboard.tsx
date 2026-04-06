@@ -68,10 +68,21 @@ export function CoordinatorDashboard() {
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
-  const timeString = useMemo(
-    () => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }).format(now),
-    [now]
-  )
+  const dateTimeString = useMemo(() => {
+    const datePart = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).format(now)
+
+    const timePart = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(now)
+
+    return `${datePart} ${timePart}`
+  }, [now])
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
@@ -108,8 +119,6 @@ export function CoordinatorDashboard() {
   // Quick actions — use primary for icon tints, muted for others
   const quickActions = [
     { href: "/dashboard/coordinator/title-management",  icon: Shield,       label: "Title Management",   description: "Forward validated titles to DC",  bg: "bg-primary/10",  color: "text-primary" },
-    { href: "/dashboard/coordinator/notify-advisors",   icon: Bell,         label: "Notify Advisors",    description: "Send broadcast to all advisors",   bg: "bg-primary/10",  color: "text-primary" },
-    { href: "/dashboard/coordinator/notify-evaluators", icon: Send,         label: "Notify Evaluators",  description: "Send broadcast to all evaluators", bg: "bg-primary/[0.06]", color: "text-primary/80" },
     { href: "/dashboard/coordinator/advisor-progress",  icon: BarChart3,    label: "Advisor Analytics",  description: "Monitor advisor performance",       bg: "bg-primary/10",  color: "text-primary" },
     { href: "/dashboard/coordinator/evaluator-progress",icon: Star,         label: "Evaluator Progress", description: "Track evaluation submissions",      bg: "bg-primary/[0.06]", color: "text-primary/80" },
     { href: "/dashboard/coordinator/grade-management",  icon: Calculator,   label: "Grade Management",   description: "Calculate & publish grades",        bg: "bg-muted",       color: "text-foreground" },
@@ -301,35 +310,9 @@ export function CoordinatorDashboard() {
         </div>
         <div className="flex items-center gap-3 mt-1 sm:mt-0 shrink-0">
           <span className="tabular-nums text-sm font-medium text-muted-foreground" aria-live="polite">
-            {timeString}
+            {dateTimeString}
           </span>
-          <div className="hidden sm:flex items-center gap-2">
-            <Link href="/dashboard/coordinator/notify-advisors">
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Bell className="h-4 w-4" /> Notify Advisors
-              </Button>
-            </Link>
-            <Link href="/dashboard/coordinator/notify-evaluators">
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Send className="h-4 w-4" /> Notify Evaluators
-              </Button>
-            </Link>
-          </div>
         </div>
-      </div>
-
-      {/* Mobile-only quick-notify row */}
-      <div className="flex sm:hidden gap-2">
-        <Link href="/dashboard/coordinator/notify-advisors" className="flex-1">
-          <Button variant="outline" size="sm" className="w-full gap-1.5">
-            <Bell className="h-4 w-4" /> Notify Advisors
-          </Button>
-        </Link>
-        <Link href="/dashboard/coordinator/notify-evaluators" className="flex-1">
-          <Button variant="outline" size="sm" className="w-full gap-1.5">
-            <Send className="h-4 w-4" /> Notify Evaluators
-          </Button>
-        </Link>
       </div>
 
       {/* ── KPI Cards — all theme-reactive ── */}

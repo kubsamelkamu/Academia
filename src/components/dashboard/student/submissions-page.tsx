@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Textarea } from "@/components/ui/textarea"
 import {
   AlertCircle,
   CheckCircle2,
@@ -34,16 +33,26 @@ import { useDocumentTemplate, useDocumentTemplatesList } from "@/lib/hooks/use-d
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useAuthStore } from "@/store/auth-store"
 import type { DocumentTemplateType } from "@/types/document-templates"
-import type { ProjectProposal } from "@/types/project-proposals"
+import type {
+  ProjectProposal,
+  ProposalDocument,
+  ProposalMilestoneSubmission,
+  ProposalMilestoneSubmissionFeedback,
+  ProposalProjectMilestone,
+} from "@/types/project-proposals"
 
 type SubmissionStatus = "approved" | "reviewed" | "pending"
 
 interface FeedbackComment {
   id: string
   author: string
+  authorRole?: string
   text: string
   date: string
   resolved: boolean
+  attachmentName?: string
+  attachmentUrl?: string
+  attachmentSize?: string
 }
 
 interface StudentSubmission {
@@ -52,9 +61,23 @@ interface StudentSubmission {
   size: string
   uploadedAt: string
   milestone: string
+  source: "proposal" | "milestone"
+  submittedBy?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  details?: string
   status: SubmissionStatus
   comments: FeedbackComment[]
   url?: string
+}
+
+interface MilestoneStatusItem {
+  id: string
+  title: string
+  status: SubmissionStatus
+  dueDate?: string
+  submittedAt?: string
+  submissionCount: number
 }
 
 const templateTypes: Array<{ label: string; value: DocumentTemplateType | null }> = [
@@ -118,6 +141,19 @@ function normalizeStatus(value: unknown): string {
   return String(value ?? "").trim().toUpperCase()
 }
 
+function formatPersonName(firstName?: string | null, lastName?: string | null, email?: string | null) {
+  return `${firstName ?? ""} ${lastName ?? ""}`.trim() || email || "Advisor"
+}
+
+function initialLetters(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+}
+
 function proposalToSubmissionStatus(status: unknown): SubmissionStatus {
   const normalized = normalizeStatus(status)
   if (normalized === "APPROVED") return "approved"
@@ -125,7 +161,16 @@ function proposalToSubmissionStatus(status: unknown): SubmissionStatus {
   return "pending"
 }
 
-function getProposalPdfDocument(proposal: ProjectProposal): ProjectProposal["documents"][number] | null {
+function milestoneSubmissionToStatus(status: unknown): SubmissionStatus {
+  const normalized = normalizeStatus(status)
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED" || normalized === "CHANGES_REQUESTED" || normalized === "NEEDS_REVISION") {
+    return "reviewed"
+  }
+  return "pending"
+}
+
+function getProposalPdfDocument(proposal: ProjectProposal): ProposalDocument | null {
   const docs = proposal.documents ?? []
   const match = docs.find((doc) => String(doc.key ?? "").toLowerCase() === "proposal.pdf")
   return match ?? docs[0] ?? null
@@ -136,15 +181,13 @@ function toProposalFeedbackComments(proposal: ProjectProposal): FeedbackComment[
   if (!text) return []
 
   const advisor = proposal.advisor
-  const author =
-    `${advisor?.firstName ?? ""} ${advisor?.lastName ?? ""}`.trim() ||
-    advisor?.email ||
-    "Advisor"
+  const author = formatPersonName(advisor?.firstName, advisor?.lastName, advisor?.email)
 
   return [
     {
       id: `feedback:${proposal.id}`,
       author,
+      authorRole: "Advisor",
       text,
       date: formatDate(proposal.updatedAt ?? proposal.createdAt ?? null),
       resolved: false,
@@ -152,8 +195,150 @@ function toProposalFeedbackComments(proposal: ProjectProposal): FeedbackComment[
   ]
 }
 
+function getMilestoneDisplayLabel(milestone: ProposalProjectMilestone, index: number) {
+  const title = milestone.title?.trim() || `Milestone ${index + 1}`
+  return `${index + 1}. ${title}`
+}
+
+function toMilestoneFeedbackComments(
+  feedbacks: ProposalMilestoneSubmissionFeedback[] | null | undefined
+): FeedbackComment[] {
+  const comments: FeedbackComment[] = []
+
+  for (const [index, feedback] of (feedbacks ?? []).entries()) {
+    const text = feedback.message?.trim()
+    if (!text) continue
+
+    const author = feedback.author
+    comments.push({
+      id: feedback.id || `milestone-feedback:${index}`,
+      author: formatPersonName(author?.firstName, author?.lastName, author?.email),
+      authorRole: feedback.authorRole ?? undefined,
+      text,
+      date: formatDate(feedback.createdAt ?? null),
+      resolved: false,
+      attachmentName: feedback.attachmentFileName ?? undefined,
+      attachmentUrl: feedback.attachmentUrl ?? undefined,
+      attachmentSize: formatFileSize(feedback.attachmentSizeBytes ?? null),
+    })
+  }
+
+  return comments.sort((a, b) => {
+      const aTime = Date.parse(a.date)
+      const bTime = Date.parse(b.date)
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+}
+
+function toProposalSubmission(proposal: ProjectProposal): StudentSubmission {
+  const doc = getProposalPdfDocument(proposal)
+  const uploadedAt = doc?.uploadedAt ?? proposal.updatedAt ?? proposal.createdAt ?? new Date().toISOString()
+  const fileName = doc?.originalName?.trim() || proposal.title?.trim() || "Project Proposal"
+
+  return {
+    id: proposal.id,
+    name: fileName,
+    size: formatFileSize(doc?.sizeBytes ?? null),
+    uploadedAt,
+    milestone: "Proposal",
+    source: "proposal",
+    submittedBy: formatPersonName(
+      proposal.submitter?.firstName,
+      proposal.submitter?.lastName,
+      proposal.submitter?.email
+    ),
+    reviewedBy: proposal.advisor
+      ? formatPersonName(proposal.advisor.firstName, proposal.advisor.lastName, proposal.advisor.email)
+      : undefined,
+    reviewedAt: proposal.updatedAt ?? undefined,
+    details: proposal.title?.trim() || undefined,
+    status: proposalToSubmissionStatus(proposal.status),
+    comments: toProposalFeedbackComments(proposal),
+    url: doc?.url,
+  }
+}
+
+function toMilestoneSubmission(
+  submission: ProposalMilestoneSubmission,
+  milestone: ProposalProjectMilestone,
+  milestoneIndex: number
+): StudentSubmission {
+  const uploadedAt = submission.createdAt ?? milestone.submittedAt ?? milestone.updatedAt ?? new Date().toISOString()
+
+  return {
+    id: `milestone-submission:${submission.id}`,
+    name: submission.fileName?.trim() || milestone.title?.trim() || "Milestone Submission",
+    size: formatFileSize(submission.sizeBytes ?? null),
+    uploadedAt,
+    milestone: getMilestoneDisplayLabel(milestone, milestoneIndex),
+    source: "milestone",
+    submittedBy: submission.uploadedBy
+      ? formatPersonName(submission.uploadedBy.firstName, submission.uploadedBy.lastName, submission.uploadedBy.email)
+      : undefined,
+    reviewedBy: submission.approvedBy
+      ? formatPersonName(submission.approvedBy.firstName, submission.approvedBy.lastName, submission.approvedBy.email)
+      : undefined,
+    reviewedAt: submission.approvedAt ?? undefined,
+    details: milestone.description?.trim() || undefined,
+    status: milestoneSubmissionToStatus(submission.status ?? milestone.status),
+    comments: toMilestoneFeedbackComments(submission.feedbacks),
+    url: submission.fileUrl ?? undefined,
+  }
+}
+
+function getLatestLinkedProposal(proposals: ProjectProposal[]): ProjectProposal | null {
+  const linked = proposals.filter((proposal) => proposal.project?.id)
+  if (!linked.length) return null
+
+  return linked
+    .slice()
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
+      const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })[0] ?? null
+}
+
+function getMilestoneSubmissions(proposal: ProjectProposal): StudentSubmission[] {
+  const milestones = proposal.project?.milestones ?? []
+
+  return milestones.flatMap((milestone, index) => {
+    const submissions = milestone.submissions ?? []
+    return submissions.map((submission) => toMilestoneSubmission(submission, milestone, index))
+  })
+}
+
+function getMilestoneStatusItems(proposal: ProjectProposal | null): MilestoneStatusItem[] {
+  if (!proposal) return []
+
+  const milestones = proposal.project?.milestones ?? []
+
+  return milestones.map((milestone, index) => {
+    const submissions = milestone.submissions ?? []
+    const latestSubmission = submissions
+      .slice()
+      .sort((a, b) => {
+        const aTime = Date.parse(String(a.createdAt ?? ""))
+        const bTime = Date.parse(String(b.createdAt ?? ""))
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      })[0]
+
+    return {
+      id: milestone.id,
+      title: getMilestoneDisplayLabel(milestone, index),
+      status: submissions.length
+        ? milestoneSubmissionToStatus(latestSubmission?.status ?? milestone.status)
+        : proposalToSubmissionStatus(milestone.status),
+      dueDate: milestone.dueDate ?? undefined,
+      submittedAt: latestSubmission?.createdAt ?? milestone.submittedAt ?? undefined,
+      submissionCount: submissions.length,
+    }
+  })
+}
+
 export function StudentSubmissionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const departmentId = useAuthStore((s) => s.user?.departmentId)
   const accessToken = useAuthStore((s) => s.accessToken)
   const [searchTerm, setSearchTerm] = useState("")
@@ -162,37 +347,34 @@ export function StudentSubmissionsPage() {
   const [templateTypeFilter, setTemplateTypeFilter] = useState<DocumentTemplateType | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<StudentSubmission | null>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
-  const [reply, setReply] = useState("")
 
   const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
+  const latestLinkedProposal = useMemo(() => {
+    const items = myGroupProposalsQuery.data ?? []
+    return getLatestLinkedProposal(items)
+  }, [myGroupProposalsQuery.data])
 
   const submissions = useMemo<StudentSubmission[]>(() => {
     const items = myGroupProposalsQuery.data ?? []
 
-    return items
+    const proposalSubmissions = items
       .slice()
       .sort((a, b) => {
         const aTime = Date.parse(String(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? ""))
         const bTime = Date.parse(String(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? ""))
         return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
       })
-      .map((proposal) => {
-        const doc = getProposalPdfDocument(proposal)
-        const uploadedAt = doc?.uploadedAt ?? proposal.updatedAt ?? proposal.createdAt ?? new Date().toISOString()
-        const fileName = doc?.originalName?.trim() || proposal.title?.trim() || "Project Proposal"
+      .map(toProposalSubmission)
 
-        return {
-          id: proposal.id,
-          name: fileName,
-          size: formatFileSize(doc?.sizeBytes ?? null),
-          uploadedAt,
-          milestone: "Proposal",
-          status: proposalToSubmissionStatus(proposal.status),
-          comments: toProposalFeedbackComments(proposal),
-          url: doc?.url,
-        }
-      })
-  }, [myGroupProposalsQuery.data])
+    const milestoneSubmissions = latestLinkedProposal ? getMilestoneSubmissions(latestLinkedProposal) : []
+
+    return [...proposalSubmissions, ...milestoneSubmissions].sort((a, b) => {
+      const aTime = Date.parse(String(a.uploadedAt ?? ""))
+      const bTime = Date.parse(String(b.uploadedAt ?? ""))
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+  }, [latestLinkedProposal, myGroupProposalsQuery.data])
+  const milestoneStatusItems = useMemo(() => getMilestoneStatusItems(latestLinkedProposal), [latestLinkedProposal])
   const templatesQuery = useDocumentTemplatesList(departmentId, {
     page: 1,
     limit: 10,
@@ -223,6 +405,16 @@ export function StudentSubmissionsPage() {
     }),
     [submissions]
   )
+
+  useEffect(() => {
+    const focusId = searchParams.get("focus")?.trim()
+    if (!focusId) return
+
+    const target = submissions.find((submission) => submission.id === focusId)
+    if (!target) return
+
+    setSelectedDoc((current) => (current?.id === target.id ? current : target))
+  }, [searchParams, submissions])
 
   return (
     <div className="space-y-6">
@@ -279,6 +471,39 @@ export function StudentSubmissionsPage() {
         </Card>
       </div>
 
+      {milestoneStatusItems.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Milestone Sequence</CardTitle>
+            <CardDescription>
+              Track each milestone status even when no submission has been uploaded yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {milestoneStatusItems.map((milestone) => (
+              <div
+                key={milestone.id}
+                className="rounded-lg border bg-muted/20 p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{milestone.title}</p>
+                    {statusBadge(milestone.status)}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Due {formatDate(milestone.dueDate ?? null)}
+                    {milestone.submittedAt ? ` • Last submitted ${formatDate(milestone.submittedAt)}` : " • No submission yet"}
+                  </p>
+                </div>
+                <Badge variant="outline">
+                  {milestone.submissionCount} submission{milestone.submissionCount === 1 ? "" : "s"}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Tabs defaultValue="documents" className="space-y-4">
         <TabsList className="grid w-full max-w-[420px] grid-cols-2">
           <TabsTrigger value="documents">My Documents</TabsTrigger>
@@ -321,34 +546,42 @@ export function StudentSubmissionsPage() {
             <CardContent className="space-y-3">
               {filtered.map((doc) => {
                 const unresolved = doc.comments.filter((c) => !c.resolved).length
+                const latestComment = doc.comments[0]
                 return (
                   <div
                     key={doc.id}
-                    className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                    className="rounded-lg border bg-muted/30 p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4"
                   >
-                    <div className="flex items-start gap-3 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <FileText className="h-5 w-5" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium truncate">{doc.name}</p>
+                          <p className="font-medium break-words">{doc.name}</p>
+                          <Badge variant="outline">{doc.source === "proposal" ? "Proposal" : "Milestone"}</Badge>
                           {statusBadge(doc.status)}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {doc.size} • {doc.milestone} • {new Date(doc.uploadedAt).toLocaleDateString()}
                         </p>
+                        {latestComment ? (
+                          <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                            Latest feedback: {latestComment.text}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)}>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full xl:w-auto xl:justify-end">
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedDoc(doc)}>
                         <MessageCircle className="h-4 w-4 mr-1" />
                         Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
                       </Button>
                       <Button
                         variant="outline"
                         size="icon"
+                        className="w-full sm:w-9"
                         onClick={() => {
                           if (doc.url) {
                             const anchor = document.createElement("a")
@@ -503,7 +736,15 @@ export function StudentSubmissionsPage() {
       </Tabs>
 
       <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
-        <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <DialogContent className="max-w-[calc(100vw-1.25rem)] sm:max-w-[500px] p-0 overflow-hidden gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {selectedDoc ? `Feedback for ${selectedDoc.name}` : "Submission feedback"}
+            </DialogTitle>
+            <DialogDescription>
+              Review advisor feedback and metadata for the selected student submission.
+            </DialogDescription>
+          </DialogHeader>
 
           {/* ── Gradient header ─────────────────────────────────── */}
           <div className="relative h-16 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">
@@ -516,24 +757,63 @@ export function StudentSubmissionsPage() {
           </div>
 
           {/* ── Identity row ─────────────────────────────────────── */}
-          <div className="pt-7 px-4 pb-2 flex items-start justify-between gap-3">
+          <div className="pt-7 px-3.5 pb-2 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-bold truncate" title={selectedDoc?.name}>
+              <p className="text-sm font-bold break-words" title={selectedDoc?.name}>
                 {selectedDoc?.name}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 {selectedDoc?.milestone} · {selectedDoc && new Date(selectedDoc.uploadedAt).toLocaleDateString()}
               </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge variant="outline">{selectedDoc?.source === "proposal" ? "Proposal" : "Milestone"}</Badge>
+                {selectedDoc?.submittedBy ? <Badge variant="secondary">By {selectedDoc.submittedBy}</Badge> : null}
+              </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
               {selectedDoc && statusBadge(selectedDoc.status)}
             </div>
           </div>
 
-          <div className="mx-4 border-t" />
+          <div className="mx-3.5 border-t" />
+
+          <div className="px-3.5 pt-3 pb-2">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/20 px-2.5 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Submitted</p>
+                <p className="mt-1 text-xs text-foreground">{selectedDoc ? formatDate(selectedDoc.uploadedAt) : "-"}</p>
+                {selectedDoc?.size ? <p className="mt-1 text-[11px] text-muted-foreground">{selectedDoc.size}</p> : null}
+              </div>
+              <div className="rounded-lg border bg-muted/20 px-2.5 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Reviewed By</p>
+                <p className="mt-1 text-xs text-foreground">{selectedDoc?.reviewedBy || "Not reviewed yet"}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {selectedDoc?.reviewedAt ? `Updated ${formatDate(selectedDoc.reviewedAt)}` : "Awaiting review update"}
+                </p>
+              </div>
+            </div>
+            {selectedDoc?.details ? (
+              <div className="mt-2 rounded-lg border bg-muted/20 px-2.5 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Details</p>
+                <p className="mt-1 text-xs text-foreground">{selectedDoc.details}</p>
+              </div>
+            ) : null}
+            {selectedDoc?.url ? (
+              <div className="mt-2 flex justify-end">
+                <Button asChild variant="outline" size="sm">
+                  <a href={selectedDoc.url} download>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Submission
+                  </a>
+                </Button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mx-3.5 border-t" />
 
           {/* ── Comments ─────────────────────────────────────────── */}
-          <div className="px-4 pt-3 pb-1">
+          <div className="px-3.5 pt-3 pb-1">
             <div className="flex items-center gap-1.5 mb-2">
               <MessageCircle className="h-3 w-3 text-primary" />
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -546,7 +826,7 @@ export function StudentSubmissionsPage() {
               )}
             </div>
 
-            <ScrollArea className="h-[180px] pr-1">
+            <ScrollArea className="h-[170px] pr-1">
               <div className="space-y-2">
                 {!selectedDoc || selectedDoc.comments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -559,28 +839,46 @@ export function StudentSubmissionsPage() {
                   selectedDoc.comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="rounded-lg border bg-muted/20 px-3 py-2.5"
+                      className="rounded-lg border bg-muted/20 px-2.5 py-2"
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                             <span className="text-[9px] font-bold text-primary">
-                              {comment.author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                              {initialLetters(comment.author)}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold truncate">{comment.author}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold truncate">{comment.author}</p>
+                            {comment.authorRole ? (
+                              <p className="text-[10px] text-muted-foreground truncate">{comment.authorRole}</p>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] text-muted-foreground">{comment.date}</span>
-                          <Badge
-                            variant={comment.resolved ? "secondary" : "outline"}
-                            className={`text-[10px] h-4 ${comment.resolved ? "" : "border-amber-200 text-amber-700 bg-amber-500/10"}`}
-                          >
-                            {comment.resolved ? "Resolved" : "Pending"}
-                          </Badge>
-                        </div>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{comment.date}</span>
                       </div>
                       <p className="text-xs text-foreground leading-relaxed">{comment.text}</p>
+                      {comment.attachmentUrl && comment.attachmentName ? (
+                        <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <Button asChild variant="outline" size="sm" className="h-7 text-[11px]">
+                              <a href={comment.attachmentUrl} target="_blank" rel="noreferrer">
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                Attachment
+                              </a>
+                            </Button>
+                            <Button asChild variant="outline" size="icon" className="h-7 w-7">
+                              <a href={comment.attachmentUrl} download>
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground break-all">
+                            {comment.attachmentName}
+                            {comment.attachmentSize && comment.attachmentSize !== "-" ? ` • ${comment.attachmentSize}` : ""}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ))
                 )}
@@ -588,39 +886,17 @@ export function StudentSubmissionsPage() {
             </ScrollArea>
           </div>
 
-          <div className="mx-4 border-t" />
+          <div className="mx-3.5 border-t" />
 
-          {/* ── Reply ────────────────────────────────────────────── */}
-          <div className="px-4 pt-3 pb-4 space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your Reply</p>
-            <Textarea
-              placeholder="Write a reply to your advisor…"
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              rows={2}
-              className="resize-none text-sm"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setSelectedDoc(null)}
-              >
-                Close
-              </Button>
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1.5"
-                onClick={() => {
-                  if (!reply.trim()) return
-                  toast.success("Reply sent to advisor")
-                  setReply("")
-                }}
-              >
-                <MessageCircle className="h-3.5 w-3.5" /> Send Reply
-              </Button>
-            </div>
+          <div className="px-3.5 pt-3 pb-3.5 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setSelectedDoc(null)}
+            >
+              Close
+            </Button>
           </div>
 
         </DialogContent>
