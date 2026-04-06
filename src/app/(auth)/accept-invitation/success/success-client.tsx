@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AuthCampusBackdrop } from "@/components/auth/auth-campus-backdrop"
 import { InvitationOnboardingShell } from "@/components/auth/invitation-onboarding-shell"
 import { cn } from "@/lib/utils"
 import { clearInviteAcceptResult, readInviteAcceptResult } from "@/lib/auth/invite-onboarding-storage"
@@ -53,24 +54,31 @@ export default function AcceptInvitationSuccessClient() {
 
   if (!stored) {
     return (
-      <InvitationOnboardingShell
-        currentStep="accept"
-        title="No password found"
-        description="This page needs the result from accepting your invitation. Please open the invitation link from your email again."
-      >
-        <Button asChild className="w-full" variant="outline">
-          <Link href="/login">Go to login</Link>
-        </Button>
-      </InvitationOnboardingShell>
+      <AuthCampusBackdrop>
+        <InvitationOnboardingShell
+          centerVertically={false}
+          withGlassStyle
+          currentStep="accept"
+          title="No password found"
+          description="This page needs the result from accepting your invitation. Please open the invitation link from your email again."
+        >
+          <Button asChild className="w-full font-black uppercase tracking-widest" variant="outline">
+            <Link href="/login">Go to login</Link>
+          </Button>
+        </InvitationOnboardingShell>
+      </AuthCampusBackdrop>
     )
   }
 
   return (
-    <InvitationOnboardingShell
-      currentStep="accept"
-      title="Copy your temporary password"
-      description="You will only see this password once. Copy it now, then continue to login."
-    >
+    <AuthCampusBackdrop>
+      <InvitationOnboardingShell
+        centerVertically={false}
+        withGlassStyle
+        currentStep="accept"
+        title="Copy your temporary password"
+        description="You will only see this password once. Copy it now, then continue to login."
+      >
       <div className="space-y-4">
         <div className="rounded-md border p-4">
           <div className="flex items-center justify-between gap-2">
@@ -107,5 +115,6 @@ export default function AcceptInvitationSuccessClient() {
         </div>
       </div>
     </InvitationOnboardingShell>
+    </AuthCampusBackdrop>
   )
 }

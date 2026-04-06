@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
+import { listPendingGroupLeaderRequests, approveGroupLeaderRequest, rejectGroupLeaderRequest } from "@/lib/api/group-leader-requests"
+import type { GroupLeaderRequestsSummary } from "@/types/group-leader-requests"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -294,8 +296,39 @@ export default function GroupApprovalPage() {
   const [tab, setTab]           = useState("pending")
   const [selected, setSelected] = useState<GroupAppItem | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   
-  const [data, setData] = useState(MOCK_GROUPS)
+  const [data, setData] = useState<GroupAppItem[]>(MOCK_GROUPS)
+  const [summary, setSummary] = useState<GroupLeaderRequestsSummary | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await listPendingGroupLeaderRequests({ limit: 50 })
+        if (res.summary) setSummary(res.summary)
+        if (res.items && res.items.length > 0) {
+          setData(res.items.map(req => ({
+            id: req.id,
+            groupName: `${req.student.firstName} ${req.student.lastName}'s Group`,
+            domain: "Leadership",
+            requestedAt: req.createdAt,
+            status: req.status.toLowerCase() as AppStatus,
+            members: [{ id: req.student.id, name: `${req.student.firstName} ${req.student.lastName}`, email: req.student.email, role: "leader" }],
+            projectIdea: req.message || "No project details provided.",
+            motivation: req.message || "No motivation provided.",
+            advisorPreference: "Not stated"
+          })))
+        } else if (res.items && res.items.length === 0) {
+          setData([])
+        }
+      } catch (err) {
+        toast.error("Failed to load requests from backend")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -307,16 +340,33 @@ export default function GroupApprovalPage() {
   }, [data, tab, search])
 
   const counts = {
-    all: data.length,
-    pending: data.filter(g => g.status === "pending").length,
-    approved: data.filter(g => g.status === "approved").length,
-    rejected: data.filter(g => g.status === "rejected").length,
+    all: summary ? summary.total : data.length,
+    pending: summary ? summary.pending : data.filter(g => g.status === "pending").length,
+    approved: summary ? summary.approved : data.filter(g => g.status === "approved").length,
+    rejected: summary ? summary.rejected : data.filter(g => g.status === "rejected").length,
   }
 
   const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
-    await new Promise(r => setTimeout(r, 800))
-    setData(prev => prev.map(g => g.id === id ? { ...g, status: decision } : g))
-    toast.success(`Group ${decision === "approved" ? "Approved" : "Rejected"} successfully`)
+    try {
+      if (decision === "approved") {
+        await approveGroupLeaderRequest(id)
+      } else {
+        await rejectGroupLeaderRequest(id, reason || "Rejected")
+      }
+      setData(prev => prev.map(g => g.id === id ? { ...g, status: decision } : g))
+      setSummary(prev => {
+        if (!prev) return prev
+        const decisionKey = decision as "approved" | "rejected"
+        return {
+          ...prev,
+          pending: Math.max(0, prev.pending - 1),
+          [decisionKey]: prev[decisionKey] + 1
+        }
+      })
+      toast.success(`Request ${decision === "approved" ? "Approved" : "Rejected"} successfully`)
+    } catch(err) {
+      toast.error("Failed to record decision")
+    }
   }
 
   return (

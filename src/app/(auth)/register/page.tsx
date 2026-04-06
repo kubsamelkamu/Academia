@@ -6,11 +6,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Loader2,
@@ -31,41 +30,19 @@ import { DEPARTMENT_NAME_OPTIONS, registerInstitutionSchema, RegisterInstitution
 import {
   AuthCampusBackdrop,
   AUTH_ACCENT_ICON,
-  AUTH_CTA_CARD_CLASS,
   AUTH_FORM_INPUT_CLASS,
-  AUTH_GLASS_FORM,
-  AUTH_GLASS_PANEL,
   AUTH_WELCOME_HEADLINE_CLASS,
   AUTH_PRIMARY_BUTTON_CLASS,
   SIGN_IN_LOGO_SURFACE,
-  SIGN_IN_MAGIC_AURA,
-  SIGN_IN_MAGIC_CARD_SHELL,
-  SIGN_IN_MAGIC_HOVER,
-  SIGN_IN_MAGIC_SHINE,
 } from '@/components/auth/auth-campus-backdrop';
 import { cn } from '@/lib/utils';
-
-const containerVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const formCardVariants = {
-  hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
+import {
+  AuthTiltCard,
+  AUTH_CONTAINER_VARIANTS,
+  AUTH_ITEM_VARIANTS,
+  AUTH_SLIDE_LEFT_VARIANTS,
+  AUTH_SLIDE_RIGHT_VARIANTS,
+} from '@/components/auth/auth-tilt-card';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -96,7 +73,7 @@ export default function RegisterPage() {
         ...data,
         universityName: DEFAULT_UNIVERSITY_NAME,
       });
-      setSuccessMessage(`Registration submitted! Check ${data.email} for the verification code.`);
+      setSuccessMessage(`Registration submitted! Check ${data.email} for verify code.`);
       setTimeout(() => {
         router.push('/register/verify');
       }, 2000);
@@ -118,28 +95,29 @@ export default function RegisterPage() {
 
   const stepChipClass = (active: boolean) =>
     cn(
-      'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm',
+      'rounded-full px-4 py-1.5 text-xs font-black transition-all duration-300 uppercase tracking-widest',
       active
-        ? 'bg-sky-600 text-white shadow-md shadow-sky-950/20 dark:bg-sky-500'
-        : 'bg-white/45 text-slate-600 ring-1 ring-white/50 backdrop-blur-sm dark:bg-slate-950/40 dark:text-slate-200'
+        ? 'bg-[#ED5F45] text-white shadow-lg shadow-[#ED5F45]/30'
+        : 'bg-[#ED5F45]/10 text-[#ED5F45]/60 border border-[#ED5F45]/20 backdrop-blur-sm'
     );
 
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-5xl"
-        variants={containerVariants}
+        className="mx-auto w-full max-w-6xl"
+        variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        <motion.div className="mb-8 text-center sm:mb-10" variants={itemVariants}>
+        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
           <motion.div
             className={cn(
-              'relative mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full sm:h-24 sm:w-24',
+              'relative mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl sm:h-24 sm:w-24',
               SIGN_IN_LOGO_SURFACE
             )}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.06, rotate: -3 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
             {logoOk ? (
               <Image
@@ -153,330 +131,284 @@ export default function RegisterPage() {
               />
             ) : (
               <Building2
-                className="h-10 w-10 text-emerald-600 drop-shadow-sm sm:h-11 sm:w-11 dark:text-emerald-400"
+                className="h-10 w-10 text-[#ED5F45] sm:h-11 sm:w-11"
                 aria-hidden
               />
             )}
           </motion.div>
-          <h1 className={cn('mb-2 text-3xl sm:text-4xl md:text-5xl', AUTH_WELCOME_HEADLINE_CLASS)}>
+          <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
             Join Academia
           </h1>
-          <p className="mx-auto max-w-xl text-pretty text-base text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] sm:text-lg md:text-xl md:leading-relaxed">
-            Transform your institution with our academic management platform
+          <p className="mx-auto max-w-lg text-pretty text-base text-white/90 drop-shadow-sm sm:text-lg font-medium">
+            Transform your institution with the next generation of academic management.
           </p>
         </motion.div>
 
-        <div className="grid items-stretch gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
-          <motion.div className="order-2 space-y-5 sm:space-y-6 lg:order-1" variants={itemVariants}>
-            <motion.div
-              className="group relative overflow-hidden rounded-2xl border border-[#E84813]/20 bg-slate-900/40 p-5 shadow-xl backdrop-blur-xl sm:p-6 dark:border-[#E84813]/20 dark:bg-slate-900/60"
-            >
-              <div className="absolute inset-x-0 top-0 h-0.5 bg-[#E84813] opacity-90" />
-              <div className="relative z-[1]">
-                <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-white sm:text-lg">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E84813]/20 border border-[#E84813]/30">
-                    <CheckCircle2 className="h-4 w-4 text-[#E84813]" />
-                  </span>
-                  Why choose Academia?
-                </h3>
-                <ul className="space-y-2.5">
-                  {[
-                    'Streamlined project management',
-                    'Automated defense scheduling',
-                    'Real-time progress tracking',
-                    'Multi-role dashboard access',
-                    'Secure multi-tenant architecture',
-                  ].map((benefit, index) => (
-                    <motion.li
-                      key={benefit}
-                      className="flex items-start gap-3 text-sm text-slate-100 sm:text-[0.9375rem]"
-                      initial={{ opacity: 0, x: -14 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.15 + index * 0.08 }}
-                    >
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E84813]/20 border border-[#E84813]/30">
-                        <CheckCircle2 className="h-3 w-3 text-[#E84813]" />
-                      </span>
-                      {benefit}
-                    </motion.li>
-                  ))}
-                </ul>
+        <div className="grid items-stretch gap-8 lg:grid-cols-[1.1fr_1fr]">
+          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
+            <AuthTiltCard>
+              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
+                <div className="relative z-[1]">
+                  <h3 className="mb-6 flex items-center gap-3 text-lg font-black text-white sm:text-xl uppercase tracking-tight">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ED5F45]/20 border border-[#ED5F45]/30">
+                      <CheckCircle2 className="h-5 w-5 text-[#ED5F45]" />
+                    </span>
+                    Institutional Benefits
+                  </h3>
+                  <ul className="space-y-4">
+                    {[
+                      'Streamlined project lifecycle management',
+                      'Integrated automated defense scheduling',
+                      'Unified institutional progress tracking',
+                      'Permission-based multi-role dashboards',
+                      'Secure multitenant cloud architecture',
+                    ].map((benefit, index) => (
+                      <motion.li
+                        key={benefit}
+                        className="flex items-start gap-4 text-sm text-slate-100 sm:text-base font-medium"
+                        initial={{ opacity: 0, x: -14 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.18 + index * 0.07 }}
+                      >
+                        <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ED5F45]/20 border border-[#ED5F45]/30">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-[#ED5F45]" />
+                        </span>
+                        {benefit}
+                      </motion.li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </motion.div>
+            </AuthTiltCard>
 
-            <motion.div
-              className={cn(SIGN_IN_MAGIC_CARD_SHELL, AUTH_CTA_CARD_CLASS)}
-              whileHover={SIGN_IN_MAGIC_HOVER}
-            >
-              <div className={SIGN_IN_MAGIC_AURA} aria-hidden />
-              <div className="relative z-[1]">
-                <GraduationCap className="mb-3 h-7 w-7 sm:h-8 sm:w-8" />
-                <h3 className="mb-2 text-base font-semibold sm:text-lg">Ready to get started?</h3>
-                <p className="text-sm leading-relaxed text-white/90 sm:text-base">
-                  Join institutions already using Academia to manage academic projects efficiently.
-                </p>
-              </div>
-              <div className={SIGN_IN_MAGIC_SHINE} aria-hidden />
-            </motion.div>
-          </motion.div>
-
-          <motion.div 
-            className="order-1 lg:order-2" 
-            variants={formCardVariants}
-            whileHover={{ y: -6 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          >
-            <div className="relative overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_60px_-15px_rgba(16,185,129,0.25)] backdrop-blur-2xl dark:border-emerald-500/20 dark:bg-slate-900/95">
-              <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
-              <div className="px-6 pb-7 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
-                <div className="mb-6 text-center">
-                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
-                    <span className={stepChipClass(step === 1)}>1 · Department</span>
-                    <ArrowRight className="hidden h-4 w-4 text-slate-400 sm:block" aria-hidden />
-                    <span className={stepChipClass(step === 2)}>2 · Account</span>
+            <AuthTiltCard>
+               <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
+                <div className="relative z-[1]">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#ED5F45]/30 ring-4 ring-[#ED5F45]/10">
+                    <GraduationCap className="h-6 w-6 text-[#ED5F45]" />
                   </div>
-                  <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
-                    <GraduationCap className="h-5 w-5 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-900 sm:text-2xl dark:text-slate-100">
-                    Register your department
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {step === 1
-                      ? 'Choose your department and code (Haramaya University).'
-                      : 'Create the department head account.'}
+                  <h3 className="mb-2 text-lg font-black sm:text-xl uppercase tracking-tight">Department-Led Success</h3>
+                  <p className="text-sm leading-relaxed text-white/80 sm:text-base font-medium">
+                    Empower your department heads with tools designed to optimize academic outcomes and institutional efficiency.
                   </p>
                 </div>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
+              </div>
+            </AuthTiltCard>
+          </motion.div>
+
+          <motion.div
+            className="order-1 lg:order-2"
+            variants={AUTH_SLIDE_RIGHT_VARIANTS}
+          >
+            <AuthTiltCard>
+              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white dark:bg-slate-900 shadow-2xl backdrop-blur-2xl">
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
+                
+                <div className="px-6 pb-10 pt-8 sm:px-10">
+                  <div className="mb-8 text-center">
+                    <div className="flex flex-wrap items-center justify-center gap-3 mb-5">
+                      <span className={stepChipClass(step === 1)}>1 · DEPT</span>
+                      <ArrowRight className="h-4 w-4 text-slate-300" aria-hidden />
+                      <span className={stepChipClass(step === 2)}>2 · ACCOUNT</span>
+                    </div>
+                    
+                    <h2 className="text-2xl font-black text-slate-900 sm:text-3xl dark:text-slate-100 uppercase tracking-tight">
+                      {step === 1 ? 'Register Setup' : 'Admin Details'}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 font-medium text-pretty leading-snug">
+                      {step === 1
+                        ? 'Initialize your department at Haramaya University.'
+                        : 'Configure the administrator account for this department.'}
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                     <input type="hidden" {...register('universityName')} />
 
-                    {step === 1 ? (
-                      <motion.div
-                        key="step1"
-                        className="space-y-4"
-                        initial={{ opacity: 0, x: 12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.25 }}
-                      >
-                        <div className="flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-600/50">
-                          <GraduationCap className={cn('h-4 w-4 shrink-0', AUTH_ACCENT_ICON)} />
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-100">Department details</h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <AnimatePresence mode="wait">
+                      {step === 1 ? (
+                        <motion.div
+                          key="step1"
+                          className="space-y-5"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        >
                           <div className="space-y-2">
-                            <Label htmlFor="departmentName">Department name</Label>
+                            <Label htmlFor="departmentName" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                              <GraduationCap className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                              Department Name
+                            </Label>
                             <select
                               id="departmentName"
                               {...register('departmentName')}
-                              defaultValue=""
                               className={cn(
                                 AUTH_FORM_INPUT_CLASS,
-                                'h-9 w-full rounded-md px-3 py-1 text-base md:text-sm'
+                                'h-12 w-full rounded-xl border-2 px-4 text-sm font-bold'
                               )}
-                              aria-invalid={errors.departmentName ? 'true' : 'false'}
                             >
-                              <option value="" disabled>
-                                Select a department
-                              </option>
+                              <option value="" disabled>Select Department</option>
                               {DEPARTMENT_NAME_OPTIONS.map((name) => (
-                                <option key={name} value={name}>
-                                  {name}
-                                </option>
+                                <option key={name} value={name}>{name}</option>
                               ))}
                             </select>
-                            {errors.departmentName ? (
-                              <p className="text-sm text-destructive">{errors.departmentName.message}</p>
-                            ) : null}
+                            {errors.departmentName && <p className="text-[11px] font-bold text-destructive px-1">{errors.departmentName.message}</p>}
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="departmentCode">Department code</Label>
+                            <Label htmlFor="departmentCode" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                              <Building2 className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                              Dept Code
+                            </Label>
                             <Input
                               id="departmentCode"
                               {...register('departmentCode')}
-                              placeholder="CS"
-                              className={AUTH_FORM_INPUT_CLASS}
+                              placeholder="e.g. CS, SWE, IS"
+                              className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                             />
-                            {errors.departmentCode ? (
-                              <p className="text-sm text-destructive">{errors.departmentCode.message}</p>
-                            ) : null}
+                            {errors.departmentCode && <p className="text-[11px] font-bold text-destructive px-1">{errors.departmentCode.message}</p>}
                           </div>
-                        </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="departmentDescription">Department description (optional)</Label>
-                          <Input
-                            id="departmentDescription"
-                            {...register('departmentDescription')}
-                            placeholder="Brief description of the department"
-                            className={AUTH_FORM_INPUT_CLASS}
-                          />
-                          {errors.departmentDescription ? (
-                            <p className="text-sm text-destructive">{errors.departmentDescription.message}</p>
-                          ) : null}
-                        </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="departmentDescription" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                              <Info className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                              Brief Info
+                            </Label>
+                            <Input
+                              id="departmentDescription"
+                              {...register('departmentDescription')}
+                              placeholder="Optional department description"
+                              className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
+                            />
+                          </div>
 
-                        <Button
-                          type="button"
-                          className={AUTH_PRIMARY_BUTTON_CLASS}
-                          onClick={() => void goToStep2()}
+                          <Button
+                            type="button"
+                            className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest")}
+                            onClick={() => void goToStep2()}
+                          >
+                            <span className="flex items-center justify-center gap-3">
+                              NEXT STEP
+                              <ArrowRight className="h-5 w-5" />
+                            </span>
+                          </Button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="step2"
+                          className="space-y-5"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                         >
-                          <span className="flex items-center justify-center gap-2">
-                            Continue
-                            <ArrowRight className="h-4 w-4" />
-                          </span>
-                        </Button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="step2"
-                        className="space-y-4"
-                        initial={{ opacity: 0, x: 12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.25 }}
-                      >
-                        <div className="flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-slate-600/50">
-                          <User className={cn('h-4 w-4 shrink-0', AUTH_ACCENT_ICON)} />
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-100">Department head</h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="firstName">First name</Label>
-                            <Input
-                              id="firstName"
-                              {...register('firstName')}
-                              placeholder="John"
-                              className={AUTH_FORM_INPUT_CLASS}
-                            />
-                            {errors.firstName ? (
-                              <p className="text-sm text-destructive">{errors.firstName.message}</p>
-                            ) : null}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="firstName" className="text-[10px] font-black text-slate-500 uppercase tracking-widest">First Name</Label>
+                              <Input id="firstName" {...register('firstName')} placeholder="John" className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              {errors.firstName && <p className="text-[11px] font-bold text-destructive px-1">{errors.firstName.message}</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="lastName" className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Last Name</Label>
+                              <Input id="lastName" {...register('lastName')} placeholder="Doe" className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              {errors.lastName && <p className="text-[11px] font-bold text-destructive px-1">{errors.lastName.message}</p>}
+                            </div>
                           </div>
+
                           <div className="space-y-2">
-                            <Label htmlFor="lastName">Last name</Label>
-                            <Input
-                              id="lastName"
-                              {...register('lastName')}
-                              placeholder="Doe"
-                              className={AUTH_FORM_INPUT_CLASS}
-                            />
-                            {errors.lastName ? (
-                              <p className="text-sm text-destructive">{errors.lastName.message}</p>
-                            ) : null}
+                            <Label htmlFor="email" className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              <Mail className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                              Work Email
+                            </Label>
+                            <Input id="email" type="email" {...register('email')} placeholder="admin@haramaya.edu" className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                            {errors.email && <p className="text-[11px] font-bold text-destructive px-1">{errors.email.message}</p>}
                           </div>
-                        </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="email" className="flex items-center gap-2">
-                            <Mail className={cn('h-4 w-4 shrink-0', AUTH_ACCENT_ICON)} />
-                            Email
-                          </Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            {...register('email')}
-                            placeholder="john.doe@university.edu"
-                            className={AUTH_FORM_INPUT_CLASS}
-                          />
-                          {errors.email ? (
-                            <p className="text-sm text-destructive">{errors.email.message}</p>
-                          ) : null}
-                        </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="password" className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              <Lock className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                              Password
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="password"
+                                type={isPasswordVisible ? 'text' : 'password'}
+                                {...register('password')}
+                                placeholder="••••••••"
+                                className={cn('pr-12 h-12 rounded-xl border-2', AUTH_FORM_INPUT_CLASS)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setIsPasswordVisible((p) => !p)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                              >
+                                {isPasswordVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </div>
+                            <p className="flex items-center gap-1.5 px-1 text-[10px] font-black text-[#ED5F45] uppercase tracking-widest">
+                              <Info className="h-3 w-3 shrink-0" />
+                              Mixed case + digit
+                            </p>
+                            {errors.password && <p className="text-[11px] font-bold text-destructive px-1">{errors.password.message}</p>}
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="password" className="flex items-center gap-2">
-                            <Lock className={cn('h-4 w-4 shrink-0', AUTH_ACCENT_ICON)} />
-                            Password
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="password"
-                              type={isPasswordVisible ? 'text' : 'password'}
-                              {...register('password')}
-                              placeholder="••••••••"
-                              className={cn('pr-10', AUTH_FORM_INPUT_CLASS)}
-                            />
+                          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setIsPasswordVisible((p) => !p)}
-                              aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
-                              className="absolute right-1 top-1/2 -translate-y-1/2"
+                              className="h-14 rounded-xl border-2 border-slate-200 font-black text-slate-500 uppercase tracking-widest sm:flex-1"
+                              onClick={() => { clearError(); setStep(1); }}
                             >
-                              {isPasswordVisible ? <EyeOff /> : <Eye />}
+                              BACK
+                            </Button>
+                            <Button
+                              type="submit"
+                              className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest sm:flex-[2]")}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <span className="flex items-center gap-3">
+                                  <Loader2 className="h-5 w-5 animate-spin" />
+                                  LAUNCHING...
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center gap-3">
+                                  FINISH
+                                  <ArrowRight className="h-5 w-5" />
+                                </span>
+                              )}
                             </Button>
                           </div>
-                          <p className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                            <Info className="h-3 w-3 shrink-0" />
-                            Uppercase, lowercase, and a number required
-                          </p>
-                          {errors.password ? (
-                            <p className="text-sm text-destructive">{errors.password.message}</p>
-                          ) : null}
-                        </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full border-white/50 bg-white/30 backdrop-blur-sm sm:w-auto sm:min-w-[7rem]"
-                            onClick={() => {
-                              clearError();
-                              setStep(1);
-                            }}
-                          >
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                          </Button>
-                          <Button
-                            type="submit"
-                            className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'sm:flex-1')}
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <span className="flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Creating department…
-                              </span>
-                            ) : (
-                              <span className="flex items-center justify-center gap-2">
-                                Register department
-                                <ArrowRight className="h-4 w-4" />
-                              </span>
-                            )}
-                          </Button>
-                        </div>
-                      </motion.div>
+                    {error && (
+                      <Alert variant="destructive" className="rounded-xl border-[#ED5F45]/20 bg-[#ED5F45]/5 text-[#ED5F45] py-2 px-3">
+                        <AlertDescription className="text-xs font-bold">{error}</AlertDescription>
+                      </Alert>
                     )}
 
-                    {error ? (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
+                    {successMessage && (
+                      <Alert className="rounded-xl border-emerald-500/20 bg-emerald-500/10 text-emerald-600 py-2 px-3">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertDescription className="text-xs font-bold">{successMessage}</AlertDescription>
                       </Alert>
-                    ) : null}
-
-                    {successMessage ? (
-                      <Alert>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        <AlertDescription>{successMessage}</AlertDescription>
-                      </Alert>
-                    ) : null}
+                    )}
                   </form>
 
-                  <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-300">
-                    Already have an account?{' '}
-                    <Link
-                      href="/login"
-                      className="font-medium text-emerald-600 underline-offset-4 hover:text-emerald-700 hover:underline dark:text-emerald-400 dark:hover:text-emerald-300"
-                    >
+                  <p className="mt-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+                    Already an admin?{' '}
+                    <Link href="/login" className="font-black text-[#ED5F45] hover:underline uppercase text-xs tracking-widest">
                       Sign in
                     </Link>
                   </p>
+                </div>
               </div>
-            </div>
+            </AuthTiltCard>
           </motion.div>
         </div>
       </motion.div>

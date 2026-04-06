@@ -22,12 +22,24 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { InvitationOnboardingStepper } from "@/components/auth/invitation-onboarding-stepper"
 import { InvitationOnboardingShell } from "@/components/auth/invitation-onboarding-shell"
+import {
+  AuthCampusBackdrop,
+  AUTH_ACCENT_ICON,
+  AUTH_FORM_INPUT_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_WELCOME_HEADLINE_CLASS,
+} from "@/components/auth/auth-campus-backdrop"
+import {
+  AuthTiltCard,
+  AUTH_CONTAINER_VARIANTS,
+  AUTH_ITEM_VARIANTS,
+  AUTH_SLIDE_LEFT_VARIANTS,
+  AUTH_SLIDE_RIGHT_VARIANTS,
+} from "@/components/auth/auth-tilt-card"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
@@ -46,23 +58,6 @@ const changePasswordSchema = z
   })
 
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
-
-const containerVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-}
 
 function ChangePasswordPageContent() {
   const router = useRouter()
@@ -160,15 +155,18 @@ function ChangePasswordPageContent() {
 
   if (isInviteFlow) {
     return (
-      <InvitationOnboardingShell
-        currentStep="change"
-        title={user?.mustChangePassword ? "Set a new password" : "Change password"}
-        description={
-          user?.mustChangePassword
-            ? "For security, you must change the temporary password before continuing."
-            : "Choose a new password to keep your account secure."
-        }
-      >
+      <AuthCampusBackdrop>
+        <InvitationOnboardingShell
+          centerVertically={false}
+          withGlassStyle
+          currentStep="change"
+          title={user?.mustChangePassword ? "Set a new password" : "Change password"}
+          description={
+            user?.mustChangePassword
+              ? "For security, you must change the temporary password before continuing."
+              : "Choose a new password to keep your account secure."
+          }
+        >
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <Button asChild variant="ghost" size="sm">
@@ -204,7 +202,7 @@ function ChangePasswordPageContent() {
                   type={showCurrent ? "text" : "password"}
                   {...form.register("currentPassword")}
                   placeholder="Enter your current password"
-                  className="pr-10"
+                  className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
                 <Button
                   type="button"
@@ -229,7 +227,7 @@ function ChangePasswordPageContent() {
                   type={showNew ? "text" : "password"}
                   {...form.register("newPassword")}
                   placeholder="Create a strong password"
-                  className="pr-10"
+                  className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
                 <Button
                   type="button"
@@ -297,7 +295,7 @@ function ChangePasswordPageContent() {
                   type={showConfirm ? "text" : "password"}
                   {...form.register("confirmPassword")}
                   placeholder="Re-enter your new password"
-                  className="pr-10"
+                  className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
                 <Button
                   type="button"
@@ -314,7 +312,11 @@ function ChangePasswordPageContent() {
               ) : null}
             </div>
 
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+            <Button
+              type="submit"
+              className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest")}
+              disabled={form.formState.isSubmitting}
+            >
               {form.formState.isSubmitting
                 ? "Updating password..."
                 : user?.mustChangePassword
@@ -323,152 +325,123 @@ function ChangePasswordPageContent() {
             </Button>
           </form>
         </div>
-      </InvitationOnboardingShell>
+        </InvitationOnboardingShell>
+      </AuthCampusBackdrop>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <AuthCampusBackdrop>
       <motion.div
-        className="w-full max-w-4xl"
-        variants={containerVariants}
+        className="mx-auto w-full max-w-6xl"
+        variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        {/* Hero Section */}
-        <motion.div
-          className="text-center mb-8"
-          variants={itemVariants}
-        >
+        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
           <motion.div
-            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl mb-4"
-            whileHover={{ scale: 1.05, rotate: -5 }}
-            whileTap={{ scale: 0.95 }}
+            className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30 sm:h-24 sm:w-24"
+            whileHover={{ scale: 1.06, rotate: -4 }}
+            whileTap={{ scale: 0.94 }}
           >
-            <Key className="w-8 h-8 text-white" />
+            <Key className="h-10 w-10 text-white sm:h-11 sm:w-11" />
           </motion.div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
-            {user?.mustChangePassword ? "Set New Password" : "Change Password"}
+          <h1 className={cn("mb-3 text-4xl sm:text-5xl md:text-6xl", AUTH_WELCOME_HEADLINE_CLASS)}>
+            Change password
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            {user?.mustChangePassword
-              ? "Your temporary password needs to be updated for security"
-              : "Update your password to keep your account secure"}
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+            Update your password to keep your account secure.
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-8 items-start">
-          {/* Info Section */}
-          <motion.div
-            className="space-y-6"
-            variants={itemVariants}
-          >
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-green-500" />
-                Password Requirements
-              </h3>
-              <ul className="space-y-3">
-                {[
-                  "At least 8 characters long",
-                  "Include uppercase letters (A-Z)",
-                  "Include lowercase letters (a-z)",
-                  "Include numbers (0-9)",
-                  "Special characters for extra security"
-                ].map((req, index) => (
-                  <motion.li
-                    key={index}
-                    className="flex items-center gap-3 text-gray-700"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + index * 0.1 }}
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    {req}
-                  </motion.li>
-                ))}
-              </ul>
-            </div>
-
-            <motion.div
-              className="bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl p-6 text-white"
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <Info className="w-8 h-8 mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Security First</h3>
-              <p className="text-green-100">
-                A strong password is your first line of defense. Make sure it&apos;s unique and not used elsewhere.
-              </p>
-            </motion.div>
+        <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_420px]">
+          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
+            <AuthTiltCard>
+              <div className="relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
+                <h3 className="mb-6 flex items-center gap-3 text-lg font-black uppercase tracking-tight text-white sm:text-xl">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ED5F45]/30 bg-[#ED5F45]/20">
+                    <Shield className="h-5 w-5 text-[#ED5F45]" />
+                  </span>
+                  Requirements
+                </h3>
+                <ul className="space-y-3 text-sm font-medium text-slate-100 sm:text-base">
+                  {[
+                    "At least 8 characters",
+                    "Upper & lowercase letters",
+                    "Numbers and special characters",
+                  ].map((req, i) => (
+                    <motion.li
+                      key={req}
+                      className="flex gap-3"
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.12 + i * 0.06 }}
+                    >
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#ED5F45]" />
+                      {req}
+                    </motion.li>
+                  ))}
+                </ul>
+              </div>
+            </AuthTiltCard>
+            <AuthTiltCard>
+              <div className="relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
+                <Info className="mb-3 h-8 w-8 text-[#ED5F45]" />
+                <h3 className="mb-2 text-lg font-black uppercase tracking-tight">Security first</h3>
+                <p className="text-sm font-medium text-white/85 sm:text-base">
+                  Use a unique password you don&apos;t reuse on other sites.
+                </p>
+              </div>
+            </AuthTiltCard>
           </motion.div>
 
-          {/* Main Card */}
-          <motion.div variants={itemVariants}>
-            <Card className="backdrop-blur-sm bg-white/80 border-white/20 shadow-xl">
-              <CardHeader className="space-y-1 pb-4">
-                {isInviteFlow ? (
-                  <div className="pb-2">
-                    <InvitationOnboardingStepper currentStep="change" />
+          <motion.div className="order-1 lg:order-2" variants={AUTH_SLIDE_RIGHT_VARIANTS}>
+            <AuthTiltCard>
+              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white shadow-2xl backdrop-blur-2xl dark:bg-slate-900">
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
+                <div className="px-6 pb-10 pt-8 sm:px-10">
+                  <div className="mb-8 text-center">
+                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30">
+                      <Lock className="h-6 w-6 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
+                      Update password
+                    </h2>
+                    <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                      Enter your current password and choose a new one.
+                    </p>
                   </div>
-                ) : null}
-                <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-                  <Lock className="w-6 h-6 text-green-500" />
-                  Update Password
-                </CardTitle>
-                <CardDescription className="text-center">
-                  {user?.mustChangePassword
-                    ? "You must change your temporary password before continuing."
-                    : "Enter your current password and choose a new one."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 flex items-center justify-between">
-                  <Button 
-                    asChild 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  >
-                    <Link href={isInviteFlow ? "/login?from=invite" : "/login"} className="flex items-center gap-2">
-                      <ArrowLeft className="w-4 h-4" />
-                      Back to login
-                    </Link>
-                  </Button>
-                  {user?.mustChangePassword ? (
-                    <Badge variant="destructive" className="bg-red-500">
-                      Required
-                    </Badge>
-                  ) : null}
-                </div>
 
-                <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+                  <div className="mb-6 flex items-center justify-between">
+                    <Button asChild variant="ghost" size="sm" className="font-bold text-[#ED5F45]">
+                      <Link href="/login" className="flex items-center gap-2">
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                      </Link>
+                    </Button>
+                  </div>
+
+                  <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
                   {user?.email ? (
-                    <motion.div 
-                      variants={itemVariants}
-                      className="rounded-xl bg-blue-50/50 border border-blue-100 p-4"
-                    >
-                      <p className="text-sm font-medium text-blue-900 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    <motion.div variants={AUTH_ITEM_VARIANTS} className="rounded-xl border border-[#ED5F45]/20 bg-[#ED5F45]/5 p-4">
+                      <p className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                        <CheckCircle2 className="h-4 w-4 text-[#ED5F45]" />
                         Signed in as
                       </p>
-                      <p className="text-sm text-blue-700 mt-1">{user.email}</p>
-                      {user.mustChangePassword ? (
-                        <Alert className="mt-3 bg-yellow-50 border-yellow-200">
-                          <AlertCircle className="h-4 w-4 text-yellow-600" />
-                          <AlertDescription className="text-xs text-yellow-700">
-                            Tip: your “current password” is the temporary password you used to log in.
-                          </AlertDescription>
-                        </Alert>
-                      ) : null}
+                      <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">{user.email}</p>
                     </motion.div>
                   ) : null}
 
                   {/* Current Password */}
-                  <motion.div className="space-y-2" variants={itemVariants}>
-                    <Label htmlFor="currentPassword" className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-gray-500" />
-                      Current Password
+                  <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                    <Label
+                      htmlFor="currentPassword"
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                    >
+                      <Lock className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
+                      Current password
                     </Label>
                     <div className="relative">
                       <Input
@@ -476,7 +449,7 @@ function ChangePasswordPageContent() {
                         type={showCurrent ? "text" : "password"}
                         {...form.register("currentPassword")}
                         placeholder="Enter your current password"
-                        className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-green-500/20"
+                        className={cn("h-12 rounded-xl border-2 pr-12", AUTH_FORM_INPUT_CLASS)}
                       />
                       <Button
                         type="button"
@@ -501,10 +474,13 @@ function ChangePasswordPageContent() {
                   </motion.div>
 
                   {/* New Password */}
-                  <motion.div className="space-y-2" variants={itemVariants}>
-                    <Label htmlFor="newPassword" className="flex items-center gap-2">
-                      <Key className="w-4 h-4 text-gray-500" />
-                      New Password
+                  <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                    <Label
+                      htmlFor="newPassword"
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                    >
+                      <Key className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
+                      New password
                     </Label>
                     <div className="relative">
                       <Input
@@ -512,7 +488,7 @@ function ChangePasswordPageContent() {
                         type={showNew ? "text" : "password"}
                         {...form.register("newPassword")}
                         placeholder="Create a strong password"
-                        className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-green-500/20"
+                        className={cn("h-12 rounded-xl border-2 pr-12", AUTH_FORM_INPUT_CLASS)}
                       />
                       <Button
                         type="button"
@@ -557,13 +533,13 @@ function ChangePasswordPageContent() {
                   </motion.div>
 
                   {/* Password Checklist */}
-                  <motion.div 
-                    variants={itemVariants}
-                    className="rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-3"
+                  <motion.div
+                    variants={AUTH_ITEM_VARIANTS}
+                    className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40"
                   >
-                    <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-green-500" />
-                      Password Strength Checklist
+                    <p className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      <Shield className="h-4 w-4 text-[#ED5F45]" />
+                      Strength checklist
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {[
@@ -581,16 +557,20 @@ function ChangePasswordPageContent() {
                           animate={{ opacity: 1 }}
                           transition={{ delay: index * 0.05 }}
                         >
-                          <div className={cn(
-                            "w-4 h-4 rounded-full flex items-center justify-center",
-                            check.met ? "bg-green-500" : "bg-gray-300"
-                          )}>
-                            {check.met && <CheckCircle2 className="w-3 h-3 text-white" />}
+                          <div
+                            className={cn(
+                              "flex h-4 w-4 items-center justify-center rounded-full",
+                              check.met ? "bg-[#ED5F45]" : "bg-slate-300 dark:bg-slate-600"
+                            )}
+                          >
+                            {check.met ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
                           </div>
-                          <span className={cn(
-                            "text-gray-600",
-                            check.met && "text-gray-900 font-medium"
-                          )}>
+                          <span
+                            className={cn(
+                              "text-slate-600 dark:text-slate-400",
+                              check.met && "font-medium text-slate-900 dark:text-slate-100"
+                            )}
+                          >
                             {check.label}
                           </span>
                         </motion.div>
@@ -599,10 +579,13 @@ function ChangePasswordPageContent() {
                   </motion.div>
 
                   {/* Confirm Password */}
-                  <motion.div className="space-y-2" variants={itemVariants}>
-                    <Label htmlFor="confirmPassword" className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-gray-500" />
-                      Confirm New Password
+                  <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                    <Label
+                      htmlFor="confirmPassword"
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                    >
+                      <CheckCircle2 className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
+                      Confirm password
                     </Label>
                     <div className="relative">
                       <Input
@@ -611,9 +594,10 @@ function ChangePasswordPageContent() {
                         {...form.register("confirmPassword")}
                         placeholder="Re-enter your new password"
                         className={cn(
-                          "pr-10 transition-all duration-200 focus:ring-2 focus:ring-green-500/20",
-                          confirmPassword && newPassword && confirmPassword === newPassword && "border-green-500 ring-1 ring-green-500",
-                          confirmPassword && newPassword && confirmPassword !== newPassword && "border-red-500"
+                          "h-12 rounded-xl border-2 pr-12",
+                          AUTH_FORM_INPUT_CLASS,
+                          confirmPassword && newPassword && confirmPassword === newPassword && "border-emerald-500",
+                          confirmPassword && newPassword && confirmPassword !== newPassword && "border-destructive"
                         )}
                       />
                       <Button
@@ -648,37 +632,23 @@ function ChangePasswordPageContent() {
                     ) : null}
                   </motion.div>
 
-                  {/* Submit Button */}
-                  <motion.div
-                    variants={itemVariants}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
+                  <motion.div variants={AUTH_ITEM_VARIANTS}>
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                      className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest")}
                       disabled={form.formState.isSubmitting}
                     >
-                      {form.formState.isSubmitting ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Updating Password...
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Lock className="w-4 h-4" />
-                          {user?.mustChangePassword ? "Set New Password" : "Change Password"}
-                        </div>
-                      )}
+                      {form.formState.isSubmitting ? "Updating…" : "Update password"}
                     </Button>
                   </motion.div>
                 </form>
-              </CardContent>
-            </Card>
+                </div>
+              </div>
+            </AuthTiltCard>
           </motion.div>
         </div>
       </motion.div>
-    </div>
+    </AuthCampusBackdrop>
   )
 }
 
@@ -686,9 +656,9 @@ export default function ChangePasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
+        <AuthCampusBackdrop>
+          <p className="text-sm font-medium text-white/90 drop-shadow">Loading…</p>
+        </AuthCampusBackdrop>
       }
     >
       <ChangePasswordPageContent />
