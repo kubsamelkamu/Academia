@@ -1,11 +1,13 @@
 "use client"
 
 import React, { useState, useMemo } from "react"
+import { useAuthStore } from "@/store/auth-store"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -55,6 +57,8 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useCoordinatorStudentDirectory } from "@/lib/hooks/use-coordinator-analytics"
+import type { CoordinatorStudentDirectoryItem } from "@/types/student-analytics"
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
 type ProjectStatus = "on_track" | "at_risk" | "completed" | "overdue" | "not_started"
@@ -97,6 +101,21 @@ interface Project {
   activities: Activity[]
   submissionsCount: number
   grade?: number
+}
+
+interface StudentDirectoryCardItem {
+  id: string
+  name: string
+  email: string
+  avatarUrl: string | null
+  avatar: string
+  role: "leader" | "member"
+  userStatus: string
+  lastActive: string
+  techStack: string[]
+  bio: string | null
+  groupName: string
+  groupStatus: string | null
 }
 
 /* ─── Mock Data ─────────────────────────────────────────────────────────── */
@@ -274,6 +293,39 @@ function fmtDate(iso: string) {
 
 function initials(name: string) {
   return name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2)
+}
+
+function formatLastLogin(value?: string | null) {
+  if (!value) return "Never logged in"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Never logged in"
+
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function normalizeRole(value?: string | null): "leader" | "member" {
+  return value?.trim().toUpperCase() === "LEADER" ? "leader" : "member"
+}
+
+function mapDirectoryItemToStudentCard(item: CoordinatorStudentDirectoryItem): StudentDirectoryCardItem {
+  const fullName = [item.student.firstName, item.student.lastName].filter(Boolean).join(" ").trim()
+  const displayName = fullName || item.student.email || "Student"
+
+  return {
+    id: item.student.id,
+    name: displayName,
+    email: item.student.email,
+    avatarUrl: item.student.avatarUrl,
+    avatar: initials(displayName),
+    role: normalizeRole(item.group.role),
+    userStatus: item.student.userStatus,
+    lastActive: formatLastLogin(item.student.lastLoginAt),
+    techStack: item.profile.techStack ?? [],
+    bio: item.profile.bio,
+    groupName: item.group.name || "No group yet",
+    groupStatus: item.group.status,
+  }
 }
 
 /* ─── Activity Item ─────────────────────────────────────────────────── */
@@ -664,18 +716,23 @@ function ProjectDetailSheet({
 }
 
 /* ─── All-Students Card ─────────────────────────────────────────────── */
-function AllStudentCard({ student, project, onChat, onEmail }: {
-  student: Student
-  project: Project
-  onChat: () => void
-  onEmail: () => void
+function AllStudentCard({ student, project }: {
+  student: StudentDirectoryCardItem
+  project: { title: string; groupName: string; status: string | null }
 }) {
-  const sc = STATUS_CFG[project.status]
-  const pct = Math.round((student.tasksDone / student.tasksTotal) * 100)
+  const groupStatus = (project.status ?? "UNKNOWN").trim().toUpperCase()
+  const statusTone =
+    groupStatus === "APPROVED"
+      ? "bg-primary/10 text-primary border-primary/20"
+      : groupStatus === "REJECTED"
+        ? "bg-destructive/10 text-destructive border-destructive/20"
+        : "bg-muted text-muted-foreground border-border"
+
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3 hover:border-primary/30 hover:shadow-sm transition-all">
       <div className="flex items-start gap-3">
         <Avatar className="h-10 w-10 shrink-0">
+          <AvatarImage src={student.avatarUrl ?? undefined} alt={student.name} />
           <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{student.avatar}</AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
@@ -693,39 +750,41 @@ function AllStudentCard({ student, project, onChat, onEmail }: {
             {project.title}
           </p>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" title="Chat" onClick={onChat}>
-            <MessageSquare className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" title="Email" onClick={onEmail}>
-            <Mail className="h-3.5 w-3.5" />
-          </Button>
-        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-1.5 text-center">
         <div className="rounded-lg bg-muted/50 py-1.5">
-          <p className="text-xs font-bold">{pct}%</p>
-          <p className="text-[9px] text-muted-foreground">Tasks</p>
+          <p className="text-xs font-bold">{student.techStack.length}</p>
+          <p className="text-[9px] text-muted-foreground">Skills</p>
         </div>
         <div className="rounded-lg bg-muted/50 py-1.5">
-          <p className="text-xs font-bold">{student.contribution}%</p>
-          <p className="text-[9px] text-muted-foreground">Contrib</p>
+          <p className="text-xs font-bold">{student.userStatus}</p>
+          <p className="text-[9px] text-muted-foreground">Account</p>
         </div>
         <div className="rounded-lg bg-muted/50 py-1.5">
-          <p className={cn("text-xs font-bold", sc.cls.split(" ")[1])}>{sc.label.split(" ")[0]}</p>
-          <p className="text-[9px] text-muted-foreground">Status</p>
+          <p className={cn("text-xs font-bold", groupStatus === "APPROVED" ? "text-primary" : groupStatus === "REJECTED" ? "text-destructive" : "text-foreground")}>{groupStatus === "UNKNOWN" ? "None" : groupStatus}</p>
+          <p className="text-[9px] text-muted-foreground">Group</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Progress value={pct} className="flex-1 h-1.5" />
-        <span className="text-[10px] text-muted-foreground shrink-0">{student.tasksDone}/{student.tasksTotal} tasks</span>
+      <div className="rounded-lg border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
+        {student.bio?.trim() || "Profile not completed"}
       </div>
 
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><Activity className="h-2.5 w-2.5" />Active {student.lastActive}</span>
+        <span className="flex items-center gap-1"><Activity className="h-2.5 w-2.5" />{student.lastActive}</span>
         <span className="flex items-center gap-1"><Users className="h-2.5 w-2.5" />{project.groupName}</span>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(student.techStack.length > 0 ? student.techStack : ["No stack yet"]).slice(0, 3).map((item) => (
+          <Badge key={item} variant="outline" className="text-[10px] h-5 px-1.5">
+            {item}
+          </Badge>
+        ))}
+        <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", statusTone)}>
+          {project.status ?? "No group yet"}
+        </Badge>
       </div>
     </div>
   )
@@ -733,6 +792,8 @@ function AllStudentCard({ student, project, onChat, onEmail }: {
 
 /* ─── Page ──────────────────────────────────────────────────────────── */
 export default function GroupsPage() {
+  const user = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const [search, setSearch]         = useState("")
   const [statusFilter, setStatus]   = useState("all")
   const [domainFilter, setDomain]   = useState("all")
@@ -741,12 +802,30 @@ export default function GroupsPage() {
 
   const [stuView, setStuView]       = useState<"grid" | "table">("grid")
   const [stuSearch, setStuSearch]   = useState("")
+  const [studentUserStatus, setStudentUserStatus] = useState("all")
+  const [studentGroupStatus, setStudentGroupStatus] = useState("all")
 
   /* Chat / email from students tab */
   const [chatOpen2, setChatOpen2]   = useState(false)
   const [chatStu2, setChatStu2]     = useState<{ student: Student; project: Project } | null>(null)
   const [chatMsg2, setChatMsg2]     = useState("")
   const [sending2, setSending2]     = useState(false)
+
+  const [studentPage, setStudentPage] = useState(1)
+  const studentPageSize = 10
+
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+
+  const studentDirectoryQuery = useCoordinatorStudentDirectory({
+    departmentId,
+    search: stuSearch.trim() || undefined,
+    userStatus: studentUserStatus !== "all" ? studentUserStatus : undefined,
+    groupStatus: studentGroupStatus !== "all" ? studentGroupStatus : undefined,
+    hasGroup: true,
+    page: studentPage,
+    limit: studentPageSize,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
 
   const domains = useMemo(() => Array.from(new Set(MOCK_PROJECTS.map(p => p.domain))), [])
 
@@ -758,19 +837,36 @@ export default function GroupsPage() {
     return mS && mSt && mD
   }), [search, statusFilter, domainFilter])
 
-  const allStudents: { student: Student; project: Project }[] = useMemo(
-    () => MOCK_PROJECTS.flatMap(p => p.students.map(s => ({ student: s, project: p }))),
-    []
+  const allStudents = useMemo(
+    () => (studentDirectoryQuery.data?.items ?? []).map((item) => ({
+      student: mapDirectoryItemToStudentCard(item),
+      project: {
+        title: item.group.name || "No group yet",
+        groupName: item.group.name || "No group yet",
+        status: item.group.status,
+      },
+    })),
+    [studentDirectoryQuery.data?.items]
   )
 
+  const studentSummary = studentDirectoryQuery.data?.summary
+  const studentPagination = studentDirectoryQuery.data?.pagination
+
   const kpi = [
-    { label: "Total Groups",  value: MOCK_PROJECTS.length,                                          icon: BookOpen,      bg: "bg-primary/10",        color: "text-primary" },
-    { label: "On Track",      value: MOCK_PROJECTS.filter(p => p.status === "on_track").length,    icon: CheckCircle2,  bg: "bg-primary/10",        color: "text-primary" },
-    { label: "At Risk",       value: MOCK_PROJECTS.filter(p => p.status === "at_risk").length,     icon: AlertTriangle, bg: "bg-amber-500/10",      color: "text-amber-600" },
-    { label: "Overdue",       value: MOCK_PROJECTS.filter(p => p.status === "overdue").length,     icon: TrendingDown,  bg: "bg-destructive/10",    color: "text-destructive" },
-    { label: "Completed",     value: MOCK_PROJECTS.filter(p => p.status === "completed").length,   icon: Star,          bg: "bg-primary/10",        color: "text-primary" },
-    { label: "Total Students",value: allStudents.length,                                            icon: Users,         bg: "bg-muted",             color: "text-foreground" },
+    { label: "Total Groups", value: studentSummary?.totalProjectGroups ?? 0,        icon: BookOpen,      bg: "bg-primary/10",     color: "text-primary" },
+    { label: "Approved",     value: studentSummary?.approvedProjectGroups ?? 0,     icon: CheckCircle2,  bg: "bg-primary/10",     color: "text-primary" },
+    { label: "Rejected",     value: studentSummary?.rejectedProjectGroups ?? 0,     icon: AlertTriangle, bg: "bg-destructive/10", color: "text-destructive" },
+    { label: "Total Students", value: studentSummary?.totalStudents ?? 0,           icon: Users,         bg: "bg-muted",          color: "text-foreground" },
+    { label: "Filtered Results", value: studentPagination?.total ?? 0,               icon: Filter,        bg: "bg-amber-500/10",   color: "text-amber-600" },
+    { label: "This Page", value: allStudents.length,                                 icon: List,          bg: "bg-muted",          color: "text-foreground" },
   ]
+
+  const totalStudentResults = studentDirectoryQuery.data?.pagination.total ?? 0
+  const studentPages = studentDirectoryQuery.data?.pagination.pages ?? 1
+
+  React.useEffect(() => {
+    setStudentPage(1)
+  }, [stuSearch, studentGroupStatus, studentUserStatus])
 
   const openDetail = (p: Project) => { setSelected(p); setSheetOpen(true) }
 
@@ -806,10 +902,10 @@ export default function GroupsPage() {
         </div>
         <div className="pl-11 sm:pl-0 flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-xs">
-            {MOCK_PROJECTS.length} groups
+            {studentSummary?.totalProjectGroups ?? 0} groups
           </Badge>
           <Badge variant="outline" className="bg-muted text-muted-foreground text-xs">
-            {allStudents.length} students
+            {studentDirectoryQuery.data?.summary.totalStudents ?? 0} students
           </Badge>
           <Link href="/dashboard/coordinator/groups/applications">
             <Button size="sm" className="gap-1.5 h-8 text-xs">
@@ -921,9 +1017,39 @@ export default function GroupsPage() {
                 className="pl-9 h-10"
               />
             </div>
-            {stuSearch && (
+            <Select value={studentUserStatus} onValueChange={setStudentUserStatus}>
+              <SelectTrigger className="h-10 w-40 shrink-0">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="User status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={studentGroupStatus} onValueChange={setStudentGroupStatus}>
+              <SelectTrigger className="h-10 w-44 shrink-0">
+                <Users className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Group status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Group Statuses</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="SUBMITTED">Submitted</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+              </SelectContent>
+            </Select>
+            {(stuSearch || studentUserStatus !== "all" || studentGroupStatus !== "all") && (
               <Button variant="ghost" size="sm" className="h-10 shrink-0 text-xs"
-                onClick={() => setStuSearch("")}>
+                onClick={() => {
+                  setStuSearch("")
+                  setStudentUserStatus("all")
+                  setStudentGroupStatus("all")
+                }}>
                 <X className="h-3.5 w-3.5 mr-1" /> Clear
               </Button>
             )}
@@ -952,138 +1078,176 @@ export default function GroupsPage() {
             </div>
           </div>
 
-          {/* Results summary */}
-          {(() => {
-            const filtered2 = allStudents.filter(({ student, project }) => {
-              const q = stuSearch.toLowerCase()
-              return !stuSearch || student.name.toLowerCase().includes(q) || student.email.toLowerCase().includes(q) || project.groupName.toLowerCase().includes(q)
-            })
-            return (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  Showing <span className="font-semibold text-foreground">{filtered2.length}</span> of {allStudents.length} students
-                </p>
+          {studentDirectoryQuery.isError ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+              {studentDirectoryQuery.error instanceof Error ? studentDirectoryQuery.error.message : "Failed to load students."}
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{allStudents.length}</span> of {totalStudentResults} students
+              </p>
 
-                {stuView === "grid" ? (
+              {studentDirectoryQuery.isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <GraduationCap className="h-8 w-8 text-muted-foreground/30 mb-2 animate-pulse" />
+                  <p className="text-sm font-medium text-muted-foreground">Loading students</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Fetching department student directory.</p>
+                </div>
+              ) : stuView === "grid" ? (
+                <>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {filtered2.map(({ student, project }) => (
+                    {allStudents.map(({ student, project }) => (
                       <AllStudentCard
                         key={student.id}
                         student={student}
                         project={project}
-                        onChat={() => { setChatStu2({ student, project }); setChatOpen2(true) }}
-                        onEmail={() => {
-                          window.open(`mailto:${student.email}?subject=Re: ${project.title}`)
-                          toast.success("Email client opened", { description: `Composing to ${student.name}` })
-                        }}
                       />
                     ))}
                   </div>
-                ) : (
-                  /* Table view */
-                  <div className="rounded-xl border overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/40">
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Student</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Email</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Group</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Task Progress</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Contribution</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Project Status</th>
-                            <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Last Active</th>
-                            <th className="text-right px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {filtered2.map(({ student, project }) => {
-                            const pct2 = Math.round((student.tasksDone / student.tasksTotal) * 100)
-                            const sc2 = STATUS_CFG[project.status]
-                            return (
-                              <tr key={student.id} className="hover:bg-muted/20 transition-colors">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2.5">
-                                    <Avatar className="h-8 w-8 shrink-0">
-                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{student.avatar}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="min-w-0">
-                                      <p className="font-medium text-sm leading-tight truncate max-w-[140px]">{student.name}</p>
-                                      <div className="flex items-center gap-1 mt-0.5">
-                                        <span className="text-[10px] text-muted-foreground">{student.year}</span>
-                                        {student.role === "leader" && (
-                                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 bg-primary/5 text-primary border-primary/20 leading-none">
-                                            Leader
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="text-xs text-muted-foreground">{student.email}</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-medium">{project.groupName}</p>
-                                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{project.domain}</p>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2 min-w-[120px]">
-                                    <Progress value={pct2} className="flex-1 h-1.5" />
-                                    <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">{student.tasksDone}/{student.tasksTotal}</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="text-xs font-semibold">{student.contribution}%</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Badge variant="outline" className={cn("text-xs", sc2.cls)}>
-                                    <span className={cn("h-1.5 w-1.5 rounded-full mr-1", sc2.dot)} />
-                                    {sc2.label}
-                                  </Badge>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{student.lastActive}</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <Button size="icon" variant="ghost"
-                                      className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
-                                      title="Chat"
-                                      onClick={() => { setChatStu2({ student, project }); setChatOpen2(true) }}>
-                                      <MessageSquare className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost"
-                                      className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
-                                      title="Email"
-                                      onClick={() => {
-                                        window.open(`mailto:${student.email}?subject=Re: ${project.title}`)
-                                        toast.success("Email client opened", { description: `Composing to ${student.name}` })
-                                      }}>
-                                      <Mail className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                  {allStudents.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <GraduationCap className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">No students found</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">No students matched your search.</p>
                     </div>
-                    {filtered2.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <GraduationCap className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                        <p className="text-sm font-medium text-muted-foreground">No students found</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Try adjusting your search</p>
-                      </div>
-                    )}
+                  )}
+                </>
+              ) : (
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40">
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Student</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Email</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Account Status</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Last Login</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Group</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Group Role</th>
+                          <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Group Review Status</th>
+                          <th className="text-right px-4 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {allStudents.map(({ student, project }) => (
+                          <tr key={student.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarImage src={student.avatarUrl ?? undefined} alt={student.name} />
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">{student.avatar}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm leading-tight truncate max-w-[180px]">{student.name}</p>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {student.role === "leader" && (
+                                      <Badge variant="outline" className="text-[9px] h-3.5 px-1 bg-primary/5 text-primary border-primary/20 leading-none">
+                                        Leader
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-muted-foreground">{student.email}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className="text-xs">{student.userStatus}</Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">{student.lastActive}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium">{project.groupName}</p>
+                                <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                                  {student.bio?.trim() || "Profile not completed"}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className="text-xs">
+                                {student.role === "leader" ? "LEADER" : "MEMBER"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  project.status === "APPROVED"
+                                    ? "bg-primary/10 text-primary border-primary/20"
+                                    : project.status === "REJECTED"
+                                      ? "bg-destructive/10 text-destructive border-destructive/20"
+                                      : "bg-muted text-muted-foreground border-border"
+                                )}
+                              >
+                                {project.status ?? "No group yet"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button size="icon" variant="ghost"
+                                  className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+                                  title="Chat"
+                                  onClick={() => { setChatStu2({ student, project }); setChatOpen2(true) }}>
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost"
+                                  className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+                                  title="Email"
+                                  onClick={() => {
+                                    window.open(`mailto:${student.email}?subject=Re: ${project.title}`)
+                                    toast.success("Email client opened", { description: `Composing to ${student.name}` })
+                                  }}>
+                                  <Mail className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </>
-            )
-          })()}
+                  {allStudents.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <GraduationCap className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">No students found</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">No students matched your search.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {studentPages > 1 ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Page <span className="font-semibold text-foreground">{studentPage}</span> of {studentPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={studentPage <= 1 || studentDirectoryQuery.isFetching}
+                      onClick={() => setStudentPage((current) => Math.max(1, current - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={studentPage >= studentPages || studentDirectoryQuery.isFetching}
+                      onClick={() => setStudentPage((current) => Math.min(studentPages, current + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1096,6 +1260,7 @@ export default function GroupsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Avatar className="h-7 w-7">
+                <AvatarImage src={chatStu2?.student.avatarUrl ?? undefined} alt={chatStu2?.student.name} />
                 <AvatarFallback className="text-xs bg-primary/10 text-primary">{chatStu2?.student.avatar}</AvatarFallback>
               </Avatar>
               {chatStu2?.student.name}

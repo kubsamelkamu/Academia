@@ -3,6 +3,10 @@ import type {
   CoordinatorAdvisorOverviewParams,
   CoordinatorAdvisorOverviewResponse,
 } from '@/types/advisor-analytics'
+import type {
+  CoordinatorStudentDirectoryParams,
+  CoordinatorStudentDirectoryResponse,
+} from '@/types/student-analytics'
 
 function cleanParams(params: Record<string, string | number | undefined>) {
   return Object.fromEntries(
@@ -24,6 +28,27 @@ export async function getCoordinatorAdvisorOverview(
         projectStatus: params.projectStatus,
         startDate: params.startDate,
         endDate: params.endDate,
+      }),
+    }
+  )
+
+  return response.data
+}
+
+export async function getCoordinatorStudentDirectory(
+  params: CoordinatorStudentDirectoryParams
+): Promise<CoordinatorStudentDirectoryResponse> {
+  const response = await apiClient.get<CoordinatorStudentDirectoryResponse>(
+    '/analytics/students/directory',
+    {
+      params: cleanParams({
+        departmentId: params.departmentId,
+        search: params.search,
+        userStatus: params.userStatus,
+        groupStatus: params.groupStatus,
+        hasGroup: params.hasGroup,
+        page: params.page,
+        limit: params.limit,
       }),
     }
   )
