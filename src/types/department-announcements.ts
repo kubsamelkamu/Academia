@@ -50,7 +50,10 @@ export type CreateDepartmentAnnouncementDto = {
 }
 
 export type UpdateDepartmentAnnouncementDto = Partial<
-  Pick<CreateDepartmentAnnouncementDto, "title" | "message" | "actionType" | "deadlineAt">
+  Pick<
+    CreateDepartmentAnnouncementDto,
+    "title" | "message" | "actionType" | "actionLabel" | "actionUrl" | "deadlineAt"
+  >
 > & {
   clearDeadline?: boolean
 }

@@ -7,6 +7,10 @@ import type {
   CoordinatorStudentDirectoryParams,
   CoordinatorStudentDirectoryResponse,
 } from '@/types/student-analytics'
+import type {
+  CoordinatorProjectTrackingParams,
+  CoordinatorProjectTrackingResponse,
+} from '@/types/project-tracking'
 
 function cleanParams(params: Record<string, string | number | undefined>) {
   return Object.fromEntries(
@@ -47,6 +51,25 @@ export async function getCoordinatorStudentDirectory(
         userStatus: params.userStatus,
         groupStatus: params.groupStatus,
         hasGroup: params.hasGroup,
+        page: params.page,
+        limit: params.limit,
+      }),
+    }
+  )
+
+  return response.data
+}
+
+export async function getCoordinatorProjectTracking(
+  params: CoordinatorProjectTrackingParams
+): Promise<CoordinatorProjectTrackingResponse> {
+  const response = await apiClient.get<CoordinatorProjectTrackingResponse>(
+    '/analytics/projects/tracking',
+    {
+      params: cleanParams({
+        departmentId: params.departmentId,
+        search: params.search,
+        projectStatus: params.projectStatus,
         page: params.page,
         limit: params.limit,
       }),

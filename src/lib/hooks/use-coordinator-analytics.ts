@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   getCoordinatorAdvisorOverview,
+  getCoordinatorProjectTracking,
   getCoordinatorStudentDirectory,
 } from '@/lib/api/coordinator-analytics'
 import type {
@@ -11,6 +12,10 @@ import type {
   CoordinatorStudentDirectoryParams,
   CoordinatorStudentDirectoryResponse,
 } from '@/types/student-analytics'
+import type {
+  CoordinatorProjectTrackingParams,
+  CoordinatorProjectTrackingResponse,
+} from '@/types/project-tracking'
 
 export function coordinatorAnalyticsKeys() {
   return {
@@ -38,6 +43,16 @@ export function coordinatorAnalyticsKeys() {
         params.userStatus ?? 'all',
         params.groupStatus ?? 'all',
         String(params.hasGroup ?? ''),
+      ] as const,
+    projectTracking: (params: CoordinatorProjectTrackingParams) =>
+      [
+        ...coordinatorAnalyticsKeys().root,
+        'project-tracking',
+        params.departmentId,
+        params.page ?? 1,
+        params.limit ?? 20,
+        params.search ?? '',
+        params.projectStatus ?? 'all',
       ] as const,
   }
 }
@@ -124,6 +139,46 @@ export function useCoordinatorStudentDirectory(params: {
         userStatus: params.userStatus,
         groupStatus: params.groupStatus,
         hasGroup: params.hasGroup,
+        page: params.page,
+        limit: params.limit,
+      })
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useCoordinatorProjectTracking(params: {
+  departmentId: string | null | undefined
+  search?: string
+  projectStatus?: string
+  page?: number
+  limit?: number
+  enabled?: boolean
+}) {
+  const departmentId = params.departmentId?.trim() ? params.departmentId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(departmentId)
+
+  return useQuery<CoordinatorProjectTrackingResponse, Error>({
+    queryKey: enabled
+      ? coordinatorAnalyticsKeys().projectTracking({
+          departmentId: departmentId ?? '',
+          search: params.search,
+          projectStatus: params.projectStatus,
+          page: params.page,
+          limit: params.limit,
+        })
+      : coordinatorAnalyticsKeys().root,
+    queryFn: () => {
+      if (!departmentId) {
+        throw new Error('departmentId is required')
+      }
+
+      return getCoordinatorProjectTracking({
+        departmentId,
+        search: params.search,
+        projectStatus: params.projectStatus,
         page: params.page,
         limit: params.limit,
       })
