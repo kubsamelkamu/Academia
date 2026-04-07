@@ -345,7 +345,7 @@ export function StudentSubmissionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [templateSearch, setTemplateSearch] = useState("")
   const [templateTypeFilter, setTemplateTypeFilter] = useState<DocumentTemplateType | null>(null)
-  const [selectedDoc, setSelectedDoc] = useState<StudentSubmission | null>(null)
+  const [manualSelectedDoc, setManualSelectedDoc] = useState<StudentSubmission | null>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
 
   const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
@@ -406,15 +406,14 @@ export function StudentSubmissionsPage() {
     [submissions]
   )
 
-  useEffect(() => {
+  const focusedDoc = useMemo(() => {
     const focusId = searchParams.get("focus")?.trim()
-    if (!focusId) return
+    if (!focusId) return null
 
-    const target = submissions.find((submission) => submission.id === focusId)
-    if (!target) return
-
-    setSelectedDoc((current) => (current?.id === target.id ? current : target))
+    return submissions.find((submission) => submission.id === focusId) ?? null
   }, [searchParams, submissions])
+
+  const selectedDoc = manualSelectedDoc ?? focusedDoc
 
   return (
     <div className="space-y-6">
@@ -574,7 +573,7 @@ export function StudentSubmissionsPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full xl:w-auto xl:justify-end">
-                      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedDoc(doc)}>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setManualSelectedDoc(doc)}>
                         <MessageCircle className="h-4 w-4 mr-1" />
                         Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
                       </Button>
@@ -735,7 +734,7 @@ export function StudentSubmissionsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
+      <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setManualSelectedDoc(null)}>
         <DialogContent className="max-w-[calc(100vw-1.25rem)] sm:max-w-[500px] p-0 overflow-hidden gap-0">
           <DialogHeader className="sr-only">
             <DialogTitle>
@@ -893,7 +892,7 @@ export function StudentSubmissionsPage() {
               variant="outline"
               size="sm"
               className="h-8 text-xs"
-              onClick={() => setSelectedDoc(null)}
+              onClick={() => setManualSelectedDoc(null)}
             >
               Close
             </Button>

@@ -1,0 +1,787 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { toast } from "sonner"
+import {
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  ChevronDown,
+  Download,
+  FileText,
+  MessageSquare,
+  Paperclip,
+  Phone,
+  Send,
+  Shield,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+  Users,
+  Video,
+  User,
+} from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+type CommitteeTitle = {
+  id: string
+  name: string
+  description: string
+  attachment: string
+  votes: number
+}
+
+type CommitteeGroup = {
+  id: string
+  name: string
+  forwardedBy: string
+  committeeMembers: number
+  titles: CommitteeTitle[]
+}
+
+const committeeGroups: CommitteeGroup[] = [
+  {
+    id: "group-a",
+    name: "Group A",
+    forwardedBy: "Forwarded by the Coordinator",
+    committeeMembers: 4,
+    titles: [
+      {
+        id: "group-a-title-1",
+        name: "Smart Campus Navigation",
+        description: "A mobile-first navigation system that helps students find buildings, labs, and events with live campus context.",
+        attachment: "proposal-group-a-title-1.pdf",
+        votes: 2,
+      },
+      {
+        id: "group-a-title-2",
+        name: "Academic Support Assistant",
+        description: "An AI-powered support tool for deadlines, document reminders, and guided student onboarding.",
+        attachment: "proposal-group-a-title-2.pdf",
+        votes: 1,
+      },
+      {
+        id: "group-a-title-3",
+        name: "Department Service Hub",
+        description: "A unified request desk for academic notices, approvals, and department communication.",
+        attachment: "proposal-group-a-title-3.pdf",
+        votes: 1,
+      },
+    ],
+  },
+  {
+    id: "group-b",
+    name: "Group B",
+    forwardedBy: "Forwarded by the Coordinator",
+    committeeMembers: 4,
+    titles: [
+      {
+        id: "group-b-title-1",
+        name: "Research Collaboration Tracker",
+        description: "A planning workspace for supervising student research, milestones, and shared feedback.",
+        attachment: "proposal-group-b-title-1.pdf",
+        votes: 1,
+      },
+      {
+        id: "group-b-title-2",
+        name: "Student Achievement Dashboard",
+        description: "A visual performance dashboard for tracking milestones, submissions, and readiness signals.",
+        attachment: "proposal-group-b-title-2.pdf",
+        votes: 2,
+      },
+      {
+        id: "group-b-title-3",
+        name: "Faculty Activity Monitor",
+        description: "An activity hub that summarizes advisories, evaluation workload, and scheduled meetings.",
+        attachment: "proposal-group-b-title-3.pdf",
+        votes: 1,
+      },
+    ],
+  },
+  {
+    id: "group-c",
+    name: "Group C",
+    forwardedBy: "Forwarded by the Coordinator",
+    committeeMembers: 4,
+    titles: [
+      {
+        id: "group-c-title-1",
+        name: "Thesis Title Intelligence",
+        description: "A title recommendation and validation platform that flags scope issues and duplicates early.",
+        attachment: "proposal-group-c-title-1.pdf",
+        votes: 1,
+      },
+      {
+        id: "group-c-title-2",
+        name: "Project Review Exchange",
+        description: "A committee workflow for title review, discussion threads, and final decision logging.",
+        attachment: "proposal-group-c-title-2.pdf",
+        votes: 1,
+      },
+      {
+        id: "group-c-title-3",
+        name: "Defense Preparation Suite",
+        description: "A guided prep flow for proposals, rubrics, and last-mile readiness checks.",
+        attachment: "proposal-group-c-title-3.pdf",
+        votes: 2,
+      },
+    ],
+  },
+]
+
+const discussionMessages = [
+  {
+    author: "Advisor",
+    text: "Title 2 is practical, but the scope should be narrowed before approval.",
+    time: "2 min ago",
+  },
+  {
+    author: "Evaluator",
+    text: "Title 1 has stronger research value and a clearer deliverable path.",
+    time: "1 min ago",
+  },
+  {
+    author: "Department Head",
+    text: "We should align with departmental priorities and avoid duplicate topics.",
+    time: "Just now",
+  },
+]
+
+const communicationTabs = [
+  { value: "chat", label: "Chat", icon: MessageSquare },
+  { value: "audio", label: "Audio Call", icon: Phone },
+  { value: "video", label: "Video Call", icon: Video },
+] as const
+
+interface DcCommitteeWorkspaceProps {
+  backHref?: string
+  backLabel?: string
+  role: "advisor" | "coordinator" | "department_head"
+}
+
+export function DcCommitteeWorkspace({
+  backHref = "/dashboard/advisor",
+  backLabel = "Back to Advisor Dashboard",
+  role,
+}: DcCommitteeWorkspaceProps) {
+  const [selectedGroupId, setSelectedGroupId] = React.useState(committeeGroups[0].id)
+  const [communicationTab, setCommunicationTab] = React.useState<(typeof communicationTabs)[number]["value"]>("chat")
+  const [votesByGroup, setVotesByGroup] = React.useState<Record<string, Record<string, number>>>(() =>
+    Object.fromEntries(
+      committeeGroups.map((group) => [
+        group.id,
+        Object.fromEntries(group.titles.map((title) => [title.id, title.votes])),
+      ])
+    )
+  )
+  const [selectedVoteByGroup, setSelectedVoteByGroup] = React.useState<Record<string, string | null>>(() =>
+    Object.fromEntries(committeeGroups.map((group) => [group.id, null]))
+  )
+  const [rejectedByGroup, setRejectedByGroup] = React.useState<Record<string, string[]>>(() =>
+    Object.fromEntries(committeeGroups.map((group) => [group.id, []]))
+  )
+  const [commentDraft, setCommentDraft] = React.useState("Comment on the selected title")
+
+  const selectedGroup = React.useMemo(
+    () => committeeGroups.find((group) => group.id === selectedGroupId) ?? committeeGroups[0],
+    [selectedGroupId]
+  )
+
+  const selectedGroupVotes = votesByGroup[selectedGroup.id] ?? {}
+  const selectedTitleId = selectedVoteByGroup[selectedGroup.id]
+  const rejectedTitleIds = new Set(rejectedByGroup[selectedGroup.id] ?? [])
+
+  const voteRows = React.useMemo(() => {
+    return selectedGroup.titles.map((title) => {
+      const votes = selectedGroupVotes[title.id] ?? 0
+      const percentage = Math.round((votes / selectedGroup.committeeMembers) * 100)
+      return { ...title, votes, percentage }
+    })
+  }, [selectedGroup, selectedGroupVotes])
+
+  const leadingTitle = React.useMemo(() => {
+    return [...voteRows].sort((left, right) => right.votes - left.votes)[0] ?? voteRows[0]
+  }, [voteRows])
+
+  const totalVotes = React.useMemo(
+    () => voteRows.reduce((sum, row) => sum + row.votes, 0),
+    [voteRows]
+  )
+
+  const handleVote = (groupId: string, titleId: string, titleName: string) => {
+    const previousVoteId = selectedVoteByGroup[groupId]
+
+    setVotesByGroup((currentVotes) => {
+      const nextGroupVotes = { ...(currentVotes[groupId] ?? {}) }
+
+      if (previousVoteId && previousVoteId !== titleId) {
+        nextGroupVotes[previousVoteId] = Math.max((nextGroupVotes[previousVoteId] ?? 0) - 1, 0)
+      }
+
+      if (previousVoteId !== titleId) {
+        nextGroupVotes[titleId] = (nextGroupVotes[titleId] ?? 0) + 1
+      }
+
+      return {
+        ...currentVotes,
+        [groupId]: nextGroupVotes,
+      }
+    })
+
+    setSelectedVoteByGroup((currentSelectedVotes) => ({
+      ...currentSelectedVotes,
+      [groupId]: titleId,
+    }))
+
+    toast.success(`Vote recorded for ${titleName}`)
+  }
+
+  const toggleReject = (groupId: string, titleId: string, titleName: string) => {
+    setRejectedByGroup((currentRejected) => {
+      const groupRejected = currentRejected[groupId] ?? []
+      const alreadyRejected = groupRejected.includes(titleId)
+
+      return {
+        ...currentRejected,
+        [groupId]: alreadyRejected
+          ? groupRejected.filter((id) => id !== titleId)
+          : [...groupRejected, titleId],
+      }
+    })
+
+    toast.info(`${titleName} ${rejectedTitleIds.has(titleId) ? "restored" : "marked for review"}`)
+  }
+
+  const handleComment = (titleName: string) => {
+    setCommentDraft(`${titleName}: `)
+    setCommunicationTab("chat")
+    toast.message(`Comment draft opened for ${titleName}`)
+  }
+
+  const handleDownload = (attachment: string) => {
+    toast.success(`Downloading ${attachment}`)
+  }
+
+  const handleDecision = (message: string) => {
+    toast.success(message)
+  }
+
+  return (
+    <div className="space-y-6 pb-10">
+      <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-background p-6 shadow-sm sm:p-8">
+        <div className="absolute -right-10 top-4 h-28 w-28 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1 text-xs font-medium text-primary backdrop-blur">
+              <Shield className="h-3.5 w-3.5" />
+              DC Committee Workspace
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Review three titles from each student group in one clean workspace.
+              </h1>
+              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+                Committee members inspect title names, descriptions, and proposal attachments, discuss them live, and vote in real time before the coordinator finalizes a decision.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button asChild className="w-full gap-2 sm:w-auto">
+                <Link href={backHref}>
+                  {backLabel}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full gap-2 sm:w-auto" onClick={() => handleDecision("Live review session prepared") }>
+                <Sparkles className="h-4 w-4" />
+                Start Review Session
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
+            {[
+              { label: "Groups", value: committeeGroups.length, icon: Users },
+              { label: "Titles", value: selectedGroup.titles.length, icon: FileText },
+              { label: "Live votes", value: totalVotes, icon: BarChart3 },
+              { label: "Members", value: selectedGroup.committeeMembers, icon: CheckCircle2 },
+            ].map((item) => {
+              const Icon = item.icon
+              return (
+                <Card key={item.label} className="border-border/60 bg-background/90 shadow-sm backdrop-blur">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                      <p className="mt-2 text-2xl font-bold tracking-tight">{item.value}</p>
+                    </div>
+                    <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Group List</CardTitle>
+            <CardDescription>Click a group to open its forwarded titles.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {committeeGroups.map((group) => {
+              const isActive = group.id === selectedGroupId
+
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => setSelectedGroupId(group.id)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-200",
+                    isActive
+                      ? "border-primary/30 bg-primary/10 shadow-sm"
+                      : "border-border/70 bg-background hover:border-primary/20 hover:bg-muted/40"
+                  )}
+                >
+                  <div>
+                    <p className="font-semibold">{group.name}</p>
+                    <p className="text-xs text-muted-foreground">{group.forwardedBy}</p>
+                  </div>
+                  <Badge variant={isActive ? "default" : "outline"}>{group.titles.length} titles</Badge>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-lg">Titles Section</CardTitle>
+                <CardDescription>{selectedGroup.name} is ready for title review, discussion, and voting.</CardDescription>
+              </div>
+              <Badge variant="secondary" className="w-fit">{selectedGroup.forwardedBy}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {selectedGroup.titles.map((title, index) => {
+              const voteInfo = voteRows.find((row) => row.id === title.id)
+              const isRejected = rejectedTitleIds.has(title.id)
+              const isSelected = selectedTitleId === title.id
+
+              return (
+                <details key={title.id} open={index === 0} className="group rounded-2xl border border-border/70 bg-card/80 shadow-sm">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-semibold">{title.name}</p>
+                        {isSelected && <Badge className="bg-primary text-primary-foreground">Selected</Badge>}
+                        {isRejected && <Badge variant="destructive">Rejected</Badge>}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">Title {index + 1} • Click to expand details</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">{voteInfo?.votes ?? 0}</span>
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                    </div>
+                  </summary>
+                  <div className="space-y-4 border-t border-border/60 px-4 pb-4 pt-4">
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(260px,0.7fr)]">
+                      <div className="space-y-3">
+                        <div className="rounded-2xl bg-muted/40 p-4">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</p>
+                          <p className="mt-2 text-sm leading-6 text-foreground">{title.description}</p>
+                        </div>
+                        <div className="rounded-2xl border border-dashed border-primary/25 bg-primary/5 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                              <Paperclip className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attached proposal file</p>
+                              <p className="truncate text-sm font-semibold">{title.attachment}</p>
+                            </div>
+                            <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleDownload(title.attachment)} aria-label={`Download ${title.attachment}`}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="rounded-2xl border border-border/70 bg-background p-4">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vote Summary</p>
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className="text-sm font-semibold">Votes</span>
+                            <span className="text-sm text-muted-foreground">{voteInfo?.votes ?? 0} / {selectedGroup.committeeMembers}</span>
+                          </div>
+                          <Progress value={voteInfo?.percentage ?? 0} className="mt-3 h-2" />
+                          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Real-time updates</span>
+                            <span>{voteInfo?.percentage ?? 0}%</span>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <Button onClick={() => handleVote(selectedGroup.id, title.id, title.name)} className="gap-2">
+                            <ThumbsUp className="h-4 w-4" />
+                            Select
+                          </Button>
+                          <Button variant="outline" onClick={() => toggleReject(selectedGroup.id, title.id, title.name)} className="gap-2">
+                            <ThumbsDown className="h-4 w-4" />
+                            Reject
+                          </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" className="gap-2">
+                                <MessageSquare className="h-4 w-4" />
+                                Comment
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Add a Comment</DialogTitle>
+                                <DialogDescription>
+                                  Leave a note for the committee regarding <strong>{title.name}</strong>.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="py-2">
+                                <Textarea 
+                                  placeholder="Type your comment associated with this title here..." 
+                                  className="min-h-[120px] resize-none"
+                                />
+                              </div>
+                              <DialogFooter>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline">Cancel</Button>
+                                </DialogTrigger>
+                                <DialogTrigger asChild>
+                                  <Button onClick={() => {
+                                    toast.success(`Comment successfully added to ${title.name}`)
+                                    // Also sync chat if needed, but simple toast is perfectly fine 
+                                  }}>
+                                    Post Comment
+                                  </Button>
+                                </DialogTrigger>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <div className="space-y-6">
+          <Card className="flex flex-col border-border/60 shadow-sm sm:min-h-[600px]">
+            <CardHeader className="border-b border-border/40 bg-muted/10 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Committee Communication
+                  </CardTitle>
+                  <CardDescription className="mt-1">Coordinate and discuss decisions with your peers.</CardDescription>
+                </div>
+                <div className="flex -space-x-2">
+                  {['AD', 'DH', 'CO', 'EV'].map((initials, i) => (
+                    <div key={i} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-xs font-medium text-primary shadow-sm">
+                      {initials}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col p-0">
+              <Tabs value={communicationTab} onValueChange={(value) => setCommunicationTab(value as typeof communicationTab)} className="flex flex-1 flex-col">
+                <TabsList className="mx-4 mt-4 grid grid-cols-3 bg-muted/40">
+                  {communicationTabs.map((tab) => {
+                    const Icon = tab.icon
+                    return (
+                      <TabsTrigger key={tab.value} value={tab.value} className="gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                        <Icon className="h-4 w-4" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                      </TabsTrigger>
+                    )
+                  })}
+                </TabsList>
+
+                <TabsContent value="chat" className="flex flex-1 flex-col justify-between px-4 pb-4 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="flex flex-1 flex-col justify-end space-y-4 py-4">
+                    {discussionMessages.map((message) => {
+                      const isMe = role.replace("_", " ").toLowerCase() === message.author.toLowerCase() || (message.author === "Advisor" && role === "advisor")
+                      return (
+                        <div key={`${message.author}-${message.time}`} className={cn("flex w-full gap-3", isMe ? "justify-end" : "justify-start")}>
+                          {!isMe && (
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
+                              {message.author.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className={cn("max-w-[85%] rounded-2xl px-4 py-3 shadow-sm", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-muted/40 rounded-bl-none border border-border/50")}>
+                            {!isMe && <p className="mb-1 text-xs font-medium text-primary">{message.author}</p>}
+                            <p className="text-sm leading-relaxed">{message.text}</p>
+                            <p className={cn("mt-1.5 text-[10px]", isMe ? "text-primary-foreground/70 text-right" : "text-muted-foreground")}>{message.time}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  <div className="relative mt-2 flex items-end gap-2 rounded-2xl border border-border/60 bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+                    <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-primary">
+                      <Paperclip className="h-5 w-5" />
+                    </Button>
+                    <Textarea
+                      value={commentDraft}
+                      onChange={(event) => setCommentDraft(event.target.value)}
+                      className="min-h-[44px] w-full resize-none border-0 bg-transparent py-3 text-sm focus-visible:ring-0 sm:min-h-[44px]"
+                      placeholder={`Message the committee about ${leadingTitle?.name ?? "the selected title"}...`}
+                      rows={1}
+                    />
+                    <Button 
+                      size="icon" 
+                      className="h-10 w-10 shrink-0 rounded-full shadow-sm"
+                      onClick={() => {
+                        toast.success("Message sent to discussion thread")
+                        setCommentDraft("")
+                      }}
+                      disabled={!commentDraft.trim()}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="audio" className="flex flex-1 items-center px-4 pb-6 mt-0 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="w-full overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-muted/30 to-background shadow-sm">
+                    <div className="p-8 text-center">
+                      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary shadow-inner">
+                        <Phone className="h-8 w-8 animate-pulse" />
+                      </div>
+                      <h3 className="mb-2 text-xl font-bold tracking-tight">Audio Room: {selectedGroup.name}</h3>
+                      <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
+                        Secure, low-latency audio channel for rapid consensus and title voting alignment.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+                        <Badge variant="secondary" className="px-3 py-1 bg-background shadow-sm"><span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>4 Online</Badge>
+                        <Badge variant="outline" className="px-3 py-1">End-to-end Encrypted</Badge>
+                      </div>
+                      <Button size="lg" className="w-full sm:w-auto px-8 rounded-full shadow-md hover:shadow-lg transition-shadow" onClick={() => toast.success("Joined audio room") }>
+                        Join Audio Call
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="video" className="flex flex-1 items-center px-4 pb-6 mt-0 focus-visible:outline-none focus-visible:ring-0">
+                  <div className="w-full overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card to-muted/20 shadow-sm relative">
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <Badge variant="destructive" className="animate-pulse shadow-sm">REC</Badge>
+                    </div>
+                    <div className="p-8 text-center">
+                      <div className="grid grid-cols-2 gap-3 mb-6 max-w-sm mx-auto">
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="aspect-video rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shadow-inner relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                            <User className="h-8 w-8 text-muted-foreground/50" />
+                          </div>
+                        ))}
+                      </div>
+                      <h3 className="mb-2 text-xl font-bold tracking-tight">Virtual Review Session</h3>
+                      <p className="mb-6 text-sm text-muted-foreground">
+                        Present proposals, share screen, and compare title rubrics face-to-face.
+                      </p>
+                      <Button size="lg" className="w-full sm:w-auto px-8 rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors" onClick={() => toast.success("Joined video session") }>
+                        <Video className="mr-2 h-4 w-4" />
+                        Join Video Meeting
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                <Shield className="h-4 w-4" />
+                Recent Logs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-l-2 border-primary/20 pl-4 py-1 relative">
+                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-primary" />
+                  <p className="text-sm font-medium">Department Head opened review</p>
+                  <p className="text-xs text-muted-foreground">1 hour ago</p>
+                </div>
+                <div className="border-l-2 border-border/50 pl-4 py-1 relative">
+                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-muted-foreground/30" />
+                  <p className="text-sm">Evaluator marked Title 1 as &quot;Strong&quot;</p>
+                  <p className="text-xs text-muted-foreground">45 minutes ago</p>
+                </div>
+                <div className="border-l-2 border-border/50 pl-4 py-1 relative">
+                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-muted-foreground/30" />
+                  <p className="text-sm">Coordinator forwarded new attachments</p>
+                  <p className="text-xs text-muted-foreground">10 minutes ago</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Voting Progress</CardTitle>
+              <CardDescription>Percentages update as committee members vote.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {voteRows.map((row) => (
+                <div key={row.id} className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate font-medium">{row.name}</span>
+                    <span className="whitespace-nowrap text-muted-foreground">{row.votes} votes • {row.percentage}%</span>
+                  </div>
+                  <Progress value={row.percentage} className="h-2" />
+                </div>
+              ))}
+              <Separator />
+              <div className="rounded-2xl bg-muted/40 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Leading Title</p>
+                <p className="mt-2 text-sm font-semibold">{leadingTitle?.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{leadingTitle?.votes} votes out of {selectedGroup.committeeMembers} committee members</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {role === "coordinator" && (
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Coordinator Control Panel</CardTitle>
+                <CardDescription>Approve one title, reject all titles, or request revision.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current decision focus</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{leadingTitle?.name}</p>
+                      <p className="text-xs text-muted-foreground">Most supported title in the selected group</p>
+                    </div>
+                    <Badge>{leadingTitle?.percentage}%</Badge>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button className="gap-2" onClick={() => handleDecision(`Approved ${leadingTitle?.name ?? "selected title"}`)}>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Approve Selected Title
+                  </Button>
+                  
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <ThumbsDown className="h-4 w-4" />
+                        Reject All Titles
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Reject All Titles</DialogTitle>
+                        <DialogDescription>
+                          You are about to reject all proposed titles for <strong>{selectedGroup.name}</strong>. The students will be notified to submit new topics.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-2">
+                        <Textarea 
+                          placeholder="Provide the reason for rejecting all titles (required)..." 
+                          className="min-h-[100px] resize-none"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <DialogTrigger asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogTrigger>
+                        <DialogTrigger asChild>
+                          <Button variant="destructive" onClick={() => handleDecision("All titles rejected. Please submit new titles.") }>
+                            Confirm Rejection
+                          </Button>
+                        </DialogTrigger>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="secondary" className="gap-2 sm:col-span-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Request Revision
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Request Revision</DialogTitle>
+                        <DialogDescription>
+                          Send committee feedback to <strong>{selectedGroup.name}</strong> requesting targeted revisions before approval.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-2">
+                        <Textarea 
+                          placeholder="Summarize what revisions need to be made by the group..." 
+                          className="min-h-[120px] resize-none"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <DialogTrigger asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogTrigger>
+                        <DialogTrigger asChild>
+                          <Button onClick={() => handleDecision("Revision requested with committee feedback") }>
+                            Send Request
+                          </Button>
+                        </DialogTrigger>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="rounded-2xl bg-muted/40 p-4 text-xs text-muted-foreground">
+                  Option 1: approve one title. Option 2: reject all titles. Option 3: request revision and ask the group to submit new titles.
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
