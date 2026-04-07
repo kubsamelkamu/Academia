@@ -228,7 +228,7 @@ export function Header() {
         </div>
       </motion.header>
 
-      {/* ── Mobile menu ── */}
+      {/* ── Mobile full-screen drawer ── */}
       <AnimatePresence>
         {isMenuOpen && (
           <>

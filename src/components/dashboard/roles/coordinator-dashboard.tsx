@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
+import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useCoordinatorAdvisorOverview, useCoordinatorProjectTracking } from "@/lib/hooks/use-coordinator-analytics"
 import {
   FileText,
@@ -50,7 +51,7 @@ import {
   Complaint,
   Grade,
 } from "@/data/mockData"
-import { mockTimelineAlerts } from "@/data/timelineData"
+import type { DepartmentAnnouncementItem } from "@/types/department-announcements"
 import type { CoordinatorProjectTrackingItem, CoordinatorProjectTrackingMilestone } from "@/types/project-tracking"
 
 interface DashboardTimelineMilestone {
@@ -80,10 +81,52 @@ interface DashboardActiveProjectRow {
   status: string
 }
 
+interface DashboardAnnouncementAlert {
+  id: string
+  title: string
+  message: string
+  deadlineLabel: string | null
+  actionType: string
+  statusLabel: string
+  severity: "low" | "high" | "critical"
+}
+
 function performanceLabel(progress: number) {
   if (progress >= 75) return "Excellent"
   if (progress >= 50) return "Good"
   return "Attention"
+}
+
+function formatAnnouncementDeadline(secondsRemaining: number | null) {
+  if (secondsRemaining === null) return null
+
+  if (secondsRemaining <= 0) {
+    const overdueDays = Math.max(1, Math.ceil(Math.abs(secondsRemaining) / 86_400))
+    return `${overdueDays} day${overdueDays === 1 ? "" : "s"} overdue`
+  }
+
+  const daysRemaining = Math.max(1, Math.ceil(secondsRemaining / 86_400))
+  return `due in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
+}
+
+function mapAnnouncementToAlert(announcement: DepartmentAnnouncementItem): DashboardAnnouncementAlert {
+  const secondsRemaining = announcement.secondsRemaining
+  const severity: DashboardAnnouncementAlert["severity"] =
+    announcement.isExpired || (secondsRemaining !== null && secondsRemaining <= 0)
+      ? "critical"
+      : secondsRemaining !== null && secondsRemaining <= 172_800
+        ? "high"
+        : "low"
+
+  return {
+    id: announcement.id,
+    title: announcement.title,
+    message: announcement.message,
+    deadlineLabel: formatAnnouncementDeadline(secondsRemaining),
+    actionType: announcement.actionType,
+    statusLabel: announcement.isExpired ? "Expired" : announcement.isDisabled ? "Disabled" : "Active",
+    severity,
+  }
 }
 
 function daysUntil(dateStr: string) {
@@ -288,6 +331,13 @@ export function CoordinatorDashboard() {
     enabled: Boolean(accessToken) && Boolean(departmentId),
   })
 
+  const announcementsQuery = useDepartmentAnnouncements({
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    departmentId,
+    page: 1,
+    limit: 4,
+  })
+
   const advisorOverviewQuery = useCoordinatorAdvisorOverview({
     departmentId,
     projectStatus: "ACTIVE",
@@ -438,7 +488,18 @@ export function CoordinatorDashboard() {
     },
   ]
 
-  const unreadAlerts = mockTimelineAlerts.filter(a => !a.isRead)
+  const unreadAlerts = useMemo(
+    () =>
+      (announcementsQuery.data?.items ?? [])
+        .filter(
+          (announcement) =>
+            !announcement.isDisabled &&
+            !announcement.isExpired &&
+            (announcement.secondsRemaining === null || announcement.secondsRemaining > 0)
+        )
+        .map(mapAnnouncementToAlert),
+    [announcementsQuery.data?.items]
+  )
   const trackedTimelines = useMemo(
     () => (timelineTrackingQuery.data?.items ?? []).map(mapTrackingItemToTimelineCard),
     [timelineTrackingQuery.data?.items]
@@ -596,7 +657,7 @@ export function CoordinatorDashboard() {
       {/* ── Timeline Alerts + System Overview ── */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          {unreadAlerts.length > 0 ? (
+          {announcementsQuery.isError ? (
             <Card className="border-none shadow-sm h-full">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -604,22 +665,84 @@ export function CoordinatorDashboard() {
                     <Timer className="h-4 w-4 text-destructive" />
                   </div>
                   Timeline Alerts
-                  <Badge variant="destructive" className="ml-auto text-xs">{unreadAlerts.length} unread</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                  {announcementsQuery.error instanceof Error ? announcementsQuery.error.message : "Failed to load timeline alerts."}
+                </div>
+              </CardContent>
+            </Card>
+          ) : announcementsQuery.isLoading ? (
+            <Card className="border-none shadow-sm h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-destructive/10 flex items-center justify-center">
+                    <Timer className="h-4 w-4 text-destructive" />
+                  </div>
+                  Timeline Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+                    <div className="mt-0.5 h-3 w-3 rounded-full bg-muted-foreground/30" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 rounded bg-muted/60" />
+                      <div className="h-3 w-full rounded bg-muted/50" />
+                    </div>
+                    <div className="h-5 w-14 rounded bg-muted/50" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : unreadAlerts.length > 0 ? (
+            <Card className="border-none shadow-sm h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-destructive/10 flex items-center justify-center">
+                    <Timer className="h-4 w-4 text-destructive" />
+                  </div>
+                  Timeline Alerts
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {unreadAlerts.slice(0, 4).map((alert) => (
-                  <div key={alert.id} className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+                  <Link
+                    key={alert.id}
+                    href={`/dashboard/coordinator/messages?announcementId=${encodeURIComponent(alert.id)}`}
+                    className="block"
+                  >
+                  <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50">
                     <StatusIndicator
                       status={alert.severity === 'critical' ? 'overdue' : alert.severity === 'high' ? 'at_risk' : 'on_track'}
                       size="sm"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{alert.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium truncate">{alert.title}</p>
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5">{alert.actionType}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] h-5 px-1.5 ${
+                            alert.statusLabel === "Expired"
+                              ? "border-destructive/20 bg-destructive/10 text-destructive"
+                              : alert.statusLabel === "Disabled"
+                                ? "border-border bg-muted text-muted-foreground"
+                                : "border-primary/20 bg-primary/10 text-primary"
+                          }`}
+                        >
+                          {alert.statusLabel}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{alert.message}</p>
+                      {alert.deadlineLabel ? (
+                        <p className="text-xs text-muted-foreground mt-1 capitalize">Deadline {alert.deadlineLabel}</p>
+                      ) : null}
                     </div>
                     <Badge variant="outline" className="text-xs shrink-0 capitalize">{alert.severity}</Badge>
                   </div>
+                  </Link>
                 ))}
               </CardContent>
             </Card>

@@ -59,6 +59,20 @@ const features = [
   { icon: ShieldCheck,   text: 'Secure multi-tenant architecture' },
 ];
 
+const slideRight = {
+  hidden: { opacity: 0, scale: 0.95, y: 20 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
+
+/* ── Feature bullets ── */
+const features = [
+  { icon: CheckCircle2,  text: 'Real-time project tracking & management' },
+  { icon: CalendarCheck, text: 'Automated defense scheduling system' },
+  { icon: Users,         text: 'Multi-role user management' },
+  { icon: BarChart3,     text: 'Comprehensive reporting & analytics' },
+  { icon: ShieldCheck,   text: 'Secure multi-tenant architecture' },
+];
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -214,6 +228,8 @@ function LoginPageContent() {
           <p className="mx-auto max-w-lg text-pretty text-base text-white/90 drop-shadow-sm sm:text-lg font-medium">
             The next generation of academic project management.
           </p>
+
+
         </motion.div>
 
         {/* ── Two-column grid ── */}

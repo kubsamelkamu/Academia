@@ -20,6 +20,11 @@ import type {
   ProjectGroupDetails,
   MyGroupJoinRequestsPage,
   ProjectGroupMe,
+  ProjectGroupReviewSubmittedPage,
+  ProjectGroupReviewSubmittedStatus,
+  ApproveSubmittedProjectGroupReviewResult,
+  RejectSubmittedProjectGroupReviewDto,
+  RejectSubmittedProjectGroupReviewResult,
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
@@ -312,6 +317,63 @@ export async function submitMyProjectGroup(): Promise<SubmitMyProjectGroupResult
 
 export async function reopenMyProjectGroup(): Promise<ReopenMyProjectGroupResult> {
   const response = await apiClient.post<ReopenMyProjectGroupResult>("/project-groups/me/reopen")
+  return response.data
+}
+
+export async function getSubmittedProjectGroupsForReview(params: {
+  status?: ProjectGroupReviewSubmittedStatus | string
+  page?: number
+  limit?: number
+} = {}): Promise<ProjectGroupReviewSubmittedPage> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const status = params.status?.trim() ? params.status.trim() : "ALL"
+
+  const response = await apiClient.get<ProjectGroupReviewSubmittedPage>("/project-groups/review/submitted", {
+    params: {
+      status,
+      page,
+      limit,
+    },
+  })
+
+  return response.data
+}
+
+export async function approveSubmittedProjectGroupReview(
+  groupId: string
+): Promise<ApproveSubmittedProjectGroupReviewResult> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const response = await apiClient.post<ApproveSubmittedProjectGroupReviewResult>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/approve`
+  )
+
+  return response.data
+}
+
+export async function rejectSubmittedProjectGroupReview(
+  groupId: string,
+  dto: RejectSubmittedProjectGroupReviewDto
+): Promise<RejectSubmittedProjectGroupReviewResult> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const reason = dto.reason.trim()
+  if (!reason) {
+    throw new Error("reason is required")
+  }
+
+  const response = await apiClient.post<RejectSubmittedProjectGroupReviewResult>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/reject`,
+    { reason }
+  )
+
   return response.data
 }
 

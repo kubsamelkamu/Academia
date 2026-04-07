@@ -329,3 +329,97 @@ export type ReopenMyProjectGroupResult = {
     submittedAt: null
   }
 }
+
+export type ProjectGroupReviewSubmittedStatus =
+  | "ALL"
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+
+export type ProjectGroupReviewSubmittedFilter = {
+  value: ProjectGroupReviewSubmittedStatus | string
+  label: string
+  total: number
+}
+
+export type ProjectGroupReviewSubmittedLeader = {
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status: string
+  departmentId: string
+}
+
+export type ProjectGroupReviewSubmittedMember = {
+  id: string
+  joinedAt: string
+  user: ProjectGroupReviewSubmittedLeader
+}
+
+export type ProjectGroupReviewSubmittedItem = {
+  id: string
+  name: string
+  status: "SUBMITTED" | "APPROVED" | "REJECTED" | string
+  reviewStatus: ProjectGroupReviewSubmittedStatus | string
+  submittedAt: string
+  reviewedAt: string | null
+  rejectionReason: string | null
+  leader: ProjectGroupReviewSubmittedLeader
+  members: ProjectGroupReviewSubmittedMember[]
+  memberCount: number
+  minGroupSize: number
+  maxGroupSize: number
+  createdAt: string
+}
+
+export type ProjectGroupReviewSubmittedSummary = {
+  pending: number
+  approved: number
+  rejected: number
+  all: number
+}
+
+export type ProjectGroupReviewSubmittedPagination = {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export type ProjectGroupReviewSubmittedPage = {
+  filters: {
+    appliedStatus: ProjectGroupReviewSubmittedStatus | string
+    availableStatuses: ProjectGroupReviewSubmittedFilter[]
+  }
+  summary: ProjectGroupReviewSubmittedSummary
+  items: ProjectGroupReviewSubmittedItem[]
+  pagination: ProjectGroupReviewSubmittedPagination
+}
+
+export type ApproveSubmittedProjectGroupReviewResult = {
+  group?: {
+    id: string
+    reviewStatus?: "APPROVED" | string
+    reviewedAt?: string | null
+  }
+  approved?: boolean
+  message?: string
+}
+
+export type RejectSubmittedProjectGroupReviewDto = {
+  reason: string
+}
+
+export type RejectSubmittedProjectGroupReviewResult = {
+  group?: {
+    id: string
+    reviewStatus?: "REJECTED" | string
+    reviewedAt?: string | null
+    rejectionReason?: string | null
+  }
+  rejected?: boolean
+  message?: string
+}
