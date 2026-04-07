@@ -7,15 +7,12 @@ import StatusBadge from "@/components/shared/StatusBadge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { TimelineCard } from "@/components/timeline/TimelineCard"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
+import { useCoordinatorAdvisorOverview, useCoordinatorProjectTracking } from "@/lib/hooks/use-coordinator-analytics"
 import {
   FileText,
   FileCheck,
@@ -40,9 +37,9 @@ import {
   MessageSquare,
   Shield,
   Star,
+  ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import {
   mockProjectTitles,
   mockProjects,
@@ -50,14 +47,200 @@ import {
   mockComplaints,
   mockUsers,
   mockGrades,
-  ProjectSummary,
   Complaint,
   Grade,
 } from "@/data/mockData"
-import { mockProjectTimelines, mockTimelineAlerts } from "@/data/timelineData"
+import { mockTimelineAlerts } from "@/data/timelineData"
+import type { CoordinatorProjectTrackingItem, CoordinatorProjectTrackingMilestone } from "@/types/project-tracking"
+
+interface DashboardTimelineMilestone {
+  id: string
+  title: string
+  label: string
+  tone: string
+}
+
+interface DashboardTimelineCardModel {
+  projectId: string
+  projectTitle: string
+  overallProgress: number
+  daysRemaining: number
+  milestoneSummary: string
+  status: "on_track" | "at_risk" | "overdue"
+  milestones: DashboardTimelineMilestone[]
+}
+
+interface DashboardActiveProjectRow {
+  id: string
+  title: string
+  groupName: string
+  advisorName: string
+  evaluatorLabel: string
+  progress: number
+  status: string
+}
+
+function performanceLabel(progress: number) {
+  if (progress >= 75) return "Excellent"
+  if (progress >= 50) return "Good"
+  return "Attention"
+}
+
+function daysUntil(dateStr: string) {
+  const diff = new Date(dateStr).getTime() - Date.now()
+  return Math.round(diff / 86400000)
+}
+
+function mapMilestoneLabel(status: string) {
+  const normalized = status.trim().toUpperCase()
+
+  if (normalized === "APPROVED") {
+    return { label: "Approved", tone: "bg-primary/10 text-primary border-primary/20" }
+  }
+
+  if (normalized === "SUBMITTED") {
+    return { label: "Submitted", tone: "bg-amber-500/10 text-amber-700 border-amber-400/30" }
+  }
+
+  if (normalized === "REJECTED") {
+    return { label: "Rejected", tone: "bg-destructive/10 text-destructive border-destructive/20" }
+  }
+
+  return { label: "Pending", tone: "bg-muted text-muted-foreground border-border" }
+}
+
+function deriveTimelineStatus(item: CoordinatorProjectTrackingItem): DashboardTimelineCardModel["status"] {
+  const overduePendingMilestone = item.milestones.some((milestone) => {
+    const status = milestone.status.trim().toUpperCase()
+    return status !== "APPROVED" && new Date(milestone.dueDate).getTime() < Date.now()
+  })
+
+  if (overduePendingMilestone) {
+    return "overdue"
+  }
+
+  if (item.milestoneProgress.rejected > 0 || item.milestoneProgress.pending > item.milestoneProgress.approved) {
+    return "at_risk"
+  }
+
+  return "on_track"
+}
+
+function mapTrackingItemToTimelineCard(item: CoordinatorProjectTrackingItem): DashboardTimelineCardModel {
+  const milestones = [...item.milestones].sort(
+    (left, right) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
+  )
+  const lastMilestone = milestones[milestones.length - 1]
+  const approvedMilestones = item.milestoneProgress.approved
+
+  return {
+    projectId: item.projectId,
+    projectTitle: item.projectTitle,
+    overallProgress: item.milestoneProgress.percentage,
+    daysRemaining: lastMilestone ? daysUntil(lastMilestone.dueDate) : 0,
+    milestoneSummary: `${approvedMilestones}/${item.milestoneProgress.total} milestones`,
+    status: deriveTimelineStatus(item),
+    milestones: milestones.slice(0, 2).map((milestone: CoordinatorProjectTrackingMilestone) => {
+      const mapped = mapMilestoneLabel(milestone.status)
+      return {
+        id: milestone.id,
+        title: milestone.title,
+        label: mapped.label,
+        tone: mapped.tone,
+      }
+    }),
+  }
+}
+
+function toDisplayStatus(status: string) {
+  const normalized = status.trim().toUpperCase()
+
+  if (normalized === "ACTIVE") return "active"
+  if (normalized === "COMPLETED") return "completed"
+  if (normalized === "CANCELLED") return "cancelled"
+
+  return status.toLowerCase()
+}
+
+function advisorDisplayName(advisor: CoordinatorProjectTrackingItem["advisor"]) {
+  const fullName = advisor?.fullName?.trim()
+  if (fullName) return fullName
+
+  return advisor?.email?.trim() || "Unassigned"
+}
+
+function mapTrackingItemToActiveProjectRow(item: CoordinatorProjectTrackingItem): DashboardActiveProjectRow {
+  return {
+    id: item.projectId,
+    title: item.projectTitle,
+    groupName: item.group?.name?.trim() || "Unassigned Group",
+    advisorName: advisorDisplayName(item.advisor),
+    evaluatorLabel: "Pending integration",
+    progress: item.milestoneProgress.percentage,
+    status: toDisplayStatus(item.projectStatus),
+  }
+}
+
+function DashboardTimelineCard({ timeline }: { timeline: DashboardTimelineCardModel }) {
+  const statusIcon =
+    timeline.status === "overdue"
+      ? <Timer className="h-4 w-4 text-destructive" />
+      : timeline.status === "at_risk"
+        ? <AlertTriangle className="h-4 w-4 text-amber-600" />
+        : <CheckCircle2 className="h-4 w-4 text-primary" />
+
+  const statusClasses =
+    timeline.status === "overdue"
+      ? "border-destructive/20 bg-destructive/5 hover:border-destructive/30"
+      : timeline.status === "at_risk"
+        ? "border-amber-400/30 bg-amber-500/5 hover:border-amber-500/40"
+        : "border-primary/20 bg-primary/5 hover:border-primary/30"
+
+  return (
+    <Link href={`/dashboard/coordinator/groups?search=${encodeURIComponent(timeline.projectTitle)}`}>
+      <Card className={`h-full border transition-all hover:shadow-md ${statusClasses}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-start justify-between gap-3 text-sm font-medium">
+            <span className="line-clamp-2 leading-snug">{timeline.projectTitle}</span>
+            <span className="shrink-0">{statusIcon}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-semibold">{timeline.overallProgress}%</span>
+            </div>
+            <Progress value={timeline.overallProgress} className="h-2" />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 text-sm">
+            <Badge variant="outline" className="text-xs">{timeline.milestoneSummary}</Badge>
+          </div>
+
+          <div className="space-y-2">
+            {timeline.milestones.map((milestone) => (
+              <div key={milestone.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="truncate text-foreground">{milestone.title}</span>
+                <Badge variant="outline" className={`text-[10px] ${milestone.tone}`}>
+                  {milestone.label}
+                </Badge>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-end pt-1 text-xs font-medium text-primary">
+            Open in Projects <ExternalLink className="ml-1 h-3.5 w-3.5" />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
 
 export function CoordinatorDashboard() {
   const authUser = useAuthStore((state) => state.user)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const displayName = authUser
     ? `${authUser.firstName ?? ""} ${authUser.lastName ?? ""}`.trim() || "Coordinator"
     : "Coordinator"
@@ -84,10 +267,34 @@ export function CoordinatorDashboard() {
     return `${datePart} ${timePart}`
   }, [now])
 
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
-  const [selectedAdvisor, setSelectedAdvisor] = useState('')
   const [localGrades] = useState<Grade[]>(mockGrades)
+  const [timelinePage, setTimelinePage] = useState(1)
+
+  const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
+
+  const timelineTrackingQuery = useCoordinatorProjectTracking({
+    departmentId,
+    projectStatus: "ACTIVE",
+    page: timelinePage,
+    limit: 4,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+
+  const activeProjectsTableQuery = useCoordinatorProjectTracking({
+    departmentId,
+    projectStatus: "ACTIVE",
+    page: 1,
+    limit: 5,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+
+  const advisorOverviewQuery = useCoordinatorAdvisorOverview({
+    departmentId,
+    projectStatus: "ACTIVE",
+    page: 1,
+    limit: 6,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
 
   const pendingTitles = mockProjectTitles.filter(t => t.status === 'pending')
   const activeProjects = mockProjects.filter(p => p.status === 'in_progress')
@@ -96,16 +303,15 @@ export function CoordinatorDashboard() {
 
   const advisors = mockUsers.filter(u => u.role === 'advisor')
   const evaluators = mockUsers.filter(u => u.role === 'evaluator')
+  const activeProjectRows = useMemo(
+    () => (activeProjectsTableQuery.data?.items ?? []).map(mapTrackingItemToActiveProjectRow),
+    [activeProjectsTableQuery.data?.items]
+  )
 
   const avgProgress = useMemo(() => {
     if (activeProjects.length === 0) return 0
     return Math.round(activeProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / activeProjects.length)
   }, [activeProjects])
-
-  const handleAssignAdvisor = () => {
-    toast.success('Assignments Saved', { description: 'Successfully updated project assignments.' })
-    setAssignDialogOpen(false)
-  }
 
   // Workflow stages use primary + secondary + muted — all theme-reactive
   const workflowStages = [
@@ -126,7 +332,7 @@ export function CoordinatorDashboard() {
     { href: "/dashboard/coordinator/messages",          icon: MessageSquare,label: "Messages",           description: "Communication center",             bg: "bg-muted",       color: "text-foreground" },
   ]
 
-  const projectColumns: Column<ProjectSummary>[] = [
+  const projectColumns: Column<DashboardActiveProjectRow>[] = [
     { 
       key: 'title', header: 'Project',
       render: (p) => (
@@ -143,7 +349,7 @@ export function CoordinatorDashboard() {
     },
     { 
       key: 'advisorName', header: 'Advisor',
-      render: (p) => p.advisorName ? (
+      render: (p) => p.advisorName && p.advisorName !== "Unassigned" ? (
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs bg-primary/10 text-primary">{p.advisorName.charAt(0)}</AvatarFallback>
@@ -156,12 +362,7 @@ export function CoordinatorDashboard() {
     },
     {
       key: 'evaluators', header: 'Evaluators',
-      render: (p) => {
-        const count = (p.evaluatorIds ?? []).length
-        return count > 0
-          ? <Badge variant="secondary" className="text-xs">{count} assigned</Badge>
-          : <Badge variant="outline" className="text-muted-foreground text-xs">None</Badge>
-      }
+      render: (p) => <Badge variant="outline" className="text-muted-foreground text-xs">{p.evaluatorLabel}</Badge>
     },
     {
       key: 'progress', header: 'Progress',
@@ -176,47 +377,11 @@ export function CoordinatorDashboard() {
     {
       key: 'actions', header: '',
       render: (p) => (
-        <Dialog open={assignDialogOpen && selectedProject?.id === p.id} onOpenChange={(open) => {
-          setAssignDialogOpen(open)
-          if (open) setSelectedProject(p)
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5">
-              <UserPlus className="h-3.5 w-3.5" /> Manage
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Manage Project Assignment</DialogTitle>
-              <DialogDescription>Assign or change advisors and evaluators for this project.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Project</Label>
-                <p className="text-sm text-muted-foreground mt-1">{selectedProject?.title}</p>
-              </div>
-              <div>
-                <Label>Assign Advisor</Label>
-                <Select value={selectedAdvisor} onValueChange={setSelectedAdvisor}>
-                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select an advisor" /></SelectTrigger>
-                  <SelectContent>
-                    {advisors.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Assign Evaluators</Label>
-                <Select>
-                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select evaluators" /></SelectTrigger>
-                  <SelectContent>
-                    {evaluators.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full" onClick={handleAssignAdvisor}>Save Assignments</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Link href="/dashboard/coordinator/projects">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5">
+            <UserPlus className="h-3.5 w-3.5" /> Manage
+          </Button>
+        </Link>
       )
     },
   ]
@@ -274,6 +439,12 @@ export function CoordinatorDashboard() {
   ]
 
   const unreadAlerts = mockTimelineAlerts.filter(a => !a.isRead)
+  const trackedTimelines = useMemo(
+    () => (timelineTrackingQuery.data?.items ?? []).map(mapTrackingItemToTimelineCard),
+    [timelineTrackingQuery.data?.items]
+  )
+  const trackedTimelineTotal = timelineTrackingQuery.data?.pagination.totalItems ?? 0
+  const trackedTimelinePages = Math.max(1, timelineTrackingQuery.data?.pagination.totalPages ?? 1)
 
   const evaluatorMetrics = useMemo(() => evaluators.map(ev => {
     const assigned = mockProjects.filter(p => (p.evaluatorIds ?? []).includes(ev.id))
@@ -510,16 +681,73 @@ export function CoordinatorDashboard() {
               <CardTitle>Project Timelines</CardTitle>
               <CardDescription>Countdown and progress tracking for active projects</CardDescription>
             </div>
-            <Badge variant="outline" className="text-xs">{mockProjectTimelines.length} tracked</Badge>
+            <Badge variant="outline" className="text-xs">{trackedTimelineTotal} tracked</Badge>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {mockProjectTimelines.slice(0, 4).map((timeline) => {
-              const project = mockProjects.find(p => p.id === timeline.projectId)
-              return <TimelineCard key={timeline.projectId} timeline={timeline} projectTitle={project?.title || 'Unknown Project'} />
-            })}
-          </div>
+          {timelineTrackingQuery.isError ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+              {timelineTrackingQuery.error instanceof Error ? timelineTrackingQuery.error.message : "Failed to load project timelines."}
+            </div>
+          ) : timelineTrackingQuery.isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Card key={index} className="border shadow-sm">
+                  <CardContent className="space-y-3 p-5">
+                    <div className="h-5 w-2/3 rounded bg-muted/60" />
+                    <div className="h-2 rounded bg-muted/50" />
+                    <div className="flex justify-between gap-2">
+                      <div className="h-4 w-24 rounded bg-muted/50" />
+                      <div className="h-5 w-20 rounded bg-muted/50" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-5 rounded bg-muted/40" />
+                      <div className="h-5 rounded bg-muted/40" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : trackedTimelines.length > 0 ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {trackedTimelines.map((timeline) => (
+                  <DashboardTimelineCard key={timeline.projectId} timeline={timeline} />
+                ))}
+              </div>
+              {trackedTimelinePages > 1 ? (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Page <span className="font-semibold text-foreground">{timelinePage}</span> of {trackedTimelinePages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={timelinePage <= 1 || timelineTrackingQuery.isFetching}
+                      onClick={() => setTimelinePage((current) => Math.max(1, current - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={timelinePage >= trackedTimelinePages || timelineTrackingQuery.isFetching}
+                      onClick={() => setTimelinePage((current) => Math.min(trackedTimelinePages, current + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/10 px-6 py-16 text-center">
+              <Timer className="mb-3 h-10 w-10 text-muted-foreground/30" />
+              <p className="font-medium text-foreground">No active project timelines found</p>
+              <p className="mt-1 text-xs text-muted-foreground">The live tracking endpoint returned no active projects for this department.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -576,7 +804,13 @@ export function CoordinatorDashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <DataTable data={mockProjects.slice(0, 5)} columns={projectColumns} />
+              {activeProjectsTableQuery.isError ? (
+                <div className="px-6 py-6 text-sm text-destructive">
+                  {activeProjectsTableQuery.error instanceof Error ? activeProjectsTableQuery.error.message : "Failed to load active projects."}
+                </div>
+              ) : (
+                <DataTable data={activeProjectRows} columns={projectColumns} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -603,34 +837,60 @@ export function CoordinatorDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {advisors.map((advisor) => {
-                  const advisorProjects = mockProjects.filter(p => p.advisorId === advisor.id)
-                  const avgProg = advisorProjects.length > 0
-                    ? Math.round(advisorProjects.reduce((s, p) => s + (p.progress || 0), 0) / advisorProjects.length)
-                    : 0
-                  const perfLabel = avgProg >= 75 ? 'Excellent' : avgProg >= 50 ? 'Good' : 'Attention'
-                  return (
-                    <div key={advisor.id} className="flex items-center gap-4 rounded-xl border p-3 hover:bg-muted/40 transition-colors">
-                      <Avatar className="h-10 w-10 shrink-0">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">{advisor.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{advisor.name}</p>
-                        <p className="text-xs text-muted-foreground">{advisor.email}</p>
+              {advisorOverviewQuery.isError ? (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                  {advisorOverviewQuery.error instanceof Error ? advisorOverviewQuery.error.message : "Failed to load advisor performance."}
+                </div>
+              ) : advisorOverviewQuery.isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-4 rounded-xl border p-3">
+                      <div className="h-10 w-10 rounded-full bg-muted/60 shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-40 rounded bg-muted/60" />
+                        <div className="h-3 w-32 rounded bg-muted/50" />
                       </div>
-                      <div className="hidden sm:flex flex-col items-end gap-1 w-28 shrink-0">
-                        <div className="flex justify-between w-full text-xs">
-                          <span className="text-muted-foreground">{advisorProjects.length} proj</span>
-                          <span className="font-medium">{avgProg}%</span>
-                        </div>
-                        <Progress value={avgProg} className="h-1.5 w-full" />
+                      <div className="hidden sm:block w-28 space-y-2 shrink-0">
+                        <div className="h-3 rounded bg-muted/50" />
+                        <div className="h-1.5 rounded bg-muted/50" />
                       </div>
-                      <Badge variant={avgProg >= 50 ? 'secondary' : 'outline'} className="text-xs shrink-0">{perfLabel}</Badge>
+                      <div className="h-5 w-20 rounded bg-muted/50 shrink-0" />
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : (advisorOverviewQuery.data?.advisors.length ?? 0) > 0 ? (
+                <div className="space-y-3">
+                  {advisorOverviewQuery.data?.advisors.map((advisor) => {
+                    const avgProg = advisor.metrics.overallProjectProgress
+                    const perfLabel = performanceLabel(avgProg)
+                    return (
+                      <div key={advisor.advisorId} className="flex items-center gap-4 rounded-xl border p-3 hover:bg-muted/40 transition-colors">
+                        <Avatar className="h-10 w-10 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">{advisor.fullName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{advisor.fullName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{advisor.email}</p>
+                        </div>
+                        <div className="hidden sm:flex flex-col items-end gap-1 w-28 shrink-0">
+                          <div className="flex justify-between w-full text-xs">
+                            <span className="text-muted-foreground">{advisor.metrics.totalProjectsAdvising} proj</span>
+                            <span className="font-medium">{avgProg}%</span>
+                          </div>
+                          <Progress value={avgProg} className="h-1.5 w-full" />
+                        </div>
+                        <Badge variant={avgProg >= 50 ? 'secondary' : 'outline'} className="text-xs shrink-0">{perfLabel}</Badge>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground font-medium">No advisor performance data found</p>
+                  <p className="text-xs text-muted-foreground mt-1">The live advisor overview endpoint returned no advisors for this department.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
