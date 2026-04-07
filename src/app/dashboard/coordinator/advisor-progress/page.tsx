@@ -685,14 +685,21 @@ export default function AdvisorProgressPage() {
     search: normalizedSearch || undefined,
   })
 
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
     setPage(1)
-  }, [normalizedSearch, perfFilter])
+  }
 
-  useEffect(() => {
-    setSheetOpen(false)
-    setSheetAdvisor(null)
-  }, [page])
+  const handlePerfFilterChange = (value: string) => {
+    setPerfFilter(value)
+    setPage(1)
+  }
+
+  const handleClearFilters = () => {
+    setSearch("")
+    setPerfFilter("all")
+    setPage(1)
+  }
 
   const advisorMetrics: AdvisorMetrics[] = useMemo(() => {
     return (advisorOverviewQuery.data?.advisors ?? []).map(mapAdvisorMetrics)
@@ -836,11 +843,11 @@ export default function AdvisorProgressPage() {
               <Input
                 placeholder="Search advisor by name or email…"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9 h-10"
               />
             </div>
-            <Select value={perfFilter} onValueChange={setPerfFilter}>
+            <Select value={perfFilter} onValueChange={handlePerfFilterChange}>
               <SelectTrigger className="h-10 w-48 shrink-0">
                 <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Performance" />
@@ -854,7 +861,7 @@ export default function AdvisorProgressPage() {
             </Select>
             {(search || perfFilter !== 'all') && (
               <Button variant="ghost" size="sm" className="h-10 text-xs"
-                onClick={() => { setSearch(''); setPerfFilter('all') }}>
+                onClick={handleClearFilters}>
                 Clear
               </Button>
             )}
