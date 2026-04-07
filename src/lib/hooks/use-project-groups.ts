@@ -8,7 +8,9 @@ import {
   createProjectGroupInvitation,
   previewProjectGroupInvitation,
   cancelProjectGroupJoinRequest,
+  approveSubmittedProjectGroupReview,
   approveMyGroupJoinRequest,
+  rejectSubmittedProjectGroupReview,
   rejectMyGroupJoinRequest,
   submitMyProjectGroup,
   reopenMyProjectGroup,
@@ -22,9 +24,11 @@ import {
   getMyGroupJoinRequests,
   getMyProjectGroup,
   getProjectGroupDetails,
+  getSubmittedProjectGroupsForReview,
 } from "@/lib/api/project-groups"
 import type {
   AvailableStudentsPage,
+  ApproveSubmittedProjectGroupReviewResult,
   BrowseProjectGroupsPage,
   CancelProjectGroupJoinRequestResult,
   ApproveMyGroupJoinRequestResult,
@@ -44,6 +48,10 @@ import type {
   ProjectGroup,
   ProjectGroupDetails,
   ProjectGroupMe,
+  ProjectGroupReviewSubmittedPage,
+  ProjectGroupReviewSubmittedStatus,
+  RejectSubmittedProjectGroupReviewDto,
+  RejectSubmittedProjectGroupReviewResult,
 } from "@/types/project-groups"
 import type {
   AnnouncementDetails,
@@ -66,6 +74,8 @@ export function projectGroupKeys() {
       [...projectGroupKeys().root, "join-requests", "me", params] as const,
     joinRequestsMyGroup: (params: { page: number; limit: number; status?: MyProjectGroupJoinRequestStatus | string }) =>
       [...projectGroupKeys().root, "join-requests", "my-group", params] as const,
+    reviewSubmitted: (params: { page: number; limit: number; status?: ProjectGroupReviewSubmittedStatus | string }) =>
+      [...projectGroupKeys().root, "review", "submitted", params] as const,
     announcementsMyGroup: (params: { page: number; limit: number }) =>
       [...projectGroupKeys().root, "announcements", "my-group", params] as const,
     announcementMyGroup: (announcementId: string) =>
@@ -237,6 +247,55 @@ export function useMyGroupJoinRequests(params: {
     staleTime: 30_000,
     placeholderData: (previous) => previous,
     retry: false,
+  })
+}
+
+export function useSubmittedProjectGroupsForReview(params: {
+  enabled: boolean
+  page: number
+  limit: number
+  status?: ProjectGroupReviewSubmittedStatus | string
+}) {
+  const status = params.status?.trim() ? params.status.trim() : "ALL"
+
+  return useQuery<ProjectGroupReviewSubmittedPage, Error>({
+    queryKey: projectGroupKeys().reviewSubmitted({
+      page: params.page,
+      limit: params.limit,
+      status,
+    }),
+    queryFn: () =>
+      getSubmittedProjectGroupsForReview({
+        page: params.page,
+        limit: params.limit,
+        status,
+      }),
+    enabled: params.enabled,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    retry: false,
+  })
+}
+
+export function useApproveSubmittedProjectGroupReview() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ApproveSubmittedProjectGroupReviewResult, Error, { groupId: string }>({
+    mutationFn: ({ groupId }) => approveSubmittedProjectGroupReview(groupId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectGroupKeys().root })
+    },
+  })
+}
+
+export function useRejectSubmittedProjectGroupReview() {
+  const queryClient = useQueryClient()
+
+  return useMutation<RejectSubmittedProjectGroupReviewResult, Error, { groupId: string; dto: RejectSubmittedProjectGroupReviewDto }>({
+    mutationFn: ({ groupId, dto }) => rejectSubmittedProjectGroupReview(groupId, dto),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectGroupKeys().root })
+    },
   })
 }
 

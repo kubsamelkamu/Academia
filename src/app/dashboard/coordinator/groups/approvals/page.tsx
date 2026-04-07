@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useEffect } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,15 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import {
+  useApproveSubmittedProjectGroupReview,
+  useRejectSubmittedProjectGroupReview,
+  useSubmittedProjectGroupsForReview,
+} from "@/lib/hooks/use-project-groups"
+import type {
+  ProjectGroupReviewSubmittedItem,
+  ProjectGroupReviewSubmittedStatus,
+} from "@/types/project-groups"
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 type AppStatus = "pending" | "approved" | "rejected"
@@ -47,61 +56,12 @@ interface GroupMember {
 interface GroupAppItem {
   id: string
   groupName: string
-  domain: string
   requestedAt: string
   status: AppStatus
   members: GroupMember[]
-  projectIdea: string
-  motivation: string
-  advisorPreference: string
+  leaderName: string
+  rejectionReason?: string | null
 }
-
-/* ─── Mock Data ─────────────────────────────────────────────────────── */
-const MOCK_GROUPS: GroupAppItem[] = [
-  {
-    id: "ga-1",
-    groupName: "DeepMind Innovators",
-    domain: "AI / Machine Learning",
-    requestedAt: "2024-05-12",
-    status: "pending",
-    members: [
-      { id: "m1", name: "Alex Johnson", email: "alex.j@uni.edu", role: "leader" },
-      { id: "m2", name: "Maria Garcia", email: "maria.g@uni.edu", role: "member" },
-      { id: "m3", name: "David Kim", email: "david.k@uni.edu", role: "member" },
-    ],
-    projectIdea: "An AI-powered campus navigation system utilizing computer vision for indoor positioning.",
-    motivation: "We want to solve the problem of freshmen getting lost in the science complex.",
-    advisorPreference: "Dr. Sarah Williams",
-  },
-  {
-    id: "ga-2",
-    groupName: "Cyber Defenders",
-    domain: "Cybersecurity",
-    requestedAt: "2024-05-13",
-    status: "pending",
-    members: [
-      { id: "m4", name: "Noah Williams", email: "noah.w@uni.edu", role: "leader" },
-      { id: "m5", name: "Olivia Martinez", email: "olivia.m@uni.edu", role: "member" },
-    ],
-    projectIdea: "A decentralized credential verification system using blockchain.",
-    motivation: "To prevent degree forgery and simplify the verification process for employers.",
-    advisorPreference: "Prof. Robert Chen",
-  },
-  {
-    id: "ga-3",
-    groupName: "NextGen Web",
-    domain: "Web Development",
-    requestedAt: "2024-05-10",
-    status: "approved",
-    members: [
-      { id: "m6", name: "Emma Wilson", email: "emma.w@uni.edu", role: "leader" },
-      { id: "m7", name: "James Lee", email: "james.l@uni.edu", role: "member" },
-    ],
-    projectIdea: "Real-time collaboration platform for study groups using WebRTC.",
-    motivation: "Current tools are either too complex or lack academic focus.",
-    advisorPreference: "Dr. Michael Brown",
-  },
-]
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
 function initials(name: string) {
@@ -116,6 +76,62 @@ const STATUS_CFG: Record<AppStatus, { label: string; cls: string; dot: string; i
   pending:  { label: "Pending",  cls: "bg-amber-500/10 text-amber-600 border-amber-400/30",    dot: "bg-amber-500",   icon: Clock },
   approved: { label: "Approved", cls: "bg-primary/10 text-primary border-primary/20",           dot: "bg-primary",     icon: CheckCircle },
   rejected: { label: "Rejected", cls: "bg-destructive/10 text-destructive border-destructive/20", dot: "bg-destructive", icon: XCircle },
+}
+
+function toAppStatus(status: string | undefined): AppStatus {
+  switch ((status ?? "").toUpperCase()) {
+    case "APPROVED":
+      return "approved"
+    case "REJECTED":
+      return "rejected"
+    case "PENDING":
+    default:
+      return "pending"
+  }
+}
+
+function tabToReviewStatus(tab: string): ProjectGroupReviewSubmittedStatus {
+  switch (tab) {
+    case "approved":
+      return "APPROVED"
+    case "rejected":
+      return "REJECTED"
+    case "pending":
+      return "PENDING"
+    case "all":
+    default:
+      return "ALL"
+  }
+}
+
+function mapSubmittedGroupToAppItem(item: ProjectGroupReviewSubmittedItem): GroupAppItem {
+  const leaderName = item.leader.fullName || [item.leader.firstName, item.leader.lastName].filter(Boolean).join(" ") || item.leader.email
+
+  return {
+    id: item.id,
+    groupName: item.name,
+    requestedAt: item.submittedAt,
+    status: toAppStatus(item.reviewStatus),
+    leaderName,
+    rejectionReason: item.rejectionReason,
+    members: [
+      {
+        id: item.leader.id,
+        name: leaderName,
+        email: item.leader.email,
+        role: "leader",
+      },
+      ...item.members.map((member) => ({
+        id: member.id,
+        name:
+          member.user.fullName ||
+          [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") ||
+          member.user.email,
+        email: member.user.email,
+        role: "member" as const,
+      })),
+    ],
+  }
 }
 
 /* ─── Review Sheet ─────────────────────────────────────────────────── */
@@ -148,9 +164,15 @@ function GroupReviewSheet({
     if (decision === "rejected" && !reason.trim()) { toast.error("Please provide a rejection reason"); return }
 
     setLoading(true)
-    await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
-    setLoading(false)
-    onClose()
+    try {
+      await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
+      onClose()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to submit review decision"
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -206,11 +228,19 @@ function GroupReviewSheet({
           </div>
 
           {alreadyDecided ? (
-            <div className={cn("rounded-xl border p-4 flex items-center gap-3", sc.cls)}>
-              <sc.icon className="h-5 w-5 shrink-0" />
-              <p className="text-sm font-medium">
-                This group request has already been <span className="font-bold">{app.status}</span>.
-              </p>
+            <div className="space-y-3">
+              <div className={cn("rounded-xl border p-4 flex items-center gap-3", sc.cls)}>
+                <sc.icon className="h-5 w-5 shrink-0" />
+                <p className="text-sm font-medium">
+                  This group request has already been <span className="font-bold">{app.status}</span>.
+                </p>
+              </div>
+              {app.rejectionReason ? (
+                <div className="rounded-xl border bg-destructive/5 p-4 space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rejection Reason</p>
+                  <p className="text-sm text-foreground">{app.rejectionReason}</p>
+                </div>
+              ) : null}
             </div>
           ) : (
             <>
@@ -292,31 +322,86 @@ function GroupReviewSheet({
 export default function GroupApprovalPage() {
   const [search, setSearch]     = useState("")
   const [tab, setTab]           = useState("pending")
+  const [page, setPage]         = useState(1)
   const [selected, setSelected] = useState<GroupAppItem | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  
-  const [data, setData] = useState(MOCK_GROUPS)
+
+  const pageSize = 10
+
+  const reviewStatus = tabToReviewStatus(tab)
+  const reviewQuery = useSubmittedProjectGroupsForReview({
+    enabled: true,
+    page,
+    limit: pageSize,
+    status: reviewStatus,
+  })
+  const approveReviewMutation = useApproveSubmittedProjectGroupReview()
+  const rejectReviewMutation = useRejectSubmittedProjectGroupReview()
+
+  useEffect(() => {
+    setPage(1)
+  }, [tab])
+
+  useEffect(() => {
+    const totalPages = reviewQuery.data?.pagination.pages ?? 1
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, reviewQuery.data?.pagination.pages])
+
+  useEffect(() => {
+    if (reviewQuery.error) {
+      toast.error(reviewQuery.error.message || "Failed to load submitted project groups")
+    }
+  }, [reviewQuery.error])
+
+  const data = useMemo(() => (reviewQuery.data?.items ?? []).map(mapSubmittedGroupToAppItem), [reviewQuery.data])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return data.filter(g => {
       const matchTab = tab === "all" || g.status === tab
-      const matchSearch = !search || g.groupName.toLowerCase().includes(q) || g.domain.toLowerCase().includes(q)
+      const matchSearch =
+        !search ||
+        g.groupName.toLowerCase().includes(q) ||
+        g.leaderName.toLowerCase().includes(q) ||
+        g.members.some(member => member.name.toLowerCase().includes(q) || member.email.toLowerCase().includes(q))
       return matchTab && matchSearch
     })
   }, [data, tab, search])
 
   const counts = {
-    all: data.length,
-    pending: data.filter(g => g.status === "pending").length,
-    approved: data.filter(g => g.status === "approved").length,
-    rejected: data.filter(g => g.status === "rejected").length,
+    all: reviewQuery.data?.summary.all ?? 0,
+    pending: reviewQuery.data?.summary.pending ?? 0,
+    approved: reviewQuery.data?.summary.approved ?? 0,
+    rejected: reviewQuery.data?.summary.rejected ?? 0,
   }
 
+  const pagination = reviewQuery.data?.pagination
+  const currentPage = pagination?.page ?? page
+  const totalPages = pagination?.pages ?? 1
+  const totalItems = pagination?.total ?? filtered.length
+  const showingFrom = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const showingTo = totalItems === 0 ? 0 : Math.min((currentPage - 1) * pageSize + filtered.length, totalItems)
+
   const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
-    await new Promise(r => setTimeout(r, 800))
-    setData(prev => prev.map(g => g.id === id ? { ...g, status: decision } : g))
-    toast.success(`Group ${decision === "approved" ? "Approved" : "Rejected"} successfully`)
+    if (decision === "approved") {
+      await approveReviewMutation.mutateAsync({ groupId: id })
+      toast.success("Group approved successfully")
+      return
+    }
+
+    const trimmedReason = reason?.trim()
+    if (!trimmedReason) {
+      toast.error("Please provide a rejection reason")
+      return
+    }
+
+    await rejectReviewMutation.mutateAsync({
+      groupId: id,
+      dto: { reason: trimmedReason },
+    })
+    toast.success("Group rejected successfully")
   }
 
   return (
@@ -409,39 +494,72 @@ export default function GroupApprovalPage() {
         {['pending', 'approved', 'rejected', 'all'].map(t => (
           <TabsContent key={t} value={t} className="mt-4">
             {filtered.length > 0 ? (
-              <div className="space-y-3">
-                {filtered.map(app => {
-                  const sc = STATUS_CFG[app.status]
-                  return (
-                    <div key={app.id} className={cn("group rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/30 transition-all", app.status === "pending" ? "border-border/70 shadow-sm" : "border-border/40 opacity-80")}>
-                      <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                        <Users className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                          <span className="font-semibold text-sm">{app.groupName}</span>
-                          <Badge variant="outline" className={cn("text-[10px] h-5", sc.cls)}>
-                            <span className={cn("h-1.5 w-1.5 rounded-full mr-1", sc.dot)} />{sc.label}
-                          </Badge>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {filtered.map(app => {
+                    const sc = STATUS_CFG[app.status]
+                    return (
+                      <div key={app.id} className={cn("group rounded-xl border bg-card p-4 flex items-center gap-4 hover:border-primary/30 transition-all", app.status === "pending" ? "border-border/70 shadow-sm" : "border-border/40 opacity-80")}>
+                        <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                          <Users className="h-5 w-5" />
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" />{app.domain}</span>
-                          <span className="flex items-center gap-1"><Users className="h-3 w-3" />{app.members.length} members</span>
-                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{fmtDate(app.requestedAt)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="font-semibold text-sm">{app.groupName}</span>
+                            <Badge variant="outline" className={cn("text-[10px] h-5", sc.cls)}>
+                              <span className={cn("h-1.5 w-1.5 rounded-full mr-1", sc.dot)} />{sc.label}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" />Leader: {app.leaderName}</span>
+                            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{app.members.length} members</span>
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{fmtDate(app.requestedAt)}</span>
+                          </div>
                         </div>
+                        <Button size="sm" variant={app.status === "pending" ? "default" : "outline"} className="shrink-0 h-8 gap-1.5 text-xs" onClick={() => { setSelected(app); setSheetOpen(true); }}>
+                          <Eye className="h-3.5 w-3.5" /> {app.status === "pending" ? "Review" : "View"}
+                        </Button>
                       </div>
-                      <Button size="sm" variant={app.status === "pending" ? "default" : "outline"} className="shrink-0 h-8 gap-1.5 text-xs" onClick={() => { setSelected(app); setSheetOpen(true); }}>
-                        <Eye className="h-3.5 w-3.5" /> {app.status === "pending" ? "Review" : "View"}
+                    )
+                  })}
+                </div>
+
+                {totalPages > 1 ? (
+                  <div className="flex flex-col gap-3 rounded-xl border bg-muted/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{showingFrom}</span>-<span className="font-medium text-foreground">{showingTo}</span> of <span className="font-medium text-foreground">{totalItems}</span> requests
+                    </p>
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPage((value) => Math.max(value - 1, 1))}
+                        disabled={currentPage <= 1 || reviewQuery.isFetching}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Page <span className="font-medium text-foreground">{currentPage}</span> of <span className="font-medium text-foreground">{totalPages}</span>
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPage((value) => Math.min(value + 1, totalPages))}
+                        disabled={currentPage >= totalPages || reviewQuery.isFetching}
+                      >
+                        Next
                       </Button>
                     </div>
-                  )
-                })}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed text-center">
-                <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                <p className="font-medium text-muted-foreground">No groups found</p>
-                <p className="text-xs text-muted-foreground mt-1">Pending group formations will appear here</p>
+                {reviewQuery.error ? <AlertCircle className="h-10 w-10 text-destructive/40 mb-3" /> : <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />}
+                <p className="font-medium text-muted-foreground">{reviewQuery.error ? "Unable to load groups" : "No groups found"}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reviewQuery.error ? "Please retry after checking the backend connection" : "Pending group formations will appear here"}
+                </p>
               </div>
             )}
           </TabsContent>
