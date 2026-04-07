@@ -639,6 +639,26 @@ export function EvaluatorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-full bg-primary p-2.5 text-primary-foreground shadow-sm">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold leading-none">DC Committee Access</p>
+              <p className="text-sm text-muted-foreground">Open the committee project workspace from your evaluator dashboard.</p>
+            </div>
+          </div>
+          <Button asChild className="w-full gap-1.5 sm:w-auto">
+            <Link href="/dashboard/department-committee/assigned-projects">
+              Access DC Committee
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

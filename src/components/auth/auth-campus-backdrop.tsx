@@ -27,38 +27,41 @@ export const SIGN_IN_MAGIC_CARD_SHELL =
 export const SIGN_IN_MAGIC_SHINE =
   'pointer-events-none absolute inset-0 z-[2] rounded-2xl -translate-x-full skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition duration-700 ease-out group-hover:translate-x-full group-hover:opacity-100'
 
-/** Hover glow aura — emerald green */
+/** Hover glow aura — brand orange */
 export const SIGN_IN_MAGIC_AURA =
-  'pointer-events-none absolute -inset-px z-0 rounded-2xl bg-gradient-to-br from-emerald-500/22 via-green-400/15 to-teal-400/10 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100'
+  'pointer-events-none absolute -inset-px z-0 rounded-2xl bg-gradient-to-br from-[#ED5F45]/22 via-[#F47A64]/15 to-orange-400/10 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100'
 
 /** "Join Academia" style headline */
-export const AUTH_GREEN_HEADLINE_CLASS =
-  'text-balance font-black tracking-tight text-emerald-600 drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)] dark:text-emerald-400'
+export const AUTH_BRAND_HEADLINE_CLASS =
+  'text-balance font-black tracking-tight bg-gradient-to-r from-emerald-400 via-green-500 to-emerald-400 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]'
+
+/** Invitation shell headline when not on glass / campus (readable on light UI) */
+export const AUTH_GREEN_HEADLINE_CLASS = AUTH_BRAND_HEADLINE_CLASS
 
 /** "Welcome back" headline — white on campus photo */
 export const AUTH_WELCOME_HEADLINE_CLASS =
-  'text-balance font-black tracking-tight bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 bg-clip-text text-transparent drop-shadow-[0_2px_22px_rgba(0,0,0,0.55),0_1px_4px_rgba(0,0,0,0.45)]'
+  'text-balance font-black tracking-tight bg-gradient-to-r from-emerald-400 via-green-500 to-teal-400 bg-clip-text text-transparent drop-shadow-[0_2px_22px_rgba(0,0,0,0.6),0_1px_4px_rgba(0,0,0,0.5)]'
 
 /** University logo circle */
 export const SIGN_IN_LOGO_SURFACE =
-  'border-2 border-emerald-400/40 bg-white shadow-lg ring-4 ring-emerald-500/15 dark:border-emerald-400/25 dark:bg-slate-900/80 dark:ring-emerald-400/20'
+  'border-2 border-[#ED5F45]/40 bg-white shadow-lg ring-4 ring-[#ED5F45]/15 dark:border-[#ED5F45]/25 dark:bg-slate-900/80 dark:ring-[#ED5F45]/20'
 
-/** Icons and inline accents — emerald */
-export const AUTH_ACCENT_ICON = 'text-emerald-600 dark:text-emerald-400'
+/** Icons and inline accents — brand orange */
+export const AUTH_ACCENT_ICON = 'text-[#ED5F45] dark:text-[#ED5F45]'
 
-export const AUTH_ACCENT_TEXT = 'text-emerald-700 dark:text-emerald-300'
+export const AUTH_ACCENT_TEXT = 'text-[#ED5F45] dark:text-[#F47A64]'
 
-/** Inputs — emerald focus ring */
+/** Inputs — brand orange focus ring */
 export const AUTH_FORM_INPUT_CLASS =
-  'border-slate-200/90 bg-white/95 text-slate-900 shadow-sm backdrop-blur-sm transition-all duration-200 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/25 md:text-sm dark:border-white/12 dark:bg-slate-950/70 dark:text-slate-100 dark:focus-visible:border-emerald-400 dark:focus-visible:ring-emerald-400/25'
+  'border-slate-200/90 bg-white/95 text-slate-900 shadow-sm backdrop-blur-sm transition-all duration-200 focus-visible:border-[#ED5F45] focus-visible:ring-[#ED5F45]/25 md:text-sm dark:border-white/12 dark:bg-slate-950/70 dark:text-slate-100 dark:focus-visible:border-[#ED5F45] dark:focus-visible:ring-[#ED5F45]/25'
 
-/** Primary CTA button — emerald gradient */
+/** Primary CTA button — brand orange gradient */
 export const AUTH_PRIMARY_BUTTON_CLASS =
-  'relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 py-6 text-base font-bold text-white transition-all duration-200 hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-55 sm:py-5 before:absolute before:inset-0 before:-translate-x-full before:skew-x-12 before:bg-white/15 before:transition-transform before:duration-700 hover:before:translate-x-full'
+  'relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] py-6 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] shadow-lg shadow-[#ED5F45]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED5F45]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-55 sm:py-5 before:absolute before:inset-0 before:-translate-x-full before:skew-x-12 before:bg-white/15 before:transition-transform before:duration-700 hover:before:translate-x-full'
 
-/** Analytics side card — rich emerald/teal dark tone */
+/** Analytics side card — rich brand tones */
 export const AUTH_CTA_CARD_CLASS =
-  'border border-emerald-400/25 bg-gradient-to-br from-emerald-900/90 via-green-900/85 to-teal-900/80 p-5 text-white backdrop-blur-xl sm:p-6 hover:border-emerald-300/40 dark:from-emerald-950/90 dark:via-green-950/85 dark:to-teal-950/80'
+  'border border-[#ED5F45]/25 bg-gradient-to-br from-slate-900/95 via-slate-800/90 to-slate-900/95 p-5 text-white backdrop-blur-xl sm:p-6 hover:border-[#ED5F45]/40'
 
 type AuthCampusBackdropProps = {
   children: ReactNode
@@ -77,31 +80,31 @@ export function AuthCampusBackdrop({ children, className }: AuthCampusBackdropPr
     >
       {/* ── Background ── */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        {/* Fallback gradient — deep green-to-forest tones */}
+        {/* Fallback gradient — brand orange tones */}
         <div
-          className="absolute inset-0 bg-[linear-gradient(152deg,#052e16_0%,#064e3b_22%,#065f46_44%,#047857_62%,#059669_80%,#a7f3d0_100%)]"
+          className="absolute inset-0 bg-[linear-gradient(152deg,#1e293b_0%,#334155_22%,#475569_44%,#ED5F45_100%)]"
           aria-hidden
         />
         {campusPhotoOk ? (
           <Image
-            src="/image.png"
+            src="/Auth background.png"
             alt=""
             fill
             priority
             sizes="100vw"
-            className="object-cover object-[center_30%] sm:object-[center_28%] lg:object-center"
+            className="object-cover object-[center_30%] sm:object-[center_28%] lg:object-center opacity-60"
             aria-hidden
             onError={() => setCampusPhotoOk(false)}
           />
         ) : null}
-        {/* Overlay — emerald-tinted dark scrim */}
+        {/* Overlay — Scrim */}
         <div
-          className="absolute inset-0 bg-gradient-to-br from-slate-950/50 via-emerald-950/30 to-slate-950/55 dark:from-slate-950/68 dark:via-emerald-950/40 dark:to-slate-950/72"
+          className="absolute inset-0 bg-gradient-to-br from-slate-950/70 via-slate-900/40 to-slate-950/80 dark:from-slate-950/80 dark:via-slate-950/60 dark:to-slate-950/90"
           aria-hidden
         />
-        {/* Subtle green shimmer at top */}
+        {/* Subtle brand shimmer at top */}
         <div
-          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent"
+          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#ED5F45]/40 to-transparent"
           aria-hidden
         />
       </div>

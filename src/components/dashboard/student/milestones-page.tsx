@@ -250,7 +250,7 @@ export function StudentMilestonesPage() {
     enabled: Boolean(resolvedProjectId),
   })
 
-  const milestones = useMemo<Milestone[]>(() => {
+  const milestones: Milestone[] = (() => {
     const templates = templatesData?.templates ?? []
     const activeTemplate = getActiveMilestoneTemplate(templates)
 
@@ -387,7 +387,7 @@ export function StudentMilestonesPage() {
     }
 
     return myProject.milestones
-  }, [projectMilestonesData?.items, proposalMilestoneState, templatesData?.templates])
+  })()
 
   const completedMilestones = milestones.filter((m) => m.status === "approved").length
   const totalMilestones = milestones.length

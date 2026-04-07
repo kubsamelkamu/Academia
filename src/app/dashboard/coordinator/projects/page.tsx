@@ -618,12 +618,34 @@ export default function ProjectsPage() {
     })
   }, [projects, search, statusFilter, advisorFilter])
 
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
     setProjectPage(1)
-  }, [search, statusFilter, advisorFilter])
+  }
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value)
+    setProjectPage(1)
+  }
+
+  const handleAdvisorFilterChange = (value: string) => {
+    setAdvisorFilter(value)
+    setProjectPage(1)
+  }
+
+  const handleClearFilters = () => {
+    setSearch("")
+    setStatusFilter("all")
+    setAdvisorFilter("all")
+    setProjectPage(1)
+  }
 
   useEffect(() => {
-    setAdvisorWorkloadPage(1)
+    const timeoutId = window.setTimeout(() => {
+      setAdvisorWorkloadPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [departmentId])
 
   // Stats
@@ -796,12 +818,12 @@ export default function ProjectsPage() {
               <Input
                 placeholder="Search by title, group, or advisor…"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9 h-10"
               />
             </div>
             <div className="flex gap-2 shrink-0">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="h-10 w-40">
                   <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                   <SelectValue placeholder="Status" />
@@ -814,7 +836,7 @@ export default function ProjectsPage() {
                   <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+              <Select value={advisorFilter} onValueChange={handleAdvisorFilterChange}>
                 <SelectTrigger className="h-10 w-44">
                   <Users className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                   <SelectValue placeholder="Advisor" />
@@ -846,7 +868,7 @@ export default function ProjectsPage() {
               <Button
                 variant="ghost" size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => { setSearch(''); setStatusFilter('all'); setAdvisorFilter('all') }}
+                onClick={handleClearFilters}
               >
                 Clear filters
               </Button>

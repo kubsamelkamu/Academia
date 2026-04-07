@@ -1,46 +1,52 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Loader2,
   Mail,
   Shield,
   CheckCircle2,
   ArrowRight,
-  Clock
-} from 'lucide-react';
-import { RegistrationProgress } from '@/components/auth/registration-progress';
-import { useAuthStore } from '@/store/auth-store';
-import { verifyOtpSchema, VerifyOtpFormData, resendOtpSchema, ResendOtpFormData } from '@/validations/auth';
+  Clock,
+  GraduationCap,
+  BarChart3,
+} from 'lucide-react'
+import { RegistrationProgress } from '@/components/auth/registration-progress'
+import { useAuthStore } from '@/store/auth-store'
+import { verifyOtpSchema, VerifyOtpFormData, resendOtpSchema, ResendOtpFormData } from '@/validations/auth'
+import {
+  AuthCampusBackdrop,
+  AUTH_ACCENT_ICON,
+  AUTH_FORM_INPUT_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_WELCOME_HEADLINE_CLASS,
+} from '@/components/auth/auth-campus-backdrop'
+import {
+  AuthTiltCard,
+  AUTH_CONTAINER_VARIANTS,
+  AUTH_ITEM_VARIANTS,
+  AUTH_SLIDE_LEFT_VARIANTS,
+  AUTH_SLIDE_RIGHT_VARIANTS,
+} from '@/components/auth/auth-tilt-card'
+import { cn } from '@/lib/utils'
 
-const containerVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
+const verifySteps = [
+  'Check your email for the 6-digit verification code',
+  'Enter the code below to activate your account',
+  'Your institution will be ready for setup',
+  'Access your department head dashboard',
+]
 
 export default function VerifyPage() {
-  const router = useRouter();
+  const router = useRouter()
   const {
     verifyEmailOtp,
     resendEmailOtp,
@@ -50,11 +56,11 @@ export default function VerifyPage() {
     clearAuthSession,
     registration,
     tenantDomain,
-  } = useAuthStore();
+  } = useAuthStore()
 
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendMessage, setResendMessage] = useState<string>('');
-  const [countdown, setCountdown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string>('')
+  const [countdown, setCountdown] = useState(0)
 
   const {
     register,
@@ -62,282 +68,259 @@ export default function VerifyPage() {
     formState: { errors },
   } = useForm<VerifyOtpFormData>({
     resolver: zodResolver(verifyOtpSchema),
-  });
+  })
 
   const {
     register: registerResend,
     handleSubmit: handleResendSubmit,
   } = useForm<ResendOtpFormData>({
     resolver: zodResolver(resendOtpSchema),
-  });
+  })
 
   useEffect(() => {
     if (!registration || !tenantDomain) {
-      router.push('/register');
-      return;
+      router.push('/register')
     }
-  }, [registration, tenantDomain, router]);
+  }, [registration, tenantDomain, router])
 
   useEffect(() => {
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+      return () => clearTimeout(timer)
     }
-  }, [countdown]);
+  }, [countdown])
 
   const onSubmit = async (data: VerifyOtpFormData) => {
-    if (!tenantDomain) return;
-
+    if (!tenantDomain) return
     try {
-      clearError();
+      clearError()
       await verifyEmailOtp({
         email: registration!.departmentHead.email,
         otp: data.otp,
-      });
-
-      // Ensure we don't get redirected to /dashboard due to a previously persisted session.
-      clearAuthSession();
-      router.push('/login');
+      })
+      clearAuthSession()
+      router.push('/login')
     } catch {
-      // Error handled by store
+      /* store */
     }
-  };
+  }
 
   const onResend = async (data: ResendOtpFormData) => {
-    if (!tenantDomain || countdown > 0) return;
-
+    if (!tenantDomain || countdown > 0) return
     try {
-      setResendLoading(true);
-      await resendEmailOtp({
-        email: data.email,
-      });
-      setResendMessage('OTP sent successfully! Check your email.');
-      setCountdown(60); // 60 second cooldown
+      setResendLoading(true)
+      await resendEmailOtp({ email: data.email })
+      setResendMessage('OTP sent successfully! Check your email.')
+      setCountdown(60)
     } catch {
-      setResendMessage('Failed to resend OTP. Please try again.');
+      setResendMessage('Failed to resend OTP. Please try again.')
     } finally {
-      setResendLoading(false);
+      setResendLoading(false)
     }
-  };
+  }
 
   if (!registration) {
-    return null; // Will redirect
+    return null
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <AuthCampusBackdrop>
       <motion.div
-        className="w-full max-w-4xl"
-        variants={containerVariants}
+        className="mx-auto w-full max-w-6xl"
+        variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        {/* Hero Section */}
-        <motion.div
-          className="text-center mb-8"
-          variants={itemVariants}
-        >
+        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
           <motion.div
-            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl mb-4"
-            whileHover={{ scale: 1.05, rotate: -5 }}
-            whileTap={{ scale: 0.95 }}
+            className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30 sm:h-24 sm:w-24"
+            whileHover={{ scale: 1.06, rotate: -4 }}
+            whileTap={{ scale: 0.94 }}
           >
-            <Shield className="w-8 h-8 text-white" />
+            <Shield className="h-10 w-10 text-white sm:h-11 sm:w-11" />
           </motion.div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
-            Verify Your Email
+          <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
+            Verify your email
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We&apos;ve sent a verification code to secure your academic institution account
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+            We&apos;ve sent a verification code to secure your academic institution account.
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-8 items-start">
-          {/* Info Section */}
-          <motion.div
-            className="space-y-6"
-            variants={itemVariants}
-          >
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-blue-500" />
-                What happens next?
-              </h3>
-              <ul className="space-y-3">
-                {[
-                  "Check your email for the 6-digit verification code",
-                  "Enter the code below to activate your account",
-                  "Your institution will be ready for setup",
-                  "Access your department head dashboard"
-                ].map((step, index) => (
-                  <motion.li
-                    key={index}
-                    className="flex items-center gap-3 text-gray-700"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + index * 0.1 }}
-                  >
-                    <div className="flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full">
-                      <span className="text-xs font-semibold text-blue-600">{index + 1}</span>
-                    </div>
-                    {step}
-                  </motion.li>
-                ))}
-              </ul>
-            </div>
+        <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_420px]">
+          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
+            <AuthTiltCard>
+              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
+                <h3 className="mb-6 flex items-center gap-3 text-lg font-black uppercase tracking-tight text-white sm:text-xl">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ED5F45]/30 bg-[#ED5F45]/20">
+                    <Mail className="h-5 w-5 text-[#ED5F45]" />
+                  </span>
+                  What happens next
+                </h3>
+                <ul className="space-y-4">
+                  {verifySteps.map((step, i) => (
+                    <motion.li
+                      key={step}
+                      className="flex items-start gap-4 text-sm font-medium text-slate-100 sm:text-base"
+                      initial={{ opacity: 0, x: -14 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.18 + i * 0.07 }}
+                    >
+                      <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ED5F45]/30 bg-[#ED5F45]/20 text-xs font-bold text-[#ED5F45]">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </motion.li>
+                  ))}
+                </ul>
+              </div>
+            </AuthTiltCard>
 
-            <motion.div
-              className="bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl p-6 text-white"
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <CheckCircle2 className="w-8 h-8 mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Secure & Protected</h3>
-              <p className="text-green-100">
-                Your verification code ensures only authorized personnel can access your institution&apos;s academic management system.
-              </p>
-            </motion.div>
+            <AuthTiltCard>
+              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
+                <div className="relative z-[1]">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#ED5F45]/30 ring-4 ring-[#ED5F45]/10">
+                    <GraduationCap className="h-6 w-6 text-[#ED5F45]" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-black uppercase tracking-tight sm:text-xl">Secure & protected</h3>
+                  <p className="text-sm font-medium leading-relaxed text-white/80 sm:text-base">
+                    Your verification code ensures only authorized personnel can access your institution&apos;s academic
+                    management system.
+                  </p>
+                </div>
+              </div>
+            </AuthTiltCard>
           </motion.div>
 
-          {/* Verification Form */}
-          <motion.div variants={itemVariants}>
-            <Card className="backdrop-blur-sm bg-white/80 border-white/20 shadow-xl">
-              <CardHeader className="space-y-1 pb-4">
-                <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-                  <Mail className="w-6 h-6 text-green-500" />
-                  Enter Verification Code
-                </CardTitle>
-                <CardDescription className="text-center">
-                  We sent a code to <strong>{registration.departmentHead.email}</strong>
-                </CardDescription>
-                <RegistrationProgress currentStep="verify" />
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  <motion.div className="space-y-2" variants={itemVariants}>
-                    <Label htmlFor="otp" className="flex items-center gap-2 text-center justify-center">
-                      <Shield className="w-4 h-4" />
-                      6-Digit Verification Code
-                    </Label>
-                    <Input
-                      id="otp"
-                      {...register('otp')}
-                      placeholder="123456"
-                      maxLength={6}
-                      className="text-center text-2xl font-mono tracking-widest transition-all duration-200 focus:ring-2 focus:ring-green-500/20"
-                    />
-                    {errors.otp && (
-                      <motion.p
-                        className="text-sm text-red-600 text-center"
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
+          <motion.div className="order-1 lg:order-2" variants={AUTH_SLIDE_RIGHT_VARIANTS}>
+            <AuthTiltCard>
+              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white shadow-2xl backdrop-blur-2xl dark:bg-slate-900">
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
+                <div className="px-6 pb-10 pt-8 sm:px-10">
+                  <div className="mb-8 text-center">
+                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30">
+                      <BarChart3 className="h-6 w-6 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
+                      Enter verification code
+                    </h2>
+                    <p className="mt-2 text-sm font-medium leading-snug text-pretty text-slate-500 dark:text-slate-400">
+                      We sent a code to <strong>{registration.departmentHead.email}</strong>
+                    </p>
+                    <div className="mt-6">
+                      <RegistrationProgress currentStep="verify" />
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                    <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                      <Label
+                        htmlFor="otp"
+                        className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
                       >
-                        {errors.otp.message}
-                      </motion.p>
-                    )}
-                  </motion.div>
-
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                    >
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
+                        <Shield className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
+                        6-digit code
+                      </Label>
+                      <Input
+                        id="otp"
+                        {...register('otp')}
+                        placeholder="123456"
+                        maxLength={6}
+                        className={cn(
+                          AUTH_FORM_INPUT_CLASS,
+                          'h-14 rounded-xl border-2 text-center font-mono text-2xl tracking-[0.35em]',
+                        )}
+                      />
+                      <AnimatePresence>
+                        {errors.otp ? (
+                          <motion.p
+                            className="text-center text-[11px] font-bold text-destructive"
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                          >
+                            {errors.otp.message}
+                          </motion.p>
+                        ) : null}
+                      </AnimatePresence>
                     </motion.div>
-                  )}
 
-                  <motion.div
-                    variants={itemVariants}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
+                    <AnimatePresence>
+                      {error ? (
+                        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+                          <Alert variant="destructive" className="rounded-xl border-[#ED5F45]/20 bg-[#ED5F45]/5 text-[#ED5F45]">
+                            <AlertDescription className="text-xs font-bold">{error}</AlertDescription>
+                          </Alert>
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
+
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                      className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-14 text-base font-black uppercase tracking-widest')}
                       disabled={isLoading}
                     >
                       {isLoading ? (
-                        <motion.div
-                          className="flex items-center gap-2"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        >
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Verifying...
-                        </motion.div>
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="z-[1] h-5 w-5 animate-spin" />
+                          Verifying…
+                        </span>
                       ) : (
-                        <motion.div
-                          className="flex items-center gap-2"
-                          whileHover={{ x: 2 }}
-                        >
-                          Verify Email
-                          <ArrowRight className="w-4 h-4" />
-                        </motion.div>
+                        <span className="z-[1] flex items-center justify-center gap-3">
+                          Verify email
+                          <ArrowRight className="h-5 w-5" />
+                        </span>
                       )}
                     </Button>
-                  </motion.div>
-                </form>
+                  </form>
 
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-sm text-gray-600 text-center mb-4">
-                    Didn&apos;t receive the code?
-                  </p>
-
-                  <form onSubmit={handleResendSubmit(onResend)} className="space-y-2">
-                    <Input
-                      {...registerResend('email')}
-                      defaultValue={registration.departmentHead.email}
-                      placeholder="Enter your email"
-                      disabled={countdown > 0}
-                      className="transition-all duration-200 focus:ring-2 focus:ring-blue-500/20"
-                    />
-
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
+                  <div className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-700">
+                    <p className="mb-4 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+                      Didn&apos;t receive the code?
+                    </p>
+                    <form onSubmit={handleResendSubmit(onResend)} className="space-y-3">
+                      <Input
+                        {...registerResend('email')}
+                        defaultValue={registration.departmentHead.email}
+                        placeholder="Email"
+                        disabled={countdown > 0}
+                        className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-2')}
+                      />
                       <Button
                         type="submit"
                         variant="outline"
-                        className="w-full border-blue-200 hover:bg-blue-50"
+                        className="h-12 w-full rounded-xl border-2 border-[#ED5F45]/30 font-bold text-[#ED5F45] hover:bg-[#ED5F45]/10"
                         disabled={resendLoading || countdown > 0}
                       >
-                        {resendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {resendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {countdown > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
+                          <span className="flex items-center justify-center gap-2">
+                            <Clock className="h-4 w-4" />
                             Resend in {countdown}s
-                          </div>
+                          </span>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4" />
-                            Resend Code
-                          </div>
+                          <span className="flex items-center justify-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            Resend code
+                          </span>
                         )}
                       </Button>
-                    </motion.div>
-                  </form>
-
-                  {resendMessage && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-4"
-                    >
-                      <Alert>
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    </form>
+                    {resendMessage ? (
+                      <Alert className="mt-4 rounded-xl">
+                        <CheckCircle2 className="h-4 w-4 text-[#ED5F45]" />
                         <AlertDescription>{resendMessage}</AlertDescription>
                       </Alert>
-                    </motion.div>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </AuthTiltCard>
           </motion.div>
         </div>
       </motion.div>
-    </div>
-  );
+    </AuthCampusBackdrop>
+  )
 }
