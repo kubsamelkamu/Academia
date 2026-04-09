@@ -40,7 +40,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
-  usePendingGroupLeaderRequests,
+  useGroupLeaderRequests,
   useApproveGroupLeaderRequest,
   useRejectGroupLeaderRequest,
 } from "@/lib/hooks/use-group-leader-requests"
@@ -154,7 +154,7 @@ function ReviewSheet({
   app: AppItem | null
   open: boolean
   onClose: () => void
-  onDecide: (id: string, decision: "approved" | "rejected", reason?: string) => Promise<void>
+  onDecide: (id: string, decision: "approved" | "rejected", reason?: string) => Promise<boolean>
 }) {
   const [decision, setDecision] = useState<"approved" | "rejected" | null>(null)
   const [reason, setReason]     = useState("")
@@ -180,9 +180,9 @@ function ReviewSheet({
     }
 
     setLoading(true)
-    await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
+    const ok = await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
     setLoading(false)
-    onClose()
+    if (ok) onClose()
   }
 
   return (
@@ -448,7 +448,7 @@ export default function CoordinatorApplicationsPage() {
 
   /* API hooks */
   const debouncedSearch = search.trim() || undefined
-  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = usePendingGroupLeaderRequests({
+  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useGroupLeaderRequests({
     page,
     limit,
     search: debouncedSearch,
@@ -499,7 +499,11 @@ export default function CoordinatorApplicationsPage() {
   /* Decision handler */
   const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
     const item = apiItems.find(a => a.id === id)
-    if (!item) return
+    if (!item) return false
+    if (item.status !== "pending") {
+      toast.error("Only pending applications can be updated")
+      return false
+    }
 
     try {
       if (decision === "approved") {
@@ -510,8 +514,10 @@ export default function CoordinatorApplicationsPage() {
         toast.success("Application Rejected", { description: `${item.name}'s request declined.` })
       }
       await refetch()
+      return true
     } catch {
       toast.error("Action failed", { description: "Please try again." })
+      return false
     }
   }
 
@@ -587,7 +593,10 @@ export default function CoordinatorApplicationsPage() {
       )}
 
       {/* Tabs + Search */}
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={(value) => {
+        setTab(value)
+        setPage(1)
+      }}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-start">
           <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
             <TabsTrigger value="pending"  className="text-xs gap-1.5 shrink-0">
@@ -665,6 +674,37 @@ export default function CoordinatorApplicationsPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between rounded-xl border bg-muted/20 p-3">
+        <p className="text-xs text-muted-foreground">
+          Page <span className="font-semibold text-foreground">{apiData?.pagination?.page ?? page}</span>
+          {" "}of <span className="font-semibold text-foreground">{apiData?.pagination?.pages ?? 1}</span>
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+            disabled={page <= 1 || apiLoading}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => {
+              const totalPages = apiData?.pagination?.pages ?? 1
+              setPage(prev => Math.min(totalPages, prev + 1))
+            }}
+            disabled={page >= (apiData?.pagination?.pages ?? 1) || apiLoading}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
 
       {/* Review Sheet */}
       <ReviewSheet

@@ -47,6 +47,8 @@ import {
   UserCheck,
   UserPlus,
   Send,
+  MessageSquare,
+  Mail,
   X,
   Info,
   LayoutGrid,
@@ -836,7 +838,7 @@ export default function GroupsPage() {
 
   /* Chat / email from students tab */
   const [chatOpen2, setChatOpen2]   = useState(false)
-  const [chatStu2, setChatStu2]     = useState<{ student: Student; project: Project } | null>(null)
+  const [chatStu2, setChatStu2]     = useState<{ student: StudentDirectoryCardItem; project: { title: string } } | null>(null)
   const [chatMsg2, setChatMsg2]     = useState("")
   const [sending2, setSending2]     = useState(false)
 
@@ -1030,7 +1032,7 @@ export default function GroupsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search by title, group, or domain…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-10" />
             </div>
-            <Select value={statusFilter} onValueChange={setStatus}>
+            <Select value={statusFilter} onValueChange={(value) => setStatus(value as BackendProjectStatusFilter)}>
               <SelectTrigger className="h-10 w-40 shrink-0">
                 <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Status" />

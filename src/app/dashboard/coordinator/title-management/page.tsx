@@ -618,7 +618,7 @@ function ReviewSheet({
             </div>
             <div className="min-w-0 flex-1">
               <SheetTitle className="line-clamp-3 break-words pr-4 text-sm leading-snug sm:text-base">
-                {title.title}
+                {`${title.groupName} Project Titles`}
               </SheetTitle>
               <SheetDescription className="mt-0.5 break-words pr-4 text-xs sm:text-sm">
                 {title.groupName} · Advisor: {title.advisorName}
@@ -908,7 +908,7 @@ function TitleRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2 flex-wrap">
-            <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{title.title}</p>
+            <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{`${title.groupName} Project Titles`}</p>
             <Badge variant="outline" className={`shrink-0 text-xs ${statusConfig.cls}`}>
               {statusConfig.label}
             </Badge>

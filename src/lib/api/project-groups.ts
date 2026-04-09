@@ -4,6 +4,9 @@ import type {
   AvailableStudentsPage,
   AvailableStudentsPagination,
   BrowseProjectGroupsPage,
+  ProjectGroupsReviewSubmittedPage,
+  ProjectGroupReviewStatus,
+  RejectProjectGroupReviewDto,
   CancelProjectGroupJoinRequestResult,
   ApproveMyGroupJoinRequestResult,
   RejectMyGroupJoinRequestDto,
@@ -312,6 +315,64 @@ export async function submitMyProjectGroup(): Promise<SubmitMyProjectGroupResult
 
 export async function reopenMyProjectGroup(): Promise<ReopenMyProjectGroupResult> {
   const response = await apiClient.post<ReopenMyProjectGroupResult>("/project-groups/me/reopen")
+  return response.data
+}
+
+export async function listSubmittedProjectGroupsForReview(params: {
+  status?: ProjectGroupReviewStatus
+  page?: number
+  limit?: number
+  search?: string
+} = {}): Promise<ProjectGroupsReviewSubmittedPage> {
+  const status = params.status ?? "ALL"
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const search = params.search?.trim() ? params.search.trim() : undefined
+
+  const response = await apiClient.get<ProjectGroupsReviewSubmittedPage>("/project-groups/review/submitted", {
+    params: {
+      status,
+      page,
+      limit,
+      ...(search ? { search } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function approveProjectGroupReview(groupId: string): Promise<{ approved: boolean; id: string }> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const response = await apiClient.patch<{ approved: boolean; id: string }>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/approve`
+  )
+
+  return response.data
+}
+
+export async function rejectProjectGroupReview(
+  groupId: string,
+  dto: RejectProjectGroupReviewDto
+): Promise<{ rejected: boolean; id: string; rejectionReason?: string | null }> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const reason = dto.reason.trim()
+  if (!reason) {
+    throw new Error("reason is required")
+  }
+
+  const response = await apiClient.patch<{ rejected: boolean; id: string; rejectionReason?: string | null }>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/reject`,
+    { reason }
+  )
+
   return response.data
 }
 

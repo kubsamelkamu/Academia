@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -24,6 +24,7 @@ import {
   Sparkles,
   ArrowLeft,
   Filter,
+  X,
   ChevronRight,
   BookOpen,
   Calendar,
@@ -33,7 +34,19 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { mockUsers, mockProjects } from '@/data/mockData'
+import {
+  useCoordinatorAdvisorNotificationHistory,
+  useCoordinatorAdvisorNotificationHistorySummary,
+  useSendCoordinatorAdvisorNotification,
+} from '@/lib/hooks/use-coordinator-advisor-notifications'
+import type {
+  CoordinatorAdvisorNotificationPriority,
+  DeliveryMethod,
+  RecipientMode,
+} from '@/types/coordinator-advisor-notifications'
+import { useCoordinatorAdvisorOverview } from '@/lib/hooks/use-coordinator-analytics'
+import { useAuthStore } from '@/store/auth-store'
+import type { CoordinatorAdvisorOverviewAdvisor } from '@/types/advisor-analytics'
 
 const NOTIFICATION_TEMPLATES = [
   {
@@ -43,7 +56,7 @@ const NOTIFICATION_TEMPLATES = [
     description: 'Remind advisors about pending evaluation submissions',
     subject: 'Reminder: Pending Evaluation Submission',
     message: `Dear Advisor,\n\nThis is a reminder that you have pending evaluation submissions that require your attention. Please log in to the system and complete your evaluations at your earliest convenience.\n\nDeadline: [Date]\n\nThank you for your prompt attention to this matter.\n\nBest regards,\nAcademia Coordinator`,
-    priority: 'high' as const,
+    priority: 'HIGH' as const,
     badge: 'Common',
     badgeColor: 'bg-blue-500/10 text-blue-600 border-blue-300',
   },
@@ -54,7 +67,7 @@ const NOTIFICATION_TEMPLATES = [
     description: 'Request status updates on project progress',
     subject: 'Action Required: Project Progress Update',
     message: `Dear Advisor,\n\nPlease provide an updated status on the projects you are currently supervising. Ensure all milestone reports are up to date in the system.\n\nThis update is required by: [Date]\n\nThank you for your cooperation.\n\nBest regards,\nAcademia Coordinator`,
-    priority: 'medium' as const,
+    priority: 'INFO' as const,
     badge: 'Popular',
     badgeColor: 'bg-emerald-500/10 text-emerald-600 border-emerald-300',
   },
@@ -65,7 +78,7 @@ const NOTIFICATION_TEMPLATES = [
     description: 'Notify advisors about upcoming defense schedules',
     subject: 'Defense Schedule Announcement',
     message: `Dear Advisor,\n\nPlease be advised that defense schedules have been finalized. Please review the schedule in the system and confirm your availability.\n\nDefense Period: [Date Range]\nLocation: [Location]\n\nKindly confirm your attendance for each scheduled defense.\n\nBest regards,\nAcademia Coordinator`,
-    priority: 'high' as const,
+    priority: 'HIGH' as const,
     badge: 'Seasonal',
     badgeColor: 'bg-violet-500/10 text-violet-600 border-violet-300',
   },
@@ -76,7 +89,7 @@ const NOTIFICATION_TEMPLATES = [
     description: 'Alert advisors about grade submission deadlines',
     subject: 'IMPORTANT: Grade Submission Deadline',
     message: `Dear Advisor,\n\nThis is to notify you that the deadline for submitting student grades is approaching.\n\nSubmission Deadline: [Date]\n\nPlease ensure all scores are entered in the system before the deadline. Late submissions may affect the grade finalization process.\n\nBest regards,\nAcademia Coordinator`,
-    priority: 'urgent' as const,
+    priority: 'CRITICAL' as const,
     badge: 'Urgent',
     badgeColor: 'bg-rose-500/10 text-rose-600 border-rose-300',
   },
@@ -95,86 +108,248 @@ function AwardIcon(props: React.SVGProps<SVGSVGElement>) {
   return <Star {...props} />
 }
 
-interface NotificationLog {
-  id: string
-  subject: string
-  sentTo: string
-  sentAt: string
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  status: 'delivered' | 'pending' | 'failed'
-  recipients: number
+const priorityConfig = {
+  INFO: { label: 'Info', color: 'bg-blue-500/10 text-blue-600 border-blue-300', dot: 'bg-blue-400' },
+  HIGH: { label: 'High', color: 'bg-amber-500/10 text-amber-600 border-amber-300', dot: 'bg-amber-400' },
+  CRITICAL: { label: 'Critical', color: 'bg-rose-500/10 text-rose-600 border-rose-300', dot: 'bg-rose-400' },
 }
 
-const mockNotificationLogs: NotificationLog[] = [
-  {
-    id: 'n1',
-    subject: 'Reminder: Pending Evaluation Submission',
-    sentTo: 'All Advisors',
-    sentAt: '2024-01-14T09:30:00Z',
-    priority: 'high',
-    status: 'delivered',
-    recipients: 8,
-  },
-  {
-    id: 'n2',
-    subject: 'Action Required: Project Progress Update',
-    sentTo: 'Selected Advisors',
-    sentAt: '2024-01-12T14:15:00Z',
-    priority: 'medium',
-    status: 'delivered',
-    recipients: 3,
-  },
-  {
-    id: 'n3',
-    subject: 'Defense Schedule Announcement',
-    sentTo: 'All Advisors',
-    sentAt: '2024-01-10T11:00:00Z',
-    priority: 'high',
-    status: 'delivered',
-    recipients: 8,
-  },
-]
+type AdvisorPerformance = 'excellent' | 'good' | 'needs_attention'
 
-const priorityConfig = {
-  low: { label: 'Low', color: 'bg-slate-500/10 text-slate-600 border-slate-300', dot: 'bg-slate-400' },
-  medium: { label: 'Medium', color: 'bg-blue-500/10 text-blue-600 border-blue-300', dot: 'bg-blue-400' },
-  high: { label: 'High', color: 'bg-amber-500/10 text-amber-600 border-amber-300', dot: 'bg-amber-400' },
-  urgent: { label: 'Urgent', color: 'bg-rose-500/10 text-rose-600 border-rose-300', dot: 'bg-rose-400' },
+interface AdvisorRecipientOption {
+  advisorId: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status: string
+  currentLoad: number
+  availableCapacity: number
+  projectCount: number
+  performance: AdvisorPerformance
+}
+
+function getAdvisorPerformance(advisor: CoordinatorAdvisorOverviewAdvisor): AdvisorPerformance {
+  if (advisor.availableCapacity <= 0) {
+    return 'needs_attention'
+  }
+
+  const progress = advisor.metrics.overallProjectProgress
+  if (progress >= 75) {
+    return 'excellent'
+  }
+  if (progress >= 50) {
+    return 'good'
+  }
+
+  return 'needs_attention'
+}
+
+function getRecipientModeLabel(recipientMode: 'SINGLE' | 'MULTIPLE' | 'ALL') {
+  if (recipientMode === 'ALL') return 'All Advisors'
+  if (recipientMode === 'SINGLE') return 'Single Advisor'
+  return 'Selected Advisors'
+}
+
+function getCampaignStatus(campaign: {
+  totalReachedCount: number
+  inAppDeliveredCount: number
+  emailAcceptedCount: number
+  emailDeliveredCount: number
+  emailFailedCount: number
+}) {
+  if (
+    campaign.emailFailedCount > 0 &&
+    campaign.inAppDeliveredCount === 0 &&
+    campaign.emailAcceptedCount === 0 &&
+    campaign.emailDeliveredCount === 0
+  ) {
+    return 'failed' as const
+  }
+
+  if (
+    campaign.inAppDeliveredCount > 0 ||
+    campaign.emailAcceptedCount > 0 ||
+    campaign.emailDeliveredCount > 0
+  ) {
+    return 'delivered' as const
+  }
+
+  return 'pending' as const
+}
+
+function getErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  const response = (error as { response?: { status?: unknown } }).response
+  const status = response?.status
+  return typeof status === 'number' ? status : null
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  if (error && typeof error === 'object') {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  return fallback
+}
+
+function mapSendError(error: unknown): { title: string; description: string } {
+  const status = getErrorStatus(error)
+  const backendMessage = getErrorMessage(error, 'Failed to send notification campaign.')
+
+  if (status === 403) {
+    return {
+      title: 'Permission denied',
+      description: backendMessage || 'One or more selected advisors are outside your department.',
+    }
+  }
+
+  if (status === 400) {
+    return {
+      title: 'Invalid request',
+      description: backendMessage || 'Please check required fields and try again.',
+    }
+  }
+
+  if (status === 404) {
+    return {
+      title: 'Not found',
+      description: backendMessage || 'The notification endpoint is not available.',
+    }
+  }
+
+  return {
+    title: 'Send failed',
+    description: backendMessage,
+  }
+}
+
+function mapHistoryError(error: unknown): string {
+  const status = getErrorStatus(error)
+  if (status === 403) {
+    return 'You do not have permission to view advisor notification history for this department.'
+  }
+  if (status === 404) {
+    return 'Notification history endpoint was not found.'
+  }
+  return getErrorMessage(error, 'Failed to load notification history.')
 }
 
 export default function NotifyAdvisorsPage() {
-  const advisors = mockUsers.filter(u => u.role === 'advisor')
+  const user = useAuthStore((state) => state.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const canQueryCoordinatorData = Boolean(user)
+
+  const advisorOverviewQuery = useCoordinatorAdvisorOverview({
+    departmentId,
+    enabled: canQueryCoordinatorData && Boolean(departmentId),
+    page: 1,
+    limit: 100,
+  })
 
   const [selectedAdvisors, setSelectedAdvisors] = useState<string[]>([])
   const [selectAll, setSelectAll] = useState(false)
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
+  const [priority, setPriority] = useState<'INFO' | 'HIGH' | 'CRITICAL'>('INFO')
   const [notificationType, setNotificationType] = useState<'email' | 'in-app' | 'both'>('both')
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [filterPerformance, setFilterPerformance] = useState('all')
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historySearch, setHistorySearch] = useState('')
+  const [historyPriorityFilter, setHistoryPriorityFilter] = useState<'all' | CoordinatorAdvisorNotificationPriority>('all')
+  const [historyDeliveryFilter, setHistoryDeliveryFilter] = useState<'all' | DeliveryMethod>('all')
+  const historyPageSize = 5
 
-  const advisorMetrics = advisors.map(advisor => {
-    const projects = mockProjects.filter(p => p.advisorId === advisor.id)
-    const avgProg = projects.length > 0
-      ? Math.round(projects.reduce((s, p) => s + (p.progress || 0), 0) / projects.length)
-      : 0
-    return {
-      ...advisor,
-      projectCount: projects.length,
-      avgProgress: avgProg,
-      performance: avgProg >= 75 ? 'excellent' : avgProg >= 50 ? 'good' : 'needs_attention',
-    }
-  })
+  const historySummaryQuery = useCoordinatorAdvisorNotificationHistorySummary(canQueryCoordinatorData)
+  const historyQuery = useCoordinatorAdvisorNotificationHistory(
+    {
+      page: historyPage,
+      limit: historyPageSize,
+      search: historySearch.trim() || undefined,
+      priority: historyPriorityFilter === 'all' ? undefined : historyPriorityFilter,
+      deliveryMethod: historyDeliveryFilter === 'all' ? undefined : historyDeliveryFilter,
+    },
+    canQueryCoordinatorData
+  )
+  const sendNotificationMutation = useSendCoordinatorAdvisorNotification()
+
+  const advisors = useMemo<AdvisorRecipientOption[]>(() => {
+    return (advisorOverviewQuery.data?.advisors ?? []).map((advisor) => ({
+      advisorId: advisor.advisorId,
+      fullName: advisor.fullName,
+      email: advisor.email,
+      avatarUrl: advisor.avatarUrl,
+      status: advisor.status,
+      currentLoad: advisor.currentLoad,
+      availableCapacity: advisor.availableCapacity,
+      projectCount: advisor.metrics.totalProjectsAdvising,
+      performance: getAdvisorPerformance(advisor),
+    }))
+  }, [advisorOverviewQuery.data?.advisors])
 
   const filteredAdvisors = filterPerformance === 'all'
-    ? advisorMetrics
-    : advisorMetrics.filter(a => a.performance === filterPerformance)
+    ? advisors
+    : advisors.filter(a => a.performance === filterPerformance)
+
+  const totalAdvisorCount = advisorOverviewQuery.data?.summary.totalAdvisors ?? advisors.length
+  const recipientLoadError = advisorOverviewQuery.error?.message
+  const isRecipientsLoading = advisorOverviewQuery.isLoading
+  const historyItems = historyQuery.data?.items ?? []
+  const historyTotalItems = historyQuery.data?.pagination.totalItems ?? historyItems.length
+  const historySummary = historySummaryQuery.data
+  const historyError = historyQuery.error ?? historySummaryQuery.error
+  const historyErrorMessage = historyError ? mapHistoryError(historyError) : null
+  const isHistoryLoading = historyQuery.isLoading || historySummaryQuery.isLoading
+
+  const summaryCards = useMemo(() => {
+    const summary = historySummary
+    const summaryIsEmpty =
+      !summary ||
+      (
+        summary.totalSent === 0 &&
+        summary.delivered === 0 &&
+        summary.totalReached === 0
+      )
+
+    if (!summaryIsEmpty) {
+      return {
+        totalSent: summary.totalSent,
+        delivered: summary.delivered,
+        totalReached: summary.totalReached,
+      }
+    }
+
+    if (historyItems.length === 0) {
+      return { totalSent: 0, delivered: 0, totalReached: 0 }
+    }
+
+    return {
+      totalSent: historyItems.length,
+      delivered: historyItems.filter((item) => getCampaignStatus(item) === 'delivered').length,
+      totalReached: historyItems.reduce((sum, item) => sum + item.totalReachedCount, 0),
+    }
+  }, [historySummary, historyItems])
+
+  React.useEffect(() => {
+    setHistoryPage(1)
+  }, [historySearch, historyPriorityFilter, historyDeliveryFilter])
+  const historyPagination = historyQuery.data?.pagination
+  const historyTotalPages = Math.max(1, historyPagination?.totalPages ?? 1)
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked)
-    setSelectedAdvisors(checked ? filteredAdvisors.map(a => a.id) : [])
+    setSelectedAdvisors(checked ? filteredAdvisors.map(a => a.advisorId) : [])
   }
 
   const handleSelectAdvisor = (id: string, checked: boolean) => {
@@ -199,29 +374,53 @@ export default function NotifyAdvisorsPage() {
       toast.error('Message is required')
       return
     }
-    const targetCount = selectAll ? advisors.length : selectedAdvisors.length
+    const targetCount = selectAll ? totalAdvisorCount : selectedAdvisors.length
     if (targetCount === 0) {
       toast.error('Select at least one advisor')
       return
     }
 
+    const recipientMode: RecipientMode =
+      selectAll ? 'ALL' : selectedAdvisors.length === 1 ? 'SINGLE' : 'MULTIPLE'
+
+    const deliveryMethodMap: Record<typeof notificationType, DeliveryMethod> = {
+      email: 'EMAIL',
+      'in-app': 'IN_APP',
+      both: 'BOTH',
+    }
+
+    const payload = {
+      recipientMode,
+      advisorUserIds: recipientMode === 'ALL' ? undefined : selectedAdvisors,
+      priority,
+      deliveryMethod: deliveryMethodMap[notificationType],
+      subject: subject.trim(),
+      message: message.trim(),
+    }
+
     setIsSending(true)
-    await new Promise(r => setTimeout(r, 1500))
-    setIsSending(false)
-    setSent(true)
+    try {
+      const result = await sendNotificationMutation.mutateAsync(payload)
 
-    toast.success('Notifications Sent!', {
-      description: `Successfully notified ${targetCount} advisor${targetCount !== 1 ? 's' : ''}.`,
-    })
+      setSent(true)
+      toast.success('Notifications Sent!', {
+        description: `Successfully notified ${targetCount} advisor${targetCount !== 1 ? 's' : ''}.`,
+      })
 
-    setTimeout(() => setSent(false), 3000)
-    setSubject('')
-    setMessage('')
-    setSelectedAdvisors([])
-    setSelectAll(false)
+      setTimeout(() => setSent(false), 3000)
+      setSubject('')
+      setMessage('')
+      setSelectedAdvisors([])
+      setSelectAll(false)
+    } catch (error) {
+      const mapped = mapSendError(error)
+      toast.error(mapped.title, { description: mapped.description })
+    } finally {
+      setIsSending(false)
+    }
   }
 
-  const recipientCount = selectAll ? advisors.length : selectedAdvisors.length
+  const recipientCount = selectAll ? totalAdvisorCount : selectedAdvisors.length
 
   return (
     <div className="space-y-6 pb-8 animate-fade-in">
@@ -242,11 +441,11 @@ export default function NotifyAdvisorsPage() {
         <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <div className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5">
             <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{advisors.length} advisors</span>
+            <span className="text-sm font-medium">{totalAdvisorCount} advisors</span>
           </div>
           <div className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5">
             <Bell className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{mockNotificationLogs.length} sent today</span>
+            <span className="text-sm font-medium">{summaryCards.totalSent} sent</span>
           </div>
         </div>
       </div>
@@ -258,7 +457,7 @@ export default function NotifyAdvisorsPage() {
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2 shrink-0">
             <Clock className="h-4 w-4" /> History
-            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{mockNotificationLogs.length}</Badge>
+            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{historyTotalItems}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -297,7 +496,7 @@ export default function NotifyAdvisorsPage() {
                     />
                     <label htmlFor="select-all" className="flex-1 cursor-pointer">
                       <p className="text-sm font-semibold">Select All Advisors</p>
-                      <p className="text-xs text-muted-foreground">{advisors.length} advisors</p>
+                      <p className="text-xs text-muted-foreground">{totalAdvisorCount} advisors</p>
                     </label>
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">All</Badge>
                   </div>
@@ -306,24 +505,49 @@ export default function NotifyAdvisorsPage() {
 
                   {/* Individual Advisors */}
                   <div className="space-y-1 pt-1">
+                    {!departmentId && (
+                      <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                        Your account is missing a department assignment, so advisors cannot be loaded yet.
+                      </div>
+                    )}
+
+                    {departmentId && recipientLoadError && (
+                      <div className="rounded-lg border border-destructive/20 px-3 py-4 text-sm text-destructive">
+                        Failed to load advisors: {recipientLoadError}
+                      </div>
+                    )}
+
+                    {departmentId && isRecipientsLoading && (
+                      <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                        Loading advisors...
+                      </div>
+                    )}
+
+                    {departmentId && !isRecipientsLoading && !recipientLoadError && filteredAdvisors.length === 0 && (
+                      <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                        No advisors found for the current department.
+                      </div>
+                    )}
+
                     {filteredAdvisors.map(advisor => (
                       <div
-                        key={advisor.id}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors cursor-pointer ${selectedAdvisors.includes(advisor.id) ? 'bg-primary/5 border border-primary/20' : 'hover:bg-muted/50 border border-transparent'}`}
-                        onClick={() => handleSelectAdvisor(advisor.id, !selectedAdvisors.includes(advisor.id))}
+                        key={advisor.advisorId}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors cursor-pointer ${selectedAdvisors.includes(advisor.advisorId) ? 'bg-primary/5 border border-primary/20' : 'hover:bg-muted/50 border border-transparent'}`}
+                        onClick={() => handleSelectAdvisor(advisor.advisorId, !selectedAdvisors.includes(advisor.advisorId))}
                       >
                         <Checkbox
-                          checked={selectAll || selectedAdvisors.includes(advisor.id)}
-                          onCheckedChange={(v) => handleSelectAdvisor(advisor.id, v as boolean)}
+                          checked={selectAll || selectedAdvisors.includes(advisor.advisorId)}
+                          onCheckedChange={(v) => handleSelectAdvisor(advisor.advisorId, v as boolean)}
                           onClick={e => e.stopPropagation()}
                         />
                         <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarImage src={advisor.avatarUrl ?? undefined} alt={advisor.fullName} />
                           <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
-                            {advisor.name.charAt(0)}
+                            {advisor.fullName.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{advisor.name}</p>
+                          <p className="text-sm font-medium truncate">{advisor.fullName}</p>
                           <p className="text-xs text-muted-foreground">{advisor.projectCount} projects</p>
                         </div>
                         <div className={`h-2 w-2 rounded-full shrink-0 ${advisor.performance === 'excellent' ? 'bg-emerald-400' : advisor.performance === 'good' ? 'bg-blue-400' : 'bg-amber-400'}`} />
@@ -401,28 +625,22 @@ export default function NotifyAdvisorsPage() {
                           </div>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 w-2 rounded-full bg-slate-400" />
-                              Low Priority
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="medium">
+                          <SelectItem value="INFO">
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-2 rounded-full bg-blue-400" />
-                              Medium Priority
+                              Info
                             </div>
                           </SelectItem>
-                          <SelectItem value="high">
+                          <SelectItem value="HIGH">
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-2 rounded-full bg-amber-400" />
-                              High Priority
+                              High
                             </div>
                           </SelectItem>
-                          <SelectItem value="urgent">
+                          <SelectItem value="CRITICAL">
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-2 rounded-full bg-rose-400" />
-                              Urgent
+                              Critical
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -514,9 +732,9 @@ export default function NotifyAdvisorsPage() {
                     <Button
                       className={`btn-gradient gap-2 w-full sm:w-auto sm:min-w-[140px] ${sent ? 'bg-emerald-500 hover:bg-emerald-600' : ''}`}
                       onClick={handleSend}
-                      disabled={isSending || recipientCount === 0 || !subject.trim() || !message.trim()}
+                      disabled={isSending || sendNotificationMutation.isPending || recipientCount === 0 || !subject.trim() || !message.trim()}
                     >
-                      {isSending ? (
+                      {isSending || sendNotificationMutation.isPending ? (
                         <>
                           <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
                           Sending...
@@ -543,9 +761,9 @@ export default function NotifyAdvisorsPage() {
         <TabsContent value="history" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3 mb-6">
             {[
-              { label: 'Total Sent', value: mockNotificationLogs.length, icon: Send, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-              { label: 'Delivered', value: mockNotificationLogs.filter(n => n.status === 'delivered').length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-              { label: 'Total Reached', value: mockNotificationLogs.reduce((s, n) => s + n.recipients, 0), icon: Users, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+              { label: 'Total Sent', value: summaryCards.totalSent, icon: Send, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+              { label: 'Delivered', value: summaryCards.delivered, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+              { label: 'Total Reached', value: summaryCards.totalReached, icon: Users, color: 'text-violet-500', bg: 'bg-violet-500/10' },
             ].map(stat => (
               <Card key={stat.label} className="border-none shadow-sm">
                 <CardContent className="pt-5 pb-5">
@@ -563,47 +781,157 @@ export default function NotifyAdvisorsPage() {
             ))}
           </div>
 
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Input
+                placeholder="Search history by subject..."
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <Select
+              value={historyPriorityFilter}
+              onValueChange={(value) => setHistoryPriorityFilter(value as 'all' | CoordinatorAdvisorNotificationPriority)}
+            >
+              <SelectTrigger className="h-10 w-full sm:w-40 shrink-0">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="INFO">Info</SelectItem>
+                <SelectItem value="HIGH">High</SelectItem>
+                <SelectItem value="CRITICAL">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={historyDeliveryFilter}
+              onValueChange={(value) => setHistoryDeliveryFilter(value as 'all' | DeliveryMethod)}
+            >
+              <SelectTrigger className="h-10 w-full sm:w-44 shrink-0">
+                <SelectValue placeholder="Delivery" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Delivery</SelectItem>
+                <SelectItem value="IN_APP">In-App</SelectItem>
+                <SelectItem value="EMAIL">Email</SelectItem>
+                <SelectItem value="BOTH">Both</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {(historySearch || historyPriorityFilter !== 'all' || historyDeliveryFilter !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 shrink-0 text-xs"
+                onClick={() => {
+                  setHistorySearch('')
+                  setHistoryPriorityFilter('all')
+                  setHistoryDeliveryFilter('all')
+                }}
+              >
+                <X className="h-3.5 w-3.5 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-display">Notification History</CardTitle>
               <CardDescription>Previously sent notifications and their delivery status</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {mockNotificationLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-4 rounded-xl border p-4 hover:bg-muted/30 transition-colors">
-                  <div className={`mt-0.5 h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${log.status === 'delivered' ? 'bg-emerald-500/10' : log.status === 'pending' ? 'bg-amber-500/10' : 'bg-rose-500/10'}`}>
-                    {log.status === 'delivered' ? (
-                      <CheckCircle2 className={`h-5 w-5 text-emerald-500`} />
-                    ) : log.status === 'pending' ? (
-                      <Clock className="h-5 w-5 text-amber-500" />
-                    ) : (
-                      <AlertTriangle className="h-5 w-5 text-rose-500" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-start gap-2 mb-1">
-                      <p className="font-semibold text-sm flex-1 min-w-0 truncate">{log.subject}</p>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Badge className={`text-xs ${priorityConfig[log.priority].color}`}>{priorityConfig[log.priority].label}</Badge>
-                        <Badge variant="outline" className="text-xs capitalize">{log.status}</Badge>
+              {historyErrorMessage && (
+                <div className="rounded-xl border border-destructive/20 p-4 text-sm text-destructive">
+                  {historyErrorMessage}
+                </div>
+              )}
+
+              {isHistoryLoading && !historyErrorMessage && (
+                <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  Loading notification history...
+                </div>
+              )}
+
+              {!isHistoryLoading && !historyErrorMessage && historyItems.length === 0 && (
+                <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  No notification campaigns have been sent yet.
+                </div>
+              )}
+
+              {historyItems.map((log) => {
+                const campaignStatus = getCampaignStatus(log)
+
+                return (
+                  <div key={log.campaignId} className="rounded-xl border">
+                    <div className="flex items-start gap-4 p-4">
+                      <div className={`mt-0.5 h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${campaignStatus === 'delivered' ? 'bg-emerald-500/10' : campaignStatus === 'pending' ? 'bg-amber-500/10' : 'bg-rose-500/10'}`}>
+                        {campaignStatus === 'delivered' ? (
+                          <CheckCircle2 className={`h-5 w-5 text-emerald-500`} />
+                        ) : campaignStatus === 'pending' ? (
+                          <Clock className="h-5 w-5 text-amber-500" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-rose-500" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-start gap-2 mb-1">
+                          <p className="font-semibold text-sm flex-1 min-w-0 truncate">{log.subject}</p>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Badge className={`text-xs ${priorityConfig[log.priority].color}`}>{priorityConfig[log.priority].label}</Badge>
+                            <Badge variant="outline" className="text-xs capitalize">{campaignStatus}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" /> {log.totalReachedCount} recipients
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" /> {getRecipientModeLabel(log.recipientMode)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" /> {log.deliveryMethod}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" /> {log.recipients} recipients
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageSquare className="h-3 w-3" /> {log.sentTo}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {new Date(log.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
                   </div>
-                </div>
-              ))}
+              )})}
             </CardContent>
           </Card>
+
+          {historyTotalPages > 1 ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Page <span className="font-semibold text-foreground">{historyPagination?.page ?? historyPage}</span> of {historyTotalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={historyPage <= 1 || historyQuery.isFetching}
+                  onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={historyPage >= historyTotalPages || historyQuery.isFetching}
+                  onClick={() => setHistoryPage((current) => Math.min(historyTotalPages, current + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
         </TabsContent>
       </Tabs>
     </div>

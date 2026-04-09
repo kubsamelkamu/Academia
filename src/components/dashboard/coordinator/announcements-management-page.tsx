@@ -755,16 +755,16 @@ export function CoordinatorAnnouncementsManagementPage() {
           if (!nextOpen) setEditAnnouncementId(null)
         }}
       >
-        <DialogContent className="max-w-2xl w-[95vw]">
-          {editAnnouncementId ? (
+        {editAnnouncementId ? (
+          <DialogContent className="max-w-2xl w-[95vw]">
             <AnnouncementEditDialogContent
               departmentId={departmentId}
               announcementId={editAnnouncementId}
               onClose={() => setEditAnnouncementId(null)}
               onSaved={() => announcementsQuery.refetch()}
             />
-          ) : null}
-        </DialogContent>
+          </DialogContent>
+        ) : null}
       </Dialog>
 
       <Dialog
@@ -773,16 +773,16 @@ export function CoordinatorAnnouncementsManagementPage() {
           if (!nextOpen) setDeleteAnnouncement(null)
         }}
       >
-        <DialogContent className="max-w-md">
-          {deleteAnnouncement ? (
+        {deleteAnnouncement ? (
+          <DialogContent className="max-w-md">
             <AnnouncementDeleteDialogContent
               departmentId={departmentId}
               announcement={deleteAnnouncement}
               onClose={() => setDeleteAnnouncement(null)}
               onDeleted={() => announcementsQuery.refetch()}
             />
-          ) : null}
-        </DialogContent>
+          </DialogContent>
+        ) : null}
       </Dialog>
 
       <Card className="border-border/70">
