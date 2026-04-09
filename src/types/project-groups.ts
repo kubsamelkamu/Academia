@@ -61,6 +61,32 @@ export interface ProjectGroupMe {
   pendingInvitationsCount: number
 }
 
+export interface ProjectGroupMeeting {
+  id: string
+  projectId: string
+  projectGroupId?: string | null
+  title: string
+  meetingAt: string
+  durationMinutes: number
+  agenda?: string | null
+  isCancelled: boolean
+  cancellationReason?: string | null
+}
+
+export interface ProjectGroupMeetingsPagination {
+  page: number
+  limit: number
+  totalItems: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface MyProjectGroupMeetingsListResult {
+  items: ProjectGroupMeeting[]
+  pagination: ProjectGroupMeetingsPagination
+}
+
 export type AvailableStudentProfile = {
   bio: string | null
   githubUrl: string | null

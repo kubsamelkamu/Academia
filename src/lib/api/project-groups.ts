@@ -22,7 +22,9 @@ import type {
   ProjectGroup,
   ProjectGroupDetails,
   MyGroupJoinRequestsPage,
+  MyProjectGroupMeetingsListResult,
   ProjectGroupMe,
+  ProjectGroupMeeting,
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
@@ -114,6 +116,31 @@ function normalizeAvailableStudentsPagination(payload: unknown): AvailableStuden
   }
 }
 
+function normalizeProjectGroupMeeting(payload: unknown): ProjectGroupMeeting | null {
+  if (!isRecord(payload)) return null
+
+  const id = asNullableString(payload.id) ?? asNullableString(payload._id)
+  const projectId = asNullableString(payload.projectId)
+  const meetingAt = asNullableString(payload.meetingAt)
+
+  if (!id || !projectId || !meetingAt) return null
+
+  return {
+    id,
+    projectId,
+    projectGroupId: asNullableString(payload.projectGroupId),
+    title: asNullableString(payload.title) ?? "Advisor Meeting",
+    meetingAt,
+    durationMinutes:
+      typeof payload.durationMinutes === "number" && Number.isFinite(payload.durationMinutes)
+        ? payload.durationMinutes
+        : 0,
+    agenda: asNullableString(payload.agenda),
+    isCancelled: payload.isCancelled === true,
+    cancellationReason: asNullableString(payload.cancellationReason),
+  }
+}
+
 /**
  * Create a new project group for the current approved group leader.
  *
@@ -134,6 +161,64 @@ export async function createProjectGroup(dto: CreateProjectGroupDto): Promise<Pr
 export async function getMyProjectGroup(): Promise<ProjectGroupMe> {
   const response = await apiClient.get<ProjectGroupMe>("/project-groups/me")
   return response.data
+}
+
+export async function listMyProjectGroupMeetings(params: {
+  page?: number
+  limit?: number
+  projectId?: string
+} = {}): Promise<MyProjectGroupMeetingsListResult> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 100
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : undefined
+
+  const response = await apiClient.get<unknown>("/project-groups/me/meetings", {
+    params: {
+      page,
+      limit,
+      ...(projectId ? { projectId } : null),
+    },
+  })
+
+  const payload = isRecord(response.data) ? response.data : {}
+  const rawItems = Array.isArray(payload.items) ? payload.items : []
+  const items = rawItems
+    .map(normalizeProjectGroupMeeting)
+    .filter((item): item is ProjectGroupMeeting => Boolean(item))
+
+  const paginationRaw = isRecord(payload.pagination) ? payload.pagination : {}
+  const totalItems =
+    typeof paginationRaw.totalItems === "number" && Number.isFinite(paginationRaw.totalItems)
+      ? paginationRaw.totalItems
+      : items.length
+  const totalPages =
+    typeof paginationRaw.totalPages === "number" && Number.isFinite(paginationRaw.totalPages)
+      ? paginationRaw.totalPages
+      : Math.max(1, Math.ceil(totalItems / Math.max(limit, 1)))
+
+  return {
+    items,
+    pagination: {
+      page:
+        typeof paginationRaw.page === "number" && Number.isFinite(paginationRaw.page)
+          ? paginationRaw.page
+          : page,
+      limit:
+        typeof paginationRaw.limit === "number" && Number.isFinite(paginationRaw.limit)
+          ? paginationRaw.limit
+          : limit,
+      totalItems,
+      totalPages,
+      hasNextPage:
+        typeof paginationRaw.hasNextPage === "boolean"
+          ? paginationRaw.hasNextPage
+          : page < totalPages,
+      hasPreviousPage:
+        typeof paginationRaw.hasPreviousPage === "boolean"
+          ? paginationRaw.hasPreviousPage
+          : page > 1,
+    },
+  }
 }
 
 export async function getAvailableStudents(params: {
