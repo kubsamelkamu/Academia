@@ -646,11 +646,11 @@ export function StudentTeamPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
+    <div className="min-h-full w-full px-3 py-4 sm:px-5 sm:py-6 lg:px-8">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div className="mb-4 flex flex-col gap-3 md:mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
             Student Teams
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -659,23 +659,23 @@ export function StudentTeamPage() {
         </div>
         
         {/* User Profile Card */}
-        <Card className="bg-primary/5 border-primary/20 w-full md:w-auto">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 border-2 border-primary">
+        <Card className="w-full border-primary/20 bg-primary/5 shadow-sm md:w-auto">
+          <CardContent className="p-2.5 sm:p-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <Avatar className="h-9 w-9 border-2 border-primary sm:h-10 sm:w-10">
                 <AvatarImage src={user?.avatarUrl ?? undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {getInitials(profileName)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{profileName}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline" className="text-xs">
+                <p className="truncate text-sm font-medium">{profileName}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground sm:mt-0 sm:gap-2 sm:text-xs">
+                  <Badge variant="outline" className="text-[10px] sm:text-xs">
                     Group Leader
                   </Badge>
-                  <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Approved</Badge>
-                  <span>{profileDepartment || departmentName || "No department"}</span>
+                  <Badge className="bg-green-100 text-[10px] text-green-800 hover:bg-green-200 sm:text-xs">Approved</Badge>
+                  <span className="truncate">{profileDepartment || departmentName || "No department"}</span>
                 </div>
               </div>
             </div>
@@ -685,7 +685,7 @@ export function StudentTeamPage() {
 
       {/* Alert Messages */}
       {groupApproved && (
-        <Alert className="mb-6 bg-green-50 border-green-200">
+        <Alert className="mb-6 rounded-xl border-green-200 bg-green-50 shadow-sm">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Group Formation Approved</AlertTitle>
           <AlertDescription className="text-green-700">
@@ -695,7 +695,7 @@ export function StudentTeamPage() {
       )}
 
       {groupSubmitted && !groupApproved && (
-        <Alert className="mb-6 bg-yellow-50 border-yellow-200">
+        <Alert className="mb-6 rounded-xl border-yellow-200 bg-yellow-50 shadow-sm">
           <Clock className="h-4 w-4 text-yellow-600" />
           <AlertTitle className="text-yellow-800">Group Submitted for Review</AlertTitle>
           <AlertDescription className="text-yellow-700">
@@ -705,7 +705,7 @@ export function StudentTeamPage() {
       )}
 
       {groupRejected && (
-        <Alert className="mb-6" variant="destructive">
+        <Alert className="mb-6 rounded-xl shadow-sm" variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Group Rejected</AlertTitle>
           <AlertDescription>
@@ -743,39 +743,41 @@ export function StudentTeamPage() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs value={derivedActiveTab} className="space-y-6" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-flex">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="my-group" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">My Group</span>
-          </TabsTrigger>
-          <TabsTrigger value="requests" className="flex items-center gap-2" disabled={!myGroup}>
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Requests</span>
-            {pendingJoinRequestsCount > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0">
-                {pendingJoinRequestsCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="available" className="flex items-center gap-2" disabled={!myGroup}>
-            <UserPlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Available</span>
-          </TabsTrigger>
-          <TabsTrigger value="student" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Student</span>
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={derivedActiveTab} className="space-y-4 sm:space-y-6" onValueChange={setActiveTab}>
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] touch-pan-x">
+          <TabsList className="inline-flex h-auto w-max min-w-max flex-nowrap gap-1 rounded-xl border bg-muted/40 p-1">
+            <TabsTrigger value="overview" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap px-3 text-xs sm:min-h-10 sm:gap-2 sm:text-sm">
+              <Eye className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="my-group" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap px-3 text-xs sm:min-h-10 sm:gap-2 sm:text-sm">
+              <Users className="h-4 w-4" />
+              <span>My Group</span>
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap px-3 text-xs sm:min-h-10 sm:gap-2 sm:text-sm" disabled={!myGroup}>
+              <Clock className="h-4 w-4" />
+              <span>Requests</span>
+              {pendingJoinRequestsCount > 0 && (
+                <Badge variant="destructive" className="ml-1 h-4 min-w-4 rounded-full px-1 text-[10px] leading-none sm:h-5 sm:min-w-5 sm:text-xs">
+                  {pendingJoinRequestsCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="available" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap px-3 text-xs sm:min-h-10 sm:gap-2 sm:text-sm" disabled={!myGroup}>
+              <UserPlus className="h-4 w-4" />
+              <span>Available</span>
+            </TabsTrigger>
+            <TabsTrigger value="student" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap px-3 text-xs sm:min-h-10 sm:gap-2 sm:text-sm">
+              <User className="h-4 w-4" />
+              <span>Student</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Group Formation Process Card */}
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Info className="h-5 w-5 text-primary" />
@@ -840,7 +842,7 @@ export function StudentTeamPage() {
 
           {/* Roles and Responsibilities */}
           <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+            <Card className="border-border/80 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <UserCheck className="h-5 w-5 text-blue-500" />
@@ -883,7 +885,7 @@ export function StudentTeamPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-border/80 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Users className="h-5 w-5 text-green-500" />
@@ -916,30 +918,30 @@ export function StudentTeamPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{groupMembers.length}</div>
-                <p className="text-xs text-muted-foreground">Current Team Size</p>
-                <Progress value={groupProgress} className="mt-2" />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
+            <Card className="border-border/80 shadow-sm">
+              <CardContent className="px-3 pb-3 pt-3 sm:pt-6">
+                <div className="text-lg font-bold sm:text-2xl">{groupMembers.length}</div>
+                <p className="text-[11px] text-muted-foreground sm:text-xs">Current Team Size</p>
+                <Progress value={groupProgress} className="mt-1.5 sm:mt-2" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/80 shadow-sm">
+              <CardContent className="px-3 pb-3 pt-3 sm:pt-6">
+                <div className="text-lg font-bold sm:text-2xl">{pendingJoinRequestsCount}</div>
+                <p className="text-[11px] text-muted-foreground sm:text-xs">Pending Requests</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{pendingJoinRequestsCount}</div>
-                <p className="text-xs text-muted-foreground">Pending Requests</p>
+              <CardContent className="px-3 pb-3 pt-3 sm:pt-6">
+                <div className="text-lg font-bold sm:text-2xl">{availableStudentsCount}</div>
+                <p className="text-[11px] text-muted-foreground sm:text-xs">Available Students</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{availableStudentsCount}</div>
-                <p className="text-xs text-muted-foreground">Available Students</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{minGroupSize}-{maxGroupSize}</div>
-                <p className="text-xs text-muted-foreground">Required Group Size</p>
+              <CardContent className="px-3 pb-3 pt-3 sm:pt-6">
+                <div className="text-lg font-bold sm:text-2xl">{minGroupSize}-{maxGroupSize}</div>
+                <p className="text-[11px] text-muted-foreground sm:text-xs">Required Group Size</p>
               </CardContent>
             </Card>
           </div>
@@ -947,7 +949,7 @@ export function StudentTeamPage() {
 
         {/* My Group Tab */}
         <TabsContent value="my-group" className="space-y-6">
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle>My Group Members</CardTitle>

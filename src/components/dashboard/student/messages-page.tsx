@@ -45,6 +45,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useQueryClient } from "@tanstack/react-query"
@@ -2253,10 +2254,10 @@ export function StudentMessagesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
+    <div className="w-full px-3 py-4 sm:px-4 sm:py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+        <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
           Messages
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -2265,26 +2266,42 @@ export function StudentMessagesPage() {
       </div>
 
       {/* Main Content */}
-      <Tabs defaultValue="chats" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
-          <TabsTrigger value="chats" className="gap-2">
-            <MessageSquare className="h-4 w-4" />
-            <span>Chats</span>
-          </TabsTrigger>
-          <TabsTrigger value="advisor" className="gap-2">
-            <UserRound className="h-4 w-4" />
-            <span>Chat with Advisor</span>
-          </TabsTrigger>
-          <TabsTrigger value="announcements" className="gap-2">
-            <Bell className="h-4 w-4" />
-            <span>Announcements</span>
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="chats" className="w-full min-w-0 space-y-4">
+        <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] touch-pan-x">
+          <TabsList className="inline-flex h-auto w-max min-w-max shrink-0 flex-nowrap gap-0.5 rounded-xl border bg-muted/40 p-0.5 sm:gap-1 sm:p-1">
+            <TabsTrigger
+              value="chats"
+              className="shrink-0 gap-1 whitespace-nowrap rounded-md px-2.5 py-2 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <MessageSquare className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span>Chats</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="advisor"
+              className="shrink-0 gap-1 whitespace-nowrap rounded-md px-2.5 py-2 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <UserRound className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="sm:hidden">Advisor</span>
+              <span className="hidden sm:inline">Chat with Advisor</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="announcements"
+              className="shrink-0 gap-1 whitespace-nowrap rounded-md px-2.5 py-2 text-[11px] sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <Bell className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="sm:hidden">Announce</span>
+              <span className="hidden sm:inline">Announcements</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="chats" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3 h-auto min-h-0 lg:h-[calc(100vh-280px)] lg:min-h-[600px]">
+        <TabsContent
+          value="chats"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+        >
+          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:min-h-[600px] lg:grid-cols-3 lg:overflow-hidden">
             {/* Conversations List */}
-            <Card className="flex min-h-0 flex-col lg:col-span-1">
+            <Card className="flex min-h-0 flex-col overflow-hidden max-lg:max-h-[min(200px,30dvh)] max-lg:shrink-0 lg:col-span-1">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">Conversations</CardTitle>
@@ -2306,7 +2323,7 @@ export function StudentMessagesPage() {
                     filteredConversations.map((conv) => (
                       <div
                         key={conv.id}
-                        className={`flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors border-b last:border-0 ${
+                        className={`flex cursor-pointer items-start gap-3 border-b p-3 transition-colors hover:bg-muted/50 sm:p-4 last:border-0 ${
                           selectedConversation?.id === conv.id ? 'bg-muted' : ''
                         }`}
                         onClick={() => setSelectedConversation(conv)}
@@ -2354,11 +2371,11 @@ export function StudentMessagesPage() {
             </Card>
 
             {/* Chat Window */}
-            <Card className="flex min-h-0 flex-col lg:col-span-2">
+            <Card className="flex min-h-0 flex-col overflow-hidden py-4 max-lg:min-h-0 sm:py-6 lg:col-span-2 lg:flex-1">
               {effectiveSelectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <CardHeader className="border-b py-3">
+                  <CardHeader className="shrink-0 border-b py-2.5 sm:py-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -2384,7 +2401,7 @@ export function StudentMessagesPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5 sm:gap-2">
                         <Button variant="outline" size="icon" onClick={() => handleCall('audio')}>
                           <Phone className="h-4 w-4" />
                         </Button>
@@ -2448,10 +2465,10 @@ export function StudentMessagesPage() {
                   </CardHeader>
 
                   {/* Messages */}
-                  <CardContent className="flex min-h-0 flex-1 flex-col p-4">
+                  <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
                     <div
                       ref={messagesScrollRootRef}
-                      className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                      className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] max-lg:min-h-[22rem] max-lg:max-h-[min(680px,calc(100dvh-9.5rem))]"
                     >
                       <div className="space-y-4">
                         {messages[effectiveSelectedConversation.id]?.map((msg) => (
@@ -2750,7 +2767,7 @@ export function StudentMessagesPage() {
                   </CardContent>
 
                   {/* Message Input */}
-                  <div className="p-4 border-t">
+                  <div className="shrink-0 border-t p-3 sm:p-4">
                     {replyToMessageId && (
                       <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1">
                         <div className="min-w-0">
@@ -2905,10 +2922,13 @@ export function StudentMessagesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="advisor" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3 h-auto min-h-0 lg:h-[calc(100vh-280px)] lg:min-h-[600px]">
+        <TabsContent
+          value="advisor"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+        >
+          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:min-h-[600px] lg:grid-cols-3 lg:overflow-hidden">
             {/* Advisor conversation list (single item) */}
-            <Card className="flex min-h-0 flex-col lg:col-span-1">
+            <Card className="flex min-h-0 flex-col overflow-hidden max-lg:max-h-[min(160px,26dvh)] max-lg:shrink-0 lg:col-span-1 lg:max-h-none">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">Chat with Advisor</CardTitle>
@@ -2961,11 +2981,11 @@ export function StudentMessagesPage() {
             </Card>
 
             {/* Advisor chat window */}
-            <Card className="flex min-h-0 flex-col lg:col-span-2">
+            <Card className="flex min-h-0 flex-col overflow-hidden py-4 max-lg:min-h-0 sm:py-6 lg:col-span-2 lg:flex-1">
               {hasAdvisorConversation ? (
                 <>
               {/* Chat Header - matches Chats section */}
-              <CardHeader className="border-b py-3">
+              <CardHeader className="shrink-0 border-b py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
@@ -3009,8 +3029,8 @@ export function StudentMessagesPage() {
               </CardHeader>
 
               {/* Messages - matches Chats section */}
-              <CardContent className="flex min-h-0 flex-1 flex-col p-4">
-                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+                <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] max-lg:min-h-[22rem] max-lg:max-h-[min(680px,calc(100dvh-9.5rem))]">
                   <div className="space-y-4">
                     {advisorScopedMessages.length > 0 ? advisorScopedMessages.map((msg) => (
                       <div
@@ -3096,7 +3116,7 @@ export function StudentMessagesPage() {
               </CardContent>
 
               {/* Message Input - matches Chats section */}
-              <div className="p-4 border-t">
+              <div className="shrink-0 border-t p-3 sm:p-4">
                 <div className="flex gap-2">
                   <Input
                     placeholder="Type your message..."
@@ -3125,29 +3145,32 @@ export function StudentMessagesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="announcements" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-primary" />
-                    Team Announcements
+        <TabsContent value="announcements" className="min-w-0 space-y-4">
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="px-4 sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-base sm:text-lg">
+                    <Bell className="h-5 w-5 shrink-0 text-primary" />
+                    <span className="break-words">Team Announcements</span>
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="mt-1.5">
                     Important updates from your Group Leader
                   </CardDescription>
                 </div>
 
                 {isApprovedGroupManager && (
-                  <Button className="gap-2" onClick={openNewAnnouncementDialog}>
-                    <Plus className="h-4 w-4" />
+                  <Button
+                    className="h-10 w-full shrink-0 gap-2 sm:w-auto sm:self-start"
+                    onClick={openNewAnnouncementDialog}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
                     Create Announcement
                   </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-w-0 px-4 sm:px-6">
               <div className="space-y-4">
                 {announcementsQuery.isLoading ? (
                   <div className="py-10 text-center">
@@ -3184,9 +3207,9 @@ export function StudentMessagesPage() {
                     </p>
 
                     {isApprovedGroupManager && (
-                      <div className="mt-4 flex justify-center">
-                        <Button className="gap-2" onClick={openNewAnnouncementDialog}>
-                          <Plus className="h-4 w-4" />
+                      <div className="mt-4 flex justify-center px-1">
+                        <Button className="w-full max-w-sm gap-2 sm:w-auto" onClick={openNewAnnouncementDialog}>
+                          <Plus className="h-4 w-4 shrink-0" />
                           Create Announcement
                         </Button>
                       </div>
@@ -3194,89 +3217,118 @@ export function StudentMessagesPage() {
                   </div>
                 ) : (
                   announcements.map((announcement) => (
-                  <Card key={announcement.id} className="overflow-hidden">
+                  <Card key={announcement.id} className="min-w-0 overflow-hidden">
                     <CardContent className="p-0">
-                      <div className="flex items-start border-l-4 border-l-transparent hover:border-l-primary transition-all">
-                        <div className="p-4 flex-1">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3">
-                              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                                announcement.priority === 'high' ? 'bg-red-100' :
-                                announcement.priority === 'medium' ? 'bg-yellow-100' : 'bg-blue-100'
-                              }`}>
-                                <Bell className={`h-5 w-5 ${
-                                  announcement.priority === 'high' ? 'text-red-600' :
-                                  announcement.priority === 'medium' ? 'text-yellow-600' : 'text-blue-600'
-                                }`} />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="font-semibold">{announcement.title}</h4>
-                                  <Badge variant="outline" className={getPriorityColor(announcement.priority)}>
-                                    {announcement.priority} priority
+                      <div className="border-l-4 border-l-transparent transition-all hover:border-l-primary">
+                        <div className="flex min-w-0 gap-3 p-3 sm:gap-4 sm:p-4">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${
+                              announcement.priority === 'high'
+                                ? 'bg-red-100'
+                                : announcement.priority === 'medium'
+                                  ? 'bg-yellow-100'
+                                  : 'bg-blue-100'
+                            }`}
+                          >
+                            <Bell
+                              className={`h-4 w-4 sm:h-5 sm:w-5 ${
+                                announcement.priority === 'high'
+                                  ? 'text-red-600'
+                                  : announcement.priority === 'medium'
+                                    ? 'text-yellow-600'
+                                    : 'text-blue-600'
+                              }`}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-start min-[400px]:justify-between">
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <h4 className="break-words font-semibold leading-snug">
+                                    {announcement.title}
+                                  </h4>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      'shrink-0 text-[10px] uppercase tracking-wide sm:text-xs sm:normal-case sm:tracking-normal',
+                                      getPriorityColor(announcement.priority)
+                                    )}
+                                  >
+                                    <span className="sm:hidden">{announcement.priority}</span>
+                                    <span className="hidden sm:inline">
+                                      {announcement.priority} priority
+                                    </span>
                                   </Badge>
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+                                <p className="break-words text-sm text-muted-foreground">
+                                  {announcement.content}
+                                </p>
 
                                 {announcement.attachmentUrl && (
-                                  <div className="mt-2">
+                                  <div className="pt-0.5">
                                     <a
                                       href={announcement.attachmentUrl}
                                       target="_blank"
                                       rel="noreferrer noopener"
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4"
+                                      className="inline-flex max-w-full items-center gap-1 break-all text-xs text-primary underline-offset-4 hover:underline"
                                     >
-                                      <Paperclip className="h-3 w-3" />
+                                      <Paperclip className="h-3 w-3 shrink-0" />
                                       Open link
                                     </a>
                                   </div>
                                 )}
 
-                                <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                                  <span>Posted by {announcement.author}</span>
-                                  <span>•</span>
-                                  <span>{new Date(announcement.date).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                  })}</span>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1 text-xs text-muted-foreground">
+                                  <span className="break-words">
+                                    Posted by {announcement.author}
+                                  </span>
+                                  <span className="hidden sm:inline" aria-hidden>
+                                    •
+                                  </span>
+                                  <span className="min-w-0 sm:whitespace-nowrap">
+                                    {new Date(announcement.date).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                    })}
+                                  </span>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
                               {canManageAnnouncements && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      aria-label="Announcement actions"
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      disabled={updateAnnouncementMutation.isPending}
-                                      onSelect={(e) => {
-                                        e.preventDefault()
-                                        openEditAnnouncementDialog(announcement)
-                                      }}
-                                    >
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      disabled={deleteAnnouncementMutation.isPending}
-                                      onSelect={(e) => {
-                                        e.preventDefault()
-                                        void handleDeleteAnnouncement(announcement.id)
-                                      }}
-                                    >
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                <div className="flex shrink-0 justify-end min-[400px]:justify-start">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label="Announcement actions"
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        disabled={updateAnnouncementMutation.isPending}
+                                        onSelect={(e) => {
+                                          e.preventDefault()
+                                          openEditAnnouncementDialog(announcement)
+                                        }}
+                                      >
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        disabled={deleteAnnouncementMutation.isPending}
+                                        onSelect={(e) => {
+                                          e.preventDefault()
+                                          void handleDeleteAnnouncement(announcement.id)
+                                        }}
+                                      >
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -3288,21 +3340,23 @@ export function StudentMessagesPage() {
                 )}
 
                 {announcementPagination && announcementPagination.pages > 1 && !announcementsQuery.isLoading && (
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex flex-col items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={() => setAnnouncementsPage((prev) => Math.max(1, prev - 1))}
                       disabled={announcementsPage <= 1}
                     >
                       Previous
                     </Button>
 
-                    <p className="text-sm text-muted-foreground">
+                    <p className="order-first text-center text-sm text-muted-foreground sm:order-none">
                       Page {announcementsPage} of {announcementsTotalPages}
                     </p>
 
                     <Button
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={() =>
                         setAnnouncementsPage((prev) => Math.min(announcementsTotalPages, prev + 1))
                       }

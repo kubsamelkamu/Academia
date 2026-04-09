@@ -138,10 +138,10 @@ export function StudentDefensePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
             Final Defense
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -151,7 +151,7 @@ export function StudentDefensePage() {
 
         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="w-full gap-2 sm:w-auto">
               <Upload className="h-4 w-4" />
               Upload Material
             </Button>
@@ -192,40 +192,42 @@ export function StudentDefensePage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Days Until Defense</p>
-            <p className="text-3xl font-bold">{daysUntil}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        <Card className="border-border/80 shadow-sm">
+          <CardContent className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+            <p className="text-xs text-muted-foreground sm:text-sm">Days Until Defense</p>
+            <p className="text-xl font-bold sm:text-3xl">{daysUntil}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Preparation Progress</p>
-            <p className="text-3xl font-bold">{preparationProgress}%</p>
+        <Card className="border-border/80 shadow-sm">
+          <CardContent className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+            <p className="text-xs text-muted-foreground sm:text-sm">Preparation Progress</p>
+            <p className="text-xl font-bold sm:text-3xl">{preparationProgress}%</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Approved Materials</p>
-            <p className="text-3xl font-bold">{approvedMaterials}</p>
+        <Card className="border-border/80 shadow-sm">
+          <CardContent className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+            <p className="text-xs text-muted-foreground sm:text-sm">Approved Materials</p>
+            <p className="text-xl font-bold sm:text-3xl">{approvedMaterials}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Committee Members</p>
-            <p className="text-3xl font-bold">{defenseData.committee.length}</p>
+        <Card className="border-border/80 shadow-sm">
+          <CardContent className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+            <p className="text-xs text-muted-foreground sm:text-sm">Committee Members</p>
+            <p className="text-xl font-bold sm:text-3xl">{defenseData.committee.length}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full max-w-3xl grid-cols-2 sm:grid-cols-4">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] touch-pan-x">
+          <TabsList className="inline-flex h-auto w-max min-w-max flex-nowrap gap-1 rounded-xl border bg-muted/40 p-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
           <TabsTrigger value="checklist">Checklist</TabsTrigger>
           <TabsTrigger value="guide">Tips & Guide</TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="grid gap-6 md:grid-cols-2">
           <Card>
