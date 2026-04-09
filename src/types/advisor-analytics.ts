@@ -27,6 +27,26 @@ export interface CoordinatorAdvisorOverviewMilestone {
   feedback: string | null
   createdAt: string
   updatedAt: string
+  approvedSubmissionFile?: CoordinatorAdvisorOverviewApprovedFile | null
+}
+
+export interface CoordinatorAdvisorOverviewApprovedFile {
+  submissionId: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  fileUrl: string
+  filePublicId: string
+  resourceType: string
+  approvedAt: string
+  approvedBy: {
+    id: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  } | null
 }
 
 export interface CoordinatorAdvisorOverviewProject {

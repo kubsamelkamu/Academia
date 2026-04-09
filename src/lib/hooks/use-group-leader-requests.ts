@@ -2,7 +2,14 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createGroupLeaderRequest, getMyGroupLeaderRequest, listPendingGroupLeaderRequests, approveGroupLeaderRequest, rejectGroupLeaderRequest } from "@/lib/api/group-leader-requests"
+import {
+  createGroupLeaderRequest,
+  getMyGroupLeaderRequest,
+  listPendingGroupLeaderRequests,
+  listGroupLeaderRequests,
+  approveGroupLeaderRequest,
+  rejectGroupLeaderRequest,
+} from "@/lib/api/group-leader-requests"
 import type {
   CreateGroupLeaderRequestDto,
   GroupLeaderMeResponse,
@@ -60,8 +67,10 @@ export function useCreateGroupLeaderRequest() {
 export function groupLeaderRequestListKeys() {
   return {
     root: ["group-leader-requests", "list"] as const,
-    list: (params: { search?: string; page?: number; limit?: number }) =>
-      ["group-leader-requests", "list", params] as const,
+    pending: (params: { search?: string; page?: number; limit?: number }) =>
+      ["group-leader-requests", "list", "pending", params] as const,
+    all: (params: { search?: string; page?: number; limit?: number }) =>
+      ["group-leader-requests", "list", "all", params] as const,
   }
 }
 
@@ -73,8 +82,23 @@ export function usePendingGroupLeaderRequests(params: {
 }) {
   const { search, page = 1, limit = 20, enabled = true } = params
   return useQuery<GroupLeaderRequestsListData, Error>({
-    queryKey: groupLeaderRequestListKeys().list({ search, page, limit }),
+    queryKey: groupLeaderRequestListKeys().pending({ search, page, limit }),
     queryFn: () => listPendingGroupLeaderRequests({ search, page, limit }),
+    enabled,
+    staleTime: 30_000,
+  })
+}
+
+export function useGroupLeaderRequests(params: {
+  search?: string
+  page?: number
+  limit?: number
+  enabled?: boolean
+}) {
+  const { search, page = 1, limit = 20, enabled = true } = params
+  return useQuery<GroupLeaderRequestsListData, Error>({
+    queryKey: groupLeaderRequestListKeys().all({ search, page, limit }),
+    queryFn: () => listGroupLeaderRequests({ search, page, limit }),
     enabled,
     staleTime: 30_000,
   })

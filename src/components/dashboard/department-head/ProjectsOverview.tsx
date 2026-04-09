@@ -64,6 +64,8 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useDepartmentProjectsOverview, useProjectDetails } from "@/lib/hooks/use-projects"
+import { useCoordinatorAdvisorOverview } from "@/lib/hooks/use-coordinator-analytics"
+import type { CoordinatorAdvisorOverviewProject } from "@/types/advisor-analytics"
 import type { ProjectDetail } from "@/types/projects"
 
 function memberInitials(name: string) {
@@ -88,6 +90,24 @@ function formatOptionalDate(value?: string | null) {
   }
 
   return date.toLocaleDateString()
+}
+
+function formatFileSize(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "Unknown size"
+  }
+
+  const units = ["B", "KB", "MB", "GB"]
+  let current = value
+  let unitIndex = 0
+
+  while (current >= 1024 && unitIndex < units.length - 1) {
+    current /= 1024
+    unitIndex += 1
+  }
+
+  const decimals = current >= 10 || unitIndex === 0 ? 0 : 1
+  return `${current.toFixed(decimals)} ${units[unitIndex]}`
 }
 
 function formatAdvisorName(advisor: {
@@ -175,6 +195,46 @@ function mapProjectDetailToActiveProject(detail: ProjectDetail, fallback: Projec
       detail.description ?? detail.proposal?.description ?? detail.proposal?.projectGroup?.objectives ?? fallback.description,
     technologies,
     milestones,
+  }
+}
+
+type FinalApprovedMilestoneFile = {
+  milestoneId: string
+  milestoneTitle: string
+  fileName: string
+  fileUrl: string
+  mimeType?: string
+  sizeBytes?: number
+  approvedAt?: string
+  approvedByName?: string
+}
+
+function pickFinalApprovedMilestoneFile(
+  project: CoordinatorAdvisorOverviewProject
+): FinalApprovedMilestoneFile | null {
+  const approvedMilestones = project.milestones
+    .filter((milestone) => Boolean(milestone.approvedSubmissionFile?.fileUrl?.trim()))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.approvedSubmissionFile?.approvedAt ?? left.updatedAt ?? left.createdAt)
+      const rightTime = Date.parse(right.approvedSubmissionFile?.approvedAt ?? right.updatedAt ?? right.createdAt)
+
+      return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0)
+    })
+
+  const latest = approvedMilestones[0]
+  if (!latest?.approvedSubmissionFile) {
+    return null
+  }
+
+  return {
+    milestoneId: latest.id,
+    milestoneTitle: latest.title,
+    fileName: latest.approvedSubmissionFile.fileName,
+    fileUrl: latest.approvedSubmissionFile.fileUrl,
+    mimeType: latest.approvedSubmissionFile.mimeType,
+    sizeBytes: latest.approvedSubmissionFile.sizeBytes,
+    approvedAt: latest.approvedSubmissionFile.approvedAt,
+    approvedByName: latest.approvedSubmissionFile.approvedBy?.fullName ?? undefined,
   }
 }
 
@@ -728,6 +788,12 @@ export default function ProjectsOverview() {
     departmentId,
     enabled: Boolean(accessToken) && Boolean(departmentId),
   })
+  const advisorOverviewQuery = useCoordinatorAdvisorOverview({
+    departmentId,
+    page: 1,
+    limit: 100,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedProject, setSelectedProject] = useState<PastProject | null>(null)
   const [showPastDetails, setShowPastDetails] = useState(false)
@@ -764,6 +830,20 @@ export default function ProjectsOverview() {
     description: "",
     technologies: [],
   }))
+  const approvedMilestoneFileByProjectId = React.useMemo(() => {
+    const map = new Map<string, FinalApprovedMilestoneFile>()
+
+    for (const advisor of advisorOverviewQuery.data?.advisors ?? []) {
+      for (const project of advisor.projects) {
+        const finalApprovedFile = pickFinalApprovedMilestoneFile(project)
+        if (finalApprovedFile) {
+          map.set(project.id, finalApprovedFile)
+        }
+      }
+    }
+
+    return map
+  }, [advisorOverviewQuery.data?.advisors])
   const allProjects = [...activeProjects, ...mockPastProjects];
 
   // Filter projects based on search
@@ -1274,6 +1354,7 @@ export default function ProjectsOverview() {
     const teamMembers = project.groupMemberProfiles?.length
       ? project.groupMemberProfiles
       : project.groupMembers.map((name) => ({ name, avatarUrl: null }))
+    const finalApprovedMilestoneFile = approvedMilestoneFileByProjectId.get(project.id) ?? null
 
     return (
       <div className="min-h-screen bg-muted/30 overflow-y-auto">
@@ -1462,6 +1543,57 @@ export default function ProjectsOverview() {
               </CardContent>
             </Card>
           )}
+
+          <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/30">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <Download className="h-4 w-4 text-primary" />
+                </span>
+                Final Approved Milestone File
+              </CardTitle>
+              <CardDescription className="text-xs">Latest approved submission from project milestones</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {advisorOverviewQuery.isLoading ? (
+                <div className="rounded-lg border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+                  Loading approved file information...
+                </div>
+              ) : finalApprovedMilestoneFile ? (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-3 space-y-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Milestone</p>
+                    <p className="text-sm font-medium">{finalApprovedMilestoneFile.milestoneTitle}</p>
+                    <p className="text-xs text-muted-foreground">{finalApprovedMilestoneFile.fileName}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>Size: {formatFileSize(finalApprovedMilestoneFile.sizeBytes)}</span>
+                    {finalApprovedMilestoneFile.approvedAt ? (
+                      <span>Approved: {new Date(finalApprovedMilestoneFile.approvedAt).toLocaleString()}</span>
+                    ) : null}
+                    {finalApprovedMilestoneFile.approvedByName ? (
+                      <span>By: {finalApprovedMilestoneFile.approvedByName}</span>
+                    ) : null}
+                  </div>
+                  <div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => handleDownloadDocument(finalApprovedMilestoneFile.fileUrl, finalApprovedMilestoneFile.fileName)}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+                  No approved milestone file is available for this project yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="rounded-xl shadow-sm border-0 sm:border overflow-hidden">
             <CardHeader className="pb-3 border-b bg-muted/30">

@@ -105,7 +105,7 @@ export default function TitleDetailPage() {
     await new Promise(r => setTimeout(r, 600))
     setSaving(false)
     setStatus("approved")
-    toast.success("Sent to DC Committee", { description: `"${found.title}" is now under committee review.` })
+    toast.success("Sent to DC Committee", { description: `${found.groupName} Project Titles are now under committee review.` })
   }
 
   return (
@@ -134,7 +134,7 @@ export default function TitleDetailPage() {
                 <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-base leading-snug">{found.title}</CardTitle>
+                <CardTitle className="text-base leading-snug">{`${found.groupName} Project Titles`}</CardTitle>
                 <CardDescription className="mt-0.5">{found.domain}</CardDescription>
               </div>
             </div>

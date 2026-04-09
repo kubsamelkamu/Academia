@@ -329,3 +329,74 @@ export type ReopenMyProjectGroupResult = {
     submittedAt: null
   }
 }
+
+export type ProjectGroupReviewStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED"
+
+export type ProjectGroupReviewStatusOption = {
+  value: ProjectGroupReviewStatus
+  label: string
+  total: number
+}
+
+export type ProjectGroupReviewFilters = {
+  appliedStatus: ProjectGroupReviewStatus
+  availableStatuses: ProjectGroupReviewStatusOption[]
+}
+
+export type ProjectGroupReviewSummary = {
+  pending: number
+  approved: number
+  rejected: number
+  all: number
+}
+
+export type ProjectGroupReviewUser = {
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status: string
+  departmentId: string
+}
+
+export type ProjectGroupReviewMember = {
+  id: string
+  joinedAt: string
+  user: ProjectGroupReviewUser
+}
+
+export type ProjectGroupReviewItem = {
+  id: string
+  name: string
+  status: string
+  reviewStatus: Exclude<ProjectGroupReviewStatus, "ALL"> | string
+  submittedAt: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
+  leader: ProjectGroupReviewUser
+  members: ProjectGroupReviewMember[]
+  memberCount: number
+  minGroupSize: number
+  maxGroupSize: number
+  createdAt: string
+}
+
+export type ProjectGroupReviewPagination = {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export type ProjectGroupsReviewSubmittedPage = {
+  filters: ProjectGroupReviewFilters
+  summary: ProjectGroupReviewSummary
+  items: ProjectGroupReviewItem[]
+  pagination: ProjectGroupReviewPagination
+}
+
+export type RejectProjectGroupReviewDto = {
+  reason: string
+}

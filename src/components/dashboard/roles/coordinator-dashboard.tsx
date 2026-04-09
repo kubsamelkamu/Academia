@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import { useCoordinatorAdvisorOverview, useCoordinatorProjectTracking } from "@/lib/hooks/use-coordinator-analytics"
+import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import {
   FileText,
   FileCheck,
@@ -50,8 +51,8 @@ import {
   Complaint,
   Grade,
 } from "@/data/mockData"
-import { mockTimelineAlerts } from "@/data/timelineData"
 import type { CoordinatorProjectTrackingItem, CoordinatorProjectTrackingMilestone } from "@/types/project-tracking"
+import type { DepartmentAnnouncementItem } from "@/types/department-announcements"
 
 interface DashboardTimelineMilestone {
   id: string
@@ -79,6 +80,17 @@ interface DashboardActiveProjectRow {
   progress: number
   status: string
 }
+
+interface DashboardAnnouncementAlert {
+  id: string
+  title: string
+  message: string
+  severity: "low" | "high" | "critical"
+  isRead: boolean
+  createdAt: string
+}
+
+const ALERT_DUE_SOON_SECONDS = 3 * 24 * 60 * 60
 
 function performanceLabel(progress: number) {
   if (progress >= 75) return "Excellent"
@@ -178,6 +190,48 @@ function mapTrackingItemToActiveProjectRow(item: CoordinatorProjectTrackingItem)
     evaluatorLabel: "Pending integration",
     progress: item.milestoneProgress.percentage,
     status: toDisplayStatus(item.projectStatus),
+  }
+}
+
+function formatDueRelative(secondsRemaining: number): string {
+  if (secondsRemaining < 0) {
+    const overdueDays = Math.max(1, Math.ceil(Math.abs(secondsRemaining) / 86_400))
+    return `Overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}`
+  }
+
+  const days = Math.floor(secondsRemaining / 86_400)
+  const hours = Math.floor((secondsRemaining % 86_400) / 3_600)
+
+  if (days > 0) {
+    return `Due in ${days} day${days === 1 ? "" : "s"}`
+  }
+
+  if (hours > 0) {
+    return `Due in ${hours} hour${hours === 1 ? "" : "s"}`
+  }
+
+  return "Due soon"
+}
+
+function mapAnnouncementToTimelineAlert(announcement: DepartmentAnnouncementItem): DashboardAnnouncementAlert | null {
+  if (announcement.isDisabled || announcement.isExpired) return null
+
+  const secondsRemaining = announcement.secondsRemaining
+  const isOverdue = secondsRemaining !== null && secondsRemaining < 0
+  const isDueSoon = secondsRemaining !== null && secondsRemaining >= 0 && secondsRemaining <= ALERT_DUE_SOON_SECONDS
+
+  const relativeDueMessage =
+    secondsRemaining !== null
+      ? formatDueRelative(secondsRemaining)
+      : "No deadline"
+
+  return {
+    id: announcement.id,
+    title: announcement.title,
+    message: `${announcement.message} • ${relativeDueMessage}`,
+    severity: isOverdue ? "critical" : isDueSoon ? "high" : "low",
+    isRead: false,
+    createdAt: announcement.createdAt,
   }
 }
 
@@ -294,6 +348,14 @@ export function CoordinatorDashboard() {
     page: 1,
     limit: 6,
     enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+
+  const timelineAnnouncementsQuery = useDepartmentAnnouncements({
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    departmentId,
+    page: 1,
+    limit: 50,
+    refetchIntervalMs: 60_000,
   })
 
   const pendingTitles = mockProjectTitles.filter(t => t.status === 'pending')
@@ -438,7 +500,14 @@ export function CoordinatorDashboard() {
     },
   ]
 
-  const unreadAlerts = mockTimelineAlerts.filter(a => !a.isRead)
+  const unreadAlerts = useMemo(() => {
+    const items = timelineAnnouncementsQuery.data?.items ?? []
+
+    return items
+      .map(mapAnnouncementToTimelineAlert)
+      .filter((alert): alert is DashboardAnnouncementAlert => Boolean(alert))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+  }, [timelineAnnouncementsQuery.data?.items])
   const trackedTimelines = useMemo(
     () => (timelineTrackingQuery.data?.items ?? []).map(mapTrackingItemToTimelineCard),
     [timelineTrackingQuery.data?.items]
@@ -596,7 +665,40 @@ export function CoordinatorDashboard() {
       {/* ── Timeline Alerts + System Overview ── */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          {unreadAlerts.length > 0 ? (
+          {timelineAnnouncementsQuery.isLoading ? (
+            <Card className="border-none shadow-sm h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-muted flex items-center justify-center">
+                    <Timer className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  Timeline Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="rounded-lg border bg-muted/30 p-3">
+                    <div className="h-4 w-1/3 rounded bg-muted" />
+                    <div className="mt-2 h-3 w-2/3 rounded bg-muted" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : timelineAnnouncementsQuery.isError ? (
+            <Card className="border-none shadow-sm h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-destructive/10 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                  </div>
+                  Timeline Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-destructive">Failed to load timeline alerts from announcements.</p>
+              </CardContent>
+            </Card>
+          ) : unreadAlerts.length > 0 ? (
             <Card className="border-none shadow-sm h-full">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -604,7 +706,6 @@ export function CoordinatorDashboard() {
                     <Timer className="h-4 w-4 text-destructive" />
                   </div>
                   Timeline Alerts
-                  <Badge variant="destructive" className="ml-auto text-xs">{unreadAlerts.length} unread</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
