@@ -151,7 +151,6 @@ export function StudentUploadDocumentsPage() {
 
   useEffect(() => {
     if (!milestone && milestoneKeyFromParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMilestone(milestoneKeyFromParam)
     }
   }, [milestone, milestoneKeyFromParam])
@@ -279,7 +278,6 @@ export function StudentUploadDocumentsPage() {
 
     const base = projectTitle || ""
     const suggested = base ? `${base} — ${milestoneLabel}` : milestoneLabel
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(suggested)
   }, [isProposalFlow, milestone, milestoneLabel, projectTitle, title])
 

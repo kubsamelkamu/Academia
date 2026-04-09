@@ -387,7 +387,12 @@ export function StudentMilestonesPage() {
     }
 
     return myProject.milestones
-  }, [projectMilestonesData?.items, proposalMilestoneState, templatesData?.templates])
+  }, [
+    projectMilestonesData?.items,
+    proposalMilestoneState,
+    templatesData?.templates,
+    latestLinkedProposal?.project?.milestones,
+  ])
 
   const completedMilestones = milestones.filter((m) => m.status === "approved").length
   const totalMilestones = milestones.length
@@ -407,10 +412,10 @@ export function StudentMilestonesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
             Milestones
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -419,22 +424,22 @@ export function StudentMilestonesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
+      <Card className="border-border/80 shadow-sm">
+        <CardContent className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+          <div className="mb-3 flex items-center justify-between sm:mb-4">
             <div>
-              <h3 className="font-semibold">{projectDisplayName}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-sm font-semibold sm:text-base">{projectDisplayName}</h3>
+              <p className="text-xs text-muted-foreground sm:text-sm">
                 {completedMilestones} of {totalMilestones} milestones completed
               </p>
             </div>
-            <span className="text-2xl font-bold text-primary">{progressPercent.toFixed(0)}%</span>
+            <span className="text-xl font-bold text-primary sm:text-2xl">{progressPercent.toFixed(0)}%</span>
           </div>
           <Progress value={progressPercent} className="h-3" />
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle>Project Milestones</CardTitle>
           <CardDescription>
@@ -473,11 +478,11 @@ export function StudentMilestonesPage() {
             return (
               <div
                 key={milestone.id}
-                className="rounded-lg border bg-muted/30 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                className="flex flex-col justify-between gap-3 rounded-lg border bg-muted/30 p-3 sm:gap-4 sm:p-4 lg:flex-row lg:items-center"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3 sm:gap-4">
                   <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold sm:h-10 sm:w-10 ${
                       milestone.status === "approved"
                         ? "bg-green-100 text-green-700"
                         : milestone.status === "submitted"
@@ -491,9 +496,9 @@ export function StudentMilestonesPage() {
                       milestone.sequence ?? index + 1
                     )}
                   </div>
-                  <div>
-                    <p className="font-medium">{milestone.name}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
+                  <div className="min-w-0">
+                    <p className="font-medium leading-tight">{milestone.name}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:gap-3">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         Due: {formatDate(milestone.dueDate)}
@@ -547,22 +552,23 @@ export function StudentMilestonesPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
                   {milestoneStatusBadge(milestone.status)}
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-stretch gap-1 sm:items-end">
                     {milestone.latestSubmissionUrl ? (
-                      <Button variant="outline" size="sm" onClick={() => handleOpenSubmissionDetails(milestone)}>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => handleOpenSubmissionDetails(milestone)}>
                         View Submission
                       </Button>
                     ) : null}
                     {milestone.latestFeedbackAttachmentUrl && milestone.latestFeedbackAttachmentName ? (
-                      <Button variant="outline" size="sm" onClick={() => handleOpenSubmissionDetails(milestone)}>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => handleOpenSubmissionDetails(milestone)}>
                         Open Advisor Attachment
                       </Button>
                     ) : null}
                     {(milestone.canUploadFirst || milestone.canResubmit) ? (
                       <Button
                         size="sm"
+                        className="w-full sm:w-auto"
                         disabled={isLocked}
                         onClick={() => handleSubmitMilestone(milestone)}
                       >

@@ -413,14 +413,17 @@ export function StudentSubmissionsPage() {
     const target = submissions.find((submission) => submission.id === focusId)
     if (!target) return
 
-    setSelectedDoc((current) => (current?.id === target.id ? current : target))
+    const id = window.setTimeout(() => {
+      setSelectedDoc((current) => (current?.id === target.id ? current : target))
+    }, 0)
+    return () => window.clearTimeout(id)
   }, [searchParams, submissions])
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
             Submissions
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -428,7 +431,7 @@ export function StudentSubmissionsPage() {
           </p>
         </div>
         <Button
-          className="gap-2"
+          className="w-full gap-2 sm:w-auto"
           onClick={() => router.push("/dashboard/student/upload-documents")}
         >
           <Upload className="h-4 w-4" />
@@ -436,43 +439,43 @@ export function StudentSubmissionsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
             <CardDescription>Total Documents</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{stats.total}</p>
+          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold sm:text-2xl">{stats.total}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
             <CardDescription>With Feedback</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{stats.withFeedback}</p>
+          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold sm:text-2xl">{stats.withFeedback}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
             <CardDescription>Pending Review</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold text-yellow-600 sm:text-2xl">{stats.pending}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
             <CardDescription>Approved</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold text-green-600 sm:text-2xl">{stats.approved}</p>
           </CardContent>
         </Card>
       </div>
 
       {milestoneStatusItems.length ? (
-        <Card>
+        <Card className="border-border/80 shadow-sm">
           <CardHeader>
             <CardTitle>Milestone Sequence</CardTitle>
             <CardDescription>
@@ -505,13 +508,13 @@ export function StudentSubmissionsPage() {
       ) : null}
 
       <Tabs defaultValue="documents" className="space-y-4">
-        <TabsList className="grid w-full max-w-[420px] grid-cols-2">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl border bg-muted/40 p-1 sm:max-w-[420px]">
           <TabsTrigger value="documents">My Documents</TabsTrigger>
           <TabsTrigger value="templates">Templates & Guidelines</TabsTrigger>
         </TabsList>
 
         <TabsContent value="documents" className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -536,7 +539,7 @@ export function StudentSubmissionsPage() {
             </div>
           </div>
 
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>All Documents</span>
@@ -550,7 +553,7 @@ export function StudentSubmissionsPage() {
                 return (
                   <div
                     key={doc.id}
-                    className="rounded-lg border bg-muted/30 p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4"
+                    className="flex flex-col justify-between gap-3 rounded-lg border bg-muted/30 p-3 sm:gap-4 sm:p-4 xl:flex-row xl:items-center"
                   >
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -573,7 +576,7 @@ export function StudentSubmissionsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full xl:w-auto xl:justify-end">
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center xl:w-auto xl:justify-end">
                       <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSelectedDoc(doc)}>
                         <MessageCircle className="h-4 w-4 mr-1" />
                         Feedback{unresolved > 0 ? ` (${unresolved})` : ""}
@@ -581,7 +584,7 @@ export function StudentSubmissionsPage() {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="w-full sm:w-9"
+                        className="h-9 w-full sm:h-9 sm:w-9"
                         onClick={() => {
                           if (doc.url) {
                             const anchor = document.createElement("a")
@@ -608,7 +611,7 @@ export function StudentSubmissionsPage() {
         </TabsContent>
 
         <TabsContent value="templates">
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle>Templates & Guidelines</CardTitle>
               <CardDescription>Download active document templates from your department.</CardDescription>

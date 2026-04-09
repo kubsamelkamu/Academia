@@ -227,24 +227,24 @@ export function StudentTimelinePage() {
   }, [currentTime])
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
+    <div className="w-full px-3 py-4 sm:px-4 sm:py-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div className="mb-4 flex flex-col gap-3 md:mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
             Project Timeline
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Track tasks and progress throughout your project
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <Button
             onClick={() => {
               setFocusedTaskStatus(null)
               setActiveTab("tasks")
             }}
-            className="gap-2"
+            className="w-full gap-2 sm:w-auto"
             disabled={!isGroupApproved}
             title={!isGroupApproved ? "Your project group must be approved" : "Add a task"}
           >
@@ -253,7 +253,7 @@ export function StudentTimelinePage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
                 <Filter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -268,7 +268,7 @@ export function StudentTimelinePage() {
       </div>
 
       {/* Task Status Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 md:gap-4">
         <Card
           role={isGroupApproved ? "button" : undefined}
           tabIndex={isGroupApproved ? 0 : -1}
@@ -293,17 +293,17 @@ export function StudentTimelinePage() {
             }
           }}
         >
-          <CardContent className="pt-6">
+          <CardContent className="px-2.5 pb-2.5 pt-2.5 sm:px-6 sm:pb-6 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">TODO</p>
-                <p className="text-2xl font-bold">{taskMetrics.todo}</p>
+                <p className="text-[11px] font-medium text-muted-foreground sm:text-sm">TODO</p>
+                <p className="text-lg font-bold sm:text-2xl">{taskMetrics.todo}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <Circle className="h-6 w-6 text-muted-foreground" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted sm:h-12 sm:w-12">
+                <Circle className="h-5 w-5 text-muted-foreground sm:h-6 sm:w-6" />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="mt-1 text-[10px] text-muted-foreground sm:mt-2 sm:text-xs">
               {taskMetrics.total > 0
                 ? `${taskMetrics.todo} of ${taskMetrics.total} • ${Math.round((taskMetrics.todo / taskMetrics.total) * 100)}%`
                 : "No tasks yet"}
@@ -335,17 +335,17 @@ export function StudentTimelinePage() {
             }
           }}
         >
-          <CardContent className="pt-6">
+          <CardContent className="px-2.5 pb-2.5 pt-2.5 sm:px-6 sm:pb-6 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">In Progress</p>
-                <p className="text-2xl font-bold">{taskMetrics.inProgress}</p>
+                <p className="text-[11px] font-medium text-muted-foreground sm:text-sm">In Progress</p>
+                <p className="text-lg font-bold sm:text-2xl">{taskMetrics.inProgress}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Hourglass className="h-6 w-6 text-primary" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 sm:h-12 sm:w-12">
+                <Hourglass className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="mt-1 text-[10px] text-muted-foreground sm:mt-2 sm:text-xs">
               {taskMetrics.total > 0
                 ? `${taskMetrics.inProgress} of ${taskMetrics.total} • ${Math.round((taskMetrics.inProgress / taskMetrics.total) * 100)}%`
                 : "No tasks yet"}
@@ -377,17 +377,17 @@ export function StudentTimelinePage() {
             }
           }}
         >
-          <CardContent className="pt-6">
+          <CardContent className="px-2.5 pb-2.5 pt-2.5 sm:px-6 sm:pb-6 sm:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">{taskMetrics.done}</p>
+                <p className="text-[11px] font-medium text-muted-foreground sm:text-sm">Completed</p>
+                <p className="text-lg font-bold sm:text-2xl">{taskMetrics.done}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <CheckCheck className="h-6 w-6 text-green-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted sm:h-12 sm:w-12">
+                <CheckCheck className="h-5 w-5 text-green-600 sm:h-6 sm:w-6" />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="mt-1 text-[10px] text-muted-foreground sm:mt-2 sm:text-xs">
               {taskMetrics.total > 0
                 ? `${taskMetrics.done} of ${taskMetrics.total} • ${taskMetrics.percent}% overall complete`
                 : "No tasks yet"}
@@ -406,19 +406,19 @@ export function StudentTimelinePage() {
         }}
         className="space-y-4"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList>
-            <TabsTrigger value="calendar" className="gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl border bg-muted/40 p-1 sm:w-auto">
+            <TabsTrigger value="calendar" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
               <CalendarDays className="h-4 w-4" />
-              <span className="hidden sm:inline">Calendar</span>
+              <span>Calendar</span>
             </TabsTrigger>
-            <TabsTrigger value="list" className="gap-2">
+            <TabsTrigger value="list" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
               <ListChecks className="h-4 w-4" />
-              <span className="hidden sm:inline">List</span>
+              <span>List</span>
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-2">
+            <TabsTrigger value="tasks" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
               <FolderKanban className="h-4 w-4" />
-              <span className="hidden sm:inline">Tasks</span>
+              <span>Tasks</span>
             </TabsTrigger>
           </TabsList>
 
@@ -441,7 +441,7 @@ export function StudentTimelinePage() {
 
         {/* Calendar View */}
         <TabsContent value="calendar" className="space-y-4">
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -449,11 +449,12 @@ export function StudentTimelinePage() {
                   Calendar View
                 </CardTitle>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-8 w-8 px-0 sm:h-9 sm:w-9"
                     onClick={() => {
                       setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
                     }}
@@ -462,7 +463,7 @@ export function StudentTimelinePage() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
 
-                  <div className="min-w-[140px] text-center text-sm font-medium">
+                  <div className="min-w-[120px] text-center text-xs font-medium sm:min-w-[140px] sm:text-sm">
                     {calendarMonthLabel}
                   </div>
 
@@ -470,6 +471,7 @@ export function StudentTimelinePage() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="px-2 text-xs sm:px-3 sm:text-sm"
                     onClick={() => {
                       const now = new Date()
                       setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1))
@@ -485,6 +487,7 @@ export function StudentTimelinePage() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-8 w-8 px-0 sm:h-9 sm:w-9"
                     onClick={() => {
                       setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
                     }}
@@ -617,7 +620,7 @@ export function StudentTimelinePage() {
 
         {/* List View */}
         <TabsContent value="list" className="space-y-4">
-          <Card>
+          <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ListChecks className="h-5 w-5 text-primary" />
