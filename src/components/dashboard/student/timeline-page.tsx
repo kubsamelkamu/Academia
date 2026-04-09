@@ -15,6 +15,7 @@ import {
   CheckCheck,
   ListChecks,
   CalendarDays,
+  CalendarClock,
   FolderKanban,
   Search,
   ChevronLeft,
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuthStore } from "@/store/auth-store"
 import { ProjectGroupTasksBoard } from "@/components/dashboard/student/project-group-tasks-board"
-import { useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import { useMyProjectGroup, useMyProjectGroupMeetings } from "@/lib/hooks/use-project-groups"
 import { useMyProjectGroupTasks } from "@/lib/hooks/use-project-group-tasks"
 import type { ProjectGroupTaskStatus } from "@/types/project-group-tasks"
 
@@ -50,6 +51,13 @@ export function StudentTimelinePage() {
   const isGroupApproved = Boolean(myGroup?.status && myGroup.status.toUpperCase() === "APPROVED")
   const myTasksQuery = useMyProjectGroupTasks(Boolean(myGroup?.id) && isGroupApproved)
   const myTasksData = myTasksQuery.data
+  const myMeetingsQuery = useMyProjectGroupMeetings({
+    enabled: Boolean(myGroup?.id) && isGroupApproved,
+    page: 1,
+    limit: 200,
+    projectId: myGroup?.projectId ?? undefined,
+  })
+  const myMeetingsData = myMeetingsQuery.data
 
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
@@ -176,6 +184,7 @@ export function StudentTimelinePage() {
     const daysInMonth = new Date(year, month + 1, 0).getDate()
 
     const tasksByDay = new Map<number, typeof filteredTasks>()
+    const meetingsByDay = new Map<number, NonNullable<typeof myMeetingsData>["items"]>()
 
     for (const task of myTasksData?.items ?? []) {
       if (!task.dueDate) continue
@@ -192,19 +201,38 @@ export function StudentTimelinePage() {
       }
     }
 
+    for (const meeting of myMeetingsData?.items ?? []) {
+      const meetingDate = new Date(meeting.meetingAt)
+      if (Number.isNaN(meetingDate.getTime())) continue
+      if (meetingDate.getFullYear() !== year || meetingDate.getMonth() !== month) continue
+
+      const day = meetingDate.getDate()
+      const existing = meetingsByDay.get(day)
+      if (existing) {
+        existing.push(meeting)
+      } else {
+        meetingsByDay.set(day, [meeting])
+      }
+    }
+
     return Array.from({ length: 35 }).map((_, idx) => {
       const dayNumber = idx - leadingEmptyCells + 1
 
       if (dayNumber < 1 || dayNumber > daysInMonth) {
-        return { dayNumber: null as number | null, tasks: [] as typeof filteredTasks }
+        return {
+          dayNumber: null as number | null,
+          tasks: [] as typeof filteredTasks,
+          meetings: [] as NonNullable<typeof myMeetingsData>["items"],
+        }
       }
 
       return {
         dayNumber,
         tasks: (tasksByDay.get(dayNumber) ?? []).slice(),
+        meetings: (meetingsByDay.get(dayNumber) ?? []).slice(),
       }
     })
-  }, [calendarMonth, myTasksData?.items])
+  }, [calendarMonth, myMeetingsData?.items, myTasksData?.items])
 
   const calendarMonthLabel = useMemo(() => {
     return calendarMonth.toLocaleDateString("en-US", {
@@ -498,7 +526,7 @@ export function StudentTimelinePage() {
                 </div>
               </div>
               <CardDescription>
-                View your tasks by due date
+                View your tasks and advisor meetings by date
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -518,9 +546,31 @@ export function StudentTimelinePage() {
                     isCurrentMonth &&
                     dayNumber === todayStart.getDate()
 
+                  const dayEvents = [
+                    ...cell.meetings.map((meeting) => ({
+                      type: "meeting" as const,
+                      id: `meeting-${meeting.id}`,
+                      orderAt: meeting.meetingAt,
+                      meeting,
+                    })),
+                    ...cell.tasks.map((task) => ({
+                      type: "task" as const,
+                      id: `task-${task.id}`,
+                      orderAt: task.dueDate ?? "",
+                      task,
+                    })),
+                  ].sort((a, b) => {
+                    const aTime = new Date(a.orderAt).getTime()
+                    const bTime = new Date(b.orderAt).getTime()
+                    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0
+                    if (Number.isNaN(aTime)) return 1
+                    if (Number.isNaN(bTime)) return -1
+                    return aTime - bTime
+                  })
+
                   const showAll = Boolean(dayNumber) && expandedCalendarDay === dayNumber
-                  const visibleTasks = showAll ? cell.tasks : cell.tasks.slice(0, 3)
-                  const hiddenCount = cell.tasks.length - visibleTasks.length
+                  const visibleEvents = showAll ? dayEvents : dayEvents.slice(0, 3)
+                  const hiddenCount = dayEvents.length - visibleEvents.length
 
                   return (
                     <div
@@ -545,9 +595,45 @@ export function StudentTimelinePage() {
                         </span>
                       </div>
 
-                      {dayNumber && cell.tasks.length > 0 ? (
+                      {dayNumber && dayEvents.length > 0 ? (
                         <div className="mt-1 space-y-1">
-                          {visibleTasks.map((task) => {
+                          {visibleEvents.map((event) => {
+                            if (event.type === "meeting") {
+                              const meetingAt = new Date(event.meeting.meetingAt)
+                              const meetingTime = Number.isNaN(meetingAt.getTime())
+                                ? ""
+                                : meetingAt.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })
+
+                              const meetingLabel = meetingTime
+                                ? `${meetingTime} - ${event.meeting.title}`
+                                : event.meeting.title
+
+                              return (
+                                <div
+                                  key={event.id}
+                                  className={
+                                    event.meeting.isCancelled
+                                      ? "w-full text-left text-xs p-1 rounded bg-destructive/10 text-destructive"
+                                      : "w-full text-left text-xs p-1 rounded bg-amber-100 text-amber-900"
+                                  }
+                                  title={
+                                    event.meeting.agenda?.trim()
+                                      ? `${meetingLabel} • ${event.meeting.agenda}`
+                                      : meetingLabel
+                                  }
+                                >
+                                  <span className="inline-flex items-center gap-1 truncate">
+                                    <CalendarClock className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{meetingLabel}</span>
+                                  </span>
+                                </div>
+                              )
+                            }
+
+                            const { task } = event
                             const due = task.dueDate ? new Date(task.dueDate) : null
                             const dueStart =
                               due && !Number.isNaN(due.getTime())
@@ -572,7 +658,7 @@ export function StudentTimelinePage() {
 
                             return (
                               <button
-                                key={task.id}
+                                key={event.id}
                                 type="button"
                                 className={`${styles} w-full text-left text-xs p-1 rounded truncate hover:opacity-90`}
                                 onClick={() => {
@@ -598,7 +684,7 @@ export function StudentTimelinePage() {
                             </button>
                           ) : null}
 
-                          {showAll && cell.tasks.length > 3 ? (
+                          {showAll && dayEvents.length > 3 ? (
                             <button
                               type="button"
                               className="text-[10px] text-muted-foreground hover:underline"

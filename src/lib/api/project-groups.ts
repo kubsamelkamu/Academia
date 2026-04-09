@@ -4,6 +4,9 @@ import type {
   AvailableStudentsPage,
   AvailableStudentsPagination,
   BrowseProjectGroupsPage,
+  ProjectGroupsReviewSubmittedPage,
+  ProjectGroupReviewStatus,
+  RejectProjectGroupReviewDto,
   CancelProjectGroupJoinRequestResult,
   ApproveMyGroupJoinRequestResult,
   RejectMyGroupJoinRequestDto,
@@ -19,7 +22,9 @@ import type {
   ProjectGroup,
   ProjectGroupDetails,
   MyGroupJoinRequestsPage,
+  MyProjectGroupMeetingsListResult,
   ProjectGroupMe,
+  ProjectGroupMeeting,
   SubmitMyProjectGroupResult,
   ReopenMyProjectGroupResult,
 } from "@/types/project-groups"
@@ -111,6 +116,31 @@ function normalizeAvailableStudentsPagination(payload: unknown): AvailableStuden
   }
 }
 
+function normalizeProjectGroupMeeting(payload: unknown): ProjectGroupMeeting | null {
+  if (!isRecord(payload)) return null
+
+  const id = asNullableString(payload.id) ?? asNullableString(payload._id)
+  const projectId = asNullableString(payload.projectId)
+  const meetingAt = asNullableString(payload.meetingAt)
+
+  if (!id || !projectId || !meetingAt) return null
+
+  return {
+    id,
+    projectId,
+    projectGroupId: asNullableString(payload.projectGroupId),
+    title: asNullableString(payload.title) ?? "Advisor Meeting",
+    meetingAt,
+    durationMinutes:
+      typeof payload.durationMinutes === "number" && Number.isFinite(payload.durationMinutes)
+        ? payload.durationMinutes
+        : 0,
+    agenda: asNullableString(payload.agenda),
+    isCancelled: payload.isCancelled === true,
+    cancellationReason: asNullableString(payload.cancellationReason),
+  }
+}
+
 /**
  * Create a new project group for the current approved group leader.
  *
@@ -131,6 +161,64 @@ export async function createProjectGroup(dto: CreateProjectGroupDto): Promise<Pr
 export async function getMyProjectGroup(): Promise<ProjectGroupMe> {
   const response = await apiClient.get<ProjectGroupMe>("/project-groups/me")
   return response.data
+}
+
+export async function listMyProjectGroupMeetings(params: {
+  page?: number
+  limit?: number
+  projectId?: string
+} = {}): Promise<MyProjectGroupMeetingsListResult> {
+  const page = params.page ?? 1
+  const limit = params.limit ?? 100
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : undefined
+
+  const response = await apiClient.get<unknown>("/project-groups/me/meetings", {
+    params: {
+      page,
+      limit,
+      ...(projectId ? { projectId } : null),
+    },
+  })
+
+  const payload = isRecord(response.data) ? response.data : {}
+  const rawItems = Array.isArray(payload.items) ? payload.items : []
+  const items = rawItems
+    .map(normalizeProjectGroupMeeting)
+    .filter((item): item is ProjectGroupMeeting => Boolean(item))
+
+  const paginationRaw = isRecord(payload.pagination) ? payload.pagination : {}
+  const totalItems =
+    typeof paginationRaw.totalItems === "number" && Number.isFinite(paginationRaw.totalItems)
+      ? paginationRaw.totalItems
+      : items.length
+  const totalPages =
+    typeof paginationRaw.totalPages === "number" && Number.isFinite(paginationRaw.totalPages)
+      ? paginationRaw.totalPages
+      : Math.max(1, Math.ceil(totalItems / Math.max(limit, 1)))
+
+  return {
+    items,
+    pagination: {
+      page:
+        typeof paginationRaw.page === "number" && Number.isFinite(paginationRaw.page)
+          ? paginationRaw.page
+          : page,
+      limit:
+        typeof paginationRaw.limit === "number" && Number.isFinite(paginationRaw.limit)
+          ? paginationRaw.limit
+          : limit,
+      totalItems,
+      totalPages,
+      hasNextPage:
+        typeof paginationRaw.hasNextPage === "boolean"
+          ? paginationRaw.hasNextPage
+          : page < totalPages,
+      hasPreviousPage:
+        typeof paginationRaw.hasPreviousPage === "boolean"
+          ? paginationRaw.hasPreviousPage
+          : page > 1,
+    },
+  }
 }
 
 export async function getAvailableStudents(params: {
@@ -312,6 +400,64 @@ export async function submitMyProjectGroup(): Promise<SubmitMyProjectGroupResult
 
 export async function reopenMyProjectGroup(): Promise<ReopenMyProjectGroupResult> {
   const response = await apiClient.post<ReopenMyProjectGroupResult>("/project-groups/me/reopen")
+  return response.data
+}
+
+export async function listSubmittedProjectGroupsForReview(params: {
+  status?: ProjectGroupReviewStatus
+  page?: number
+  limit?: number
+  search?: string
+} = {}): Promise<ProjectGroupsReviewSubmittedPage> {
+  const status = params.status ?? "ALL"
+  const page = params.page ?? 1
+  const limit = params.limit ?? 20
+  const search = params.search?.trim() ? params.search.trim() : undefined
+
+  const response = await apiClient.get<ProjectGroupsReviewSubmittedPage>("/project-groups/review/submitted", {
+    params: {
+      status,
+      page,
+      limit,
+      ...(search ? { search } : null),
+    },
+  })
+
+  return response.data
+}
+
+export async function approveProjectGroupReview(groupId: string): Promise<{ approved: boolean; id: string }> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const response = await apiClient.patch<{ approved: boolean; id: string }>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/approve`
+  )
+
+  return response.data
+}
+
+export async function rejectProjectGroupReview(
+  groupId: string,
+  dto: RejectProjectGroupReviewDto
+): Promise<{ rejected: boolean; id: string; rejectionReason?: string | null }> {
+  const trimmed = groupId.trim()
+  if (!trimmed) {
+    throw new Error("groupId is required")
+  }
+
+  const reason = dto.reason.trim()
+  if (!reason) {
+    throw new Error("reason is required")
+  }
+
+  const response = await apiClient.patch<{ rejected: boolean; id: string; rejectionReason?: string | null }>(
+    `/project-groups/review/${encodeURIComponent(trimmed)}/reject`,
+    { reason }
+  )
+
   return response.data
 }
 

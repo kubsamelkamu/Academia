@@ -49,6 +49,7 @@ import {
   Bell,
   AlertCircle,
   Video,
+  Shield,
 } from "lucide-react"
 
 // Types
@@ -558,26 +559,12 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
     enabled: Boolean(selectedReview),
   })
 
-  useEffect(() => {
+  const handleSelectReview = useCallback((entry: AdvisorReviewQueueEntry) => {
+    setSelectedReviewId(entry.id)
     setFeedbackDraft("")
     setFeedbackFile(null)
     setIsApproveDialogOpen(false)
-  }, [selectedReview?.id])
-
-  useEffect(() => {
-    if (!pendingMilestones.length) {
-      setSelectedReviewId((current) => (current === null ? current : null))
-      return
-    }
-
-    setSelectedReviewId((current) => {
-      if (current && pendingMilestones.some((item) => item.id === current)) {
-        return current
-      }
-
-      return pendingMilestones[0].id
-    })
-  }, [pendingMilestones])
+  }, [])
 
   const recentMessages = useMemo(() => {
     return advisorProjects
@@ -876,7 +863,7 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
                             <button
                               key={entry.id}
                               type="button"
-                              onClick={() => setSelectedReviewId(entry.id)}
+                              onClick={() => handleSelectReview(entry)}
                               className={`w-full rounded-lg border text-left transition-colors ${
                                 isSelected
                                   ? "border-primary bg-primary/5 shadow-sm"
@@ -1303,6 +1290,26 @@ export function AdvisorDashboard({ userName = "Advisor", advisorId = "u7" }: Adv
           </div>
         </TabsContent>
       </Tabs>
+
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-full bg-primary p-2.5 text-primary-foreground shadow-sm">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold leading-none">DC Committee Access</p>
+              <p className="text-sm text-muted-foreground">Open the committee project workspace from your advisor dashboard.</p>
+            </div>
+          </div>
+          <Button asChild className="w-full gap-1.5 sm:w-auto">
+            <Link href="/dashboard/advisor/dc-committee">
+              Access DC Committee
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

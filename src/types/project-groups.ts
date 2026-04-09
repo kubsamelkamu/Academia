@@ -61,6 +61,32 @@ export interface ProjectGroupMe {
   pendingInvitationsCount: number
 }
 
+export interface ProjectGroupMeeting {
+  id: string
+  projectId: string
+  projectGroupId?: string | null
+  title: string
+  meetingAt: string
+  durationMinutes: number
+  agenda?: string | null
+  isCancelled: boolean
+  cancellationReason?: string | null
+}
+
+export interface ProjectGroupMeetingsPagination {
+  page: number
+  limit: number
+  totalItems: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface MyProjectGroupMeetingsListResult {
+  items: ProjectGroupMeeting[]
+  pagination: ProjectGroupMeetingsPagination
+}
+
 export type AvailableStudentProfile = {
   bio: string | null
   githubUrl: string | null
@@ -328,4 +354,75 @@ export type ReopenMyProjectGroupResult = {
     status: "DRAFT" | string
     submittedAt: null
   }
+}
+
+export type ProjectGroupReviewStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED"
+
+export type ProjectGroupReviewStatusOption = {
+  value: ProjectGroupReviewStatus
+  label: string
+  total: number
+}
+
+export type ProjectGroupReviewFilters = {
+  appliedStatus: ProjectGroupReviewStatus
+  availableStatuses: ProjectGroupReviewStatusOption[]
+}
+
+export type ProjectGroupReviewSummary = {
+  pending: number
+  approved: number
+  rejected: number
+  all: number
+}
+
+export type ProjectGroupReviewUser = {
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  avatarUrl: string | null
+  status: string
+  departmentId: string
+}
+
+export type ProjectGroupReviewMember = {
+  id: string
+  joinedAt: string
+  user: ProjectGroupReviewUser
+}
+
+export type ProjectGroupReviewItem = {
+  id: string
+  name: string
+  status: string
+  reviewStatus: Exclude<ProjectGroupReviewStatus, "ALL"> | string
+  submittedAt: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
+  leader: ProjectGroupReviewUser
+  members: ProjectGroupReviewMember[]
+  memberCount: number
+  minGroupSize: number
+  maxGroupSize: number
+  createdAt: string
+}
+
+export type ProjectGroupReviewPagination = {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export type ProjectGroupsReviewSubmittedPage = {
+  filters: ProjectGroupReviewFilters
+  summary: ProjectGroupReviewSummary
+  items: ProjectGroupReviewItem[]
+  pagination: ProjectGroupReviewPagination
+}
+
+export type RejectProjectGroupReviewDto = {
+  reason: string
 }

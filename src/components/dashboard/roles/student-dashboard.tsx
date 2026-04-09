@@ -570,10 +570,10 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent sm:text-3xl">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             {welcomeTitle}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -588,56 +588,56 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
-            <CardTitle className="text-xs font-medium sm:text-sm">Project Status</CardTitle>
-            <FolderKanban className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Project Status</CardTitle>
+            <FolderKanban className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6 sm:pt-0">
-            <p className="truncate text-lg font-bold sm:text-2xl">
+          <CardContent>
+            <p className="text-2xl font-bold truncate">
               {projectStatusLabel}
             </p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">
+            <p className="mt-1 text-xs text-muted-foreground truncate">
               {projectDisplayName}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
-            <CardTitle className="text-xs font-medium sm:text-sm">Progress</CardTitle>
-            <Clock3 className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Progress</CardTitle>
+            <Clock3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6 sm:pt-0">
-            <p className="text-lg font-bold sm:text-2xl">{backendMilestones.length ? `${data.project.progress}%` : "—"}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">Overall completion</p>
+          <CardContent>
+            <p className="text-2xl font-bold">{backendMilestones.length ? `${data.project.progress}%` : "—"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Overall completion</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
-            <CardTitle className="text-xs font-medium sm:text-sm">Milestones</CardTitle>
-            <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Milestones</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6 sm:pt-0">
-            <p className="text-lg font-bold sm:text-2xl">
+          <CardContent>
+            <p className="text-2xl font-bold">
               {completedMilestones}/{totalMilestones}
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">Completed</p>
+            <p className="mt-1 text-xs text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3 sm:pb-2 sm:px-6 sm:pt-6">
-            <CardTitle className="text-xs font-medium sm:text-sm">My Grade</CardTitle>
-            <BarChart3 className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">My Grade</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0 sm:px-6 sm:pb-6 sm:pt-0">
-            <p className="text-lg font-bold sm:text-2xl">
+          <CardContent>
+            <p className="text-2xl font-bold">
               {data.grade ? data.grade.grade : "Pending"}
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {data.grade ? `${data.grade.finalScore}% overall` : "Not published yet"}
             </p>
           </CardContent>
@@ -647,8 +647,8 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       {/* Main Grid */}
       <div className="grid gap-4 xl:grid-cols-3">
         {/* Project Snapshot */}
-        <Card className="xl:col-span-2 border-border/80 shadow-sm">
-          <CardHeader className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
+        <Card className="xl:col-span-2">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg font-semibold">
                 {projectDisplayName}
@@ -657,11 +657,11 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 Advisor: <span className="font-medium">{advisorDisplayName}</span>
               </CardDescription>
             </div>
-            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm">
                 <Link href="/dashboard/student/milestones">View milestones</Link>
               </Button>
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleViewProject}>
+              <Button variant="outline" size="sm" onClick={handleViewProject}>
                 View full project
               </Button>
             </div>
@@ -753,7 +753,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         </Card>
 
         {/* Action Items / Next Deadline */}
-        <Card className="border-border/80 shadow-sm">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
               <span>Next Deadline</span>
@@ -828,7 +828,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label="Open Team page"
         >
-          <Card className="cursor-pointer border-border/80 shadow-sm transition-colors hover:bg-muted/30 hover:border-muted-foreground/20 hover:opacity-95">
+          <Card className="cursor-pointer transition-colors hover:bg-muted/30 hover:border-muted-foreground/20 hover:opacity-95">
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="group-hover:underline underline-offset-4">My Team</span>
@@ -896,7 +896,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         </Link>
 
         {/* Grades */}
-        <Card className="border-border/80 shadow-sm">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
               <span>My Grades</span>

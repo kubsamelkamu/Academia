@@ -1,9 +1,13 @@
 "use client"
 
-import React, { useState, useMemo, useEffect } from "react"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { listPendingGroupLeaderRequests, approveGroupLeaderRequest, rejectGroupLeaderRequest } from "@/lib/api/group-leader-requests"
-import type { GroupLeaderRequestsSummary } from "@/types/group-leader-requests"
+import {
+  listSubmittedProjectGroupsForReview,
+  approveProjectGroupReview,
+  rejectProjectGroupReview,
+} from "@/lib/api/project-groups"
+import type { ProjectGroupReviewSummary } from "@/types/project-groups"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,16 +32,15 @@ import {
   Clock,
   Users,
   Calendar,
-  FileText,
   ChevronRight,
   Eye,
-  AlertCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 type AppStatus = "pending" | "approved" | "rejected"
+type ReviewTab = "PENDING" | "APPROVED" | "REJECTED" | "ALL"
 
 interface GroupMember {
   id: string
@@ -51,59 +54,14 @@ interface GroupAppItem {
   groupName: string
   domain: string
   requestedAt: string
+  reviewedAt: string | null
+  rejectionReason: string | null
   status: AppStatus
+  memberCount: number
+  minGroupSize: number
+  maxGroupSize: number
   members: GroupMember[]
-  projectIdea: string
-  motivation: string
-  advisorPreference: string
 }
-
-/* ─── Mock Data ─────────────────────────────────────────────────────── */
-const MOCK_GROUPS: GroupAppItem[] = [
-  {
-    id: "ga-1",
-    groupName: "DeepMind Innovators",
-    domain: "AI / Machine Learning",
-    requestedAt: "2024-05-12",
-    status: "pending",
-    members: [
-      { id: "m1", name: "Alex Johnson", email: "alex.j@uni.edu", role: "leader" },
-      { id: "m2", name: "Maria Garcia", email: "maria.g@uni.edu", role: "member" },
-      { id: "m3", name: "David Kim", email: "david.k@uni.edu", role: "member" },
-    ],
-    projectIdea: "An AI-powered campus navigation system utilizing computer vision for indoor positioning.",
-    motivation: "We want to solve the problem of freshmen getting lost in the science complex.",
-    advisorPreference: "Dr. Sarah Williams",
-  },
-  {
-    id: "ga-2",
-    groupName: "Cyber Defenders",
-    domain: "Cybersecurity",
-    requestedAt: "2024-05-13",
-    status: "pending",
-    members: [
-      { id: "m4", name: "Noah Williams", email: "noah.w@uni.edu", role: "leader" },
-      { id: "m5", name: "Olivia Martinez", email: "olivia.m@uni.edu", role: "member" },
-    ],
-    projectIdea: "A decentralized credential verification system using blockchain.",
-    motivation: "To prevent degree forgery and simplify the verification process for employers.",
-    advisorPreference: "Prof. Robert Chen",
-  },
-  {
-    id: "ga-3",
-    groupName: "NextGen Web",
-    domain: "Web Development",
-    requestedAt: "2024-05-10",
-    status: "approved",
-    members: [
-      { id: "m6", name: "Emma Wilson", email: "emma.w@uni.edu", role: "leader" },
-      { id: "m7", name: "James Lee", email: "james.l@uni.edu", role: "member" },
-    ],
-    projectIdea: "Real-time collaboration platform for study groups using WebRTC.",
-    motivation: "Current tools are either too complex or lack academic focus.",
-    advisorPreference: "Dr. Michael Brown",
-  },
-]
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
 function initials(name: string) {
@@ -112,6 +70,13 @@ function initials(name: string) {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function toAppStatus(status: string): AppStatus {
+  const normalized = status.toUpperCase()
+  if (normalized === "APPROVED") return "approved"
+  if (normalized === "REJECTED") return "rejected"
+  return "pending"
 }
 
 const STATUS_CFG: Record<AppStatus, { label: string; cls: string; dot: string; icon: React.ElementType }> = {
@@ -150,8 +115,11 @@ function GroupReviewSheet({
     if (decision === "rejected" && !reason.trim()) { toast.error("Please provide a rejection reason"); return }
 
     setLoading(true)
-    await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
-    setLoading(false)
+    try {
+      await onDecide(app.id, decision, decision === "rejected" ? reason : undefined)
+    } finally {
+      setLoading(false)
+    }
     onClose()
   }
 
@@ -184,6 +152,22 @@ function GroupReviewSheet({
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Group Name</p>
                 <p className="text-sm font-medium">{app.groupName}</p>
               </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Domain</p>
+                  <p className="font-medium">{app.domain}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Group Size</p>
+                  <p className="font-medium">{app.memberCount} ({app.minGroupSize}-{app.maxGroupSize})</p>
+                </div>
+              </div>
+              {app.rejectionReason ? (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Rejection Reason</p>
+                  <p className="text-sm">{app.rejectionReason}</p>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -292,55 +276,93 @@ function GroupReviewSheet({
 
 /* ─── Page ─────────────────────────────────────────────────────────── */
 export default function GroupApprovalPage() {
-  const [search, setSearch]     = useState("")
-  const [tab, setTab]           = useState("pending")
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+  const [tab, setTab] = useState<ReviewTab>("ALL")
   const [selected, setSelected] = useState<GroupAppItem | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  
-  const [data, setData] = useState<GroupAppItem[]>(MOCK_GROUPS)
-  const [summary, setSummary] = useState<GroupLeaderRequestsSummary | null>(null)
+
+  const [data, setData] = useState<GroupAppItem[]>([])
+  const [summary, setSummary] = useState<ProjectGroupReviewSummary | null>(null)
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await listPendingGroupLeaderRequests({ limit: 50 })
-        if (res.summary) setSummary(res.summary)
-        if (res.items && res.items.length > 0) {
-          setData(res.items.map(req => ({
-            id: req.id,
-            groupName: `${req.student.firstName} ${req.student.lastName}'s Group`,
-            domain: "Leadership",
-            requestedAt: req.createdAt,
-            status: req.status.toLowerCase() as AppStatus,
-            members: [{ id: req.student.id, name: `${req.student.firstName} ${req.student.lastName}`, email: req.student.email, role: "leader" }],
-            projectIdea: req.message || "No project details provided.",
-            motivation: req.message || "No motivation provided.",
-            advisorPreference: "Not stated"
-          })))
-        } else if (res.items && res.items.length === 0) {
-          setData([])
-        }
-      } catch (err) {
-        toast.error("Failed to load requests from backend")
-      } finally {
-        setIsLoading(false)
-      }
+    const timeout = window.setTimeout(() => {
+      setSearch(searchInput.trim())
+    }, 350)
+
+    return () => window.clearTimeout(timeout)
+  }, [searchInput])
+
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const res = await listSubmittedProjectGroupsForReview({
+        status: tab,
+        page: 1,
+        limit: 20,
+        ...(search ? { search } : null),
+      })
+
+      setSummary(res.summary)
+      setData(
+        res.items.map((item) => ({
+          id: item.id,
+          groupName: item.name,
+          domain: "Project Group",
+          requestedAt: item.submittedAt ?? item.createdAt,
+          reviewedAt: item.reviewedAt,
+          rejectionReason: item.rejectionReason,
+          status: toAppStatus(item.reviewStatus || item.status),
+          memberCount: item.memberCount,
+          minGroupSize: item.minGroupSize,
+          maxGroupSize: item.maxGroupSize,
+          members: [
+            {
+              id: item.leader.id,
+              name: item.leader.fullName,
+              email: item.leader.email,
+              role: "leader",
+            },
+            ...item.members.map((member) => ({
+              id: member.user.id,
+              name: member.user.fullName,
+              email: member.user.email,
+              role: "member" as const,
+            })),
+          ],
+        }))
+      )
+    } catch {
+      toast.error("Failed to load group approvals")
+      setData([])
+      setSummary(null)
+    } finally {
+      setIsLoading(false)
     }
-    loadData()
-  }, [])
+  }, [search, tab])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    if (!selected) return
+    const refreshed = data.find((group) => group.id === selected.id)
+    if (!refreshed) {
+      setSheetOpen(false)
+      setSelected(null)
+      return
+    }
+    setSelected(refreshed)
+  }, [data, selected])
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return data.filter(g => {
-      const matchTab = tab === "all" || g.status === tab
-      const matchSearch = !search || g.groupName.toLowerCase().includes(q) || g.domain.toLowerCase().includes(q)
-      return matchTab && matchSearch
-    })
-  }, [data, tab, search])
+    return data
+  }, [data])
 
   const counts = {
-    all: summary ? summary.total : data.length,
+    all: summary ? summary.all : data.length,
     pending: summary ? summary.pending : data.filter(g => g.status === "pending").length,
     approved: summary ? summary.approved : data.filter(g => g.status === "approved").length,
     rejected: summary ? summary.rejected : data.filter(g => g.status === "rejected").length,
@@ -349,25 +371,22 @@ export default function GroupApprovalPage() {
   const handleDecide = async (id: string, decision: "approved" | "rejected", reason?: string) => {
     try {
       if (decision === "approved") {
-        await approveGroupLeaderRequest(id)
+        await approveProjectGroupReview(id)
       } else {
-        await rejectGroupLeaderRequest(id, reason || "Rejected")
+        await rejectProjectGroupReview(id, { reason: reason || "Rejected" })
       }
-      setData(prev => prev.map(g => g.id === id ? { ...g, status: decision } : g))
-      setSummary(prev => {
-        if (!prev) return prev
-        const decisionKey = decision as "approved" | "rejected"
-        return {
-          ...prev,
-          pending: Math.max(0, prev.pending - 1),
-          [decisionKey]: prev[decisionKey] + 1
-        }
-      })
+      await loadData()
       toast.success(`Request ${decision === "approved" ? "Approved" : "Rejected"} successfully`)
-    } catch(err) {
+    } catch {
       toast.error("Failed to record decision")
+      throw new Error("Failed to record decision")
     }
   }
+
+  const emptyDescription =
+    tab === "PENDING"
+      ? "Pending group formations will appear here"
+      : "Try changing the filter or search keyword"
 
   return (
     <div className="space-y-6 pb-10 animate-fade-in">
@@ -433,32 +452,39 @@ export default function GroupApprovalPage() {
       )}
 
       {/* Tabs + Search */}
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as ReviewTab)}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-start">
           <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
-            <TabsTrigger value="pending" className="text-xs gap-1.5 shrink-0">
+            <TabsTrigger value="PENDING" className="text-xs gap-1.5 shrink-0">
               <Clock className="h-3.5 w-3.5" /> Pending
               {counts.pending > 0 && <Badge className="h-4 px-1.5 text-[10px] bg-amber-500/20 text-amber-600 ml-0.5">{counts.pending}</Badge>}
             </TabsTrigger>
-            <TabsTrigger value="approved" className="text-xs gap-1.5 shrink-0"><CheckCircle className="h-3.5 w-3.5" /> Approved</TabsTrigger>
-            <TabsTrigger value="rejected" className="text-xs gap-1.5 shrink-0"><XCircle className="h-3.5 w-3.5" /> Rejected</TabsTrigger>
-            <TabsTrigger value="all" className="text-xs gap-1.5 shrink-0"><Filter className="h-3.5 w-3.5" /> All</TabsTrigger>
+            <TabsTrigger value="APPROVED" className="text-xs gap-1.5 shrink-0"><CheckCircle className="h-3.5 w-3.5" /> Approved</TabsTrigger>
+            <TabsTrigger value="REJECTED" className="text-xs gap-1.5 shrink-0"><XCircle className="h-3.5 w-3.5" /> Rejected</TabsTrigger>
+            <TabsTrigger value="ALL" className="text-xs gap-1.5 shrink-0"><Filter className="h-3.5 w-3.5" /> All</TabsTrigger>
           </TabsList>
 
           <div className="relative w-full sm:w-64 sm:mx-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search group name or domain…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9 h-9 text-sm"
             />
           </div>
         </div>
 
-        {['pending', 'approved', 'rejected', 'all'].map(t => (
+        {["PENDING", "APPROVED", "REJECTED", "ALL"].map((t) => (
           <TabsContent key={t} value={t} className="mt-4">
-            {filtered.length > 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 rounded-xl border border-dashed text-center">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  Loading groups...
+                </div>
+              </div>
+            ) : filtered.length > 0 ? (
               <div className="space-y-3">
                 {filtered.map(app => {
                   const sc = STATUS_CFG[app.status]
@@ -491,7 +517,7 @@ export default function GroupApprovalPage() {
               <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed text-center">
                 <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
                 <p className="font-medium text-muted-foreground">No groups found</p>
-                <p className="text-xs text-muted-foreground mt-1">Pending group formations will appear here</p>
+                <p className="text-xs text-muted-foreground mt-1">{emptyDescription}</p>
               </div>
             )}
           </TabsContent>

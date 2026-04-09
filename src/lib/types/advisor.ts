@@ -440,6 +440,71 @@ export interface AdvisorScheduleResponse {
   };
 }
 
+export type AdvisorMeetingFilter = "ALL" | "UPCOMING_REMINDERS" | "CANCELLED";
+
+export type ReminderWindowHours = 24 | 1;
+
+export type RealtimeMeetingEventType = "scheduled" | "updated" | "cancelled";
+
+export interface AdvisorProjectGroupMeeting {
+  id: string;
+  projectId: string;
+  projectGroupId?: string;
+  title: string;
+  meetingAt: string;
+  durationMinutes: number;
+  agenda: string;
+  isUpcoming: boolean;
+  isOngoing: boolean;
+  isCompleted: boolean;
+  isCancelled: boolean;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdvisorProjectGroupMeetingPagination {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface AdvisorProjectGroupMeetingListResponse {
+  items: AdvisorProjectGroupMeeting[];
+  pagination: AdvisorProjectGroupMeetingPagination;
+}
+
+export interface AdvisorProjectGroupMeetingListParams {
+  projectId: string;
+  page?: number;
+  limit?: number;
+  filter?: AdvisorMeetingFilter;
+  reminderWindowHours?: ReminderWindowHours;
+}
+
+export interface AdvisorCreateProjectGroupMeetingDto {
+  projectId: string;
+  title: string;
+  meetingAt: string;
+  durationMinutes: number;
+  agenda: string;
+}
+
+export interface AdvisorUpdateProjectGroupMeetingDto {
+  title?: string;
+  meetingAt?: string;
+  durationMinutes?: number;
+  agenda?: string;
+}
+
+export interface AdvisorCancelProjectGroupMeetingDto {
+  reason?: string;
+}
+
 export interface AdvisorAnnouncement {
   id: string;
   title: string;

@@ -1,3 +1,11 @@
+import apiClient from "@/lib/api/client"
+import type {
+  CreateGroupLeaderRequestDto,
+  GroupLeaderMeResponse,
+  GroupLeaderRequestResponse,
+  GroupLeaderRequestsListData,
+} from "@/types/group-leader-requests"
+
 /**
  * Approve a group leader request (department head action).
  * PATCH /group-leader-requests/{id}/approve
@@ -22,13 +30,6 @@ export async function rejectGroupLeaderRequest(id: string, reason: string): Prom
   )
   return response.data
 }
-import apiClient from "@/lib/api/client"
-import type {
-  CreateGroupLeaderRequestDto,
-  GroupLeaderMeResponse,
-  GroupLeaderRequestResponse,
-  GroupLeaderRequestsListData,
-} from "@/types/group-leader-requests"
 
 /**
  * Apply to become a group leader (aka group/project manager).
@@ -71,6 +72,33 @@ export async function listPendingGroupLeaderRequests(params: {
       },
     }
   )
+  const data = response.data as unknown as GroupLeaderRequestsListData & { data?: GroupLeaderRequestsListData }
+  return (data && Array.isArray((data as GroupLeaderRequestsListData).items))
+    ? (data as GroupLeaderRequestsListData)
+    : (data.data ?? (data as GroupLeaderRequestsListData))
+}
+
+/**
+ * List group leader requests across all statuses.
+ * Query params: search, page, limit
+ */
+export async function listGroupLeaderRequests(params: {
+  search?: string
+  page?: number
+  limit?: number
+} = {}): Promise<GroupLeaderRequestsListData> {
+  const { search, page = 1, limit = 20 } = params
+  const response = await apiClient.get<GroupLeaderRequestsListData>(
+    "/group-leader-requests",
+    {
+      params: {
+        ...(search ? { search } : {}),
+        page,
+        limit,
+      },
+    }
+  )
+
   const data = response.data as unknown as GroupLeaderRequestsListData & { data?: GroupLeaderRequestsListData }
   return (data && Array.isArray((data as GroupLeaderRequestsListData).items))
     ? (data as GroupLeaderRequestsListData)

@@ -953,21 +953,21 @@ export function DepartmentHeadDashboard() {
           </Card>
 
           {/* DC Committee CTA */}
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="rounded-full bg-primary p-2 shrink-0">
-                  <Star className="h-4 w-4 text-white" />
+          <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 shadow-sm">
+            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-primary p-2.5 text-primary-foreground shadow-sm">
+                  <Star className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">DC Committee Access</p>
-                  <p className="text-xs text-muted-foreground">Review project evaluations</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold leading-none">DC Committee Access</p>
+                  <p className="text-sm text-muted-foreground">Review project evaluations from the department head dashboard.</p>
                 </div>
               </div>
-              <Button asChild size="sm" className="w-full gap-1.5">
-                <Link href="/dashboard/department-committee/assigned-projects">
+              <Button asChild className="w-full gap-1.5 sm:w-auto">
+                <Link href="/dashboard/department-head/dc-committee">
                   Access DC Committee
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>

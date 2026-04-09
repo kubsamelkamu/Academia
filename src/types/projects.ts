@@ -140,6 +140,49 @@ export type DepartmentProjectAdvisorDirectoryItem = {
   } | null
 }
 
+export type ProjectEligibleEvaluatorUser = {
+  id: string
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  status?: string | null
+}
+
+export type ProjectEligibleEvaluatorDirectoryItem = {
+  id: string
+  userId: string
+  departmentId: string
+  loadLimit?: number | null
+  currentLoad?: number | null
+  user?: ProjectEligibleEvaluatorUser | null
+}
+
+export type ProjectEligibleEvaluatorsResponse = {
+  projectId: string
+  excludedUserIds: string[]
+  eligible: ProjectEligibleEvaluatorDirectoryItem[]
+}
+
+export type UpdateProjectEvaluatorsDto = {
+  evaluatorIds: string[]
+}
+
+export type ProjectEvaluatorAssignment = {
+  id: string
+  projectId: string
+  userId: string
+  departmentId?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  user?: ProjectEligibleEvaluatorUser | null
+}
+
+export type UpdateProjectEvaluatorsResponse = {
+  projectId: string
+  evaluators: ProjectEvaluatorAssignment[]
+}
+
 export type AssignProjectAdvisorDto = {
   advisorId: string
 }
@@ -167,4 +210,15 @@ export type DepartmentProjectsOverview = {
   proposalsThisMonth: number
   milestonesDueThisWeek: number
   projects: DepartmentOverviewProject[]
+}
+
+export type ProjectAssignmentSummary = {
+  departmentId: string
+  totalProjects: number
+  withAdvisor: number
+  withoutAdvisor: number
+  withEvaluators: number
+  withoutEvaluators: number
+  withAdvisorAndEvaluators: number
+  withoutAdvisorOrEvaluators: number
 }
