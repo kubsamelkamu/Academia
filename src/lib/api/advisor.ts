@@ -3,6 +3,8 @@ import type {
   AdvisorAnnouncement,
   AdvisorAnnouncementsResponse,
   AdvisorCreateAnnouncementDto,
+  AdvisorCancelProjectGroupMeetingDto,
+  AdvisorCreateProjectGroupMeetingDto,
   AdvisorCreateMeetingDto,
   AdvisorCreateMessageDto,
   AdvisorCreateMessageGroupDto,
@@ -21,11 +23,15 @@ import type {
   AdvisorMilestoneStatusDto,
   AdvisorMilestoneReviewQueueItem,
   AdvisorProjectDetail,
+  AdvisorProjectGroupMeeting,
+  AdvisorProjectGroupMeetingListParams,
+  AdvisorProjectGroupMeetingListResponse,
   AdvisorProjectsResponse,
   AdvisorReviewDocumentDto,
   AdvisorRevisionRequestDto,
   AdvisorScheduleResponse,
   AdvisorStudentsResponse,
+  AdvisorUpdateProjectGroupMeetingDto,
   AdvisorUpdateEvaluationDto,
   AdvisorUpdateMeetingDto,
   AdvisorUploadDocumentDto,
@@ -38,6 +44,108 @@ import type {
 } from "@/types/announcements";
 
 type QueryParams = Record<string, string | number | boolean | undefined | null>;
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function toAdvisorProjectGroupMeeting(raw: unknown): AdvisorProjectGroupMeeting | null {
+  const data = asObject(raw);
+  if (!data) return null;
+
+  const id = asString(data.id).trim();
+  const projectId = asString(data.projectId).trim();
+  const meetingAt = asString(data.meetingAt).trim();
+
+  if (!id || !projectId || !meetingAt) {
+    return null;
+  }
+
+  const isCancelled = asBoolean(data.isCancelled, false);
+
+  return {
+    id,
+    projectId,
+    projectGroupId: asString(data.projectGroupId).trim() || undefined,
+    title: asString(data.title),
+    meetingAt,
+    durationMinutes: asNumber(data.durationMinutes, 0),
+    agenda: asString(data.agenda),
+    isUpcoming: asBoolean(data.isUpcoming, false),
+    isOngoing: asBoolean(data.isOngoing, false),
+    isCompleted: asBoolean(data.isCompleted, false),
+    isCancelled,
+    cancelledAt: asString(data.cancelledAt) || null,
+    cancellationReason: asString(data.cancellationReason) || null,
+    createdAt: asString(data.createdAt) || undefined,
+    updatedAt: asString(data.updatedAt) || undefined,
+  };
+}
+
+function toAdvisorProjectGroupMeetingListResponse(
+  raw: unknown,
+  pageFallback: number,
+  limitFallback: number
+): AdvisorProjectGroupMeetingListResponse {
+  const payload = asObject(raw) ?? {};
+  const rawItems = Array.isArray(payload.items) ? payload.items : [];
+  const items = rawItems
+    .map((item) => toAdvisorProjectGroupMeeting(item))
+    .filter((item): item is AdvisorProjectGroupMeeting => item !== null);
+
+  const paginationRaw = asObject(payload.pagination) ?? asObject(payload.meta) ?? {};
+  const page = asNumber(paginationRaw.page, pageFallback);
+  const limit = asNumber(paginationRaw.limit, limitFallback);
+  const totalItems = asNumber(
+    paginationRaw.totalItems,
+    asNumber(paginationRaw.total, asNumber(paginationRaw.totalCount, items.length))
+  );
+  const totalPages = asNumber(
+    paginationRaw.totalPages,
+    asNumber(
+      paginationRaw.pages,
+      asNumber(paginationRaw.pageCount, Math.max(1, Math.ceil((totalItems || items.length) / Math.max(limit, 1))))
+    )
+  );
+
+  const hasNextPage = asBoolean(paginationRaw.hasNextPage, page < totalPages);
+  const hasPreviousPage = asBoolean(paginationRaw.hasPreviousPage, page > 1);
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      totalItems,
+      totalPages,
+      hasNextPage,
+      hasPreviousPage,
+    },
+  };
+}
+
+function toAdvisorProjectGroupMeetingDetailResponse(raw: unknown): AdvisorProjectGroupMeeting {
+  const payload = asObject(raw) ?? {};
+  const candidate = toAdvisorProjectGroupMeeting(payload.item ?? payload);
+
+  if (!candidate) {
+    throw new Error("Invalid meeting detail response");
+  }
+
+  return candidate;
+}
 
 function cleanParams(params?: QueryParams) {
   if (!params) return undefined;
@@ -411,6 +519,129 @@ const mockOverviewData: AdvisorDashboardOverview = {
 export async function getAdvisorSummary(): Promise<AdvisorSummary> {
   const response = await apiClient.get<AdvisorSummary>("/projects/advisors/me/summary")
   return response.data
+}
+
+export async function listAdvisorProjectGroupMeetings(
+  params: AdvisorProjectGroupMeetingListParams
+): Promise<AdvisorProjectGroupMeetingListResponse> {
+  const projectId = params.projectId.trim();
+  if (!projectId) {
+    throw new Error("projectId is required");
+  }
+
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 20;
+
+  const response = await apiClient.get<unknown>("/project-groups/advisors/me/meetings", {
+    params: cleanParams({
+      projectId,
+      page,
+      limit,
+      filter: params.filter,
+      reminderWindowHours: params.reminderWindowHours,
+    }),
+  });
+
+  return toAdvisorProjectGroupMeetingListResponse(response.data, page, limit);
+}
+
+export async function createAdvisorProjectGroupMeeting(
+  dto: AdvisorCreateProjectGroupMeetingDto
+): Promise<AdvisorProjectGroupMeeting> {
+  const response = await apiClient.post<unknown>("/project-groups/advisors/me/meetings", {
+    projectId: dto.projectId,
+    title: dto.title,
+    meetingAt: dto.meetingAt,
+    durationMinutes: dto.durationMinutes,
+    agenda: dto.agenda,
+  });
+
+  return toAdvisorProjectGroupMeetingDetailResponse(response.data);
+}
+
+export async function getAdvisorProjectGroupMeetingById(
+  meetingId: string,
+  projectId: string
+): Promise<AdvisorProjectGroupMeeting> {
+  const trimmedMeetingId = meetingId.trim();
+  const trimmedProjectId = projectId.trim();
+
+  if (!trimmedMeetingId) {
+    throw new Error("meetingId is required");
+  }
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required");
+  }
+
+  const response = await apiClient.get<unknown>(
+    `/project-groups/advisors/me/meetings/${encodeURIComponent(trimmedMeetingId)}`,
+    {
+      params: {
+        projectId: trimmedProjectId,
+      },
+    }
+  );
+
+  return toAdvisorProjectGroupMeetingDetailResponse(response.data);
+}
+
+export async function updateAdvisorProjectGroupMeeting(
+  meetingId: string,
+  projectId: string,
+  dto: AdvisorUpdateProjectGroupMeetingDto
+): Promise<AdvisorProjectGroupMeeting> {
+  const trimmedMeetingId = meetingId.trim();
+  const trimmedProjectId = projectId.trim();
+
+  if (!trimmedMeetingId) {
+    throw new Error("meetingId is required");
+  }
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required");
+  }
+
+  const response = await apiClient.patch<unknown>(
+    `/project-groups/advisors/me/meetings/${encodeURIComponent(trimmedMeetingId)}`,
+    dto,
+    {
+      params: {
+        projectId: trimmedProjectId,
+      },
+    }
+  );
+
+  return toAdvisorProjectGroupMeetingDetailResponse(response.data);
+}
+
+export async function cancelAdvisorProjectGroupMeeting(
+  meetingId: string,
+  projectId: string,
+  dto: AdvisorCancelProjectGroupMeetingDto = {}
+): Promise<AdvisorProjectGroupMeeting> {
+  const trimmedMeetingId = meetingId.trim();
+  const trimmedProjectId = projectId.trim();
+
+  if (!trimmedMeetingId) {
+    throw new Error("meetingId is required");
+  }
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required");
+  }
+
+  const response = await apiClient.delete<unknown>(
+    `/project-groups/advisors/me/meetings/${encodeURIComponent(trimmedMeetingId)}`,
+    {
+      params: {
+        projectId: trimmedProjectId,
+      },
+      data: dto,
+    }
+  );
+
+  return toAdvisorProjectGroupMeetingDetailResponse(response.data);
 }
 
 // ── /project-groups/advisors/me/announcements ────────────────────────────────

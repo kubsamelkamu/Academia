@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import { useCoordinatorAdvisorOverview, useCoordinatorProjectTracking } from "@/lib/hooks/use-coordinator-analytics"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
+import { useDepartmentProjectProposals } from "@/lib/hooks/use-project-proposals"
+import { useDepartmentProjectsOverview } from "@/lib/hooks/use-projects"
 import {
   FileText,
   FileCheck,
@@ -42,7 +44,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import {
-  mockProjectTitles,
   mockProjects,
   mockEvaluations,
   mockComplaints,
@@ -358,8 +359,17 @@ export function CoordinatorDashboard() {
     refetchIntervalMs: 60_000,
   })
 
-  const pendingTitles = mockProjectTitles.filter(t => t.status === 'pending')
-  const activeProjects = mockProjects.filter(p => p.status === 'in_progress')
+  const projectsOverviewQuery = useDepartmentProjectsOverview({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+
+  const departmentProposalsQuery = useDepartmentProjectProposals({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
+
+  const pendingTitlesCount = departmentProposalsQuery.data?.summary.pending ?? 0
   const pendingEvaluations = mockEvaluations.filter(e => e.status === 'pending')
   const openComplaints = mockComplaints.filter(c => c.status === 'open' || c.status === 'under_review')
 
@@ -370,10 +380,25 @@ export function CoordinatorDashboard() {
     [activeProjectsTableQuery.data?.items]
   )
 
-  const avgProgress = useMemo(() => {
-    if (activeProjects.length === 0) return 0
-    return Math.round(activeProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / activeProjects.length)
-  }, [activeProjects])
+  const activeOverviewProjects = useMemo(() => {
+    return (projectsOverviewQuery.data?.projects ?? []).filter((project) => {
+      const normalizedStatus = String(project.status ?? "").trim().toUpperCase()
+      return normalizedStatus === "ACTIVE" || normalizedStatus === "IN_PROGRESS"
+    })
+  }, [projectsOverviewQuery.data?.projects])
+
+  const activeProjectsCount = projectsOverviewQuery.data?.activeProjects ?? activeOverviewProjects.length
+
+  const avgActiveProjectProgress = useMemo(() => {
+    if (activeOverviewProjects.length === 0) return 0
+
+    const totalProgress = activeOverviewProjects.reduce((sum, project) => {
+      const value = Number(project.milestoneProgressPercent)
+      return sum + (Number.isFinite(value) ? value : 0)
+    }, 0)
+
+    return Math.round(totalProgress / activeOverviewProjects.length)
+  }, [activeOverviewProjects])
 
   // Workflow stages use primary + secondary + muted — all theme-reactive
   const workflowStages = [
@@ -537,9 +562,9 @@ export function CoordinatorDashboard() {
             Welcome, {displayName}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {pendingTitles.length > 0 || openComplaints.length > 0 ? (
+            {pendingTitlesCount > 0 || openComplaints.length > 0 ? (
               <>
-                <span className="font-medium text-foreground">{pendingTitles.length}</span> pending titles,{" "}
+                <span className="font-medium text-foreground">{pendingTitlesCount}</span> pending titles,{" "}
                 <span className="font-medium text-foreground">{pendingEvaluations.length}</span> evaluations and{" "}
                 <span className="font-medium text-foreground">{openComplaints.length}</span> open complaints awaiting attention.
               </>
@@ -562,10 +587,10 @@ export function CoordinatorDashboard() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending Titles</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{pendingTitles.length}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight">{pendingTitlesCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">From DC Committee</p>
               <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min((pendingTitles.length / 10) * 100, 100)}%` }} />
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min((pendingTitlesCount / 10) * 100, 100)}%` }} />
               </div>
             </div>
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
@@ -579,10 +604,10 @@ export function CoordinatorDashboard() {
           <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active Projects</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{activeProjects.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Avg {avgProgress}% progress</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight">{activeProjectsCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Avg {avgActiveProjectProgress}% progress</p>
               <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${avgProgress}%` }} />
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${avgActiveProjectProgress}%` }} />
               </div>
             </div>
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
@@ -858,7 +883,7 @@ export function CoordinatorDashboard() {
           <TabsTrigger value="projects" className="gap-1.5 text-xs sm:text-sm shrink-0">
             <LayoutDashboard className="h-4 w-4 hidden sm:block" />
             Projects
-            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{activeProjects.length}</Badge>
+            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{activeProjectsCount}</Badge>
           </TabsTrigger>
           <TabsTrigger value="advisors" className="gap-1.5 text-xs sm:text-sm shrink-0">
             <Users className="h-4 w-4 hidden sm:block" />

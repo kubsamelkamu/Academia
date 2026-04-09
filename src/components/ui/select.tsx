@@ -45,11 +45,10 @@ function SelectContent({
   className,
   children,
   position = "popper",
-  forceMount,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content> & { forceMount?: boolean }) {
+}: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
-    <SelectPrimitive.Portal forceMount={forceMount}>
+    <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
         position={position}
@@ -60,7 +59,6 @@ function SelectContent({
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className,
         )}
-        forceMount={forceMount}
         {...props}
       >
         <SelectPrimitive.ScrollUpButton className="flex cursor-default items-center justify-center py-1">
