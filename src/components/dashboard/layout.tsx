@@ -140,7 +140,9 @@ export default function DashboardLayout({
             "min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-muted/10",
             pathname.startsWith("/dashboard/advisor/evaluator")
               ? "p-0"
-              : "p-4 sm:p-6",
+              : pathname.startsWith("/dashboard/student")
+                ? "px-3 py-4 sm:px-6 sm:py-6"
+                : "p-4 sm:p-6",
           )}
         >
           <div

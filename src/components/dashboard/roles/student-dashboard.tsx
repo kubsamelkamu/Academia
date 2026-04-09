@@ -14,6 +14,7 @@ import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-studen
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useProjectDetails } from "@/lib/hooks/use-projects"
+import type { ProjectDetail } from "@/types/projects"
 import {
   addDays,
   getActiveMilestoneTemplate,
@@ -40,12 +41,19 @@ interface Milestone {
   sequence?: number
 }
 
+type CapstoneGradeSlice = {
+  letter: string | null
+  percent: number | null
+}
+
 interface GradeSummary {
   advisorScore: number
   evaluatorScores: number[]
   finalScore: number
   grade: string
   status: "final" | "provisional" | "pending"
+  capstone1: CapstoneGradeSlice
+  capstone2: CapstoneGradeSlice
 }
 
 interface TeamMember {
@@ -188,6 +196,60 @@ function buildEmptyDashboardData(): StudentDashboardData {
   }
 }
 
+function formatCapstoneGradeLine(slice: CapstoneGradeSlice | undefined): string {
+  if (!slice) return "—"
+  const { letter, percent } = slice
+  if (letter?.trim() && percent != null && !Number.isNaN(percent)) {
+    return `${letter.trim()} (${Math.round(percent)}%)`
+  }
+  if (letter?.trim()) return letter.trim()
+  if (percent != null && !Number.isNaN(percent)) return `${Math.round(percent)}%`
+  return "—"
+}
+
+function buildGradeSummaryFromProject(pd: ProjectDetail | null | undefined): GradeSummary | null {
+  if (!pd) return null
+
+  const capstone1: CapstoneGradeSlice = {
+    letter: pd.capstone1Grade?.trim() ? pd.capstone1Grade.trim() : null,
+    percent:
+      pd.capstone1FinalScore != null && !Number.isNaN(Number(pd.capstone1FinalScore))
+        ? Number(pd.capstone1FinalScore)
+        : null,
+  }
+  const capstone2: CapstoneGradeSlice = {
+    letter: pd.capstone2Grade?.trim() ? pd.capstone2Grade.trim() : null,
+    percent:
+      pd.capstone2FinalScore != null && !Number.isNaN(Number(pd.capstone2FinalScore))
+        ? Number(pd.capstone2FinalScore)
+        : null,
+  }
+
+  const hasCapstone =
+    capstone1.letter != null ||
+    capstone1.percent != null ||
+    capstone2.letter != null ||
+    capstone2.percent != null
+
+  if (!hasCapstone) return null
+
+  const percents = [capstone1.percent, capstone2.percent].filter(
+    (n): n is number => n != null && !Number.isNaN(n)
+  )
+  const finalScore =
+    percents.length > 0 ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : 0
+
+  return {
+    advisorScore: 0,
+    evaluatorScores: [],
+    finalScore,
+    grade: "—",
+    status: "pending",
+    capstone1,
+    capstone2,
+  }
+}
+
 interface StudentDashboardProps {
   userName?: string
 }
@@ -326,9 +388,19 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     })
   }, [milestonesData?.items, myGroupProposalsQuery.data, templatesData?.templates])
 
+  const gradeFromProject = useMemo(
+    () => buildGradeSummaryFromProject(projectDetailsQuery.data ?? null),
+    [projectDetailsQuery.data]
+  )
+
   const data = useMemo(() => {
     const emptyData = buildEmptyDashboardData()
-    if (!backendMilestones.length) return emptyData
+    const base: StudentDashboardData = {
+      ...emptyData,
+      grade: gradeFromProject,
+    }
+
+    if (!backendMilestones.length) return base
 
     const now = new Date()
     const completedCount = backendMilestones.filter(
@@ -346,16 +418,16 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     )
 
     return {
-      ...emptyData,
+      ...base,
       project: {
-        ...emptyData.project,
+        ...base.project,
         progress,
         milestones: backendMilestones,
         nextDeadlineLabel: upcomingMilestone.name,
         nextDeadlineDays,
       },
     }
-  }, [backendMilestones])
+  }, [backendMilestones, gradeFromProject])
 
   const activeTemplate = useMemo(() => {
     const templates = templatesData?.templates ?? []
@@ -537,15 +609,21 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     userName && userName.trim().length > 0 ? `Welcome, ${userName.trim()}` : "Welcome"
 
   const now = useLiveTime(1000)
-  const timeString = useMemo(
-    () =>
-      new Intl.DateTimeFormat(undefined, {
-        hour: "numeric",
+  /** Match advisor dashboard: locale date + time with seconds */
+  const { formattedDate, formattedTime } = useMemo(() => {
+    return {
+      formattedDate: now.toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      formattedTime: now.toLocaleTimeString(undefined, {
+        hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-      }).format(now),
-    [now]
-  )
+      }),
+    }
+  }, [now])
 
   const completedMilestones = backendMilestones.filter((milestone) => milestone.status === "approved").length
   const totalMilestones = backendMilestones.length
@@ -570,98 +648,120 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+    <div className="w-full min-w-0 space-y-5 animate-fade-in sm:space-y-6">
+      {/* Header — aligned with advisor dashboard */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent sm:text-3xl">
             {welcomeTitle}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground sm:text-base">
             Track your project progress, team activity, and evaluation status in one place.
           </p>
         </div>
-        <div className="mt-1 sm:mt-0 flex items-center text-sm text-muted-foreground">
-          <span className="tabular-nums font-medium" aria-live="polite">
-            {timeString}
-          </span>
+
+        <div
+          className="w-full min-w-0 shrink-0 rounded-lg border border-border bg-card px-3 py-2.5 text-center text-sm font-semibold text-muted-foreground tabular-nums sm:w-auto sm:text-left"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className="break-words">{formattedDate}</span>{" "}
+          <span className="whitespace-nowrap">{formattedTime}</span>
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Project Status</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
+      {/* KPI Row — compact on mobile only; full-size from sm+ */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <Card className="min-w-0 gap-0 overflow-hidden rounded-lg py-2.5 shadow-sm sm:gap-6 sm:rounded-xl sm:py-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-0 sm:px-6 sm:pb-2">
+            <CardTitle className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-sm">
+              Project Status
+            </CardTitle>
+            <FolderKanban className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold truncate">
-              {projectStatusLabel}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {projectDisplayName}
-            </p>
+          <CardContent className="px-3 pb-0 pt-0 sm:px-6 sm:pb-6">
+            <p className="truncate text-lg font-bold leading-tight sm:text-2xl">{projectStatusLabel}</p>
+            <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">{projectDisplayName}</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Progress</CardTitle>
-            <Clock3 className="h-4 w-4 text-muted-foreground" />
+        <Card className="min-w-0 gap-0 overflow-hidden rounded-lg py-2.5 shadow-sm sm:gap-6 sm:rounded-xl sm:py-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-0 sm:px-6 sm:pb-2">
+            <CardTitle className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-sm">
+              Progress
+            </CardTitle>
+            <Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{backendMilestones.length ? `${data.project.progress}%` : "—"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Overall completion</p>
+          <CardContent className="px-3 pb-0 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold leading-tight sm:text-2xl">
+              {backendMilestones.length ? `${data.project.progress}%` : "—"}
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">Overall completion</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Milestones</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+        <Card className="min-w-0 gap-0 overflow-hidden rounded-lg py-2.5 shadow-sm sm:gap-6 sm:rounded-xl sm:py-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-0 sm:px-6 sm:pb-2">
+            <CardTitle className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-sm">
+              Milestones
+            </CardTitle>
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
+          <CardContent className="px-3 pb-0 pt-0 sm:px-6 sm:pb-6">
+            <p className="text-lg font-bold leading-tight sm:text-2xl">
               {completedMilestones}/{totalMilestones}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Completed</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">Completed</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">My Grade</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        <Card className="min-w-0 gap-0 overflow-hidden rounded-lg py-2.5 shadow-sm sm:gap-6 sm:rounded-xl sm:py-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-0 sm:px-6 sm:pb-2">
+            <CardTitle className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-sm">
+              My Grades
+            </CardTitle>
+            <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {data.grade ? data.grade.grade : "Pending"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {data.grade ? `${data.grade.finalScore}% overall` : "Not published yet"}
+          <CardContent className="space-y-2 px-3 pb-0 pt-0 sm:space-y-2.5 sm:px-6 sm:pb-6">
+            <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
+              <span className="shrink-0 text-muted-foreground">Capstone 1</span>
+              <span className="min-w-0 text-right font-semibold tabular-nums text-foreground">
+                {formatCapstoneGradeLine(data.grade?.capstone1)}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
+              <span className="shrink-0 text-muted-foreground">Capstone 2</span>
+              <span className="min-w-0 text-right font-semibold tabular-nums text-foreground">
+                {formatCapstoneGradeLine(data.grade?.capstone2)}
+              </span>
+            </div>
+            <p className="border-t border-border/60 pt-2 text-[9px] text-muted-foreground sm:text-[10px]">
+              {data.grade
+                ? "Official grades appear when your department publishes them."
+                : "Capstone I & II grades will show here when published."}
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Grid */}
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-3">
         {/* Project Snapshot */}
-        <Card className="xl:col-span-2">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle className="text-lg font-semibold">
+        <Card className="min-w-0 overflow-hidden xl:col-span-2">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="break-words text-base font-semibold sm:text-lg">
                 {projectDisplayName}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="break-words">
                 Advisor: <span className="font-medium">{advisorDisplayName}</span>
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm">
+            <div className="flex w-full flex-col gap-2 min-[420px]:flex-row sm:w-auto sm:shrink-0">
+              <Button asChild variant="outline" size="sm" className="w-full min-[420px]:flex-1 sm:w-auto sm:min-w-0">
                 <Link href="/dashboard/student/milestones">View milestones</Link>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleViewProject}>
+              <Button variant="outline" size="sm" className="w-full min-[420px]:flex-1 sm:w-auto sm:min-w-0" onClick={handleViewProject}>
                 View full project
               </Button>
             </div>
@@ -896,10 +996,10 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         </Link>
 
         {/* Grades */}
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              <span>My Grades</span>
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
+              <span className="min-w-0">My Grades</span>
               {data.grade ? (
                 <Badge
                   variant={
@@ -919,34 +1019,53 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardContent>
             {data.grade ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Advisor score</p>
-                    <p className="mt-1 text-xl font-semibold">
-                      {data.grade.advisorScore}/40
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Capstone I</p>
+                    <p className="mt-1 text-lg font-semibold sm:text-xl">
+                      {formatCapstoneGradeLine(data.grade.capstone1)}
                     </p>
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Evaluators avg.</p>
-                    <p className="mt-1 text-xl font-semibold">
-                      {evaluatorAverage != null
-                        ? `${evaluatorAverage.toFixed(1)}/40`
-                        : "-"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-3">
-                    <p className="text-xs text-muted-foreground">Final score</p>
-                    <p className="mt-1 text-xl font-semibold text-primary">
-                      {data.grade.finalScore}%
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/20">
-                    <p className="text-xs text-muted-foreground">Grade</p>
-                    <p className="mt-1 text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                      {data.grade.grade}
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Capstone II</p>
+                    <p className="mt-1 text-lg font-semibold sm:text-xl">
+                      {formatCapstoneGradeLine(data.grade.capstone2)}
                     </p>
                   </div>
                 </div>
+
+                {(data.grade.advisorScore > 0 ||
+                  data.grade.evaluatorScores.length > 0 ||
+                  (data.grade.grade && data.grade.grade !== "—")) ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs text-muted-foreground">Advisor score</p>
+                      <p className="mt-1 text-xl font-semibold">
+                        {data.grade.advisorScore}/40
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs text-muted-foreground">Evaluators avg.</p>
+                      <p className="mt-1 text-xl font-semibold">
+                        {evaluatorAverage != null
+                          ? `${evaluatorAverage.toFixed(1)}/40`
+                          : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-primary/10 p-3">
+                      <p className="text-xs text-muted-foreground">Final score</p>
+                      <p className="mt-1 text-xl font-semibold text-primary">
+                        {data.grade.finalScore}%
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/20">
+                      <p className="text-xs text-muted-foreground">Grade</p>
+                      <p className="mt-1 text-xl font-semibold text-emerald-600 dark:text-emerald-400">
+                        {data.grade.grade}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
 
                 {data.grade.status === "provisional" && (
                   <Button

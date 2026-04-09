@@ -122,6 +122,8 @@ export function Sidebar({ user }: SidebarProps) {
             const isActive = item.href ? isItemActive(item.href) : false
             /** Parent group is visually "active" if any child is active */
             const isGroupActive = hasChildren && item.children!.some(c => c.href && isItemActive(c.href))
+            const isStudentDashboardLink =
+              user.role === "student" && item.href === "/dashboard/student"
 
             return (
               <motion.div
@@ -248,6 +250,8 @@ export function Sidebar({ user }: SidebarProps) {
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 overflow-hidden",
+                      isStudentDashboardLink &&
+                        "min-h-[48px] touch-manipulation py-3 text-[15px] leading-snug sm:min-h-0 sm:py-2 sm:text-sm",
                       isActive
                         ? "bg-sidebar-accent text-sidebar-primary shadow-sm"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary"
