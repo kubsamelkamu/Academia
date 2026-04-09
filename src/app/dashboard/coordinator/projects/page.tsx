@@ -22,7 +22,6 @@ import {
   Users,
   Star,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   BarChart3,
   ArrowLeft,
@@ -33,10 +32,19 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { mockUsers, type ProjectSummary } from '@/data/mockData'
+import { type ProjectSummary } from '@/data/mockData'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
-import { useAssignProjectAdvisor, useDepartmentProjectAdvisors, useDepartmentProjectsOverview } from '@/lib/hooks/use-projects'
+import { getProjectEvaluators } from '@/lib/api/projects'
+import {
+  useAssignProjectAdvisor,
+  useDepartmentProjectAdvisors,
+  useDepartmentProjectsOverview,
+  useProjectEligibleEvaluators,
+  useProjectEvaluators,
+  useRemoveProjectEvaluator,
+  useUpdateProjectEvaluators,
+} from '@/lib/hooks/use-projects'
 import { useCoordinatorAdvisorOverview } from '@/lib/hooks/use-coordinator-analytics'
 import { useDepartmentProjectProposals } from '@/lib/hooks/use-project-proposals'
 import type { DepartmentProjectAdvisorDirectoryItem } from '@/types/projects'
@@ -51,6 +59,7 @@ type AssignmentProject = ProjectSummary & {
   advisorAvatarUrl?: string | null
   memberNames?: string[]
   evaluatorIds: string[]
+  evaluatorProfiles?: EvaluatorOption[]
 }
 
 type AssignmentOverride = {
@@ -58,6 +67,19 @@ type AssignmentOverride = {
   advisorName?: string
   advisorAvatarUrl?: string | null
   evaluatorIds: string[]
+  evaluatorProfiles?: EvaluatorOption[]
+}
+
+type EvaluatorOption = {
+  id: string
+  userId: string
+  name: string
+  email: string
+  avatarUrl?: string | null
+  status?: string | null
+  loadLimit: number
+  currentLoad: number
+  departmentId: string
 }
 
 type AdvisorOption = {
@@ -75,6 +97,47 @@ function formatAdvisorName(advisor: DepartmentProjectAdvisorDirectoryItem) {
   const lastName = advisor.user?.lastName?.trim() ?? ''
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
   return fullName || advisor.user?.email?.trim() || 'Advisor'
+}
+
+function formatEligibleEvaluatorName(firstName?: string | null, lastName?: string | null, email?: string | null) {
+  const first = firstName?.trim() ?? ''
+  const last = lastName?.trim() ?? ''
+  const fullName = [first, last].filter(Boolean).join(' ').trim()
+  return fullName || email?.trim() || 'Evaluator'
+}
+
+function formatAssignedEvaluatorName(evaluator: { userId: string; user?: { firstName?: string | null; lastName?: string | null; email?: string | null } | null }) {
+  return formatEligibleEvaluatorName(evaluator.user?.firstName, evaluator.user?.lastName, evaluator.user?.email) || evaluator.userId
+}
+
+function resolveAssignedEvaluatorDisplay(
+  evaluator: {
+    userId: string
+    user?: {
+      firstName?: string | null
+      lastName?: string | null
+      email?: string | null
+      avatarUrl?: string | null
+      status?: string | null
+    } | null
+  },
+  eligibleFallback?: EvaluatorOption | null
+) {
+  const fallbackName = eligibleFallback?.name?.trim() || ''
+  const fallbackEmail = eligibleFallback?.email?.trim() || ''
+  const fallbackAvatarUrl = eligibleFallback?.avatarUrl ?? null
+
+  const name =
+    formatEligibleEvaluatorName(evaluator.user?.firstName, evaluator.user?.lastName, evaluator.user?.email) ||
+    fallbackName ||
+    evaluator.user?.email?.trim() ||
+    fallbackEmail ||
+    evaluator.userId
+
+  const email = evaluator.user?.email?.trim() || fallbackEmail || ''
+  const avatarUrl = evaluator.user?.avatarUrl ?? fallbackAvatarUrl
+
+  return { name, email, avatarUrl }
 }
 
 function formatProposalPersonName(person?: ProposalParty | null) {
@@ -202,6 +265,7 @@ function mapApprovedProposalToAssignmentProject(
     advisorAvatarUrl,
     memberNames: collectProposalMemberNames(proposal),
     evaluatorIds: override?.evaluatorIds ?? [],
+    evaluatorProfiles: override?.evaluatorProfiles ?? [],
     progress: undefined,
   }
 }
@@ -211,13 +275,46 @@ interface AssignmentDialogProps {
   project: AssignmentProject
   advisors: AdvisorOption[]
   onClose: () => void
-  onAssign: (advisorId: string, evaluatorIds: string[]) => void
+  onAssign: (advisorId: string, evaluatorIds: string[], evaluatorProfiles: EvaluatorOption[]) => void
   open: boolean
 }
 
 function AssignmentDialog({ project, advisors, onClose, onAssign, open }: AssignmentDialogProps) {
   const [selectedAdvisor, setSelectedAdvisor] = useState(project.advisorId || '')
   const [selectedEvaluators, setSelectedEvaluators] = useState<string[]>(project.evaluatorIds || [])
+  const [activeEvaluatorId, setActiveEvaluatorId] = useState('')
+  const initializedAssignedEvaluatorsRef = React.useRef<string | null>(null)
+  const removeEvaluatorMutation = useRemoveProjectEvaluator()
+
+  const eligibleEvaluatorsQuery = useProjectEligibleEvaluators({
+    projectId: project.projectId,
+    enabled: open && Boolean(project.projectId),
+  })
+
+  const assignedEvaluatorsQuery = useProjectEvaluators({
+    projectId: project.projectId,
+    enabled: open && Boolean(project.projectId),
+  })
+
+  const evaluatorOptions = useMemo<EvaluatorOption[]>(() => {
+    return (eligibleEvaluatorsQuery.data?.eligible ?? []).map((item) => ({
+      id: item.id,
+      userId: item.userId,
+      departmentId: item.departmentId,
+      name: formatEligibleEvaluatorName(item.user?.firstName, item.user?.lastName, item.user?.email),
+      email: item.user?.email?.trim() || 'No email available',
+      avatarUrl: item.user?.avatarUrl ?? null,
+      status: item.user?.status ?? null,
+      loadLimit: item.loadLimit ?? 0,
+      currentLoad: item.currentLoad ?? 0,
+    }))
+  }, [eligibleEvaluatorsQuery.data?.eligible])
+
+  const evaluatorByUserId = useMemo(() => {
+    return new Map(evaluatorOptions.map((evaluator) => [evaluator.userId, evaluator]))
+  }, [evaluatorOptions])
+
+  const activeEvaluator = activeEvaluatorId ? evaluatorByUserId.get(activeEvaluatorId) : null
 
   const prevAdvisorRef = React.useRef(project.advisorId || '')
   const prevEvaluatorsRef = React.useRef(project.evaluatorIds || [])
@@ -229,30 +326,159 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
 
   useEffect(() => {
     if (open) {
+      initializedAssignedEvaluatorsRef.current = null
       setSelectedAdvisor(prevAdvisorRef.current)
       setSelectedEvaluators(prevEvaluatorsRef.current)
+      setActiveEvaluatorId(prevEvaluatorsRef.current[0] ?? '')
     }
   }, [open])
-  const evaluators = mockUsers.filter(u => u.role === 'evaluator')
 
-  const toggleEvaluator = (id: string) => {
-    if (!selectedAdvisor) {
-      toast.error('Select an advisor first before adding evaluators.')
+  useEffect(() => {
+    if (!open) return
+    if (!project.projectId) return
+    if (assignedEvaluatorsQuery.isLoading) return
+    if (assignedEvaluatorsQuery.error) return
+
+    const signature = `${project.projectId}::${(assignedEvaluatorsQuery.data?.evaluators ?? []).map((e) => e.userId).sort().join(',')}`
+    if (initializedAssignedEvaluatorsRef.current === signature) {
       return
     }
+    initializedAssignedEvaluatorsRef.current = signature
+
+    const assignedIds = (assignedEvaluatorsQuery.data?.evaluators ?? []).map((evaluator) => evaluator.userId).filter(Boolean)
+    setSelectedEvaluators(assignedIds)
+    setActiveEvaluatorId(assignedIds[0] ?? '')
+  }, [assignedEvaluatorsQuery.data?.evaluators, assignedEvaluatorsQuery.error, assignedEvaluatorsQuery.isLoading, open, project.projectId])
+
+  useEffect(() => {
+    if (!evaluatorOptions.length) {
+      return
+    }
+
+    if (activeEvaluatorId && evaluatorByUserId.has(activeEvaluatorId)) {
+      return
+    }
+
+    const firstSelected = selectedEvaluators.find((evaluatorId) => evaluatorByUserId.has(evaluatorId))
+    setActiveEvaluatorId(firstSelected ?? evaluatorOptions[0]?.userId ?? '')
+  }, [activeEvaluatorId, evaluatorByUserId, evaluatorOptions, selectedEvaluators])
+
+  const toggleEvaluator = (id: string) => {
     setSelectedEvaluators(prev =>
       prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]
     )
+
+    setActiveEvaluatorId(id)
+  }
+
+  const handleSave = () => {
+    const normalizedSelectedIds = selectedEvaluators.filter((evaluatorId) => evaluatorByUserId.has(evaluatorId))
+    const selectedProfiles = normalizedSelectedIds
+      .map((evaluatorId) => evaluatorByUserId.get(evaluatorId) ?? null)
+      .filter((evaluator): evaluator is EvaluatorOption => evaluator !== null)
+
+    onAssign(selectedAdvisor, normalizedSelectedIds, selectedProfiles)
   }
 
   return (
-    <DialogContent onInteractOutside={onClose} onEscapeKeyDown={onClose}>
+    <DialogContent
+      onInteractOutside={onClose}
+      onEscapeKeyDown={onClose}
+      className="max-h-[90vh] w-[95vw] max-w-2xl overflow-hidden p-0 sm:w-full"
+    >
       <DialogHeader>
-        <DialogTitle>Assign Team</DialogTitle>
-        <DialogDescription className="line-clamp-1">{project.title}</DialogDescription>
+        <div className="px-5 pt-5">
+          <DialogTitle>Assign Team</DialogTitle>
+          <DialogDescription className="mt-1 line-clamp-2 break-words">{project.title}</DialogDescription>
+        </div>
       </DialogHeader>
 
-      <div className="space-y-5 py-2">
+      <div className="max-h-[calc(90vh-120px)] overflow-y-auto px-5 pb-5 pt-4">
+        <div className="space-y-5">
+        {/* Assigned Evaluators (Server) */}
+        <div className="space-y-2">
+          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Assigned Evaluators</Label>
+
+          {!project.projectId ? (
+            <div className="rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+              Assigned evaluators cannot be loaded for legacy approved items without a linked project record.
+            </div>
+          ) : assignedEvaluatorsQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="h-10 animate-pulse rounded-lg border bg-muted/40" />
+              ))}
+            </div>
+          ) : assignedEvaluatorsQuery.error ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+              Unable to load assigned evaluators right now. Please try again.
+            </div>
+          ) : (assignedEvaluatorsQuery.data?.evaluators?.length ?? 0) === 0 ? (
+            <div className="rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+              No evaluators are currently assigned to this project.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(assignedEvaluatorsQuery.data?.evaluators ?? []).map((evaluator) => {
+                const eligibleFallback = evaluatorByUserId.get(evaluator.userId) ?? null
+                const display = resolveAssignedEvaluatorDisplay(evaluator, eligibleFallback)
+
+                return (
+                  <div
+                    key={evaluator.id}
+                    className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Avatar className="h-7 w-7 shrink-0">
+                        {display.avatarUrl ? (
+                          <AvatarImage src={display.avatarUrl} alt={display.name} />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+                          {initialsFromName(display.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{display.name}</p>
+                        {display.email ? (
+                          <p className="truncate text-xs text-muted-foreground">{display.email}</p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-full text-xs sm:w-auto"
+                      disabled={removeEvaluatorMutation.isPending}
+                      onClick={async () => {
+                        if (!project.projectId) return
+                        try {
+                          await removeEvaluatorMutation.mutateAsync({
+                            projectId: project.projectId,
+                            evaluatorUserId: evaluator.userId,
+                          })
+                          const refreshed = await assignedEvaluatorsQuery.refetch()
+                          const refreshedIds = (refreshed.data?.evaluators ?? []).map((e) => e.userId).filter(Boolean)
+                          setSelectedEvaluators(refreshedIds)
+                          setActiveEvaluatorId(refreshedIds[0] ?? '')
+                          toast.success('Evaluator removed')
+                        } catch (error) {
+                          toast.error('Failed to remove evaluator', {
+                            description: error instanceof Error ? error.message : 'Please try again.',
+                          })
+                        }
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Advisor */}
         <div className="space-y-2">
           <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary Advisor</Label>
@@ -283,43 +509,116 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
           <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Evaluators <span className="text-muted-foreground/60 normal-case">({selectedEvaluators.length} selected)</span>
           </Label>
-          <div className="grid gap-2">
-            {evaluators.map(e => {
-              const selected = selectedEvaluators.includes(e.id)
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => toggleEvaluator(e.id)}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-all ${
-                    selected
-                      ? 'border-primary/40 bg-primary/5 text-foreground'
-                      : 'border-border bg-background hover:bg-muted/40'
-                  } ${!selectedAdvisor ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  <Avatar className="h-7 w-7 shrink-0">
-                    <AvatarFallback className={`text-xs font-semibold ${selected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {e.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{e.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{e.email}</p>
+
+          {!project.projectId ? (
+            <div className="rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+              Evaluator eligibility cannot be loaded for legacy approved items without a linked project record.
+            </div>
+          ) : eligibleEvaluatorsQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-14 animate-pulse rounded-lg border bg-muted/40" />
+              ))}
+            </div>
+          ) : eligibleEvaluatorsQuery.error ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+              Unable to load eligible evaluators right now. Please try again.
+            </div>
+          ) : evaluatorOptions.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+              No eligible evaluators are available for this project.
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="space-y-2">
+                {evaluatorOptions.map((evaluator) => {
+                  const selected = selectedEvaluators.includes(evaluator.userId)
+                  const isActive = activeEvaluatorId === evaluator.userId
+
+                  return (
+                    <button
+                      key={evaluator.id}
+                      type="button"
+                      onClick={() => toggleEvaluator(evaluator.userId)}
+                      onMouseEnter={() => setActiveEvaluatorId(evaluator.userId)}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-all ${
+                        selected
+                          ? 'border-primary/40 bg-primary/5 text-foreground'
+                          : isActive
+                            ? 'border-primary/25 bg-muted/50'
+                            : 'border-border bg-background hover:bg-muted/40'
+                      } ${!selectedAdvisor ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {evaluator.avatarUrl ? <AvatarImage src={evaluator.avatarUrl} alt={evaluator.name} /> : null}
+                        <AvatarFallback className={`text-xs font-semibold ${selected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                          {initialsFromName(evaluator.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{evaluator.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{evaluator.email}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Load {evaluator.currentLoad}/{evaluator.loadLimit}
+                        </p>
+                      </div>
+                      <div className={`h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${selected ? 'border-primary bg-primary' : 'border-muted-foreground/30'}`}>
+                        {selected && <CheckCircle2 className="h-full w-full text-primary-foreground" />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-3 lg:sticky lg:top-0">
+                {activeEvaluator ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="h-10 w-10">
+                        {activeEvaluator.avatarUrl ? <AvatarImage src={activeEvaluator.avatarUrl} alt={activeEvaluator.name} /> : null}
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                          {initialsFromName(activeEvaluator.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{activeEvaluator.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{activeEvaluator.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 text-xs">
+                      <div className="flex items-center justify-between rounded-md border bg-background px-2.5 py-1.5">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge variant="outline" className="h-5 px-2 text-[10px]">
+                          {(activeEvaluator.status ?? 'ACTIVE').toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border bg-background px-2.5 py-1.5">
+                        <span className="text-muted-foreground">Current load</span>
+                        <span className="font-medium">{activeEvaluator.currentLoad}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border bg-background px-2.5 py-1.5">
+                        <span className="text-muted-foreground">Load limit</span>
+                        <span className="font-medium">{activeEvaluator.loadLimit}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className={`h-4 w-4 rounded-full border-2 shrink-0 transition-colors ${selected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
-                    {selected && <CheckCircle2 className="h-full w-full text-primary-foreground" />}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Hover or select an evaluator to preview profile details.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 pt-1">
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button className="flex-1 gap-2" onClick={() => onAssign(selectedAdvisor, selectedEvaluators)} disabled={!selectedAdvisor}>
+          <Button className="flex-1 gap-2" onClick={handleSave} disabled={!selectedAdvisor && selectedEvaluators.length === 0}>
             <UserPlus className="h-4 w-4" /> Save Assignment
           </Button>
+        </div>
         </div>
       </div>
     </DialogContent>
@@ -334,7 +633,42 @@ function ProjectCard({
   project: AssignmentProject
   onAssign: (p: AssignmentProject) => void
 }) {
-  const evaluators = mockUsers.filter(u => u.role === 'evaluator' && project.evaluatorIds.includes(u.id))
+  const liveEvaluatorsQuery = useProjectEvaluators({
+    projectId: project.projectId,
+    enabled: Boolean(project.projectId),
+  })
+
+  const liveAssignments = liveEvaluatorsQuery.data?.evaluators ?? []
+  const liveEvaluatorIds = liveAssignments.map((evaluator) => evaluator.userId).filter(Boolean)
+  const liveEvaluatorProfiles: EvaluatorOption[] = liveAssignments
+    .map((assignment) => {
+      const name = formatEligibleEvaluatorName(
+        assignment.user?.firstName,
+        assignment.user?.lastName,
+        assignment.user?.email
+      )
+      return {
+        id: assignment.id,
+        userId: assignment.userId,
+        departmentId: assignment.departmentId ?? project.projectId ?? "",
+        name,
+        email: assignment.user?.email?.trim() || "No email available",
+        avatarUrl: assignment.user?.avatarUrl ?? null,
+        status: assignment.user?.status ?? null,
+        loadLimit: 0,
+        currentLoad: 0,
+      }
+    })
+    .filter((evaluator) => Boolean(evaluator.userId))
+
+  const evaluatorIdsForDisplay = liveEvaluatorIds.length > 0 ? liveEvaluatorIds : project.evaluatorIds
+  const evaluatorProfilesForDisplay =
+    liveEvaluatorProfiles.length > 0 ? liveEvaluatorProfiles : (project.evaluatorProfiles ?? [])
+
+  const evaluators = evaluatorProfilesForDisplay.filter((evaluator) =>
+    evaluatorIdsForDisplay.includes(evaluator.userId)
+  )
+  const evaluatorCount = evaluatorIdsForDisplay.length
   const isAssigned = Boolean(project.advisorName)
   const isComplete = project.status === 'completed'
   const isLegacyApprovedWithoutProject = Boolean(project.isLegacyApprovedWithoutProject)
@@ -428,19 +762,20 @@ function ProjectCard({
           )}
         </div>
         <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
-          {evaluators.length > 0 ? (
+          {evaluatorCount > 0 ? (
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex -space-x-2 shrink-0">
-                {evaluators.slice(0, 3).map(e => (
-                  <Avatar key={e.id} className="h-7 w-7 border-2 border-card shadow-sm">
-                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{initialsFromName(e.name)}</AvatarFallback>
+                {evaluators.slice(0, 3).map(evaluator => (
+                  <Avatar key={evaluator.id} className="h-7 w-7 border-2 border-card shadow-sm">
+                    {evaluator.avatarUrl ? <AvatarImage src={evaluator.avatarUrl} alt={evaluator.name} /> : null}
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{initialsFromName(evaluator.name)}</AvatarFallback>
                   </Avatar>
                 ))}
               </div>
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Evaluators</p>
                 <p className="text-xs text-foreground">
-                  {evaluators.length} evaluator{evaluators.length !== 1 ? 's' : ''}
+                  {evaluatorCount} evaluator{evaluatorCount !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
@@ -527,6 +862,7 @@ export default function ProjectsPage() {
     limit: ADVISOR_WORKLOAD_PAGE_SIZE,
   })
   const assignProjectAdvisorMutation = useAssignProjectAdvisor()
+  const updateProjectEvaluatorsMutation = useUpdateProjectEvaluators()
 
   const advisors = useMemo<AdvisorOption[]>(() => {
     return (departmentAdvisorsQuery.data ?? []).map((advisor) => ({
@@ -539,7 +875,6 @@ export default function ProjectsPage() {
       currentLoad: advisor.currentLoad ?? 0,
     }))
   }, [departmentAdvisorsQuery.data])
-  const evaluators = mockUsers.filter(u => u.role === 'evaluator')
 
   const projects = useMemo<AssignmentProject[]>(() => {
     return (proposalsQuery.data?.items ?? [])
@@ -553,10 +888,11 @@ export default function ProjectsPage() {
       })
   }, [advisors, assignmentOverrides, proposalsQuery.data?.items])
 
-  const handleAssign = useCallback(async (advisorId: string, evaluatorIds: string[]) => {
-    const advisor = advisors.find(u => u.id === advisorId)
-    const advisorName = advisor?.name || 'Unknown'
-    const advisorAvatarUrl = advisor?.avatarUrl ?? null
+  const handleAssign = useCallback(async (
+    advisorId: string,
+    evaluatorIds: string[],
+    evaluatorProfiles: EvaluatorOption[]
+  ) => {
     if (!dialogProject) {
       return
     }
@@ -568,35 +904,123 @@ export default function ProjectsPage() {
       return
     }
 
+    const normalizedAdvisorId = advisorId.trim()
+    const currentAdvisorId = String(dialogProject.advisorId ?? "").trim()
+    const shouldUpdateAdvisor = Boolean(normalizedAdvisorId) && normalizedAdvisorId !== currentAdvisorId
+
+    const advisor = advisors.find(u => u.id === normalizedAdvisorId)
+    const advisorName = advisor?.name || dialogProject.advisorName || 'Unknown'
+    const advisorAvatarUrl = advisor?.avatarUrl ?? dialogProject.advisorAvatarUrl ?? null
+
+    const normalizedEvaluatorIds = Array.from(
+      new Set(
+        evaluatorIds
+          .map((id) => id.trim())
+          .filter(Boolean)
+          .filter((id) => id !== normalizedAdvisorId)
+      )
+    )
+
+    const normalizedEvaluatorProfiles = evaluatorProfiles.filter((profile) =>
+      normalizedEvaluatorIds.includes(profile.userId)
+    )
+
+    if (shouldUpdateAdvisor) {
+      try {
+        await assignProjectAdvisorMutation.mutateAsync({
+          projectId: dialogProject.projectId,
+          dto: { advisorId: normalizedAdvisorId },
+        })
+      } catch (error) {
+        toast.error('Failed to save advisor assignment', {
+          description: error instanceof Error ? error.message : 'Please try again.',
+        })
+        return
+      }
+    }
+
     try {
-      await assignProjectAdvisorMutation.mutateAsync({
+      await updateProjectEvaluatorsMutation.mutateAsync({
         projectId: dialogProject.projectId,
-        dto: { advisorId },
+        dto: {
+          evaluatorIds: normalizedEvaluatorIds,
+        },
       })
     } catch (error) {
-      toast.error('Failed to save advisor assignment', {
+      toast.error('Failed to update evaluators', {
         description: error instanceof Error ? error.message : 'Please try again.',
       })
+
+      // If advisor update already succeeded, keep the dialog open so the user can retry evaluator update.
+      setAssignmentOverrides((prev) => ({
+        ...prev,
+        [dialogProject.id]: {
+          advisorId: normalizedAdvisorId || currentAdvisorId,
+          advisorName,
+          advisorAvatarUrl,
+          evaluatorIds: normalizedEvaluatorIds,
+          evaluatorProfiles: normalizedEvaluatorProfiles,
+        },
+      }))
       return
+    }
+
+    // Recommended: refresh from server after PUT (always correct)
+    let refreshedEvaluatorIds = normalizedEvaluatorIds
+    let refreshedEvaluatorProfiles = normalizedEvaluatorProfiles
+    try {
+      const refreshed = await getProjectEvaluators(dialogProject.projectId)
+      const refreshedAssignments = refreshed.evaluators ?? []
+      refreshedEvaluatorIds = refreshedAssignments.map((evaluator) => evaluator.userId).filter(Boolean)
+      refreshedEvaluatorProfiles = refreshedAssignments
+        .map((assignment) => {
+          const name = formatEligibleEvaluatorName(
+            assignment.user?.firstName,
+            assignment.user?.lastName,
+            assignment.user?.email
+          )
+          return {
+            id: assignment.id,
+            userId: assignment.userId,
+            departmentId: assignment.departmentId ?? dialogProject.projectId,
+            name,
+            email: assignment.user?.email?.trim() || 'No email available',
+            avatarUrl: assignment.user?.avatarUrl ?? null,
+            status: assignment.user?.status ?? null,
+            loadLimit: 0,
+            currentLoad: 0,
+          } satisfies EvaluatorOption
+        })
+        .filter((evaluator) => Boolean(evaluator.userId))
+    } catch {
+      // If refresh fails, fall back to what we just submitted.
     }
 
     setAssignmentOverrides((prev) => ({
       ...prev,
       [dialogProject.id]: {
-        advisorId,
+        advisorId: normalizedAdvisorId || currentAdvisorId,
         advisorName,
         advisorAvatarUrl,
-        evaluatorIds,
+        evaluatorIds: refreshedEvaluatorIds,
+        evaluatorProfiles: refreshedEvaluatorProfiles,
       },
     }))
-    toast.success('Advisor assignment saved', {
-      description: evaluatorIds.length > 0
-        ? `${advisorName} was assigned. Evaluator selections remain local on this page.`
-        : `${advisorName} was assigned to "${dialogProject.title}".`,
+
+    toast.success('Evaluators updated successfully', {
+      description:
+        refreshedEvaluatorIds.length > 0
+          ? `${advisorName} assigned and ${refreshedEvaluatorIds.length} evaluator${refreshedEvaluatorIds.length === 1 ? '' : 's'} updated.`
+          : `${advisorName} assigned and evaluators cleared.`,
     })
     setDialogOpen(false)
     setDialogProject(null)
-  }, [advisors, assignProjectAdvisorMutation, dialogProject])
+  }, [
+    advisors,
+    assignProjectAdvisorMutation,
+    dialogProject,
+    updateProjectEvaluatorsMutation,
+  ])
 
   const openAssign = (p: AssignmentProject) => {
     setDialogProject({ ...p })
@@ -745,10 +1169,37 @@ export default function ProjectsPage() {
       )
 
   // Evaluator workload
-  const evaluatorWorkload = useMemo(() => evaluators.map(e => {
-    const assigned = projects.filter(p => p.evaluatorIds.includes(e.id))
-    return { ...e, assigned: assigned.length }
-  }), [evaluators, projects])
+  const evaluatorWorkload = useMemo(() => {
+    const workload = new Map<string, EvaluatorOption & { assigned: number }>()
+
+    for (const project of projects) {
+      for (const evaluatorProfile of project.evaluatorProfiles ?? []) {
+        const existing = workload.get(evaluatorProfile.userId)
+
+        if (!existing) {
+          workload.set(evaluatorProfile.userId, {
+            ...evaluatorProfile,
+            assigned: 0,
+          })
+        }
+
+        if (project.evaluatorIds.includes(evaluatorProfile.userId)) {
+          const entry = workload.get(evaluatorProfile.userId)
+          if (entry) {
+            entry.assigned += 1
+          }
+        }
+      }
+    }
+
+    return Array.from(workload.values()).sort((a, b) => {
+      if (b.assigned !== a.assigned) {
+        return b.assigned - a.assigned
+      }
+
+      return a.name.localeCompare(b.name)
+    })
+  }, [projects])
 
   return (
     <div className="space-y-6 pb-8 animate-fade-in">
@@ -1100,31 +1551,38 @@ export default function ProjectsPage() {
                   <CardDescription>Projects per evaluator</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {evaluatorWorkload.map((e, i) => (
-                    <div key={e.id}>
-                      {i > 0 && <Separator />}
-                      <div className="flex items-center gap-2.5 pt-3">
-                        <div className="relative shrink-0">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                              {e.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-background border flex items-center justify-center">
-                            <Star className="h-2 w-2 text-primary fill-primary" />
+                  {evaluatorWorkload.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Select evaluators in project assignments to see workload distribution.
+                    </p>
+                  ) : (
+                    evaluatorWorkload.map((e, i) => (
+                      <div key={e.id}>
+                        {i > 0 && <Separator />}
+                        <div className="flex items-center gap-2.5 pt-3">
+                          <div className="relative shrink-0">
+                            <Avatar className="h-8 w-8">
+                              {e.avatarUrl ? <AvatarImage src={e.avatarUrl} alt={e.name} /> : null}
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                                {e.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-background border flex items-center justify-center">
+                              <Star className="h-2 w-2 text-primary fill-primary" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{e.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{e.email}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-primary">{e.assigned}</p>
+                            <p className="text-xs text-muted-foreground">project{e.assigned !== 1 ? 's' : ''}</p>
                           </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{e.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{e.email}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-primary">{e.assigned}</p>
-                          <p className="text-xs text-muted-foreground">project{e.assigned !== 1 ? 's' : ''}</p>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

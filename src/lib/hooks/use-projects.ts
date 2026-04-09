@@ -3,13 +3,20 @@ import {
   assignProjectAdvisor,
   getDepartmentProjectAdvisors,
   getDepartmentProjectsOverview,
+  getProjectEvaluators,
+  getProjectEligibleEvaluators,
   getProjectDetails,
+  removeProjectEvaluator,
+  updateProjectEvaluators,
 } from "@/lib/api/projects"
 import type {
   AssignProjectAdvisorDto,
   DepartmentProjectAdvisorDirectoryItem,
   DepartmentProjectsOverview,
+  ProjectEligibleEvaluatorsResponse,
   ProjectDetail,
+  UpdateProjectEvaluatorsDto,
+  UpdateProjectEvaluatorsResponse,
 } from "@/types/projects"
 
 export function projectKeys() {
@@ -20,6 +27,10 @@ export function projectKeys() {
       [...projectKeys().root, "department-overview", departmentId] as const,
     departmentAdvisors: (departmentId: string) =>
       [...projectKeys().root, "department-advisors", departmentId] as const,
+    eligibleEvaluators: (projectId: string) =>
+      [...projectKeys().root, "eligible-evaluators", projectId] as const,
+    evaluators: (projectId: string) =>
+      [...projectKeys().root, "evaluators", projectId] as const,
   }
 }
 
@@ -84,6 +95,46 @@ export function useDepartmentProjectAdvisors(params: {
   })
 }
 
+export function useProjectEligibleEvaluators(params: {
+  projectId: string | null | undefined
+  enabled?: boolean
+}) {
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(projectId)
+
+  return useQuery<ProjectEligibleEvaluatorsResponse, Error>({
+    queryKey: enabled
+      ? projectKeys().eligibleEvaluators(projectId ?? "")
+      : projectKeys().root,
+    queryFn: () => {
+      if (!projectId) throw new Error("projectId is required")
+      return getProjectEligibleEvaluators(projectId)
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useProjectEvaluators(params: {
+  projectId: string | null | undefined
+  enabled?: boolean
+}) {
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(projectId)
+
+  return useQuery<UpdateProjectEvaluatorsResponse, Error>({
+    queryKey: enabled ? projectKeys().evaluators(projectId ?? "") : projectKeys().root,
+    queryFn: () => {
+      if (!projectId) throw new Error("projectId is required")
+      return getProjectEvaluators(projectId)
+    },
+    enabled,
+    staleTime: 10_000,
+    retry: false,
+  })
+}
+
 export function useAssignProjectAdvisor() {
   const queryClient = useQueryClient()
 
@@ -94,6 +145,41 @@ export function useAssignProjectAdvisor() {
     mutationFn: ({ projectId, dto }) => assignProjectAdvisor(projectId, dto),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: projectKeys().root })
+      await queryClient.invalidateQueries({ queryKey: ["project-proposals"] })
+    },
+  })
+}
+
+export function useUpdateProjectEvaluators() {
+  const queryClient = useQueryClient()
+
+  return useMutation<UpdateProjectEvaluatorsResponse, Error, {
+    projectId: string
+    dto: UpdateProjectEvaluatorsDto
+  }>({
+    mutationFn: ({ projectId, dto }) => updateProjectEvaluators(projectId, dto),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: projectKeys().root })
+      await queryClient.invalidateQueries({ queryKey: projectKeys().details(variables.projectId) })
+      await queryClient.invalidateQueries({ queryKey: projectKeys().evaluators(variables.projectId) })
+      await queryClient.invalidateQueries({ queryKey: ["project-proposals"] })
+    },
+  })
+}
+
+export function useRemoveProjectEvaluator() {
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    { projectId: string; evaluatorUserId: string; removed: boolean },
+    Error,
+    { projectId: string; evaluatorUserId: string }
+  >({
+    mutationFn: ({ projectId, evaluatorUserId }) => removeProjectEvaluator(projectId, evaluatorUserId),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: projectKeys().root })
+      await queryClient.invalidateQueries({ queryKey: projectKeys().details(variables.projectId) })
+      await queryClient.invalidateQueries({ queryKey: projectKeys().evaluators(variables.projectId) })
       await queryClient.invalidateQueries({ queryKey: ["project-proposals"] })
     },
   })
