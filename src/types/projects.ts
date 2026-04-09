@@ -211,3 +211,14 @@ export type DepartmentProjectsOverview = {
   milestonesDueThisWeek: number
   projects: DepartmentOverviewProject[]
 }
+
+export type ProjectAssignmentSummary = {
+  departmentId: string
+  totalProjects: number
+  withAdvisor: number
+  withoutAdvisor: number
+  withEvaluators: number
+  withoutEvaluators: number
+  withAdvisorAndEvaluators: number
+  withoutAdvisorOrEvaluators: number
+}

@@ -3,6 +3,7 @@ import type {
   AssignProjectAdvisorDto,
   DepartmentProjectAdvisorDirectoryItem,
   DepartmentProjectsOverview,
+  ProjectAssignmentSummary,
   ProjectEligibleEvaluatorDirectoryItem,
   ProjectEligibleEvaluatorsResponse,
   ProjectEvaluatorAssignment,
@@ -138,6 +139,21 @@ export async function getDepartmentProjectAdvisors(
   )
 
   return Array.isArray(response.data) ? response.data : []
+}
+
+export async function getProjectAssignmentSummary(
+  departmentId: string
+): Promise<ProjectAssignmentSummary> {
+  const trimmed = departmentId.trim()
+  if (!trimmed) {
+    throw new Error("departmentId is required")
+  }
+
+  const response = await apiClient.get<ProjectAssignmentSummary>(
+    `/projects/assignment-summary?departmentId=${encodeURIComponent(trimmed)}`
+  )
+
+  return response.data
 }
 
 export async function getProjectEligibleEvaluators(

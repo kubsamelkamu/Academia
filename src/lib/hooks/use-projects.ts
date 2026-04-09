@@ -3,6 +3,7 @@ import {
   assignProjectAdvisor,
   getDepartmentProjectAdvisors,
   getDepartmentProjectsOverview,
+  getProjectAssignmentSummary,
   getProjectEvaluators,
   getProjectEligibleEvaluators,
   getProjectDetails,
@@ -13,6 +14,7 @@ import type {
   AssignProjectAdvisorDto,
   DepartmentProjectAdvisorDirectoryItem,
   DepartmentProjectsOverview,
+  ProjectAssignmentSummary,
   ProjectEligibleEvaluatorsResponse,
   ProjectDetail,
   UpdateProjectEvaluatorsDto,
@@ -25,6 +27,8 @@ export function projectKeys() {
     details: (projectId: string) => [...projectKeys().root, "details", projectId] as const,
     departmentOverview: (departmentId: string) =>
       [...projectKeys().root, "department-overview", departmentId] as const,
+    assignmentSummary: (departmentId: string) =>
+      [...projectKeys().root, "assignment-summary", departmentId] as const,
     departmentAdvisors: (departmentId: string) =>
       [...projectKeys().root, "department-advisors", departmentId] as const,
     eligibleEvaluators: (projectId: string) =>
@@ -67,6 +71,27 @@ export function useDepartmentProjectsOverview(params: {
     queryFn: () => {
       if (!departmentId) throw new Error("departmentId is required")
       return getDepartmentProjectsOverview(departmentId)
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useProjectAssignmentSummary(params: {
+  departmentId: string | null | undefined
+  enabled?: boolean
+}) {
+  const departmentId = params.departmentId?.trim() ? params.departmentId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(departmentId)
+
+  return useQuery<ProjectAssignmentSummary, Error>({
+    queryKey: enabled
+      ? projectKeys().assignmentSummary(departmentId ?? "")
+      : projectKeys().root,
+    queryFn: () => {
+      if (!departmentId) throw new Error("departmentId is required")
+      return getProjectAssignmentSummary(departmentId)
     },
     enabled,
     staleTime: 30_000,

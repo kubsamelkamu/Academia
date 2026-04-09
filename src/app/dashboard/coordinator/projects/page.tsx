@@ -40,6 +40,7 @@ import {
   useAssignProjectAdvisor,
   useDepartmentProjectAdvisors,
   useDepartmentProjectsOverview,
+  useProjectAssignmentSummary,
   useProjectEligibleEvaluators,
   useProjectEvaluators,
   useRemoveProjectEvaluator,
@@ -847,6 +848,10 @@ export default function ProjectsPage() {
     departmentId,
     enabled: Boolean(accessToken) && Boolean(departmentId),
   })
+  const assignmentSummaryQuery = useProjectAssignmentSummary({
+    departmentId,
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+  })
   const departmentAdvisorsQuery = useDepartmentProjectAdvisors({
     departmentId,
     enabled: Boolean(accessToken) && Boolean(departmentId),
@@ -1083,12 +1088,12 @@ export default function ProjectsPage() {
 
   const activeProjectsValue = overviewQuery.data?.activeProjects ?? 0
   const completedProjectsValue = overviewQuery.data?.completedProjects ?? 0
+  const totalProjectsValue = assignmentSummaryQuery.data?.totalProjects ?? stats.total
   const approvedProposalsValue = useMemo(() => {
     return (proposalsQuery.data?.items ?? []).filter((proposal) => {
       return String(proposal.status ?? '').trim().toUpperCase() === 'APPROVED'
     }).length
   }, [proposalsQuery.data?.items])
-
   const needsAdvisorProposalsValue = useMemo(() => {
     return (proposalsQuery.data?.items ?? []).filter((proposal) => {
       const status = String(proposal.status ?? '').trim().toUpperCase()
@@ -1096,6 +1101,11 @@ export default function ProjectsPage() {
       return status === 'APPROVED' && !advisorId
     }).length
   }, [proposalsQuery.data?.items])
+
+  const needsAdvisorValue =
+    assignmentSummaryQuery.data?.withoutAdvisor ?? needsAdvisorProposalsValue
+  const needsEvaluatorValue =
+    assignmentSummaryQuery.data?.withoutEvaluators ?? stats.needsEvaluator
 
   const renderMetricValue = (value: number, loading: boolean) => {
     if (loading) {
@@ -1223,7 +1233,7 @@ export default function ProjectsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
           <Badge variant="secondary" className="gap-1.5">
-            <FolderKanban className="h-3.5 w-3.5" /> {stats.total} Projects
+            <FolderKanban className="h-3.5 w-3.5" /> {totalProjectsValue} Projects
           </Badge>
           {stats.unassigned > 0 && (
             <Badge variant="destructive" className="gap-1.5">
@@ -1239,8 +1249,8 @@ export default function ProjectsPage() {
           { label: 'Active Projects',   value: renderMetricValue(activeProjectsValue, overviewQuery.isLoading), icon: FolderKanban, bg: 'bg-primary/10',     color: 'text-primary' },
           { label: 'Completed Projects', value: renderMetricValue(completedProjectsValue, overviewQuery.isLoading), icon: CheckCircle2, bg: 'bg-muted',          color: 'text-foreground' },
           { label: 'Approved Proposal Titles', value: renderMetricValue(approvedProposalsValue, proposalsQuery.isLoading), icon: Archive,       bg: 'bg-primary/[0.06]', color: 'text-primary/80' },
-          { label: 'Needs Advisor',     value: renderMetricValue(needsAdvisorProposalsValue, proposalsQuery.isLoading), icon: AlertTriangle,  bg: 'bg-destructive/10',  color: 'text-destructive' },
-          { label: 'Needs Evaluator',   value: stats.needsEvaluator,icon: Star,           bg: 'bg-destructive/10',  color: 'text-destructive' },
+          { label: 'Needs Advisor',     value: renderMetricValue(needsAdvisorValue, assignmentSummaryQuery.isLoading), icon: AlertTriangle,  bg: 'bg-destructive/10',  color: 'text-destructive' },
+          { label: 'Needs Evaluator',   value: renderMetricValue(needsEvaluatorValue, assignmentSummaryQuery.isLoading), icon: Star,           bg: 'bg-destructive/10',  color: 'text-destructive' },
         ].map(s => (
           <Card key={s.label} className="group border-none shadow-sm transition-all hover:shadow-md">
             <CardContent className="flex items-center gap-3 p-4">
