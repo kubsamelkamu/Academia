@@ -266,22 +266,29 @@ export function StudentTimelinePage() {
             Track tasks and progress throughout your project
           </p>
         </div>
-        <div className="flex w-full gap-2 sm:w-auto">
+        <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2 sm:flex sm:w-auto sm:shrink-0">
           <Button
+            size="sm"
             onClick={() => {
               setFocusedTaskStatus(null)
               setActiveTab("tasks")
             }}
-            className="w-full gap-2 sm:w-auto"
+            className="h-9 min-w-0 justify-center gap-1.5 px-3 text-xs font-medium sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm"
             disabled={!isGroupApproved}
             title={!isGroupApproved ? "Your project group must be approved" : "Add a task"}
           >
-            <Plus className="h-4 w-4" />
-            Add Task
+            <Plus className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+            <span className="truncate">Add Task</span>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 touch-manipulation sm:h-10 sm:w-10"
+                aria-label="Filter tasks by status"
+              >
                 <Filter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

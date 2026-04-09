@@ -108,6 +108,12 @@ export type ProjectDetail = {
     id: string
     name: string
   } | null
+  /** Letter grade for capstone I (when published by department) */
+  capstone1Grade?: string | null
+  capstone1FinalScore?: number | null
+  /** Letter grade for capstone II (when published) */
+  capstone2Grade?: string | null
+  capstone2FinalScore?: number | null
 }
 
 export type DepartmentOverviewProjectGroup = {
