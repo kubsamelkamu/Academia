@@ -21,6 +21,7 @@ import {
   getMyProjectGroupJoinRequests,
   getMyGroupJoinRequests,
   getMyProjectGroup,
+  listMyProjectGroupMeetings,
   getProjectGroupDetails,
 } from "@/lib/api/project-groups"
 import type {
@@ -41,6 +42,7 @@ import type {
   MyGroupJoinRequestsPage,
   MyProjectGroupJoinRequestStatus,
   MyProjectGroupJoinRequestsPage,
+  MyProjectGroupMeetingsListResult,
   ProjectGroup,
   ProjectGroupDetails,
   ProjectGroupMe,
@@ -70,6 +72,8 @@ export function projectGroupKeys() {
       [...projectGroupKeys().root, "announcements", "my-group", params] as const,
     announcementMyGroup: (announcementId: string) =>
       [...projectGroupKeys().root, "announcements", "my-group", announcementId] as const,
+    meetingsMyGroup: (params: { page: number; limit: number; projectId?: string }) =>
+      [...projectGroupKeys().root, "meetings", "my-group", params] as const,
   }
 }
 
@@ -85,6 +89,33 @@ export function useMyProjectGroup(enabled: boolean) {
     queryFn: () => getMyProjectGroup(),
     enabled,
     staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useMyProjectGroupMeetings(params: {
+  enabled: boolean
+  page: number
+  limit: number
+  projectId?: string
+}) {
+  const projectId = params.projectId?.trim() ? params.projectId.trim() : undefined
+
+  return useQuery<MyProjectGroupMeetingsListResult, Error>({
+    queryKey: projectGroupKeys().meetingsMyGroup({
+      page: params.page,
+      limit: params.limit,
+      ...(projectId ? { projectId } : null),
+    }),
+    queryFn: () =>
+      listMyProjectGroupMeetings({
+        page: params.page,
+        limit: params.limit,
+        projectId,
+      }),
+    enabled: params.enabled,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
     retry: false,
   })
 }

@@ -4,7 +4,6 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
-  AlertCircle,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -977,15 +976,6 @@ export function AdvisorSchedulePage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 font-medium text-foreground">
-              <AlertCircle className="h-3.5 w-3.5" />
-              Step status
-            </span>
-            <span className="ml-2">
-              Step 4 update/cancel, Step 5 realtime sync, and Step 6 deep-link opening are integrated.
-            </span>
-          </div>
         </CardContent>
       </Card>
 
