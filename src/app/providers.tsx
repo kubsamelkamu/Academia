@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react"
 import { useAuthStore } from "@/store/auth-store"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeRouteSync } from "@/components/providers/theme-route-sync"
+import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const removeChildGuardPatchedRef = useRef(false)
@@ -64,6 +65,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ThemeRouteSync />
         {children}
         <Toaster />
+        <PwaInstallPrompt />
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </ThemeProvider>
