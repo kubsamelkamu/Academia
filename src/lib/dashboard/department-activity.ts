@@ -5,6 +5,9 @@ export const DEPARTMENT_ACTIVITY_EVENT_TYPES = [
   "PROPOSAL_APPROVED",
   "PROPOSAL_REJECTED",
   "PROPOSAL_FEEDBACK_ADDED",
+  "PROJECT_ADVISOR_ASSIGNED",
+  "PROJECT_EVALUATORS_ASSIGNED",
+  "PROJECT_EVALUATOR_REMOVED",
   "PROJECT_GROUP_FORMED",
   "MILESTONE_COMPLETED",
 ] as const
@@ -59,6 +62,12 @@ function eventFallbackLabel(eventType: string): string {
       return "Feedback added"
     case "PROJECT_GROUP_FORMED":
       return "Project group"
+    case "PROJECT_ADVISOR_ASSIGNED":
+      return "Advisor assigned"
+    case "PROJECT_EVALUATORS_ASSIGNED":
+      return "Evaluators assigned"
+    case "PROJECT_EVALUATOR_REMOVED":
+      return "Evaluator removed"
     case "MILESTONE_COMPLETED":
       return "Milestone update"
     default:
@@ -73,6 +82,9 @@ function badgeForEventType(eventType: string): DepartmentActivityBadge {
     case "PROPOSAL_APPROVED":
     case "PROPOSAL_REJECTED":
     case "PROPOSAL_FEEDBACK_ADDED":
+    case "PROJECT_ADVISOR_ASSIGNED":
+    case "PROJECT_EVALUATORS_ASSIGNED":
+    case "PROJECT_EVALUATOR_REMOVED":
     case "PROJECT_GROUP_FORMED":
     case "MILESTONE_COMPLETED":
       return "completed"
@@ -101,7 +113,25 @@ export function resolveDepartmentActivityHref(notification: Notification): strin
 
   const projectGroupId = readMetadataString(record, "projectGroupId")
   if (projectGroupId) {
-    return `/dashboard/department-head/review/group-${encodeURIComponent(projectGroupId)}`
+    // A project group ID can refer to either a group review item or an active team.
+    // Prefer group review for the explicit group-formed event.
+    if (notification.eventType === "PROJECT_GROUP_FORMED") {
+      return `/dashboard/department-head/review/group-${encodeURIComponent(projectGroupId)}`
+    }
+
+    return `/dashboard/department-head/projects/teams/${encodeURIComponent(projectGroupId)}`
+  }
+
+  const teamId = readMetadataString(record, "teamId")
+  if (teamId) {
+    return `/dashboard/department-head/projects/teams/${encodeURIComponent(teamId)}`
+  }
+
+  const projectId = readMetadataString(record, "projectId")
+  if (projectId) {
+    // We don't have a stable per-project detail route in the app router today.
+    // Link to the projects overview which is still the best "next click".
+    return "/dashboard/department-head/projects"
   }
 
   const proposalId = readMetadataString(record, "proposalId")

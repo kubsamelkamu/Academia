@@ -85,7 +85,53 @@ export type ProjectDetailMilestone = {
   dueDate: string
   status: StudentProjectMilestoneStatus
   submittedAt?: string | null
+  completedAt?: string | null
   feedback?: string | null
+  latestSubmission?: {
+    id: string
+    milestoneId: string
+    status: StudentProjectMilestoneStatus | string
+    fileName: string
+    mimeType?: string | null
+    sizeBytes?: number | null
+    fileUrl: string
+    filePublicId?: string | null
+    resourceType?: string | null
+    createdAt?: string | null
+    approvedAt?: string | null
+    uploadedBy?: {
+      id: string
+      firstName?: string | null
+      lastName?: string | null
+      email?: string | null
+      avatarUrl?: string | null
+    } | null
+    approvedBy?: {
+      id: string
+      firstName?: string | null
+      lastName?: string | null
+      email?: string | null
+      avatarUrl?: string | null
+    } | null
+    feedbacks?: unknown[]
+  } | null
+  finalApprovedFile?: {
+    submissionId: string
+    url: string
+    publicId?: string | null
+    fileName: string
+    mimeType?: string | null
+    sizeBytes?: number | null
+    resourceType?: string | null
+    approvedAt?: string | null
+    approvedBy?: {
+      id: string
+      firstName?: string | null
+      lastName?: string | null
+      email?: string | null
+      avatarUrl?: string | null
+    } | null
+  } | null
 }
 
 export type ProjectDetail = {
