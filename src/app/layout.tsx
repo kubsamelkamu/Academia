@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://academia.et"),
   title: "Academia - Academic Project Management and Collaboration Platform",
   description: "Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities.",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.png",
   },
@@ -62,8 +63,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="theme-color" content="#2563eb" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Academia" />
         <meta property="og:title" content="Academia - Academic Project Management and Collaboration Platform" />
         <meta property="og:description" content="Streamline academic project collaboration for students, advisors, Evaluators and Departments in universities." />
         <meta property="og:image" content="/favicon.png" />
