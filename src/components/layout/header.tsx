@@ -26,7 +26,7 @@ import {
 const navLinks = [
   { href: "/features", label: "Features", icon: Zap },
   { href: "/about",    label: "About",    icon: Info },
-  { href: "/docs",     label: "Docs",     icon: BookOpen },
+  { href: "https://docs.academia.et/", label: "Docs", icon: BookOpen },
   { href: "/contact",  label: "Contact",  icon: FileText },
 ]
 

@@ -112,6 +112,11 @@ function getActivityIcon(type: string): React.ComponentType<React.SVGProps<SVGSV
       return FileText
     case "PROJECT_GROUP_FORMED":
       return Users2
+    case "PROJECT_ADVISOR_ASSIGNED":
+      return UserCheck
+    case "PROJECT_EVALUATORS_ASSIGNED":
+    case "PROJECT_EVALUATOR_REMOVED":
+      return Users
     case "MILESTONE_COMPLETED":
       return Target
     default:
