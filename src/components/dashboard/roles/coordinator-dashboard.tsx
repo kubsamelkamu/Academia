@@ -91,12 +91,43 @@ interface DashboardAnnouncementAlert {
   createdAt: string
 }
 
+interface DashboardCapstoneGradeRow {
+  id: string
+  studentName: string
+  capstone1Score: number
+  capstone1Grade: string
+  capstone2Score: number
+  capstone2Grade: string
+  status: Grade["status"]
+}
+
 const ALERT_DUE_SOON_SECONDS = 3 * 24 * 60 * 60
 
 function performanceLabel(progress: number) {
   if (progress >= 75) return "Excellent"
   if (progress >= 50) return "Good"
   return "Attention"
+}
+
+function scoreToLetterGrade(score: number): string {
+  if (score >= 90) return "A+"
+  if (score >= 85) return "A"
+  if (score >= 80) return "A-"
+  if (score >= 75) return "B+"
+  if (score >= 70) return "B"
+  if (score >= 65) return "B-"
+  if (score >= 60) return "C+"
+  if (score >= 55) return "C"
+  if (score >= 50) return "C-"
+  return "F"
+}
+
+function clampScore(score: number): number {
+  return Math.min(100, Math.max(0, score))
+}
+
+function toSingleDecimal(value: number): number {
+  return Math.round(value * 10) / 10
 }
 
 function daysUntil(dateStr: string) {
@@ -473,7 +504,30 @@ export function CoordinatorDashboard() {
     },
   ]
 
-  const gradeColumns: Column<Grade>[] = [
+  const capstoneGrades = useMemo<DashboardCapstoneGradeRow[]>(() => {
+    return localGrades.map((grade) => {
+      const evaluatorScores = grade.evaluatorScores ?? [35, 38, 32]
+      const evaluatorAverage = evaluatorScores.reduce((sum, score) => sum + score, 0) / evaluatorScores.length
+      const advisorScore = grade.advisorScore ?? 28
+      const evaluatorPercent = (evaluatorAverage / 40) * 100
+      const advisorPercent = (advisorScore / 30) * 100
+      const baseScore = clampScore(toSingleDecimal((evaluatorPercent * 0.8) + (advisorPercent * 0.2)))
+      const capstone1Score = clampScore(toSingleDecimal(baseScore - 4))
+      const capstone2Score = clampScore(toSingleDecimal(baseScore + 3))
+
+      return {
+        id: grade.id,
+        studentName: grade.studentName,
+        capstone1Score,
+        capstone1Grade: scoreToLetterGrade(capstone1Score),
+        capstone2Score,
+        capstone2Grade: scoreToLetterGrade(capstone2Score),
+        status: grade.status,
+      }
+    })
+  }, [localGrades])
+
+  const gradeColumns: Column<DashboardCapstoneGradeRow>[] = [
     { 
       key: 'studentName', header: 'Student',
       render: (g) => (
@@ -486,15 +540,29 @@ export function CoordinatorDashboard() {
       )
     },
     {
-      key: 'finalScore', header: 'Score',
+      key: 'capstone1', header: 'Capstone I (Semester 1)',
       render: (g) => (
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-primary">{g.finalScore.toFixed(1)}%</span>
-          <Progress value={g.finalScore} className="w-16 h-1.5" />
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-primary">{g.capstone1Score.toFixed(1)}%</span>
+            <Progress value={g.capstone1Score} className="w-16 h-1.5" />
+          </div>
+          <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">{g.capstone1Grade}</Badge>
         </div>
       )
     },
-    { key: 'grade', header: 'Grade', render: (g) => <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">{g.grade}</Badge> },
+    {
+      key: 'capstone2', header: 'Capstone II (Semester 2)',
+      render: (g) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-primary">{g.capstone2Score.toFixed(1)}%</span>
+            <Progress value={g.capstone2Score} className="w-16 h-1.5" />
+          </div>
+          <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">{g.capstone2Grade}</Badge>
+        </div>
+      )
+    },
     { key: 'status', header: 'Status', render: (g) => <StatusBadge status={g.status} /> },
   ]
 
@@ -1123,7 +1191,7 @@ export function CoordinatorDashboard() {
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
                 <CardTitle>Grade Overview</CardTitle>
-                <CardDescription>Student grades and finalization status</CardDescription>
+                <CardDescription>Capstone I and Capstone II grades per student, with overall finalization status</CardDescription>
               </div>
               <Link href="/dashboard/coordinator/grade-management">
                 <Button size="sm" className="gap-1.5 shrink-0">
@@ -1132,7 +1200,7 @@ export function CoordinatorDashboard() {
               </Link>
             </CardHeader>
             <CardContent className="p-0">
-              <DataTable data={localGrades.slice(0, 5)} columns={gradeColumns} />
+              <DataTable data={capstoneGrades.slice(0, 5)} columns={gradeColumns} />
             </CardContent>
           </Card>
         </TabsContent>

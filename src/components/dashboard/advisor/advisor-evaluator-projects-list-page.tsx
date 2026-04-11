@@ -37,6 +37,7 @@ import { mockProjects, formatDate, type Project } from "@/data/mockData"
 import { mockProjectTimelines } from "@/data/timelineData"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
+import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
 import {
   DueBadge,
   TimelineStatusRow,
@@ -389,29 +390,15 @@ function EvaluatorProjectCard({
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button variant="outline" size="sm" className="h-10 w-full sm:flex-1" asChild>
-            <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>
-              <Eye className="mr-2 h-4 w-4" aria-hidden />
-              View project
-            </Link>
-          </Button>
-          {inPendingQueue ? (
-            <Button
-              className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:flex-[1.15]"
-              size="sm"
-              asChild
-            >
-              <Link href={`/dashboard/advisor/evaluator/evaluate/${project.id}`}>
-                <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                Evaluate now
-                <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </Link>
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" className="h-10 w-full sm:flex-1" asChild>
-              <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>Open detail</Link>
-            </Button>
-          )}
+              <AdvisorEvaluatorStageMenu
+                projectId={project.id}
+                trigger={
+                  <Button variant="default" size="sm" className="rounded-lg">
+                    <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
+                    Evaluate now
+                  </Button>
+                }
+              />
         </div>
       </CardContent>
     </Card>

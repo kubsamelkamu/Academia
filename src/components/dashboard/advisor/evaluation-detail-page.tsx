@@ -3,213 +3,163 @@
 import * as React from "react"
 import Link from "next/link"
 import { toast } from "sonner"
+import {
+  ArrowLeft,
+  Users,
+  FolderKanban,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  PlayCircle,
+  TrendingUp,
+  User,
+} from "lucide-react"
 
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  FileSearch, 
-  Send,
-  Calendar,
-  User,
-  FileText,
-  AlertCircle,
-  Save,
-  RefreshCw
-} from "lucide-react"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Separator } from "@/components/ui/separator"
 
 type EvaluationStatus = "Pending Review" | "Evaluated" | "Needs Revision"
 
-interface RubricItem {
+type GroupStudent = {
   id: string
-  label: string
-  description?: string
-  max: number
-  score: number
-}
-
-interface EvaluationDetail {
-  id: string
-  studentName: string
-  studentId?: string
-  projectTitle: string
+  name: string
+  studentId: string
+  capstone1Status: EvaluationStatus
+  capstone2Status: EvaluationStatus
+  progress: number
+  capstone1Score?: number
+  capstone2Score?: number
   submittedDate: string
-  dueDate?: string
-  status: EvaluationStatus
-  summary: string
-  rubric: RubricItem[]
-  attachments?: { name: string; url: string }[]
-  feedback?: string
 }
 
-const mockEvaluations: EvaluationDetail[] = [
+type Milestone = {
+  id: string
+  title: string
+  status: "completed" | "in_progress" | "pending"
+  progress: number
+}
+
+type GroupEvaluationDetail = {
+  id: string
+  groupName: string
+  projectTitle: string
+  capstoneStage: "Capstone I" | "Capstone II"
+  submittedDate: string
+  dueDate: string
+  advisorStatus: EvaluationStatus
+  students: GroupStudent[]
+  milestones: Milestone[]
+}
+
+const MOCK_GROUP_DETAILS: GroupEvaluationDetail[] = [
   {
-    id: "eval-1",
-    studentName: "Alex Mercer",
-    studentId: "STU-2024-001",
+    id: "grp-1",
+    groupName: "AI Research Group",
     projectTitle: "Machine Learning applied to Smart Grids",
+    capstoneStage: "Capstone I",
     submittedDate: "2024-05-10",
     dueDate: "2024-05-17",
-    status: "Pending Review",
-    summary: "Initial submission looks promising. Please verify methodology and results sections.",
-    rubric: [
-      { 
-        id: "r1", 
-        label: "Problem definition", 
-        description: "Clear articulation of the problem and its significance",
-        max: 10, 
-        score: 7 
-      },
-      { 
-        id: "r2", 
-        label: "Implementation quality", 
-        description: "Code quality, architecture, and best practices",
-        max: 10, 
-        score: 6 
-      },
-      { 
-        id: "r3", 
-        label: "Evaluation & results", 
-        description: "Testing methodology and result analysis",
-        max: 10, 
-        score: 5 
-      },
-      { 
-        id: "r4", 
-        label: "Report clarity", 
-        description: "Structure, writing quality, and visual aids",
-        max: 10, 
-        score: 6 
-      },
+    advisorStatus: "Pending Review",
+    students: [
+      { id: "stu-1", name: "Alex Mercer", studentId: "STU-2024-001", capstone1Status: "Pending Review", capstone2Status: "Pending Review", progress: 72, submittedDate: "2024-05-10" },
+      { id: "stu-2", name: "Maria Garcia", studentId: "STU-2024-002", capstone1Status: "Evaluated", capstone2Status: "Pending Review", progress: 88, capstone1Score: 36, submittedDate: "2024-05-09" },
+      { id: "stu-3", name: "Liam Johnson", studentId: "STU-2024-003", capstone1Status: "Pending Review", capstone2Status: "Pending Review", progress: 67, submittedDate: "2024-05-10" },
     ],
-    attachments: [
-      { name: "project_report.pdf", url: "#" },
-      { name: "code_repository.zip", url: "#" }
-    ]
+    milestones: [
+      { id: "m1", title: "Proposal and problem definition", status: "completed", progress: 100 },
+      { id: "m2", title: "SDD and architecture review", status: "in_progress", progress: 74 },
+      { id: "m3", title: "Advisor final evaluation", status: "pending", progress: 20 },
+    ],
   },
   {
-    id: "eval-2",
-    studentName: "Maria Garcia",
-    studentId: "STU-2024-002",
+    id: "grp-2",
+    groupName: "Blockchain Team",
     projectTitle: "Blockchain for Supply Chain Transparency",
+    capstoneStage: "Capstone II",
     submittedDate: "2024-05-08",
-    status: "Evaluated",
-    summary: "Well-structured report with clear diagrams and strong justification of design choices.",
-    rubric: [
-      { id: "r1", label: "Problem definition", max: 10, score: 9 },
-      { id: "r2", label: "Implementation quality", max: 10, score: 8 },
-      { id: "r3", label: "Evaluation & results", max: 10, score: 8 },
-      { id: "r4", label: "Report clarity", max: 10, score: 9 },
+    dueDate: "2024-05-16",
+    advisorStatus: "Evaluated",
+    students: [
+      { id: "stu-4", name: "Sophia Chen", studentId: "STU-2024-004", capstone1Status: "Evaluated", capstone2Status: "Evaluated", progress: 95, capstone1Score: 37, capstone2Score: 38, submittedDate: "2024-05-08" },
+      { id: "stu-5", name: "James Wilson", studentId: "STU-2024-005", capstone1Status: "Evaluated", capstone2Status: "Evaluated", progress: 92, capstone1Score: 34, capstone2Score: 35, submittedDate: "2024-05-08" },
+      { id: "stu-6", name: "Noah Davis", studentId: "STU-2024-006", capstone1Status: "Evaluated", capstone2Status: "Evaluated", progress: 90, capstone1Score: 33, capstone2Score: 34, submittedDate: "2024-05-08" },
     ],
-    feedback: "Excellent work! Consider adding more performance metrics in future iterations."
+    milestones: [
+      { id: "m1", title: "Implementation checkpoint", status: "completed", progress: 100 },
+      { id: "m2", title: "Testing and validation", status: "completed", progress: 100 },
+      { id: "m3", title: "Advisor final evaluation", status: "completed", progress: 100 },
+    ],
   },
   {
-    id: "eval-3",
-    studentName: "Liam Johnson",
-    studentId: "STU-2024-003",
+    id: "grp-3",
+    groupName: "IoT Builders",
     projectTitle: "IoT Home Automation Prototype",
+    capstoneStage: "Capstone I",
     submittedDate: "2024-05-12",
-    status: "Needs Revision",
-    summary: "Requires revision: missing test coverage and unclear architecture section.",
-    rubric: [
-      { id: "r1", label: "Problem definition", max: 10, score: 6 },
-      { id: "r2", label: "Implementation quality", max: 10, score: 5 },
-      { id: "r3", label: "Evaluation & results", max: 10, score: 4 },
-      { id: "r4", label: "Report clarity", max: 10, score: 5 },
+    dueDate: "2024-05-19",
+    advisorStatus: "Needs Revision",
+    students: [
+      { id: "stu-7", name: "Olivia White", studentId: "STU-2024-007", capstone1Status: "Needs Revision", capstone2Status: "Pending Review", progress: 55, submittedDate: "2024-05-12" },
+      { id: "stu-8", name: "Ethan Brown", studentId: "STU-2024-008", capstone1Status: "Pending Review", capstone2Status: "Pending Review", progress: 60, submittedDate: "2024-05-12" },
+      { id: "stu-9", name: "Ava Clark", studentId: "STU-2024-009", capstone1Status: "Pending Review", capstone2Status: "Pending Review", progress: 58, submittedDate: "2024-05-12" },
+      { id: "stu-10", name: "Mason Hall", studentId: "STU-2024-010", capstone1Status: "Evaluated", capstone2Status: "Pending Review", progress: 82, capstone1Score: 30, submittedDate: "2024-05-11" },
+    ],
+    milestones: [
+      { id: "m1", title: "Proposal and scope alignment", status: "completed", progress: 100 },
+      { id: "m2", title: "Technical architecture", status: "in_progress", progress: 62 },
+      { id: "m3", title: "Advisor final evaluation", status: "pending", progress: 35 },
+    ],
+  },
+  {
+    id: "grp-4",
+    groupName: "Cloud Scale Team",
+    projectTitle: "Cloud-native Microservices Architecture",
+    capstoneStage: "Capstone II",
+    submittedDate: "2024-05-15",
+    dueDate: "2024-05-22",
+    advisorStatus: "Pending Review",
+    students: [
+      { id: "stu-11", name: "Emma Walker", studentId: "STU-2024-011", capstone1Status: "Evaluated", capstone2Status: "Pending Review", progress: 65, capstone1Score: 32, submittedDate: "2024-05-15" },
+      { id: "stu-12", name: "Logan Young", studentId: "STU-2024-012", capstone1Status: "Pending Review", capstone2Status: "Pending Review", progress: 63, submittedDate: "2024-05-15" },
+    ],
+    milestones: [
+      { id: "m1", title: "Implementation planning", status: "completed", progress: 100 },
+      { id: "m2", title: "System implementation", status: "in_progress", progress: 68 },
+      { id: "m3", title: "Advisor final evaluation", status: "pending", progress: 25 },
     ],
   },
 ]
 
-const getStatusConfig = (status: EvaluationStatus) => {
-  const configs = {
-    "Pending Review": {
-      badge: "bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800",
-      icon: AlertCircle,
-      label: "Pending Review"
-    },
-    "Evaluated": {
-      badge: "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800",
-      icon: CheckCircle,
-      label: "Evaluated"
-    },
-    "Needs Revision": {
-      badge: "bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800",
-      icon: RefreshCw,
-      label: "Needs Revision"
-    }
-  }
-  return configs[status]
+const STATUS_CONFIG: Record<EvaluationStatus, { icon: React.ElementType; className: string }> = {
+  "Pending Review": {
+    icon: Clock,
+    className: "bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800",
+  },
+  "Evaluated": {
+    icon: CheckCircle2,
+    className: "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800",
+  },
+  "Needs Revision": {
+    icon: AlertCircle,
+    className: "bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800",
+  },
 }
 
-const StatusBadge = ({ status }: { status: EvaluationStatus }) => {
-  const config = getStatusConfig(status)
-  const Icon = config.icon
-  
+function StatusBadge({ status }: { status: EvaluationStatus }) {
+  const cfg = STATUS_CONFIG[status]
+  const Icon = cfg.icon
+
   return (
-    <Badge className={`${config.badge} border`} variant="outline">
+    <Badge variant="outline" className={`${cfg.className} border`}>
       <Icon className="h-3.5 w-3.5 mr-1.5" />
-      {config.label}
+      {status}
     </Badge>
-  )
-}
-
-/** Maps mockData evaluation ids (e1…) to this page's demo detail rows (eval-1…). */
-const MOCK_EVALUATION_ID_ALIASES: Record<string, string> = {
-  e1: "eval-1",
-  e2: "eval-2",
-  e3: "eval-3",
-}
-
-const RubricItem = ({ item }: { item: RubricItem }) => {
-  const percentage = (item.score / item.max) * 100
-  
-  return (
-    <div className="rounded-lg border bg-card p-4 space-y-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{item.label}</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button className="inline-flex">
-                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-sm">{item.description || "No description available"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <p className="text-xs text-muted-foreground">Maximum score: {item.max}</p>
-        </div>
-        <Badge variant="secondary" className="text-sm">
-          {item.score}/{item.max}
-        </Badge>
-      </div>
-      <div className="space-y-1">
-        <div className="flex justify-between text-xs">
-          <span>Progress</span>
-          <span className="font-medium">{Math.round(percentage)}%</span>
-        </div>
-        <Progress value={percentage} className="h-2" />
-      </div>
-    </div>
   )
 }
 
@@ -219,55 +169,66 @@ export function AdvisorEvaluationDetailPage({
   evaluationsListLabel = "Back to Evaluations",
 }: {
   evaluationId: string
-  /** Where the primary “back” action should go (e.g. evaluator completed vs advisor evaluations list). */
   evaluationsListHref?: string
   evaluationsListLabel?: string
 }) {
-  const [evaluation, setEvaluation] = React.useState<EvaluationDetail | null>(null)
-  const [overallComment, setOverallComment] = React.useState("")
-  const [grade, setGrade] = React.useState("")
-  const [isSaving, setIsSaving] = React.useState(false)
-  const [isRequestingRevision, setIsRequestingRevision] = React.useState(false)
+  const [group, setGroup] = React.useState<GroupEvaluationDetail | null>(null)
 
   React.useEffect(() => {
-    const resolvedId = MOCK_EVALUATION_ID_ALIASES[evaluationId] ?? evaluationId
-    const found = mockEvaluations.find((e) => e.id === resolvedId) ?? null
-    setEvaluation(found)
-    if (found?.feedback) {
-      setOverallComment(found.feedback)
-    }
+    const found = MOCK_GROUP_DETAILS.find((item) => item.id === evaluationId) ?? null
+    setGroup(found)
   }, [evaluationId])
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    toast.success("Evaluation saved successfully", { 
-      description: "Your changes have been recorded."
+  const handleEvaluateNow = (studentId: string, capstone: "capstone1" | "capstone2") => {
+    setGroup((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        students: prev.students.map((student) => {
+          if (student.id !== studentId) return student
+
+          if (capstone === "capstone2" && student.capstone1Status !== "Evaluated") {
+            return student
+          }
+
+          const nextStatusKey = capstone === "capstone1" ? "capstone1Status" : "capstone2Status"
+          const nextScoreKey = capstone === "capstone1" ? "capstone1Score" : "capstone2Score"
+
+          if (student[nextStatusKey] !== "Pending Review") return student
+
+          return {
+            ...student,
+            [nextStatusKey]: "Evaluated",
+            [nextScoreKey]: 32,
+            progress: Math.max(student.progress, 85),
+          }
+        }),
+      }
     })
-    setIsSaving(false)
+
+    const current = group?.students.find((student) => student.id === studentId)
+    if (capstone === "capstone2" && current && current.capstone1Status !== "Evaluated") {
+      toast.error("Capstone II is locked", {
+        description: "Complete Capstone I evaluation for this student first.",
+      })
+      return
+    }
+
+    toast.success("Student evaluated", {
+      description: `${capstone === "capstone1" ? "Capstone I" : "Capstone II"} evaluation recorded for this student.`,
+    })
   }
 
-  const handleRequestRevision = async () => {
-    setIsRequestingRevision(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    toast.success("Revision requested", { 
-      description: "The student has been notified."
-    })
-    setIsRequestingRevision(false)
-  }
-
-  if (!evaluation) {
+  if (!group) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <div className="flex flex-col items-center justify-center min-h-[360px] text-center">
           <div className="rounded-full bg-muted p-4 mb-4">
-            <FileSearch className="h-8 w-8 text-muted-foreground" />
+            <FolderKanban className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight mb-2">Evaluation Not Found</h1>
+          <h1 className="text-2xl font-bold tracking-tight mb-2">Group Not Found</h1>
           <p className="text-muted-foreground max-w-md mb-6">
-            No evaluation exists with ID: {evaluationId}. The evaluation may have been removed or you may have followed an invalid link.
+            No group evaluation exists with ID: {evaluationId}
           </p>
           <Button asChild>
             <Link href={evaluationsListHref}>
@@ -280,16 +241,17 @@ export function AdvisorEvaluationDetailPage({
     )
   }
 
-  const totalScore = evaluation.rubric.reduce((acc, r) => acc + r.score, 0)
-  const totalMax = evaluation.rubric.reduce((acc, r) => acc + r.max, 0)
-  const overallPercentage = (totalScore / totalMax) * 100
+  const pendingCount = group.students.filter((s) => s.capstone1Status === "Pending Review" || s.capstone2Status === "Pending Review").length
+  const evaluatedCount = group.students.filter((s) => s.capstone1Status === "Evaluated" && s.capstone2Status === "Evaluated").length
+  const avgProgress = Math.round(group.students.reduce((sum, s) => sum + s.progress, 0) / group.students.length)
+  const completionRate = Math.round((evaluatedCount / group.students.length) * 100)
 
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardPageHeader
-          title="Evaluation Details"
-          description={`Review and provide feedback for ${evaluation.studentName}'s submission`}
+          title="Group Evaluation Details"
+          description={`Track ${group.groupName} progress. Capstone II evaluation unlocks only after Capstone I is completed.`}
         />
         <Button asChild variant="outline" size="sm">
           <Link href={evaluationsListHref}>
@@ -299,192 +261,186 @@ export function AdvisorEvaluationDetailPage({
         </Button>
       </div>
 
-      {/* Summary Card */}
-      <Card className="overflow-hidden">
-        <div className="bg-muted/50 px-6 py-4 border-b">
-          <div className="flex flex-wrap items-center gap-4">
-            <StatusBadge status={evaluation.status} />
-            <Badge variant="outline" className="text-sm">
-              Score: {totalScore}/{totalMax} ({Math.round(overallPercentage)}%)
-            </Badge>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusBadge status={group.advisorStatus} />
+            <Badge variant="outline">{group.capstoneStage}</Badge>
+            <Badge variant="secondary">{group.students.length} students</Badge>
           </div>
-        </div>
-        <CardContent className="p-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-4">
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-3">
               <div className="flex items-start gap-3">
-                <User className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <Users className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Student</p>
-                  <p className="font-medium">{evaluation.studentName}</p>
-                  {evaluation.studentId && (
-                    <p className="text-sm text-muted-foreground">{evaluation.studentId}</p>
-                  )}
+                  <p className="text-sm text-muted-foreground">Group Name</p>
+                  <p className="font-medium">{group.groupName}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <FileText className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <FolderKanban className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
                   <p className="text-sm text-muted-foreground">Project</p>
-                  <p className="font-medium">{evaluation.projectTitle}</p>
+                  <p className="font-medium">{group.projectTitle}</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Submitted</p>
-                  <p className="font-medium">
-                    {new Date(evaluation.submittedDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                  {evaluation.dueDate && (
-                    <p className="text-sm text-muted-foreground">
-                      Due: {new Date(evaluation.dueDate).toLocaleDateString()}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground">Submission Date</p>
+                  <p className="font-medium">{new Date(group.submittedDate).toLocaleDateString()}</p>
                 </div>
               </div>
-              {evaluation.attachments && evaluation.attachments.length > 0 && (
-                <div className="flex items-start gap-3">
-                  <FileSearch className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Attachments</p>
-                    <div className="flex flex-wrap gap-2">
-                      {evaluation.attachments.map((file, index) => (
-                        <Button key={index} variant="outline" size="sm" asChild>
-                          <a href={file.url} target="_blank" rel="noopener noreferrer">
-                            <FileText className="h-3.5 w-3.5 mr-2" />
-                            {file.name}
-                          </a>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className="font-medium">{new Date(group.dueDate).toLocaleDateString()}</p>
                 </div>
-              )}
+              </div>
             </div>
           </div>
-          {evaluation.summary && (
-            <>
-              <Separator className="my-4" />
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Summary</p>
-                <p className="text-sm">{evaluation.summary}</p>
-              </div>
-            </>
-          )}
+
+          <Separator />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Pending Students</p>
+                <p className="text-2xl font-semibold text-amber-600">{pendingCount}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Evaluated Students</p>
+                <p className="text-2xl font-semibold text-emerald-600">{evaluatedCount}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Average Progress</p>
+                <p className="text-2xl font-semibold text-primary">{avgProgress}%</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Completion Rate</p>
+                <p className="text-2xl font-semibold text-primary">{completionRate}%</p>
+              </CardContent>
+            </Card>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Rubric Section */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileSearch className="h-5 w-5 text-primary" />
-              Rubric Assessment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {evaluation.rubric.map((item) => (
-                <RubricItem key={item.id} item={item} />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Group Progress
+          </CardTitle>
+          <CardDescription>Milestone completion for this group</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {group.milestones.map((milestone) => (
+            <div key={milestone.id} className="rounded-lg border p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-sm">{milestone.title}</p>
+                <Badge variant="outline" className="capitalize">{milestone.status.replace("_", " ")}</Badge>
+              </div>
+              <Progress value={milestone.progress} className="h-2" />
+              <p className="text-xs text-muted-foreground">{milestone.progress}% complete</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Students In Group</CardTitle>
+          <CardDescription>
+            Evaluate students separately for Capstone I and Capstone II.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead>Capstone I</TableHead>
+                <TableHead>Capstone II</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {group.students.map((student) => (
+                <TableRow key={student.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-medium">{student.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{student.studentId}</TableCell>
+                  <TableCell>
+                    <div className="w-40 space-y-1">
+                      <div className="text-xs text-muted-foreground">{student.progress}%</div>
+                      <Progress value={student.progress} className="h-1.5" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <StatusBadge status={student.capstone1Status} />
+                      <p className="text-xs text-muted-foreground">
+                        {student.capstone1Score != null ? `${student.capstone1Score}/40` : "No score yet"}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <StatusBadge status={student.capstone2Status} />
+                      <p className="text-xs text-muted-foreground">
+                        {student.capstone2Score != null ? `${student.capstone2Score}/40` : "No score yet"}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant={student.capstone1Status === "Pending Review" ? "default" : "outline"}
+                        className="gap-1.5"
+                        disabled={student.capstone1Status !== "Pending Review"}
+                        onClick={() => handleEvaluateNow(student.id, "capstone1")}
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        {student.capstone1Status === "Pending Review" ? "Evaluate C-I" : "C-I Done"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={student.capstone2Status === "Pending Review" && student.capstone1Status === "Evaluated" ? "default" : "outline"}
+                        className="gap-1.5"
+                        disabled={student.capstone2Status !== "Pending Review" || student.capstone1Status !== "Evaluated"}
+                        onClick={() => handleEvaluateNow(student.id, "capstone2")}
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        {student.capstone2Status === "Pending Review"
+                          ? student.capstone1Status === "Evaluated" ? "Evaluate C-II" : "C-II Locked"
+                          : "C-II Done"}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Feedback Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Advisor Feedback</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="overall" className="text-base">
-                Overall Comment
-              </Label>
-              <Textarea
-                id="overall"
-                rows={6}
-                value={overallComment}
-                onChange={(e) => setOverallComment(e.target.value)}
-                placeholder="Provide comprehensive feedback, highlight strengths, and suggest improvements..."
-                className="resize-none"
-              />
-              <p className="text-xs text-muted-foreground">
-                {overallComment.length}/1000 characters
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="grade">Grade (optional)</Label>
-              <Input
-                id="grade"
-                placeholder="e.g., A-, 85/100, Pass with Distinction"
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <Button
-                className="w-full btn-gradient"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Feedback
-                  </>
-                )}
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleRequestRevision}
-                disabled={isRequestingRevision}
-              >
-                {isRequestingRevision ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Requesting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Request Revision
-                  </>
-                )}
-              </Button>
-
-              {evaluation.status === "Evaluated" && evaluation.feedback && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    Previous Feedback
-                  </p>
-                  <p className="text-sm">{evaluation.feedback}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import withPWA from "@ducanh2912/next-pwa";
 
 const nextConfig: NextConfig = {
   // Suppress the malformed auto-generated `.next/dev/types/validator.ts`
@@ -11,11 +10,4 @@ const nextConfig: NextConfig = {
   turbopack: {},
 };
 
-const withPWAConfig = withPWA({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
-});
-
-export default withPWAConfig(nextConfig);
+export default nextConfig;
