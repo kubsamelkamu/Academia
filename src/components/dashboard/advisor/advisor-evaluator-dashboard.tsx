@@ -33,6 +33,7 @@ import {
 import { mockProjectTimelines } from "@/data/timelineData"
 
 import { ADVISOR_SCHEDULED_SESSIONS } from "./advisor-evaluator-scheduled-data"
+import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
 import {
   DueBadge,
   TimelineStatusRow,
@@ -295,17 +296,19 @@ export function AdvisorEvaluatorDashboard() {
                                 Documents
                               </Link>
                             </Button>
-                            <Button
-                              className="group w-full rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
-                              size="sm"
-                              asChild
-                            >
-                              <Link href={`/dashboard/advisor/evaluator/evaluate/${project.id}`}>
-                                <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                                Start evaluation
-                                <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                              </Link>
-                            </Button>
+                            <AdvisorEvaluatorStageMenu
+                              projectId={project.id}
+                              trigger={
+                                <Button
+                                  className="group w-full rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
+                                  size="sm"
+                                >
+                                  <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                                  Start evaluation
+                                  <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                                </Button>
+                              }
+                            />
                           </div>
                         </CardContent>
                       </Card>

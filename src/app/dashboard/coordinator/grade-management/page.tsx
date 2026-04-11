@@ -60,6 +60,25 @@ import { toast } from 'sonner'
 import { mockGrades, mockProjects, Grade, mockComplaints, type Complaint } from '@/data/mockData'
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
+type CapstonePhase = 'capstone1' | 'capstone2'
+
+interface CapstoneGradeSlice {
+  score: number
+  grade: string
+  status: Grade['status']
+  updatedAt: string
+}
+
+interface GradeRecord {
+  id: string
+  studentName: string
+  type: Grade['type']
+  evaluatorScores?: number[]
+  advisorScore?: number
+  capstone1: CapstoneGradeSlice
+  capstone2: CapstoneGradeSlice
+}
+
 function scoreToGrade(s: number): string {
   if (s >= 90) return 'A+'
   if (s >= 85) return 'A'
@@ -88,17 +107,58 @@ function statusConfig(status: Grade['status']) {
   }
 }
 
+function phaseLabel(phase: CapstonePhase) {
+  return phase === 'capstone1' ? 'Capstone I' : 'Capstone II'
+}
+
+function toPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value * 10) / 10))
+}
+
+function mapGradeToRecord(grade: Grade): GradeRecord {
+  const eScores = grade.evaluatorScores ?? [35, 38, 32]
+  const eAvg = eScores.reduce((a, b) => a + b, 0) / eScores.length
+  const aScore = grade.advisorScore ?? 28
+  const evaluatorPercent = (eAvg / 40) * 100
+  const advisorPercent = (aScore / 30) * 100
+  const baseScore = toPercent((evaluatorPercent * 0.8) + (advisorPercent * 0.2))
+  const capstone1Score = toPercent(baseScore - 4)
+  const capstone2Score = toPercent(baseScore + 3)
+
+  return {
+    id: grade.id,
+    studentName: grade.studentName,
+    type: grade.type,
+    evaluatorScores: grade.evaluatorScores,
+    advisorScore: grade.advisorScore,
+    capstone1: {
+      score: capstone1Score,
+      grade: scoreToGrade(capstone1Score),
+      status: grade.status,
+      updatedAt: grade.updatedAt,
+    },
+    capstone2: {
+      score: capstone2Score,
+      grade: scoreToGrade(capstone2Score),
+      status: grade.status,
+      updatedAt: grade.updatedAt,
+    },
+  }
+}
+
 /* ─── Grade Detail Sheet ──────────────────────────────────────────────── */
 function GradeSheet({
   grade,
   open,
   onClose,
   onAdjust,
+  phase,
 }: {
-  grade: Grade | null
+  grade: GradeRecord | null
   open: boolean
   onClose: () => void
-  onAdjust: (id: string, score: number, reason: string) => void
+  onAdjust: (id: string, phase: CapstonePhase, score: number, reason: string) => void
+  phase: CapstonePhase
 }) {
   const [newScore, setNewScore]     = useState('')
   const [reason, setReason]         = useState('')
@@ -108,14 +168,17 @@ function GradeSheet({
 
   if (!grade) return null
 
-  const sc  = statusConfig(grade.status)
-  const gc  = gradeColor(grade.grade)
-  const eScores = grade.evaluatorScores ?? [35, 38, 32]
-  const aScore  = grade.advisorScore      ?? 28
-  const dScore  = grade.documentationScore ?? 25
-  const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
+  const selected = grade[phase]
 
-  const computed = Math.round(((eAvg * 0.4) + (aScore * 0.3) + (dScore * 0.3)) * 10) / 10
+  const sc  = statusConfig(selected.status)
+  const gc  = gradeColor(selected.grade)
+  const eScores = grade.evaluatorScores ?? [35, 38, 32]
+  const aScore  = grade.advisorScore ?? 28
+  const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
+  const evaluatorPercent = toPercent((eAvg / 40) * 100)
+  const advisorPercent = toPercent((aScore / 30) * 100)
+
+  const computed = toPercent((evaluatorPercent * 0.8) + (advisorPercent * 0.2))
   const project  = mockProjects.find(p => p.id === grade.studentName.toLowerCase().replace(' ', ''))
 
   const handleApply = async () => {
@@ -125,8 +188,8 @@ function GradeSheet({
     setSaving(true)
     await new Promise(r => setTimeout(r, 600))
     setSaving(false)
-    onAdjust(grade.id, s, reason)
-    toast.success('Grade Adjusted', { description: `${grade.studentName} updated to ${s}%` })
+    onAdjust(grade.id, phase, s, reason)
+    toast.success('Grade Adjusted', { description: `${grade.studentName} updated to ${s}% for ${phaseLabel(phase)}` })
     onClose()
   }
 
@@ -144,10 +207,10 @@ function GradeSheet({
             </Avatar>
             <div className="min-w-0 flex-1">
               <SheetTitle className="text-base truncate">{grade.studentName}</SheetTitle>
-              <SheetDescription className="text-xs capitalize">{grade.type} grade</SheetDescription>
+              <SheetDescription className="text-xs capitalize">{phaseLabel(phase)} • {grade.type} track</SheetDescription>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
-              <Badge className={`text-xs ${gc}`}>{grade.grade}</Badge>
+              <Badge className={`text-xs ${gc}`}>{selected.grade}</Badge>
               <Badge variant="outline" className={`text-xs ${sc.cls}`}>{sc.label}</Badge>
             </div>
         </div>
@@ -157,9 +220,9 @@ function GradeSheet({
 
           {/* Score hero */}
           <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-center">
-            <p className="text-4xl font-bold tracking-tight text-primary">{grade.finalScore}%</p>
-            <p className="text-sm text-muted-foreground mt-0.5">Final Score</p>
-            <p className="text-xs text-muted-foreground mt-1">Last updated: {grade.updatedAt}</p>
+            <p className="text-4xl font-bold tracking-tight text-primary">{selected.score}%</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{phaseLabel(phase)} score</p>
+            <p className="text-xs text-muted-foreground mt-1">Last updated: {selected.updatedAt}</p>
           </div>
 
           {/* Score breakdown */}
@@ -168,14 +231,13 @@ function GradeSheet({
               <BarChart3 className="h-3.5 w-3.5" /> Score Breakdown
             </p>
             {[
-              { label: 'Evaluators (40%)', value: eAvg.toFixed(1), max: 40, pct: (eAvg / 40) * 100 },
-              { label: 'Advisor (30%)',    value: aScore,           max: 30, pct: (aScore / 30) * 100 },
-              { label: 'Documentation (30%)', value: dScore,        max: 30, pct: (dScore / 30) * 100 },
+              { label: 'Evaluators (80%)', value: `${evaluatorPercent.toFixed(1)}%`, max: 100, pct: evaluatorPercent },
+              { label: 'Advisor (20%)', value: `${advisorPercent.toFixed(1)}%`, max: 100, pct: advisorPercent },
             ].map(row => (
               <div key={row.label} className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">{row.label}</span>
-                  <span className="font-semibold">{row.value}/{row.max}</span>
+                  <span className="font-semibold">{row.value}</span>
                 </div>
                 <Progress value={row.pct} className="h-1.5" />
               </div>
@@ -221,16 +283,16 @@ function GradeSheet({
           <Separator />
 
           {/* Adjustment form */}
-          {grade.status !== 'final' ? (
+          {selected.status !== 'final' ? (
             <div className="space-y-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                <SlidersHorizontal className="h-3.5 w-3.5" /> Manual Adjustment
+                <SlidersHorizontal className="h-3.5 w-3.5" /> Manual Adjustment ({phaseLabel(phase)})
               </p>
               <div className="space-y-1.5">
                 <Label className="text-xs">New Score (0–100)</Label>
                 <Input
                   type="number"
-                  placeholder={`Current: ${grade.finalScore}`}
+                  placeholder={`Current: ${selected.score}`}
                   value={newScore}
                   onChange={e => setNewScore(e.target.value)}
                   min={0} max={100} step={0.1}
@@ -273,16 +335,20 @@ function GradeSheet({
 function GradeCard({
   grade,
   onAdjust,
+  phase,
 }: {
-  grade: Grade
-  onAdjust: (g: Grade) => void
+  grade: GradeRecord
+  onAdjust: (g: GradeRecord) => void
+  phase: CapstonePhase
 }) {
-  const gc = gradeColor(grade.grade)
-  const sc = statusConfig(grade.status)
+  const selected = grade[phase]
+  const gc = gradeColor(selected.grade)
+  const sc = statusConfig(selected.status)
   const eScores = grade.evaluatorScores ?? [35, 38, 32]
   const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
-  const aScore  = grade.advisorScore      ?? 28
-  const dScore  = grade.documentationScore ?? 25
+  const aScore  = grade.advisorScore ?? 28
+  const evaluatorPercent = toPercent((eAvg / 40) * 100)
+  const advisorPercent = toPercent((aScore / 30) * 100)
 
   return (
     <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20 space-y-4">
@@ -297,12 +363,12 @@ function GradeCard({
           </Avatar>
           <div className="min-w-0">
             <p className="font-semibold truncate">{grade.studentName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{grade.type} — {grade.updatedAt}</p>
+            <p className="text-xs text-muted-foreground capitalize">{phaseLabel(phase)} • {grade.type}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div className={`rounded-xl px-3 py-1 border text-center min-w-[3rem] ${gc}`}>
-            <p className="text-base font-bold leading-none">{grade.grade}</p>
+            <p className="text-base font-bold leading-none">{selected.grade}</p>
           </div>
           <Badge variant="outline" className={`text-xs ${sc.cls}`}>{sc.label}</Badge>
         </div>
@@ -311,25 +377,32 @@ function GradeCard({
       {/* Score + bar */}
       <div className="space-y-1.5">
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Final score</span>
-          <span className="font-bold text-primary">{grade.finalScore}%</span>
+          <span className="text-muted-foreground">{phaseLabel(phase)} score</span>
+          <span className="font-bold text-primary">{selected.score}%</span>
         </div>
-        <Progress value={grade.finalScore} className="h-1.5" />
+        <Progress value={selected.score} className="h-1.5" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-center text-xs">
+        <div className="rounded-lg bg-muted/40 py-1.5">
+          <p className="text-muted-foreground">Capstone I</p>
+          <p className="font-semibold">{grade.capstone1.score}% • {grade.capstone1.grade}</p>
+        </div>
+        <div className="rounded-lg bg-muted/40 py-1.5">
+          <p className="text-muted-foreground">Capstone II</p>
+          <p className="font-semibold">{grade.capstone2.score}% • {grade.capstone2.grade}</p>
+        </div>
       </div>
 
       {/* Mini breakdown */}
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="grid grid-cols-2 gap-2 text-center text-xs">
         <div className="rounded-lg bg-muted/40 py-1.5">
-          <p className="text-muted-foreground">Evaluators</p>
-          <p className="font-semibold">{eAvg.toFixed(0)}/40</p>
+          <p className="text-muted-foreground">Evaluators (80%)</p>
+          <p className="font-semibold">{evaluatorPercent.toFixed(1)}%</p>
         </div>
         <div className="rounded-lg bg-muted/40 py-1.5">
-          <p className="text-muted-foreground">Advisor</p>
-          <p className="font-semibold">{aScore}/30</p>
-        </div>
-        <div className="rounded-lg bg-muted/40 py-1.5">
-          <p className="text-muted-foreground">Docs</p>
-          <p className="font-semibold">{dScore}/30</p>
+          <p className="text-muted-foreground">Advisor (20%)</p>
+          <p className="font-semibold">{advisorPercent.toFixed(1)}%</p>
         </div>
       </div>
 
@@ -352,11 +425,13 @@ function GradeCard({
 function PublishDialog({
   open,
   provisionalCount,
+  phase,
   onClose,
   onPublish,
 }: {
   open: boolean
   provisionalCount: number
+  phase: CapstonePhase
   onClose: () => void
   onPublish: (days: string) => void
 }) {
@@ -375,10 +450,10 @@ function PublishDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileCheck className="h-5 w-5 text-primary" /> Publish Provisional Grades
+            <FileCheck className="h-5 w-5 text-primary" /> Publish {phaseLabel(phase)} Provisional Grades
           </DialogTitle>
           <DialogDescription>
-            {provisionalCount} provisional grade{provisionalCount !== 1 ? 's' : ''} will be published as final.
+            {provisionalCount} provisional {phaseLabel(phase)} grade{provisionalCount !== 1 ? 's' : ''} will be published as final.
             Students will be notified.
           </DialogDescription>
         </DialogHeader>
@@ -401,7 +476,6 @@ function PublishDialog({
             <ul className="space-y-1 text-muted-foreground text-xs list-disc list-inside">
               <li>All evaluator scores have been submitted</li>
               <li>Advisor scores are complete</li>
-              <li>Documentation scores are recorded</li>
               <li>No pending complaint reviews remain</li>
             </ul>
           </div>
@@ -423,47 +497,54 @@ function PublishDialog({
 
 /* ─── Page ────────────────────────────────────────────────────────────── */
 export default function GradeManagementPage() {
-  const [localGrades, setLocalGrades]         = useState<Grade[]>(mockGrades)
-  const [sheetGrade, setSheetGrade]           = useState<Grade | null>(null)
+  const [localGrades, setLocalGrades]         = useState<GradeRecord[]>(() => mockGrades.map(mapGradeToRecord))
+  const [sheetGrade, setSheetGrade]           = useState<GradeRecord | null>(null)
   const [sheetOpen, setSheetOpen]             = useState(false)
   const [publishOpen, setPublishOpen]         = useState(false)
+  const [selectedCapstone, setSelectedCapstone] = useState<CapstonePhase>('capstone1')
   const [search, setSearch]                   = useState('')
   const [statusFilter, setStatusFilter]       = useState('all')
   const [typeFilter, setTypeFilter]           = useState('all')
   const [recalcLoading, setRecalcLoading]     = useState(false)
 
   /* ── Derived ── */
-  const provisional  = localGrades.filter(g => g.status === 'provisional')
-  const finalised    = localGrades.filter(g => g.status === 'final')
+  const provisional  = localGrades.filter(g => g[selectedCapstone].status === 'provisional')
+  const finalised    = localGrades.filter(g => g[selectedCapstone].status === 'final')
   const avgScore     = localGrades.length > 0
-    ? (localGrades.reduce((s, g) => s + g.finalScore, 0) / localGrades.length).toFixed(1)
+    ? (localGrades.reduce((s, g) => s + g[selectedCapstone].score, 0) / localGrades.length).toFixed(1)
     : '0.0'
-  const aGrades      = localGrades.filter(g => ['A+', 'A', 'A-'].includes(g.grade)).length
+  const aGrades      = localGrades.filter(g => ['A+', 'A', 'A-'].includes(g[selectedCapstone].grade)).length
   const passRate     = localGrades.length > 0
-    ? Math.round((localGrades.filter(g => g.finalScore >= 50).length / localGrades.length) * 100)
+    ? Math.round((localGrades.filter(g => g[selectedCapstone].score >= 50).length / localGrades.length) * 100)
     : 0
 
   const filtered = useMemo(() => {
     return localGrades.filter(g => {
       const q = search.toLowerCase()
-      const matchSearch = !search || g.studentName.toLowerCase().includes(q) || g.grade.toLowerCase().includes(q)
-      const matchStatus = statusFilter === 'all' || g.status === statusFilter
+      const matchSearch = !search
+        || g.studentName.toLowerCase().includes(q)
+        || g.capstone1.grade.toLowerCase().includes(q)
+        || g.capstone2.grade.toLowerCase().includes(q)
+      const matchStatus = statusFilter === 'all' || g[selectedCapstone].status === statusFilter
       const matchType   = typeFilter   === 'all' || g.type   === typeFilter
       return matchSearch && matchStatus && matchType
     })
-  }, [localGrades, search, statusFilter, typeFilter])
+  }, [localGrades, search, statusFilter, typeFilter, selectedCapstone])
 
   const gradeDistribution = useMemo(() => {
     const dist: Record<string, number> = {
       'A+': 0, 'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0, 'C+': 0, 'C': 0, 'C-': 0, 'F': 0,
     }
-    localGrades.forEach(g => { if (g.grade in dist) dist[g.grade]++ })
+    localGrades.forEach(g => {
+      const letter = g[selectedCapstone].grade
+      if (letter in dist) dist[letter]++
+    })
     return Object.entries(dist).map(([grade, count]) => ({
       grade,
       count,
       pct: localGrades.length > 0 ? Math.round((count / localGrades.length) * 100) : 0,
     }))
-  }, [localGrades])
+  }, [localGrades, selectedCapstone])
 
   /* ── Actions ── */
   const handleRecalculate = async () => {
@@ -472,33 +553,67 @@ export default function GradeManagementPage() {
     setLocalGrades(prev => prev.map(g => {
       const eScores = g.evaluatorScores ?? [35, 38, 32]
       const eAvg    = eScores.reduce((a, b) => a + b, 0) / eScores.length
-      const aScore  = g.advisorScore      ?? 28
-      const dScore  = g.documentationScore ?? 25
-      const score   = Math.round(((eAvg * 0.4) + (aScore * 0.3) + (dScore * 0.3)) * 10) / 10
-      return { ...g, finalScore: score, grade: scoreToGrade(score) }
+      const aScore  = g.advisorScore ?? 28
+      const evaluatorPercent = (eAvg / 40) * 100
+      const advisorPercent = (aScore / 30) * 100
+      const baseScore = toPercent((evaluatorPercent * 0.8) + (advisorPercent * 0.2))
+      const nextCapstone1 = toPercent(baseScore - 4)
+      const nextCapstone2 = toPercent(baseScore + 3)
+      return {
+        ...g,
+        capstone1: {
+          ...g.capstone1,
+          score: nextCapstone1,
+          grade: scoreToGrade(nextCapstone1),
+        },
+        capstone2: {
+          ...g.capstone2,
+          score: nextCapstone2,
+          grade: scoreToGrade(nextCapstone2),
+        },
+      }
     }))
     setRecalcLoading(false)
-    toast.success('Grades Recalculated', { description: 'All final scores have been updated.' })
+    toast.success('Grades Recalculated', { description: 'Capstone I and Capstone II scores have been updated.' })
   }
 
   const handlePublish = (days: string) => {
-    setLocalGrades(prev => prev.map(g => g.status === 'provisional' ? { ...g, status: 'final' as const } : g))
+    setLocalGrades(prev => prev.map(g => {
+      if (g[selectedCapstone].status !== 'provisional') return g
+      return {
+        ...g,
+        [selectedCapstone]: {
+          ...g[selectedCapstone],
+          status: 'final' as const,
+        },
+      }
+    }))
     toast.success('Grades Published', {
-      description: `Complaint window open for ${days} day${days !== '1' ? 's' : ''}.`,
+      description: `${phaseLabel(selectedCapstone)} complaint window open for ${days} day${days !== '1' ? 's' : ''}.`,
     })
     setPublishOpen(false)
   }
 
-  const handleAdjust = (id: string, score: number, _reason: string) => {
+  const handleAdjust = (id: string, phase: CapstonePhase, score: number, _reason: string) => {
     setLocalGrades(prev => prev.map(g =>
-      g.id === id ? { ...g, finalScore: score, grade: scoreToGrade(score), status: 'provisional' } : g
+      g.id === id
+        ? {
+            ...g,
+            [phase]: {
+              ...g[phase],
+              score,
+              grade: scoreToGrade(score),
+              status: 'provisional',
+            },
+          }
+        : g
     ))
   }
 
   const kpi = [
-    { label: 'Total Grades',    value: localGrades.length, icon: Users,        bg: 'bg-primary/10',     color: 'text-primary' },
+    { label: `${phaseLabel(selectedCapstone)} Records`, value: localGrades.length, icon: Users, bg: 'bg-primary/10', color: 'text-primary' },
     { label: 'Class Average',   value: `${avgScore}%`,     icon: Target,       bg: 'bg-primary/[0.06]', color: 'text-primary/80' },
-    { label: 'Provisional',     value: provisional.length, icon: Clock,        bg: provisional.length > 0 ? 'bg-destructive/10' : 'bg-muted', color: provisional.length > 0 ? 'text-destructive' : 'text-muted-foreground' },
+    { label: `${phaseLabel(selectedCapstone)} Provisional`, value: provisional.length, icon: Clock, bg: provisional.length > 0 ? 'bg-destructive/10' : 'bg-muted', color: provisional.length > 0 ? 'text-destructive' : 'text-muted-foreground' },
     { label: 'A Grades',        value: aGrades,            icon: Award,        bg: 'bg-muted',          color: 'text-foreground' },
   ]
 
@@ -518,7 +633,7 @@ export default function GradeManagementPage() {
               Grade Management
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Calculate, review, adjust, and publish student grades
+              Manage separate Capstone I and Capstone II grades for each student
             </p>
           </div>
         </div>
@@ -539,11 +654,18 @@ export default function GradeManagementPage() {
           {provisional.length > 0 && (
             <Button size="sm" className="gap-1.5" onClick={() => setPublishOpen(true)}>
               <FileCheck className="h-4 w-4" />
-              Publish {provisional.length} Grade{provisional.length !== 1 ? 's' : ''}
+              Publish {provisional.length} {phaseLabel(selectedCapstone)} Grade{provisional.length !== 1 ? 's' : ''}
             </Button>
           )}
         </div>
       </div>
+
+      <Tabs value={selectedCapstone} onValueChange={(value) => setSelectedCapstone(value as CapstonePhase)}>
+        <TabsList>
+          <TabsTrigger value="capstone1">Capstone I</TabsTrigger>
+          <TabsTrigger value="capstone2">Capstone II</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -568,7 +690,7 @@ export default function GradeManagementPage() {
         <div>
           <p className="text-sm font-semibold text-primary">Grade Calculation Formula</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Final Score = (Evaluator Average × 40%) + (Advisor Score × 30%) + (Documentation Score × 30%)
+            {phaseLabel(selectedCapstone)} score = (Evaluator Component × 80%) + (Advisor Component × 20%)
           </p>
         </div>
       </div>
@@ -596,7 +718,7 @@ export default function GradeManagementPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                placeholder="Search by student name or grade…"
+                      placeholder="Search by student name or capstone grade…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 h-10"
@@ -649,6 +771,7 @@ export default function GradeManagementPage() {
                 <GradeCard
                   key={g.id}
                   grade={g}
+                  phase={selectedCapstone}
                   onAdjust={grade => { setSheetGrade(grade); setSheetOpen(true) }}
                 />
                           ))}
@@ -664,9 +787,9 @@ export default function GradeManagementPage() {
             <Card className="border-none shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-primary" /> Grade Distribution
+                  <BarChart3 className="h-4 w-4 text-primary" /> {phaseLabel(selectedCapstone)} Grade Distribution
                 </CardTitle>
-                <CardDescription>Visual breakdown of all letter grades</CardDescription>
+                <CardDescription>Visual breakdown of {phaseLabel(selectedCapstone)} letter grades</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {gradeDistribution.map(({ grade, count, pct }) => (
@@ -699,16 +822,16 @@ export default function GradeManagementPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {[
-                  { label: 'Highest Score', value: `${Math.max(...localGrades.map(g => g.finalScore))}%` },
-                  { label: 'Lowest Score',  value: `${Math.min(...localGrades.map(g => g.finalScore))}%` },
+                  { label: 'Highest Score', value: `${Math.max(...localGrades.map(g => g[selectedCapstone].score))}%` },
+                  { label: 'Lowest Score',  value: `${Math.min(...localGrades.map(g => g[selectedCapstone].score))}%` },
                   {
                     label: 'Median Score',
                     value: (() => {
-                      const s = [...localGrades].sort((a, b) => a.finalScore - b.finalScore)
+                      const s = [...localGrades].sort((a, b) => a[selectedCapstone].score - b[selectedCapstone].score)
                       const m = Math.floor(s.length / 2)
                       return s.length % 2 === 0
-                        ? `${((s[m - 1].finalScore + s[m].finalScore) / 2).toFixed(1)}%`
-                        : `${s[m].finalScore.toFixed(1)}%`
+                        ? `${((s[m - 1][selectedCapstone].score + s[m][selectedCapstone].score) / 2).toFixed(1)}%`
+                        : `${s[m][selectedCapstone].score.toFixed(1)}%`
                     })(),
                   },
                   { label: 'Class Average', value: `${avgScore}%` },
@@ -733,8 +856,8 @@ export default function GradeManagementPage() {
             {[
               {
                 icon: RefreshCw,
-                title: 'Recalculate All Grades',
-                desc: 'Re-run the grade formula for all students using current component scores.',
+                title: `Recalculate All ${phaseLabel(selectedCapstone)} Grades`,
+                desc: `Re-run the grade formula for all students in ${phaseLabel(selectedCapstone)} using current component scores.`,
                 cta: 'Recalculate',
                 action: handleRecalculate,
                 loading: recalcLoading,
@@ -742,8 +865,8 @@ export default function GradeManagementPage() {
               },
               {
                 icon: FileCheck,
-                title: 'Publish Provisional Grades',
-                desc: `Finalise ${provisional.length} provisional grade${provisional.length !== 1 ? 's' : ''} and open the student complaint window.`,
+                title: `Publish ${phaseLabel(selectedCapstone)} Provisional Grades`,
+                desc: `Finalise ${provisional.length} provisional ${phaseLabel(selectedCapstone)} grade${provisional.length !== 1 ? 's' : ''} and open the student complaint window.`,
                 cta: 'Publish Grades',
                 action: () => setPublishOpen(true),
                 loading: false,
@@ -833,7 +956,6 @@ export default function GradeManagementPage() {
                 {[
                   { label: 'Evaluator scores submitted', ok: true },
                   { label: 'Advisor scores recorded',    ok: true },
-                  { label: 'Documentation scored',       ok: true },
                   { label: 'No unresolved complaints',   ok: false },
                 ].map(item => (
                   <div key={item.label} className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm border ${
@@ -989,12 +1111,14 @@ export default function GradeManagementPage() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onAdjust={handleAdjust}
+        phase={selectedCapstone}
       />
 
       {/* Publish dialog */}
       <PublishDialog
         open={publishOpen}
         provisionalCount={provisional.length}
+        phase={selectedCapstone}
         onClose={() => setPublishOpen(false)}
         onPublish={handlePublish}
       />

@@ -282,7 +282,7 @@ interface AssignmentDialogProps {
 
 function AssignmentDialog({ project, advisors, onClose, onAssign, open }: AssignmentDialogProps) {
   const [selectedAdvisor, setSelectedAdvisor] = useState(project.advisorId || '')
-  const [selectedEvaluators, setSelectedEvaluators] = useState<string[]>(project.evaluatorIds || [])
+  const [selectedEvaluatorsOverride, setSelectedEvaluatorsOverride] = useState<string[] | null>(null)
   const [activeEvaluatorId, setActiveEvaluatorId] = useState('')
   const initializedAssignedEvaluatorsRef = React.useRef<string | null>(null)
   const removeEvaluatorMutation = useRemoveProjectEvaluator()
@@ -315,24 +315,37 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
     return new Map(evaluatorOptions.map((evaluator) => [evaluator.userId, evaluator]))
   }, [evaluatorOptions])
 
-  const activeEvaluator = activeEvaluatorId ? evaluatorByUserId.get(activeEvaluatorId) : null
+  const assignedEvaluatorIds = useMemo(
+    () => (assignedEvaluatorsQuery.data?.evaluators ?? []).map((evaluator) => evaluator.userId).filter(Boolean),
+    [assignedEvaluatorsQuery.data?.evaluators],
+  )
 
-  const prevAdvisorRef = React.useRef(project.advisorId || '')
-  const prevEvaluatorsRef = React.useRef(project.evaluatorIds || [])
-
-  useEffect(() => {
-    prevAdvisorRef.current = project.advisorId || ''
-    prevEvaluatorsRef.current = project.evaluatorIds || []
-  }, [project.advisorId, project.evaluatorIds])
-
-  useEffect(() => {
-    if (open) {
-      initializedAssignedEvaluatorsRef.current = null
-      setSelectedAdvisor(prevAdvisorRef.current)
-      setSelectedEvaluators(prevEvaluatorsRef.current)
-      setActiveEvaluatorId(prevEvaluatorsRef.current[0] ?? '')
+  const selectedEvaluators = useMemo(() => {
+    if (selectedEvaluatorsOverride !== null) {
+      return selectedEvaluatorsOverride
     }
-  }, [open])
+
+    if (!open) {
+      return project.evaluatorIds || []
+    }
+
+    if (project.projectId && !assignedEvaluatorsQuery.isLoading && !assignedEvaluatorsQuery.error) {
+      return assignedEvaluatorIds
+    }
+
+    return project.evaluatorIds || []
+  }, [assignedEvaluatorsQuery.error, assignedEvaluatorsQuery.isLoading, assignedEvaluatorIds, open, project.evaluatorIds, project.projectId, selectedEvaluatorsOverride])
+
+  const resolvedActiveEvaluatorId = useMemo(() => {
+    if (activeEvaluatorId && evaluatorByUserId.has(activeEvaluatorId)) {
+      return activeEvaluatorId
+    }
+
+    const firstSelected = selectedEvaluators.find((evaluatorId) => evaluatorByUserId.has(evaluatorId))
+    return firstSelected ?? evaluatorOptions[0]?.userId ?? ''
+  }, [activeEvaluatorId, evaluatorByUserId, evaluatorOptions, selectedEvaluators])
+
+  const activeEvaluator = resolvedActiveEvaluatorId ? evaluatorByUserId.get(resolvedActiveEvaluatorId) : null
 
   useEffect(() => {
     if (!open) return
@@ -345,29 +358,13 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
       return
     }
     initializedAssignedEvaluatorsRef.current = signature
-
-    const assignedIds = (assignedEvaluatorsQuery.data?.evaluators ?? []).map((evaluator) => evaluator.userId).filter(Boolean)
-    setSelectedEvaluators(assignedIds)
-    setActiveEvaluatorId(assignedIds[0] ?? '')
   }, [assignedEvaluatorsQuery.data?.evaluators, assignedEvaluatorsQuery.error, assignedEvaluatorsQuery.isLoading, open, project.projectId])
 
-  useEffect(() => {
-    if (!evaluatorOptions.length) {
-      return
-    }
-
-    if (activeEvaluatorId && evaluatorByUserId.has(activeEvaluatorId)) {
-      return
-    }
-
-    const firstSelected = selectedEvaluators.find((evaluatorId) => evaluatorByUserId.has(evaluatorId))
-    setActiveEvaluatorId(firstSelected ?? evaluatorOptions[0]?.userId ?? '')
-  }, [activeEvaluatorId, evaluatorByUserId, evaluatorOptions, selectedEvaluators])
-
   const toggleEvaluator = (id: string) => {
-    setSelectedEvaluators(prev =>
-      prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]
-    )
+    setSelectedEvaluatorsOverride(prev => {
+      const base = prev ?? selectedEvaluators
+      return base.includes(id) ? base.filter(e => e !== id) : [...base, id]
+    })
 
     setActiveEvaluatorId(id)
   }
@@ -429,14 +426,10 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
                     key={evaluator.id}
                     className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Avatar className="h-7 w-7 shrink-0">
-                        {display.avatarUrl ? (
-                          <AvatarImage src={display.avatarUrl} alt={display.name} />
-                        ) : null}
-                        <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
-                          {initialsFromName(display.name)}
-                        </AvatarFallback>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarImage src={display.avatarUrl ?? undefined} alt={display.name} />
+                        <AvatarFallback>{display.name.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{display.name}</p>
@@ -461,7 +454,7 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
                           })
                           const refreshed = await assignedEvaluatorsQuery.refetch()
                           const refreshedIds = (refreshed.data?.evaluators ?? []).map((e) => e.userId).filter(Boolean)
-                          setSelectedEvaluators(refreshedIds)
+                          setSelectedEvaluatorsOverride(refreshedIds)
                           setActiveEvaluatorId(refreshedIds[0] ?? '')
                           toast.success('Evaluator removed')
                         } catch (error) {
@@ -488,16 +481,16 @@ function AssignmentDialog({ project, advisors, onClose, onAssign, open }: Assign
               <SelectValue placeholder="Select advisor" />
             </SelectTrigger>
             <SelectContent>
-              {advisors.map(a => (
-                <SelectItem key={a.id} value={a.id}>
+              {advisors.map((advisor) => (
+                <SelectItem key={advisor.id} value={advisor.id}>
                   <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6 shrink-0">
-                      {a.avatarUrl ? <AvatarImage src={a.avatarUrl} alt={a.name} /> : null}
-                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                        {a.name.charAt(0)}
+                    <Avatar className="h-5 w-5 shrink-0">
+                      {advisor.avatarUrl ? <AvatarImage src={advisor.avatarUrl} alt={advisor.name} /> : null}
+                      <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+                        {initialsFromName(advisor.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{a.name}</span>
+                    <span className="truncate">{advisor.name}</span>
                   </div>
                 </SelectItem>
               ))}
@@ -835,6 +828,7 @@ function ProjectCard({
 export default function ProjectsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
+  const departmentId = user?.departmentId ?? user?.department?.id ?? null
   const [assignmentOverrides, setAssignmentOverrides] = useState<Record<string, AssignmentOverride>>({})
   const [dialogProject, setDialogProject] = useState<AssignmentProject | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -843,7 +837,8 @@ export default function ProjectsPage() {
   const [advisorFilter, setAdvisorFilter] = useState('all')
   const [projectPage, setProjectPage] = useState(1)
   const [advisorWorkloadPage, setAdvisorWorkloadPage] = useState(1)
-  const departmentId = user?.departmentId ?? user?.department?.id ?? null
+  const [activeEvaluatorId, setActiveEvaluatorId] = useState('')
+  const initializedAssignedEvaluatorsRef = React.useRef<string | null>(null)
   const overviewQuery = useDepartmentProjectsOverview({
     departmentId,
     enabled: Boolean(accessToken) && Boolean(departmentId),
@@ -910,10 +905,10 @@ export default function ProjectsPage() {
     }
 
     const normalizedAdvisorId = advisorId.trim()
-    const currentAdvisorId = String(dialogProject.advisorId ?? "").trim()
+    const currentAdvisorId = String(dialogProject.advisorId ?? '').trim()
     const shouldUpdateAdvisor = Boolean(normalizedAdvisorId) && normalizedAdvisorId !== currentAdvisorId
 
-    const advisor = advisors.find(u => u.id === normalizedAdvisorId)
+    const advisor = advisors.find((u) => u.id === normalizedAdvisorId)
     const advisorName = advisor?.name || dialogProject.advisorName || 'Unknown'
     const advisorAvatarUrl = advisor?.avatarUrl ?? dialogProject.advisorAvatarUrl ?? null
 
@@ -925,9 +920,8 @@ export default function ProjectsPage() {
           .filter((id) => id !== normalizedAdvisorId)
       )
     )
-
-    const normalizedEvaluatorProfiles = evaluatorProfiles.filter((profile) =>
-      normalizedEvaluatorIds.includes(profile.userId)
+    const normalizedEvaluatorProfiles = evaluatorProfiles.filter(
+      (evaluator) => normalizedEvaluatorIds.includes(evaluator.userId)
     )
 
     if (shouldUpdateAdvisor) {
@@ -956,7 +950,6 @@ export default function ProjectsPage() {
         description: error instanceof Error ? error.message : 'Please try again.',
       })
 
-      // If advisor update already succeeded, keep the dialog open so the user can retry evaluator update.
       setAssignmentOverrides((prev) => ({
         ...prev,
         [dialogProject.id]: {
@@ -970,7 +963,6 @@ export default function ProjectsPage() {
       return
     }
 
-    // Recommended: refresh from server after PUT (always correct)
     let refreshedEvaluatorIds = normalizedEvaluatorIds
     let refreshedEvaluatorProfiles = normalizedEvaluatorProfiles
     try {
@@ -987,7 +979,7 @@ export default function ProjectsPage() {
           return {
             id: assignment.id,
             userId: assignment.userId,
-            departmentId: assignment.departmentId ?? dialogProject.projectId,
+            departmentId: assignment.departmentId ?? dialogProject.projectId ?? '',
             name,
             email: assignment.user?.email?.trim() || 'No email available',
             avatarUrl: assignment.user?.avatarUrl ?? null,
@@ -998,7 +990,7 @@ export default function ProjectsPage() {
         })
         .filter((evaluator) => Boolean(evaluator.userId))
     } catch {
-      // If refresh fails, fall back to what we just submitted.
+      // If refresh fails, fall back to submitted values.
     }
 
     setAssignmentOverrides((prev) => ({

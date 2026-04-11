@@ -191,7 +191,6 @@ export function PwaInstallPrompt() {
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               {/* App icon from the PWA manifest icon set */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/icons/icon-192x192.png"
                 alt="Academia app icon"

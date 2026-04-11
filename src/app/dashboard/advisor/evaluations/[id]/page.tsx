@@ -1,4 +1,6 @@
-import { AdvisorEvaluationDetailPage } from "@/components/dashboard/advisor/evaluation-detail-page"
+import { redirect } from "next/navigation"
+
+import { getGroupById } from "@/components/dashboard/advisor/capstone-evaluation-data"
 
 interface PageProps {
   params: {
@@ -7,6 +9,12 @@ interface PageProps {
 }
 
 export default function Page({ params }: PageProps) {
-  return <AdvisorEvaluationDetailPage evaluationId={params.id} />
+  const group = getGroupById(params.id)
+
+  if (!group) {
+    redirect("/dashboard/advisor/evaluations")
+  }
+
+  redirect(`/dashboard/advisor/evaluations/${group.stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.id}/detail`)
 }
 
