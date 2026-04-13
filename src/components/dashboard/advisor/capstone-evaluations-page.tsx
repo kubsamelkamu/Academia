@@ -39,11 +39,14 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import type { AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
+import { useAdvisorProjectEvaluationDashboard } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
 
 type CapstoneStage = "Capstone I" | "Capstone II"
 
 type GroupRow = {
   id: string
+  projectId: string
   groupName: string
   projectTitle: string
   stage: CapstoneStage
@@ -54,52 +57,30 @@ type GroupRow = {
   criteria: string[]
 }
 
-const GROUPS: GroupRow[] = [
-  {
-    id: "grp-1",
-    groupName: "AI Research Group",
-    projectTitle: "Machine Learning applied to Smart Grids",
-    stage: "Capstone I",
-    progress: 74,
-    pending: 2,
-    evaluated: 1,
-    dueLabel: "Due May 17",
-    criteria: ["Problem statement", "Proposal quality", "Methodology", "SDD readiness"],
-  },
-  {
-    id: "grp-2",
-    groupName: "Blockchain Team",
-    projectTitle: "Blockchain for Supply Chain Transparency",
-    stage: "Capstone II",
-    progress: 96,
-    pending: 0,
-    evaluated: 3,
-    dueLabel: "Published",
-    criteria: ["Implementation completeness", "Testing evidence", "Final results", "Defense readiness"],
-  },
-  {
-    id: "grp-3",
-    groupName: "IoT Builders",
-    projectTitle: "IoT Home Automation Prototype",
-    stage: "Capstone I",
-    progress: 61,
-    pending: 2,
-    evaluated: 1,
-    dueLabel: "Due May 19",
-    criteria: ["Scope definition", "Architecture design", "Feasibility", "Advisor readiness"],
-  },
-  {
-    id: "grp-4",
-    groupName: "Cloud Scale Team",
-    projectTitle: "Cloud-native Microservices Architecture",
-    stage: "Capstone II",
-    progress: 67,
-    pending: 2,
-    evaluated: 0,
-    dueLabel: "Due May 22",
-    criteria: ["Deployment quality", "System tests", "Performance results", "Final documentation"],
-  },
-]
+function toApiStage(stage: CapstoneStage): AdvisorEvaluationDashboardStage {
+  return stage === "Capstone I" ? "CAPSTONE_I" : "CAPSTONE_II"
+}
+
+function criteriaForStage(stage: CapstoneStage) {
+  return stage === "Capstone I"
+    ? ["Proposal clarity", "SDD readiness", "Problem definition", "Advisor approval"]
+    : ["Implementation completeness", "Testing evidence", "Final results", "Defense readiness"]
+}
+
+function formatDueLabel(submittedAt: string | null, nextAction: string) {
+  if (submittedAt) {
+    const submittedDate = new Date(submittedAt)
+    if (!Number.isNaN(submittedDate.getTime())) {
+      return `Submitted ${submittedDate.toLocaleDateString()}`
+    }
+  }
+
+  if (nextAction === "START_EVALUATION") {
+    return "Ready to evaluate"
+  }
+
+  return "Awaiting update"
+}
 
 function stageConfig(stage: CapstoneStage) {
   if (stage === "Capstone I") {
@@ -107,7 +88,7 @@ function stageConfig(stage: CapstoneStage) {
       accent: "text-primary",
       chip: "bg-primary/10 text-primary border-primary/20",
       subtitle: "Proposal, scope, and SDD-oriented evaluation",
-      cta: "Open Capstone I",
+      cta: "Evaluate Capstone I",
     }
   }
 
@@ -115,12 +96,14 @@ function stageConfig(stage: CapstoneStage) {
     accent: "text-emerald-600",
     chip: "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800",
     subtitle: "Implementation, testing, and final defense evaluation",
-    cta: "Open Capstone II",
+    cta: "Evaluate Capstone II",
   }
 }
 
 export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage }) {
   const router = useRouter()
+  const dashboardStage = toApiStage(stage)
+  const evaluationDashboardQuery = useAdvisorProjectEvaluationDashboard(dashboardStage)
   const [search, setSearch] = React.useState("")
   const [quickFeedbackOpen, setQuickFeedbackOpen] = React.useState(false)
   const [revisionOpen, setRevisionOpen] = React.useState(false)
@@ -130,13 +113,28 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
   const [revisionDeadline, setRevisionDeadline] = React.useState("")
 
   const cfg = stageConfig(stage)
+  const stageCriteria = criteriaForStage(stage)
   const groups = React.useMemo(() => {
-    return GROUPS.filter((group) => group.stage === stage && (
+    const projectGroups = evaluationDashboardQuery.data?.projectGroups ?? []
+    const mappedGroups: GroupRow[] = projectGroups.map((group) => ({
+      id: group.group.id,
+      projectId: group.projectId,
+      groupName: group.group.name,
+      projectTitle: group.projectTitle,
+      stage,
+      progress: group.milestones.progressPercent,
+      pending: group.evaluation.studentsPendingEvaluation,
+      evaluated: group.evaluation.studentsEvaluated,
+      dueLabel: formatDueLabel(group.evaluation.submittedAt, group.nextAction),
+      criteria: stageCriteria,
+    }))
+
+    return mappedGroups.filter((group) => (
       !search
       || group.groupName.toLowerCase().includes(search.toLowerCase())
       || group.projectTitle.toLowerCase().includes(search.toLowerCase())
     ))
-  }, [search, stage])
+  }, [evaluationDashboardQuery.data?.projectGroups, search, stage, stageCriteria])
 
   const totalPending = groups.reduce((sum, group) => sum + group.pending, 0)
   const avgProgress = groups.length > 0 ? Math.round(groups.reduce((sum, group) => sum + group.progress, 0) / groups.length) : 0
@@ -176,6 +174,17 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
     })
   }
 
+  const handleRefresh = async () => {
+    const result = await evaluationDashboardQuery.refetch()
+
+    if (result.error) {
+      toast.error("Failed to refresh stage data")
+      return
+    }
+
+    toast.success("Stage data refreshed")
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -196,7 +205,7 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
           <Button variant="outline" size="sm" onClick={() => router.push(stage === "Capstone I" ? "/dashboard/advisor/evaluations/capstone-ii" : "/dashboard/advisor/evaluations/capstone-i") }>
             Switch to {stage === "Capstone I" ? "Capstone II" : "Capstone I"}
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh} disabled={evaluationDashboardQuery.isFetching}>
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
         </div>
@@ -238,10 +247,7 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
           <CardDescription>What to verify before marking a group complete</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {(stage === "Capstone I"
-            ? ["Proposal clarity", "SDD readiness", "Problem definition", "Advisor approval"]
-            : ["Implementation completeness", "Testing evidence", "Final results", "Defense readiness"]
-          ).map((item) => (
+          {stageCriteria.map((item) => (
             <Badge key={item} variant="outline" className={`${cfg.chip} px-3 py-1`}>
               {item}
             </Badge>
@@ -282,19 +288,6 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                 <Progress value={group.progress} className="h-2" />
               </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Pending / Evaluated</span>
-                <span className="font-medium">{group.pending} / {group.evaluated}</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {group.criteria.map((criterion) => (
-                  <Badge key={criterion} variant="secondary" className="text-xs">
-                    {criterion}
-                  </Badge>
-                ))}
-              </div>
-
               <div className="flex items-center justify-between gap-3 pt-1">
                 <p className="text-xs text-muted-foreground">{group.dueLabel}</p>
                 <DropdownMenu>
@@ -306,24 +299,17 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.id}/detail`}>
+                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/detail`}>
                         <Eye className="h-4 w-4 mr-2" />
                         View Detail
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.id}/open`}>
+                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/open`}>
                         <PlayCircle className="h-4 w-4 mr-2" />
                         {cfg.cta}
                       </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => openQuickFeedback(group.id)}>
-                      Quick Feedback
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openRequestRevision(group.id)}>
-                      Request Revision
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

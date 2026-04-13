@@ -256,6 +256,191 @@ export interface AdvisorSummary {
   projects: AdvisorSummaryProject[]
 }
 
+export type AdvisorEvaluationDashboardStage = "CAPSTONE_I" | "CAPSTONE_II"
+
+export interface AdvisorProjectEvaluationDashboardSummary {
+  totalProjectGroups: number
+  totalStudents: number
+  studentsEvaluated: number
+  studentsPendingEvaluation: number
+  overallMilestoneProgressPercent: number
+  fullyEvaluatedProjectGroups: number
+  projectGroupsPendingEvaluation: number
+}
+
+export interface AdvisorProjectEvaluationDashboardProjectGroup {
+  projectId: string
+  projectTitle: string
+  projectStatus: string
+  group: {
+    id: string
+    name: string
+    status: string
+    totalMembers: number
+  }
+  evaluation: {
+    stage: AdvisorEvaluationDashboardStage
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  milestones: {
+    total: number
+    approved: number
+    submitted: number
+    pending: number
+    rejected: number
+    progressPercent: number
+  }
+  nextAction: string
+}
+
+export interface AdvisorProjectEvaluationDashboard {
+  stage: AdvisorEvaluationDashboardStage
+  generatedAt: string
+  summary: AdvisorProjectEvaluationDashboardSummary
+  projectGroups: AdvisorProjectEvaluationDashboardProjectGroup[]
+}
+
+export interface AdvisorProjectEvaluationDetail {
+  stage: AdvisorEvaluationDashboardStage
+  generatedAt: string
+  project: {
+    id: string
+    title: string
+    status: string
+    createdAt: string
+  }
+  group: {
+    id: string
+    name: string
+    status: string
+    objectives: string
+    technologies: string[]
+    totalMembers: number
+    leader: {
+      id: string
+      firstName: string
+      lastName: string
+      fullName: string
+      email: string
+      avatarUrl: string | null
+    } | null
+  }
+  evaluation: {
+    stage: AdvisorEvaluationDashboardStage
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  milestoneProgress: {
+    total: number
+    approved: number
+    submitted: number
+    pending: number
+    rejected: number
+    progressPercent: number
+  }
+  milestones: Array<{
+    id: string
+    title: string
+    description: string
+    dueDate: string
+    status: string
+    submittedAt: string | null
+    approvedSubmission: {
+      id: string
+      fileName: string
+      mimeType: string
+      fileUrl: string
+      approvedAt: string
+      approvedBy: {
+        id: string
+        firstName: string
+        lastName: string
+        fullName: string
+        email: string
+      }
+    } | null
+  }>
+  students: Array<{
+    userId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+    status: string
+    studentProfile: {
+      id?: string
+      studentId?: string | null
+    } | null
+    evaluation: {
+      status: string
+      score: number | null
+      comment: string | null
+      savedAt: string | null
+    }
+  }>
+}
+
+export interface SaveAdvisorProjectEvaluationDraftStudentInput {
+  studentUserId: string
+  score: number
+  comment: string
+}
+
+export interface SaveAdvisorProjectEvaluationDraftInput {
+  students: SaveAdvisorProjectEvaluationDraftStudentInput[]
+}
+
+export interface SaveAdvisorProjectEvaluationDraftResult {
+  message: string
+  stage: AdvisorEvaluationDashboardStage
+  projectId: string
+  evaluation: {
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  savedStudents: Array<{
+    studentUserId: string
+    score: number
+    comment: string
+    status: string
+  }>
+}
+
+interface AdvisorProjectEvaluationDashboardEnvelope {
+  success: boolean
+  message: string
+  data: AdvisorProjectEvaluationDashboard
+  timestamp: string
+}
+
+interface AdvisorProjectEvaluationDetailEnvelope {
+  success: boolean
+  message: string
+  data: AdvisorProjectEvaluationDetail
+  timestamp: string
+}
+
+interface SaveAdvisorProjectEvaluationDraftEnvelope {
+  success: boolean
+  message: string
+  data: SaveAdvisorProjectEvaluationDraftResult
+  timestamp: string
+}
+
 // ── /projects/advisors/me/projects ──────────────────────────────────────────
 
 interface ApiGroupMember {
@@ -519,6 +704,101 @@ const mockOverviewData: AdvisorDashboardOverview = {
 export async function getAdvisorSummary(): Promise<AdvisorSummary> {
   const response = await apiClient.get<AdvisorSummary>("/projects/advisors/me/summary")
   return response.data
+}
+
+export async function getAdvisorProjectEvaluationDashboard(
+  stage: AdvisorEvaluationDashboardStage
+): Promise<AdvisorProjectEvaluationDashboard> {
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.get<AdvisorProjectEvaluationDashboardEnvelope | AdvisorProjectEvaluationDashboard>(
+    "/project-evaluations/advisors/me/dashboard",
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function getAdvisorProjectEvaluationDetail(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage
+): Promise<AdvisorProjectEvaluationDetail> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.get<AdvisorProjectEvaluationDetailEnvelope | AdvisorProjectEvaluationDetail>(
+    `/project-evaluations/advisors/me/projects/${encodeURIComponent(trimmedProjectId)}`,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function saveAdvisorProjectEvaluationDraft(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage,
+  input: SaveAdvisorProjectEvaluationDraftInput
+): Promise<SaveAdvisorProjectEvaluationDraftResult> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  if (!input.students.length) {
+    throw new Error("at least one student evaluation is required")
+  }
+
+  const response = await apiClient.post<SaveAdvisorProjectEvaluationDraftEnvelope | SaveAdvisorProjectEvaluationDraftResult>(
+    `/project-evaluations/advisors/me/projects/${encodeURIComponent(trimmedProjectId)}/draft`,
+    input,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
 }
 
 export async function listAdvisorProjectGroupMeetings(

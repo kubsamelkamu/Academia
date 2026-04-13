@@ -90,11 +90,15 @@ function formatOptionalDate(value?: string | null) {
   return date.toLocaleDateString()
 }
 
-function formatAdvisorName(advisor: {
+function formatAdvisorName(advisor?: {
   firstName?: string | null
   lastName?: string | null
   email?: string | null
-}) {
+} | null) {
+  if (!advisor) {
+    return "Unassigned"
+  }
+
   const fullName = [advisor.firstName, advisor.lastName].filter(Boolean).join(" ").trim()
   return fullName || advisor.email || "Unassigned"
 }
@@ -184,7 +188,7 @@ function mapProjectDetailToActiveProject(detail: ProjectDetail, fallback: Projec
     ...fallback,
     title: detail.title || fallback.title,
     groupName: detail.proposal?.projectGroup?.name ?? fallback.groupName,
-    advisorName: formatAdvisorName(detail.advisor ?? {}),
+    advisorName: formatAdvisorName(detail.advisor),
     status: detail.status.toLowerCase().replace(/_/g, "-") as Project["status"],
     progress: fallback.progress,
     startDate: detail.createdAt ?? fallback.startDate,
@@ -198,9 +202,6 @@ function mapProjectDetailToActiveProject(detail: ProjectDetail, fallback: Projec
     technologies,
     milestones,
   }
-}
-
-type FinalApprovedMilestoneFile = {
 }
 
 // Helper Components for better reusability and styling
