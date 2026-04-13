@@ -305,6 +305,72 @@ export interface AdvisorProjectEvaluationDashboard {
   projectGroups: AdvisorProjectEvaluationDashboardProjectGroup[]
 }
 
+export interface EvaluatorProjectEvaluationDashboardSummary {
+  totalAssignedProjectGroups: number
+  totalAssignedStudents: number
+  studentsEvaluated: number
+  studentsPendingEvaluation: number
+  averageScoreGiven: number
+  pendingProjectGroups: number
+  completedProjectGroups: number
+  overallMilestoneProgressPercent: number
+}
+
+export interface EvaluatorProjectEvaluationDashboardProjectGroup {
+  projectId: string
+  projectTitle: string
+  projectStatus: string
+  group: {
+    id: string
+    name: string
+    status: string
+    technologies: string[]
+    totalMembers: number
+  }
+  advisor: {
+    id: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  }
+  evaluation: {
+    stage: AdvisorEvaluationDashboardStage
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    averageScoreGiven: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  milestones: {
+    total: number
+    approved: number
+    submitted: number
+    pending: number
+    rejected: number
+    progressPercent: number
+  }
+  groupMembers: Array<{
+    userId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+    evaluationStatus: string
+  }>
+}
+
+export interface EvaluatorProjectEvaluationDashboard {
+  stage: AdvisorEvaluationDashboardStage
+  generatedAt: string
+  summary: EvaluatorProjectEvaluationDashboardSummary
+  projectGroups: EvaluatorProjectEvaluationDashboardProjectGroup[]
+}
+
 export interface AdvisorProjectEvaluationDetail {
   stage: AdvisorEvaluationDashboardStage
   generatedAt: string
@@ -424,6 +490,13 @@ interface AdvisorProjectEvaluationDashboardEnvelope {
   success: boolean
   message: string
   data: AdvisorProjectEvaluationDashboard
+  timestamp: string
+}
+
+interface EvaluatorProjectEvaluationDashboardEnvelope {
+  success: boolean
+  message: string
+  data: EvaluatorProjectEvaluationDashboard
   timestamp: string
 }
 
@@ -715,6 +788,31 @@ export async function getAdvisorProjectEvaluationDashboard(
 
   const response = await apiClient.get<AdvisorProjectEvaluationDashboardEnvelope | AdvisorProjectEvaluationDashboard>(
     "/project-evaluations/advisors/me/dashboard",
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function getEvaluatorProjectEvaluationDashboard(
+  stage: AdvisorEvaluationDashboardStage
+): Promise<EvaluatorProjectEvaluationDashboard> {
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.get<EvaluatorProjectEvaluationDashboardEnvelope | EvaluatorProjectEvaluationDashboard>(
+    "/project-evaluations/evaluators/me/dashboard",
     {
       params: {
         stage,

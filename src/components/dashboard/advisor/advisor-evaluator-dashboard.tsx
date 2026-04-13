@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import {
   ArrowRight,
   BookOpen,
@@ -24,44 +26,284 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  mockEvaluations,
-  mockProjects,
-  formatDate,
-  type Evaluation,
-  type Project,
-} from "@/data/mockData"
-import { mockProjectTimelines } from "@/data/timelineData"
+  type AdvisorEvaluationDashboardStage,
+  getAdvisorSchedule,
+  getAdvisorSubmittedDocuments,
+} from "@/lib/api/advisor"
+import { formatDate } from "@/data/mockData"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
+import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
+import { useEvaluatorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-evaluator-project-evaluation-dashboard"
 
-import { ADVISOR_SCHEDULED_SESSIONS } from "./advisor-evaluator-scheduled-data"
 import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
 import {
-  DueBadge,
   TimelineStatusRow,
-  filterAdvisorPendingProjects,
-  timelineStatusForProject,
 } from "./advisor-evaluator-timeline"
 
 const DISPLAY_SCORE_MAX = 100
 
-function evaluationMaxScore(evaluation: Evaluation): number {
-  return (evaluation as Evaluation & { maxScore?: number }).maxScore ?? DISPLAY_SCORE_MAX
+type WorkspaceTimelineStatus = "on_track" | "at_risk" | "overdue" | "completed" | "pending"
+
+type WorkspacePendingProject = {
+  id: string
+  title: string
+  groupName: string
+  advisorName: string
+  status: string
+  progress: number
+  membersCount: number
+  documentsCount: number
+  daysRemaining: number | null
+  timelineStatus: WorkspaceTimelineStatus
+}
+
+type WorkspaceCompletedEvaluation = {
+  id: string
+  projectId: string
+  projectTitle: string
+  submittedAt: string | null
+  score: number | null
+  status: string
+}
+
+type WorkspaceScheduleSession = {
+  id: string
+  projectId: string
+  project: string
+  group: string
+  date: string
+  time: string
+  venue: string
+}
+
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function normalizeStatusToken(status?: string | null, fallback = "pending") {
+  const value = status?.trim().toLowerCase().replace(/[_\s]+/g, "-")
+  return value || fallback
+}
+
+function formatAverageScore(score: number): string {
+  return Number.isFinite(score) ? score.toFixed(1).replace(/\.0$/, "") : "0"
+}
+
+function getNextMilestoneDueDate(details: Array<{ dueDate: string; status: string }> | undefined): string | null {
+  const candidates = (details ?? [])
+    .filter((detail) => !["approved", "completed"].includes(normalizeStatusToken(detail.status)))
+    .map((detail) => detail.dueDate)
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())
+
+  return candidates[0] ?? null
+}
+
+function getDaysRemaining(isoDate: string | null): number | null {
+  if (!isoDate) return null
+
+  const dueDate = new Date(isoDate)
+  if (Number.isNaN(dueDate.getTime())) return null
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+  const diff = startOfDueDate.getTime() - startOfToday.getTime()
+
+  return Math.round(diff / 86_400_000)
+}
+
+function getTimelineStatus(progress: number, daysRemaining: number | null): WorkspaceTimelineStatus {
+  if (progress >= 100) return "completed"
+  if (daysRemaining === null) return "pending"
+  if (daysRemaining < 0) return "overdue"
+  if (daysRemaining <= 7 || progress < 35) return "at_risk"
+  return "on_track"
+}
+
+function DueSummary({ daysRemaining, projectProgress }: { daysRemaining: number | null; projectProgress: number }) {
+  if (daysRemaining === null) {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  if (projectProgress >= 100) {
+    return <span className="text-muted-foreground">Complete</span>
+  }
+
+  if (daysRemaining < 0) {
+    return <span className="font-medium text-destructive">Overdue {Math.abs(daysRemaining)}d</span>
+  }
+
+  if (daysRemaining === 0) {
+    return <span className="font-medium text-amber-600 dark:text-amber-500">Due today</span>
+  }
+
+  return <span className="text-muted-foreground">{daysRemaining}d left</span>
+}
+
+function getCompletedEvaluationStatus(submittedAt: string | null, status?: string | null) {
+  const normalized = normalizeStatusToken(status, "submitted")
+  if (submittedAt || ["submitted", "completed", "reviewed"].includes(normalized)) {
+    return "reviewed"
+  }
+
+  return "submitted"
+}
+
+function isUpcomingScheduleItem(date: string, status?: string | null) {
+  const normalizedStatus = normalizeStatusToken(status)
+
+  if (["cancelled", "completed"].includes(normalizedStatus)) {
+    return false
+  }
+
+  const scheduledDate = new Date(date)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    return true
+  }
+
+  return scheduledDate.getTime() >= Date.now() || ["scheduled", "upcoming", "ongoing", "in-progress"].includes(normalizedStatus)
 }
 
 export function AdvisorEvaluatorDashboard() {
-  const pendingProjects = React.useMemo(() => filterAdvisorPendingProjects(mockProjects), [])
-
-  const completedEvaluations = React.useMemo(
-    () => mockEvaluations.filter((e) => e.status === "submitted" || e.status === "reviewed"),
-    [],
+  const authHydrated = useAuthStoreHydrated()
+  const searchParams = useSearchParams()
+  const dashboardStage = React.useMemo(
+    () => normalizeDashboardStage(searchParams.get("stage")),
+    [searchParams],
   )
+  const evaluatorDashboardQuery = useEvaluatorProjectEvaluationDashboardWithOptions(dashboardStage, {
+    enabled: authHydrated,
+  })
+  const projectsQuery = useAdvisorProjectsWithOptions({ enabled: authHydrated })
+  const submittedDocumentsQuery = useQuery({
+    queryKey: ["advisor", "submitted-documents"],
+    queryFn: getAdvisorSubmittedDocuments,
+    enabled: authHydrated,
+    staleTime: 30_000,
+    retry: 1,
+  })
+  const scheduleQuery = useQuery({
+    queryKey: ["advisor", "schedule", "evaluator-dashboard"],
+    queryFn: () => getAdvisorSchedule(),
+    enabled: authHydrated,
+    staleTime: 30_000,
+    retry: 1,
+  })
+  const evaluatorSummary = evaluatorDashboardQuery.data?.summary
+  const projectMap = React.useMemo(
+    () => new Map((projectsQuery.data ?? []).map((project) => [project.id, project])),
+    [projectsQuery.data],
+  )
+  const documentCountByProject = React.useMemo(() => {
+    const counts = new Map<string, number>()
 
-  const scoredEvaluations = completedEvaluations.filter((e) => typeof e.score === "number")
-  const averageScore =
-    scoredEvaluations.length > 0
-      ? (
-          scoredEvaluations.reduce((sum, e) => sum + (e.score ?? 0), 0) / scoredEvaluations.length
-        ).toFixed(1)
-      : "—"
+    for (const document of submittedDocumentsQuery.data?.documents ?? []) {
+      const projectId = document.project.id.trim()
+      counts.set(projectId, (counts.get(projectId) ?? 0) + 1)
+    }
+
+    return counts
+  }, [submittedDocumentsQuery.data?.documents])
+
+  const pendingProjects = React.useMemo<WorkspacePendingProject[]>(() => {
+    const projectGroups = evaluatorDashboardQuery.data?.projectGroups ?? []
+    const strictlyPendingGroups = projectGroups.filter(
+      (projectGroup) => projectGroup.evaluation.studentsPendingEvaluation > 0,
+    )
+    const sourceGroups = strictlyPendingGroups.length > 0 ? strictlyPendingGroups : projectGroups
+
+    return sourceGroups
+      .map((projectGroup) => {
+        const project = projectMap.get(projectGroup.projectId)
+        const progress = project?.milestones.progressPercent ?? projectGroup.milestones.progressPercent
+        const daysRemaining = getDaysRemaining(getNextMilestoneDueDate(project?.milestones.details))
+
+        return {
+          id: projectGroup.projectId,
+          title: projectGroup.projectTitle,
+          groupName: project?.group.name ?? projectGroup.group.name,
+          advisorName: projectGroup.advisor.fullName,
+          status: normalizeStatusToken(project?.status ?? projectGroup.projectStatus, "active"),
+          progress,
+          membersCount: project?.group.studentCount ?? projectGroup.group.totalMembers ?? projectGroup.groupMembers.length,
+          documentsCount: documentCountByProject.get(projectGroup.projectId) ?? 0,
+          daysRemaining,
+          timelineStatus: getTimelineStatus(progress, daysRemaining),
+        }
+      })
+      .sort((left, right) => {
+        const leftDays = left.daysRemaining ?? Number.MAX_SAFE_INTEGER
+        const rightDays = right.daysRemaining ?? Number.MAX_SAFE_INTEGER
+        return leftDays - rightDays
+      })
+  }, [documentCountByProject, evaluatorDashboardQuery.data?.projectGroups, projectMap])
+
+  const completedEvaluations = React.useMemo<WorkspaceCompletedEvaluation[]>(() => {
+    return (evaluatorDashboardQuery.data?.projectGroups ?? [])
+      .filter(
+        (projectGroup) =>
+          projectGroup.evaluation.studentsEvaluated > 0 ||
+          Boolean(projectGroup.evaluation.lastSavedAt) ||
+          Boolean(projectGroup.evaluation.submittedAt),
+      )
+      .map((projectGroup) => ({
+        id: `${projectGroup.projectId}-${dashboardStage}`,
+        projectId: projectGroup.projectId,
+        projectTitle: projectGroup.projectTitle,
+        submittedAt: projectGroup.evaluation.submittedAt ?? projectGroup.evaluation.lastSavedAt,
+        score:
+          projectGroup.evaluation.studentsEvaluated > 0
+            ? projectGroup.evaluation.averageScoreGiven
+            : null,
+        status: getCompletedEvaluationStatus(projectGroup.evaluation.submittedAt, projectGroup.evaluation.status),
+      }))
+      .sort((left, right) => {
+        const leftTime = left.submittedAt ? new Date(left.submittedAt).getTime() : 0
+        const rightTime = right.submittedAt ? new Date(right.submittedAt).getTime() : 0
+        return rightTime - leftTime
+      })
+  }, [dashboardStage, evaluatorDashboardQuery.data?.projectGroups])
+
+  const scheduleItems = React.useMemo<WorkspaceScheduleSession[]>(() => {
+    return (scheduleQuery.data?.items ?? [])
+      .filter((meeting) => isUpcomingScheduleItem(meeting.date, meeting.status))
+      .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+      .slice(0, 3)
+      .map((meeting) => {
+        const project = projectMap.get(meeting.projectId)
+
+        return {
+          id: meeting.id,
+          projectId: meeting.projectId,
+          project: meeting.project,
+          group: project?.group.name ?? "Project group",
+          date: meeting.date,
+          time: meeting.time,
+          venue: meeting.location,
+        }
+      })
+  }, [projectMap, scheduleQuery.data?.items])
+
+  const pendingEvaluationCount = evaluatorDashboardQuery.data
+    ? (evaluatorSummary?.studentsPendingEvaluation ?? pendingProjects.length)
+    : "—"
+  const completedCount = evaluatorDashboardQuery.data
+    ? (evaluatorSummary?.completedProjectGroups ?? completedEvaluations.length)
+    : "—"
+  const upcomingScheduleCount = scheduleQuery.data?.items
+    ? scheduleQuery.data.items.filter((meeting) => isUpcomingScheduleItem(meeting.date, meeting.status)).length
+    : scheduleItems.length
+  const averageScoreValue = evaluatorSummary ? formatAverageScore(evaluatorSummary.averageScoreGiven) : "—"
+  const averageScoreSubtitle = evaluatorSummary
+    ? evaluatorSummary.studentsEvaluated > 0
+      ? `Across ${evaluatorSummary.studentsEvaluated} reviews`
+      : "No scores yet"
+    : "No scores yet"
+  const pendingTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
+  const completedTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
+  const scheduleTabLoading = authHydrated && scheduleQuery.isLoading
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-2 animate-in fade-in duration-500 sm:gap-8 lg:gap-10">
@@ -107,12 +349,6 @@ export function AdvisorEvaluatorDashboard() {
             </Link>
           </Button>
           <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <FileText className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-              Documents
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
             <Link href="/dashboard/advisor/evaluator/rubric">
               <BookOpen className="mr-2 h-4 w-4 shrink-0" aria-hidden />
               Rubric
@@ -129,34 +365,52 @@ export function AdvisorEvaluatorDashboard() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Pending evaluations"
-            value={pendingProjects.length}
+            value={pendingEvaluationCount}
             subtitle="Awaiting your review"
             icon={Clock}
             iconClassName="bg-amber-500/15 text-amber-600 dark:text-amber-400"
           />
           <StatCard
             title="Completed"
-            value={completedEvaluations.length}
+            value={completedCount}
             subtitle="Submitted or reviewed"
             icon={CheckCircle}
             iconClassName="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
           />
           <StatCard
             title="Scheduled sessions"
-            value={ADVISOR_SCHEDULED_SESSIONS.length}
+            value={authHydrated && scheduleQuery.isLoading ? "—" : upcomingScheduleCount}
             subtitle="Upcoming"
             icon={Calendar}
             iconClassName="bg-sky-500/15 text-sky-600 dark:text-sky-400"
           />
           <StatCard
             title="Average score given"
-            value={averageScore}
-            subtitle={scoredEvaluations.length ? `Across ${scoredEvaluations.length} reviews` : "No scores yet"}
+            value={averageScoreValue}
+            subtitle={averageScoreSubtitle}
             icon={ClipboardCheck}
             iconClassName="bg-primary/15 text-primary"
           />
         </div>
       </section>
+
+      {evaluatorDashboardQuery.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{evaluatorDashboardQuery.error.message}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {projectsQuery.error || submittedDocumentsQuery.error || scheduleQuery.error ? (
+        <Card className="border-border/70">
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Some workspace details could not be loaded. Core evaluator data is still shown with available backend values.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="flex min-w-0 flex-col gap-6 lg:gap-8 xl:gap-10">
         <div className="flex min-w-0 flex-col gap-6 lg:gap-8">
@@ -232,7 +486,16 @@ export function AdvisorEvaluatorDashboard() {
               </div>
 
               <TabsContent value="pending" className="mt-0 space-y-4 outline-none focus-visible:outline-none">
-                {pendingProjects.length === 0 ? (
+                {pendingTabLoading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/15 py-14 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+                      <LayoutDashboard className="h-7 w-7 text-muted-foreground" aria-hidden />
+                    </div>
+                    <p className="max-w-sm text-sm text-muted-foreground">
+                      Loading pending projects from the evaluator workspace.
+                    </p>
+                  </div>
+                ) : pendingProjects.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/15 py-14 text-center">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
                       <LayoutDashboard className="h-7 w-7 text-muted-foreground" aria-hidden />
@@ -242,11 +505,7 @@ export function AdvisorEvaluatorDashboard() {
                     </p>
                   </div>
                 ) : (
-                  pendingProjects.map((project: Project) => {
-                    const timeline = mockProjectTimelines.find((t) => t.projectId === project.id)
-                    const tStatus = timelineStatusForProject(timeline, project.progress ?? 0)
-
-                    return (
+                  pendingProjects.map((project) => (
                       <Card
                         key={project.id}
                         className="overflow-hidden rounded-2xl border-border/70 shadow-sm transition-shadow hover:shadow-md"
@@ -258,11 +517,11 @@ export function AdvisorEvaluatorDashboard() {
                               <div className="min-w-0 flex-1">
                                 <CardTitle className="text-lg leading-snug sm:text-xl">{project.title}</CardTitle>
                                 <CardDescription className="mt-2 text-sm">
-                                  {project.groupName ?? "Group"} · Advisor: {project.advisorName ?? "—"}
+                                  {project.groupName} · Advisor: {project.advisorName}
                                 </CardDescription>
                               </div>
                               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                                <TimelineStatusRow status={tStatus} />
+                                <TimelineStatusRow status={project.timelineStatus} />
                                 <StatusBadge status={project.status} />
                               </div>
                             </div>
@@ -272,14 +531,14 @@ export function AdvisorEvaluatorDashboard() {
                           <div className="flex flex-col flex-wrap gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
                             <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1">
                               <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              3 members
+                              {project.membersCount} members
                             </span>
                             <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1">
                               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              5 documents
+                              {project.documentsCount} documents
                             </span>
                             <span className="inline-flex items-center sm:ml-0">
-                              <DueBadge timeline={timeline} projectProgress={project.progress ?? 0} />
+                              <DueSummary daysRemaining={project.daysRemaining} projectProgress={project.progress} />
                             </span>
                           </div>
 
@@ -288,12 +547,6 @@ export function AdvisorEvaluatorDashboard() {
                               <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>
                                 <Eye className="mr-2 h-4 w-4" aria-hidden />
                                 View project
-                              </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" className="w-full rounded-lg sm:w-auto" asChild>
-                              <Link href="/dashboard/advisor/evaluator/documents">
-                                <FileText className="mr-2 h-4 w-4" aria-hidden />
-                                Documents
                               </Link>
                             </Button>
                             <AdvisorEvaluatorStageMenu
@@ -312,8 +565,7 @@ export function AdvisorEvaluatorDashboard() {
                           </div>
                         </CardContent>
                       </Card>
-                    )
-                  })
+                  ))
                 )}
               </TabsContent>
 
@@ -325,13 +577,16 @@ export function AdvisorEvaluatorDashboard() {
                   </Button>
                 </div>
                 <div className="mt-4 space-y-2">
-                  {completedEvaluations.length === 0 ? (
+                  {completedTabLoading ? (
+                    <p className="rounded-xl border border-dashed border-border/70 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
+                      Loading completed evaluations from the backend.
+                    </p>
+                  ) : completedEvaluations.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border/70 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
                       No completed evaluations yet.
                     </p>
                   ) : (
-                    completedEvaluations.map((evaluation: Evaluation) => {
-                      const maxScore = evaluationMaxScore(evaluation)
+                    completedEvaluations.map((evaluation) => {
                       return (
                         <div
                           key={evaluation.id}
@@ -346,10 +601,10 @@ export function AdvisorEvaluatorDashboard() {
                               <p className="text-sm text-muted-foreground">
                                 {evaluation.submittedAt
                                   ? `Submitted ${formatDate(evaluation.submittedAt)}`
-                                  : "Submitted"}
+                                  : "Saved draft"}
                               </p>
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {mockProjects.find((p) => p.id === evaluation.projectId)?.title ?? "Project"}
+                                {evaluation.projectTitle}
                               </p>
                             </div>
                           </div>
@@ -358,7 +613,7 @@ export function AdvisorEvaluatorDashboard() {
                               <p className="text-2xl font-bold tabular-nums tracking-tight text-primary">
                                 {evaluation.score ?? "—"}
                                 <span className="text-base font-medium text-muted-foreground">
-                                  /{maxScore}
+                                  /{DISPLAY_SCORE_MAX}
                                 </span>
                               </p>
                             </div>
@@ -366,7 +621,7 @@ export function AdvisorEvaluatorDashboard() {
                               <StatusBadge status={evaluation.status} />
                               <Button variant="outline" size="icon" className="shrink-0 rounded-lg" asChild>
                                 <Link
-                                  href={`/dashboard/advisor/evaluator/evaluations/${evaluation.id}`}
+                                  href={`/dashboard/advisor/evaluator/projects/${evaluation.projectId}`}
                                   aria-label="View evaluation details"
                                 >
                                   <Eye className="h-4 w-4" aria-hidden />
@@ -389,7 +644,15 @@ export function AdvisorEvaluatorDashboard() {
                   </Button>
                 </div>
                 <div className="mt-4 space-y-2">
-                  {ADVISOR_SCHEDULED_SESSIONS.map((session) => (
+                  {scheduleTabLoading ? (
+                    <p className="rounded-xl border border-dashed border-border/70 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
+                      Loading schedule preview from the backend.
+                    </p>
+                  ) : scheduleItems.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-border/70 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
+                      No upcoming sessions found.
+                    </p>
+                  ) : scheduleItems.map((session) => (
                     <div
                       key={session.id}
                       className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 transition-colors hover:border-sky-500/25 hover:bg-muted/15 lg:flex-row lg:items-center lg:justify-between"
@@ -411,7 +674,7 @@ export function AdvisorEvaluatorDashboard() {
                           </p>
                         </div>
                         <Button variant="outline" size="sm" className="shrink-0 rounded-lg" asChild>
-                          <Link href={`/dashboard/advisor/evaluator/scheduled/${session.id}`}>Details</Link>
+                          <Link href={`/dashboard/advisor/schedule?projectId=${encodeURIComponent(session.projectId)}&meetingId=${encodeURIComponent(session.id)}`}>Details</Link>
                         </Button>
                       </div>
                     </div>

@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import * as React from "react"
 import type { ReactElement } from "react"
+import { useRouter } from "next/navigation"
 
 import {
   DropdownMenu,
@@ -30,14 +32,26 @@ type AdvisorEvaluatorStageMenuProps = {
 }
 
 export function AdvisorEvaluatorStageMenu({ projectId, trigger, align = "end" }: AdvisorEvaluatorStageMenuProps) {
+  const router = useRouter()
+  const [open, setOpen] = React.useState(false)
+
+  const handleStageSelect = (stage: AdvisorEvaluatorStage) => (event: Event) => {
+    event.preventDefault()
+    setOpen(false)
+
+    window.setTimeout(() => {
+      router.push(evaluationHref(projectId, stage))
+    }, 0)
+  }
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="w-52">
+      <DropdownMenuContent align={align} className="w-52" portal={false}>
         <DropdownMenuLabel>Choose capstone</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {STAGE_OPTIONS.map((option) => (
-          <DropdownMenuItem key={option.stage} asChild>
+          <DropdownMenuItem key={option.stage} asChild onSelect={handleStageSelect(option.stage)}>
             <Link href={evaluationHref(projectId, option.stage)}>{option.label}</Link>
           </DropdownMenuItem>
         ))}
