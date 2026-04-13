@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Plus, Pencil, Trash2, Loader2, Bell, ChevronDown, AlertTriangle, Clock } from "lucide-react"
 
+import { cn } from "@/lib/utils"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
