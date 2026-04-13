@@ -153,21 +153,21 @@ export default function EvaluationSetupPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Advisor Weight", value: `${advisorWeight}%`, icon: Users },
           { label: "Examiner Weight", value: `${examinerWeight}%`, icon: ClipboardCheck },
           { label: "History Events", value: filteredHistory.length, icon: History },
           { label: "Policy Health", value: totalWeight === 100 ? "Balanced" : "Review", icon: totalWeight === 100 ? CheckCircle2 : AlertTriangle },
         ].map((item) => (
-          <Card key={item.label} className="border-none shadow-sm">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <item.icon className="h-5 w-5 text-primary" />
+          <Card key={item.label} className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-4">
+              <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110">
+                <item.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight">{item.value}</p>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold tracking-tight">{item.value}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{item.label}</p>
               </div>
             </CardContent>
           </Card>

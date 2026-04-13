@@ -999,14 +999,14 @@ export default function GroupsPage() {
       {/* KPIs */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         {kpi.map(s => (
-          <Card key={s.label} className="group border-none shadow-sm hover:shadow-md transition-all">
-            <CardContent className="p-3 flex items-center gap-2.5">
-              <div className={cn("h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.bg)}>
+          <Card key={s.label} className="group border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+            <CardContent className="p-3 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-2.5">
+              <div className={cn("h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.bg)}>
                 <s.icon className={cn("h-4 w-4", s.color)} />
               </div>
-              <div>
-                <p className="text-xl font-bold leading-none">{s.value}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl font-bold leading-none tracking-tight">{s.value}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>

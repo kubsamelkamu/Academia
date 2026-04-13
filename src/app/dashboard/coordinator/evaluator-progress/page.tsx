@@ -139,16 +139,16 @@ export default function EvaluatorProgressPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {summaryStats.map(s => (
-          <div key={s.label} className="group relative overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight">{s.value}</p>
+          <div key={s.label} className="group relative overflow-hidden rounded-xl border bg-card p-3 sm:p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">{s.label}</p>
+                <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-bold tracking-tight">{s.value}</p>
               </div>
-              <div className={`h-12 w-12 rounded-2xl ${s.bg} flex items-center justify-center transition-transform group-hover:scale-110`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+              <div className={`h-8 w-8 sm:h-12 sm:w-12 rounded-2xl ${s.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                <s.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.color}`} />
               </div>
             </div>
           </div>

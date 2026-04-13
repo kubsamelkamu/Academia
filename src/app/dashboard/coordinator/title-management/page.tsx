@@ -1516,18 +1516,18 @@ export default function CoordinatorTitleManagementPage() {
           </Card>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               {kpi.map((item) => (
                 <Card key={item.label} className="group border-none shadow-sm transition-all hover:shadow-md">
-                  <CardContent className="flex min-w-0 items-center gap-3 p-4">
+                  <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-4">
                     <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${item.bg}`}
+                      className={`flex h-8 w-8 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full ${item.bg}`}
                     >
-                      <item.icon className={`h-5 w-5 ${item.color}`} />
+                      <item.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${item.color}`} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-2xl font-bold tracking-tight">{item.value}</p>
-                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className="text-lg sm:text-2xl font-bold tracking-tight">{item.value}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{item.label}</p>
                     </div>
                   </CardContent>
                 </Card>
