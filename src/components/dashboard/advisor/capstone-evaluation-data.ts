@@ -55,6 +55,7 @@ export const CAPSTONE_GROUPS: CapstoneGroup[] = [
       { title: "Problem statement", description: "Clear articulation of the research problem.", maxScore: 10 },
       { title: "Proposal quality", description: "Scope, structure, and feasibility of the proposal.", maxScore: 10 },
       { title: "Methodology", description: "Planning, technical approach, and method selection.", maxScore: 10 },
+      { title: "SRS readiness", description: "Software requirements specification readiness for first-semester approval.", maxScore: 10 },
       { title: "SDD readiness", description: "Design document readiness for first-semester approval.", maxScore: 10 },
     ],
     students: [
@@ -107,6 +108,7 @@ export const CAPSTONE_GROUPS: CapstoneGroup[] = [
       { title: "Scope definition", description: "Well-defined scope and problem boundaries.", maxScore: 10 },
       { title: "Architecture design", description: "System architecture and component planning.", maxScore: 10 },
       { title: "Feasibility", description: "Technical and timeline feasibility assessment.", maxScore: 10 },
+      { title: "SRS readiness", description: "Software requirements specification readiness for first-semester approval.", maxScore: 10 },
       { title: "Advisor readiness", description: "Readiness for first-semester approval.", maxScore: 10 },
     ],
     students: [

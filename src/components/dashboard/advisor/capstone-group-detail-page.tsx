@@ -2,16 +2,88 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowLeft, Calendar, FolderKanban, Users, TrendingUp } from "lucide-react"
+import { ArrowLeft, Calendar, Download, FolderKanban, Users, TrendingUp } from "lucide-react"
 
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
-import { CAPSTONE_GROUPS, type CapstoneStage, type EvaluationStatus } from "./capstone-evaluation-data"
+import type { AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
+import { useAdvisorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
+import { useAdvisorProjectEvaluationDetail } from "@/lib/hooks/use-advisor-project-evaluation-detail"
+import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
+import type { CapstoneStage } from "./capstone-evaluation-data"
+
+type EvaluationStatus = "Pending Review" | "Evaluated" | "Needs Revision"
+
+function toApiStage(stage: CapstoneStage): AdvisorEvaluationDashboardStage {
+  return stage === "Capstone I" ? "CAPSTONE_I" : "CAPSTONE_II"
+}
+
+function toEvaluationStatus(status?: string | null): EvaluationStatus {
+  const normalized = status?.trim().toUpperCase() ?? "PENDING"
+
+  if (["EVALUATED", "COMPLETED", "APPROVED"].includes(normalized)) {
+    return "Evaluated"
+  }
+
+  if (["NEEDS_REVISION", "REJECTED"].includes(normalized)) {
+    return "Needs Revision"
+  }
+
+  return "Pending Review"
+}
+
+function formatOptionalDate(value?: string | null) {
+  if (!value) {
+    return "—"
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+
+  return date.toLocaleDateString()
+}
+
+function milestoneProgressValue(status?: string | null) {
+  const normalized = status?.trim().toUpperCase() ?? "PENDING"
+
+  if (normalized === "APPROVED") {
+    return 100
+  }
+
+  if (normalized === "SUBMITTED") {
+    return 70
+  }
+
+  if (normalized === "REJECTED") {
+    return 10
+  }
+
+  return 25
+}
+
+function formatMilestoneStatus(status?: string | null) {
+  return (status ?? "PENDING").toLowerCase().replace(/_/g, " ")
+}
+
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+}
 
 function StatusBadge({ status }: { status: EvaluationStatus }) {
   const style =
@@ -24,15 +96,57 @@ function StatusBadge({ status }: { status: EvaluationStatus }) {
   return <Badge variant="outline" className={`${style} border`}>{status}</Badge>
 }
 
-export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: CapstoneStage; groupId: string }) {
-  const group = React.useMemo(
-    () => CAPSTONE_GROUPS.find((item) => item.id === groupId && item.stage === stage) ?? CAPSTONE_GROUPS.find((item) => item.stage === stage) ?? CAPSTONE_GROUPS[0],
-    [groupId, stage],
-  )
+export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: CapstoneStage; projectId: string }) {
+  const authHydrated = useAuthStoreHydrated()
+  const dashboardStage = toApiStage(stage)
+  const projectsQuery = useAdvisorProjectsWithOptions({
+    enabled: authHydrated,
+  })
+  const dashboardQuery = useAdvisorProjectEvaluationDashboardWithOptions(dashboardStage, {
+    enabled: authHydrated,
+  })
+  const resolvedProjectId = React.useMemo(() => {
+    const advisorProjects = projectsQuery.data ?? []
+    const matchedAdvisorProject = advisorProjects.find(
+      (project) => project.id === projectId || project.group.id === projectId
+    )
 
-  const pendingStudents = group.students.filter((student) => student.capstone1Status === "Pending Review" || student.capstone2Status === "Pending Review").length
-  const evaluatedStudents = group.students.filter((student) => student.capstone1Status === "Evaluated" && student.capstone2Status === "Evaluated").length
-  const avgProgress = Math.round(group.students.reduce((sum, student) => sum + student.progress, 0) / group.students.length)
+    if (matchedAdvisorProject) {
+      return matchedAdvisorProject.id
+    }
+
+    const projectGroups = dashboardQuery.data?.projectGroups ?? []
+    const matchedProject = projectGroups.find(
+      (group) => group.projectId === projectId || group.group.id === projectId
+    )
+
+    return matchedProject?.projectId ?? ""
+  }, [dashboardQuery.data?.projectGroups, projectId, projectsQuery.data])
+
+  const detailQuery = useAdvisorProjectEvaluationDetail(resolvedProjectId, dashboardStage, {
+    enabled: authHydrated && Boolean(resolvedProjectId),
+  })
+  const detail = detailQuery.data
+  const pendingStudents = detail?.evaluation.studentsPendingEvaluation ?? 0
+  const evaluatedStudents = detail?.evaluation.studentsEvaluated ?? 0
+  const avgProgress = detail?.milestoneProgress.progressPercent ?? 0
+  const isLoading = !authHydrated || projectsQuery.isLoading || dashboardQuery.isLoading || (Boolean(resolvedProjectId) && detailQuery.isLoading)
+
+  const students = React.useMemo(() => {
+    return (detail?.students ?? []).map((student) => {
+      const currentStageStatus = toEvaluationStatus(student.evaluation.status)
+      const progress = currentStageStatus === "Evaluated" ? 100 : avgProgress
+
+      return {
+        id: student.userId,
+        name: student.fullName,
+        email: student.email,
+        avatarUrl: student.avatarUrl,
+        progress: avgProgress,
+        capstone1Status: stage === "Capstone I" ? currentStageStatus : "Evaluated",
+      }
+    })
+  }, [avgProgress, detail?.students, stage])
 
   return (
     <div className="space-y-8 animate-fade-in pb-8">
@@ -40,7 +154,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
         <DashboardPageHeader
           title={`${stage} Group Detail`}
           description="Review all project information, milestones, and student members for this group."
-          badge={group.groupName}
+          badge={isLoading ? "Loading..." : detail?.group.name ?? "—"}
         />
         <Button asChild variant="outline" size="sm">
           <Link href={stage === "Capstone I" ? "/dashboard/advisor/evaluations/capstone-i" : "/dashboard/advisor/evaluations/capstone-ii"}>
@@ -49,11 +163,41 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
         </Button>
       </div>
 
+      {projectsQuery.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{projectsQuery.error.message}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {dashboardQuery.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{dashboardQuery.error.message}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {detailQuery.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{detailQuery.error.message}</p>
+          </CardContent>
+        </Card>
+      ) : authHydrated && !projectsQuery.isLoading && !dashboardQuery.isLoading && !projectsQuery.error && !dashboardQuery.error && !resolvedProjectId ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">The selected evaluation project could not be found for this stage.</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="outline">{stage}</Badge>
-            <Badge variant="secondary">{group.students.length} members</Badge>
+            <Badge variant="secondary">{detail?.group.totalMembers ?? 0} members</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -63,14 +207,14 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
                 <Users className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Group Name</p>
-                  <p className="font-medium">{group.groupName}</p>
+                  <p className="font-medium">{detail?.group.name ?? "—"}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <FolderKanban className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Project</p>
-                  <p className="font-medium">{group.projectTitle}</p>
+                  <p className="font-medium">{detail?.project.title ?? "—"}</p>
                 </div>
               </div>
             </div>
@@ -79,14 +223,14 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
                 <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Due</p>
-                  <p className="font-medium">{group.dueLabel}</p>
+                  <p className="font-medium">{formatOptionalDate(detail?.milestones?.[0]?.dueDate)}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <TrendingUp className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Stage Progress</p>
-                  <p className="font-medium">{group.progress}%</p>
+                  <p className="font-medium">{avgProgress}%</p>
                 </div>
               </div>
             </div>
@@ -123,13 +267,35 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
           <CardDescription>Stage-specific milestones for this group.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {group.milestones.map((milestone) => (
+          {(detail?.milestones ?? []).map((milestone) => (
             <div key={milestone.id} className="space-y-2 rounded-lg border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-medium text-sm">{milestone.title}</p>
-                <Badge variant="outline" className="capitalize">{milestone.status.replace("_", " ")}</Badge>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-medium text-sm">{milestone.title}</p>
+                  <p className="text-xs text-muted-foreground">{milestone.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Due {formatOptionalDate(milestone.dueDate)}
+                    {milestone.submittedAt ? ` • Submitted ${formatOptionalDate(milestone.submittedAt)}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {milestone.approvedSubmission?.fileUrl ? (
+                    <Button asChild variant="outline" size="sm" className="h-8">
+                      <a
+                        href={milestone.approvedSubmission.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={milestone.approvedSubmission.fileName}
+                      >
+                        <Download className="mr-2 h-3.5 w-3.5" />
+                        Download
+                      </a>
+                    </Button>
+                  ) : null}
+                  <Badge variant="outline" className="capitalize">{formatMilestoneStatus(milestone.status)}</Badge>
+                </div>
               </div>
-              <Progress value={milestone.progress} className="h-2" />
+              <Progress value={milestoneProgressValue(milestone.status)} className="h-2" />
             </div>
           ))}
         </CardContent>
@@ -145,17 +311,24 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
-                <TableHead>ID</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead>Capstone I</TableHead>
-                <TableHead>Capstone II</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {group.students.map((student) => (
+              {students.map((student) => (
                 <TableRow key={student.id}>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.studentId}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={student.avatarUrl ?? undefined} alt={student.name} />
+                        <AvatarFallback className="text-xs">{getInitials(student.name)}</AvatarFallback>
+                      </Avatar>
+                      <span>{student.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{student.email}</TableCell>
                   <TableCell>
                     <div className="w-40 space-y-1">
                       <p className="text-xs text-muted-foreground">{student.progress}%</p>
@@ -164,9 +337,6 @@ export function AdvisorCapstoneGroupDetailPage({ stage, groupId }: { stage: Caps
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={student.capstone1Status} />
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={student.capstone2Status} />
                   </TableCell>
                 </TableRow>
               ))}

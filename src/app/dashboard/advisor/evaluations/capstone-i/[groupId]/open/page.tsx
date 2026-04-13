@@ -1,11 +1,13 @@
 import { AdvisorCapstoneGroupEvaluatePage } from "@/components/dashboard/advisor/capstone-group-evaluate-page"
 
 interface PageProps {
-  params: {
+  params: Promise<{
     groupId: string
-  }
+  }>
 }
 
-export default function Page({ params }: PageProps) {
-  return <AdvisorCapstoneGroupEvaluatePage stage="Capstone I" groupId={params.groupId} />
+export default async function Page({ params }: PageProps) {
+  const { groupId } = await params
+
+  return <AdvisorCapstoneGroupEvaluatePage stage="Capstone I" groupId={groupId} />
 }
