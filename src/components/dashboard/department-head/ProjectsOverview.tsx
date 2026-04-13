@@ -200,9 +200,6 @@ function mapProjectDetailToActiveProject(detail: ProjectDetail, fallback: Projec
   }
 }
 
-type FinalApprovedMilestoneFile = {
-}
-
 // Helper Components for better reusability and styling
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="flex justify-between items-start gap-4 py-2.5 text-sm border-b border-border/50 last:border-0 last:pb-0 first:pt-0">

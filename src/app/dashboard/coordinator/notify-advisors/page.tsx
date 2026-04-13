@@ -759,22 +759,20 @@ export default function NotifyAdvisorsPage() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3 mb-6">
+          <div className="grid gap-4 grid-cols-3 mb-6">
             {[
               { label: 'Total Sent', value: summaryCards.totalSent, icon: Send, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               { label: 'Delivered', value: summaryCards.delivered, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-              { label: 'Total Reached', value: summaryCards.totalReached, icon: Users, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+              { label: 'Reached', value: summaryCards.totalReached, icon: Users, color: 'text-violet-500', bg: 'bg-violet-500/10' },
             ].map(stat => (
-              <Card key={stat.label} className="border-none shadow-sm">
-                <CardContent className="pt-5 pb-5">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    </div>
+              <Card key={stat.label} className="border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-5">
+                  <div className={`h-8 w-8 sm:h-10 sm:w-10 rounded-xl ${stat.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                    <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${stat.color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-2xl font-bold tracking-tight">{stat.value}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{stat.label}</p>
                   </div>
                 </CardContent>
               </Card>
