@@ -12,12 +12,14 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Table,
   TableBody,
@@ -33,6 +35,7 @@ import {
   Clock,
   FileText,
   Users,
+  Search,
 } from "lucide-react"
 
 type ClearanceStatus = "ready_for_clearance" | "cleared" | "revision_required"
@@ -184,311 +187,354 @@ export function AdvisorStudentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Clear</h1>
-          <p className="text-muted-foreground">Review clear groups and clear projects for evaluation.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Clearance Management</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Review and clear student projects for final evaluation.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button asChild variant="outline" className="flex-1 sm:flex-none h-9 text-xs">
             <Link href="/dashboard/advisor/messages">
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="h-3.5 w-3.5 mr-2" />
               Messages
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <div className="flex-1">
-              <Label className="sr-only" htmlFor="search">
-                Search
-              </Label>
-              <Input
-                id="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by project title or group name..."
-              />
+      {/* Statistics */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-primary/5 border-primary/10 shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold leading-none">{readyCount}</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Ready</p>
+              </div>
             </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-success/5 border-success/10 shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+                <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-success" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold leading-none">{clearedCount}</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Cleared</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-warning/5 border-warning/10 shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+                <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-warning" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold leading-none">{revisionCount}</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Revision</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-accent/5 border-accent/10 shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold leading-none">{totalStudents}</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Students</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      <Card className="border-primary/10 shadow-sm">
+        <CardContent className="p-3 sm:p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by project title or group name..."
+              className="pl-9 h-9 sm:h-10 text-xs sm:text-sm"
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Projects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Projects Awaiting Clearance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead>Members</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProjects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{project.title}</p>
-                      <p className="text-sm text-muted-foreground">{project.groupName}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full" style={{ width: `${project.progress}%` }} />
+      {/* Projects List - Responsive Grid/Table */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-1">Projects Awaiting Clearance</h2>
+        
+        {/* Desktop Table View */}
+        <Card className="hidden md:block border-primary/10 shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Project</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Progress</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Status</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Submitted</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Members</TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProjects.map((project) => (
+                  <TableRow key={project.id} className="hover:bg-muted/20 transition-colors">
+                    <TableCell>
+                      <div className="py-1">
+                        <p className="font-bold text-sm leading-tight">{project.title}</p>
+                        <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{project.groupName}</p>
                       </div>
-                      <span className="text-sm">{project.progress}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(project.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{formatDate(project.submittedAt)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{project.members.length} members</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {project.status === "ready_for_clearance" && (
-                        <>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <CheckCircle className="h-4 w-4 mr-1" /> Clear
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Clear Project for Evaluation</DialogTitle>
-                                <DialogDescription>
-                                  Confirm clearance of <span className="font-medium">{project.title}</span> for final
-                                  evaluation.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor={`notes-${project.id}`}>Clearance Notes</Label>
-                                  <Textarea
-                                    id={`notes-${project.id}`}
-                                    placeholder="Add any notes for the evaluators..."
-                                    value={clearanceNotes}
-                                    onChange={(e) => setClearanceNotes(e.target.value)}
-                                    rows={3}
-                                  />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 min-w-[100px]">
+                        <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-primary h-full rounded-full" style={{ width: `${project.progress}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-primary">{project.progress}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(project.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{formatDate(project.submittedAt)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>{project.members.length}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {project.status === "ready_for_clearance" && (
+                          <>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="default" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider">
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Clear
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[425px] rounded-2xl">
+                                <DialogHeader>
+                                  <DialogTitle className="text-xl font-bold">Clear Project</DialogTitle>
+                                  <DialogDescription className="text-sm font-medium">
+                                    Confirm clearance for <span className="text-primary font-bold">{project.title}</span>.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`notes-${project.id}`} className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clearance Notes</Label>
+                                    <Textarea
+                                      id={`notes-${project.id}`}
+                                      placeholder="Add any notes for the evaluators..."
+                                      value={clearanceNotes}
+                                      onChange={(e) => setClearanceNotes(e.target.value)}
+                                      rows={4}
+                                      className="resize-none text-sm border-primary/20 focus-visible:ring-primary/30"
+                                    />
+                                  </div>
                                 </div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="outline">Cancel</Button>
-                                  <Button onClick={() => handleClearProject(project)}>Clear Project</Button>
+                                <DialogFooter className="gap-2 sm:gap-0">
+                                  <Button variant="outline" className="h-10 text-xs font-bold uppercase tracking-wider">Cancel</Button>
+                                  <Button onClick={() => handleClearProject(project)} className="h-10 text-xs font-bold uppercase tracking-wider">Confirm Clearance</Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+
+                            <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider">
+                              <Link href={`/dashboard/advisor/students/revision/${project.id}`}>
+                                <AlertCircle className="h-3.5 w-3.5 mr-1.5" /> Revision
+                              </Link>
+                            </Button>
+                          </>
+                        )}
+
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider hover:bg-primary/10">
+                              <FileText className="h-3.5 w-3.5 mr-1.5" /> Details
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 rounded-2xl border-primary/20 shadow-2xl">
+                            <DialogHeader className="p-6 pb-0 bg-muted/30 border-b">
+                              <div className="flex items-start justify-between pr-8 mb-4">
+                                <div className="space-y-1">
+                                  <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">{project.title}</DialogTitle>
+                                  <DialogDescription className="flex items-center gap-2 mt-1 font-medium text-primary">
+                                    <Users className="h-4 w-4" />
+                                    {project.groupName}
+                                  </DialogDescription>
                                 </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/dashboard/advisor/students/revision/${project.id}`}>
-                              <AlertCircle className="h-4 w-4 mr-1" /> Revision
-                            </Link>
-                          </Button>
-                        </>
-                      )}
-
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <FileText className="h-4 w-4 mr-1" /> Details
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="w-[99vw] max-w-9xl">
-                          <DialogHeader>
-                            <DialogTitle>{project.title}</DialogTitle>
-                            <DialogDescription>Project details and clearance information</DialogDescription>
-                          </DialogHeader>
-
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div>
-                                <h4 className="font-medium">Group</h4>
-                                <p className="text-sm text-muted-foreground">{project.groupName}</p>
-                              </div>
-                              <div>
-                                <h4 className="font-medium">Progress</h4>
-                                <p className="text-sm text-muted-foreground">{project.progress}%</p>
-                              </div>
-                              <div>
-                                <h4 className="font-medium">Submitted</h4>
-                                <p className="text-sm text-muted-foreground">{formatDate(project.submittedAt)}</p>
-                              </div>
-                              <div>
-                                <h4 className="font-medium">Status</h4>
                                 <div className="mt-1">{getStatusBadge(project.status)}</div>
                               </div>
-                            </div>
+                            </DialogHeader>
 
-                            <div>
-                              <h4 className="font-medium mb-3">Team Members</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {project.members.map((member) => (
-                                  <div
-                                    key={member.id}
-                                    className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg"
-                                  >
-                                    <Avatar className="h-6 w-6">
-                                      <AvatarImage src={member.avatar} alt={member.name} />
-                                      <AvatarFallback className="text-xs">
-                                        {member.name
-                                          .split(" ")
-                                          .filter(Boolean)
-                                          .map((n) => n[0])
-                                          .slice(0, 2)
-                                          .join("")}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-sm">{member.name}</span>
-                                    <span className="text-xs text-muted-foreground">({member.role})</span>
+                            <ScrollArea className="max-h-[calc(90vh-8rem)]">
+                              <div className="p-6 space-y-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                  <div className="p-3 rounded-xl bg-muted/30 border shadow-sm text-center">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Progress</p>
+                                    <p className="text-lg font-bold text-primary mt-1">{project.progress}%</p>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div>
-                              <h4 className="font-medium mb-3">Milestones</h4>
-                              <div className="space-y-2">
-                                {project.milestones.map((milestone) => (
-                                  <div
-                                    key={milestone.id}
-                                    className="flex items-center justify-between p-2 bg-muted/30 rounded-lg"
-                                  >
-                                    <div>
-                                      <p className="font-medium text-sm">{milestone.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Submitted: {formatDate(milestone.submittedAt)}
-                                      </p>
-                                    </div>
-                                    {getMilestoneStatusBadge(milestone.status)}
+                                  <div className="p-3 rounded-xl bg-muted/30 border shadow-sm text-center">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Submitted</p>
+                                    <p className="text-sm font-bold text-foreground mt-1">{formatDate(project.submittedAt)}</p>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div>
-                              <h4 className="font-medium mb-3">Evaluation Criteria</h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-sm">Technical</span>
-                                    <span className="text-sm font-medium">{project.evaluationCriteria.technical}%</span>
+                                  <div className="p-3 rounded-xl bg-muted/30 border shadow-sm text-center">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Members</p>
+                                    <p className="text-lg font-bold text-foreground mt-1">{project.members.length}</p>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-sm">Presentation</span>
-                                    <span className="text-sm font-medium">
-                                      {project.evaluationCriteria.presentation}%
-                                    </span>
+                                  <div className="p-3 rounded-xl bg-muted/30 border shadow-sm text-center">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Milestones</p>
+                                    <p className="text-lg font-bold text-foreground mt-1">{project.milestones.length}</p>
                                   </div>
                                 </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-sm">Documentation</span>
-                                    <span className="text-sm font-medium">
-                                      {project.evaluationCriteria.documentation}%
-                                    </span>
+
+                                <div className="space-y-4">
+                                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Team Members</h4>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {project.members.map((member) => (
+                                      <div key={member.id} className="flex items-center gap-3 p-3 bg-background border rounded-xl shadow-sm">
+                                        <Avatar className="h-9 w-9 border-2 border-primary/10 shadow-sm">
+                                          <AvatarImage src={member.avatar} alt={member.name} />
+                                          <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                                            {member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-bold text-foreground truncate">{member.name}</p>
+                                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.role}</p>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-sm">Innovation</span>
-                                    <span className="text-sm font-medium">{project.evaluationCriteria.innovation}%</span>
+                                </div>
+
+                                <div className="space-y-4">
+                                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Milestones Status</h4>
+                                  <div className="space-y-2.5">
+                                    {project.milestones.map((milestone) => (
+                                      <div key={milestone.id} className="flex items-center justify-between p-3.5 bg-background border rounded-xl shadow-sm hover:bg-muted/5 transition-colors">
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-sm text-foreground leading-tight">{milestone.name}</p>
+                                          <p className="text-[10px] font-medium text-muted-foreground mt-1">
+                                            Submitted: {formatDate(milestone.submittedAt)}
+                                          </p>
+                                        </div>
+                                        {getMilestoneStatusBadge(milestone.status)}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Evaluation Metrics</h4>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {Object.entries(project.evaluationCriteria).map(([key, value]) => (
+                                      <div key={key} className="space-y-2">
+                                        <div className="flex justify-between items-center px-1">
+                                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{key}</span>
+                                          <span className="text-xs font-bold text-primary">{value}%</span>
+                                        </div>
+                                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                          <div className="bg-primary h-full rounded-full" style={{ width: `${value}%` }} />
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                            </ScrollArea>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Mobile Card View */}
+        <div className="grid grid-cols-1 gap-4 md:hidden">
+          {filteredProjects.map((project) => (
+            <Card key={project.id} className="border-primary/10 shadow-md overflow-hidden">
+              <CardHeader className="p-4 bg-muted/30 border-b">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base font-bold leading-tight">{project.title}</CardTitle>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">{project.groupName}</p>
+                  </div>
+                  {getStatusBadge(project.status)}
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="text-primary">{project.progress}%</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="bg-primary h-full rounded-full" style={{ width: `${project.progress}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Submitted</p>
+                    <p className="text-xs font-bold mt-0.5">{formatDate(project.submittedAt)}</p>
+                  </div>
+                </div>
 
-              {filteredProjects.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-10">
-                    No projects found for “{query}”.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-4 py-2 border-y border-dashed">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-bold">{project.members.length} Members</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-bold">{project.milestones.length} Milestones</span>
+                  </div>
+                </div>
 
-      {/* Statistics */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{readyCount}</p>
-                <p className="text-sm text-muted-foreground">Ready for Clearance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-success/10 flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{clearedCount}</p>
-                <p className="text-sm text-muted-foreground">Cleared Projects</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{revisionCount}</p>
-                <p className="text-sm text-muted-foreground">Revision Required</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Users className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalStudents}</p>
-                <p className="text-sm text-muted-foreground">Total Students</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="flex gap-2 pt-1">
+                  {project.status === "ready_for_clearance" && (
+                    <Button variant="default" size="sm" className="flex-1 h-9 text-[10px] font-bold uppercase tracking-wider">
+                      <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Clear
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="flex-1 h-9 text-[10px] font-bold uppercase tracking-wider">
+                    <FileText className="h-3.5 w-3.5 mr-1.5" /> Details
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {filteredProjects.length === 0 && (
+          <div className="text-center py-20 bg-muted/10 rounded-2xl border border-dashed">
+            <Search className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No projects found</p>
+            <p className="text-xs text-muted-foreground mt-1">Try adjusting your search query.</p>
+          </div>
+        )}
       </div>
     </div>
   )

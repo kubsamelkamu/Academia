@@ -317,7 +317,7 @@ export function DcCommitteeWorkspace({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-2">
             {[
               { label: "Groups", value: committeeGroups.length, icon: Users },
               { label: "Titles", value: selectedGroup.titles.length, icon: FileText },
@@ -327,13 +327,13 @@ export function DcCommitteeWorkspace({
               const Icon = item.icon
               return (
                 <Card key={item.label} className="border-border/60 bg-background/90 shadow-sm backdrop-blur">
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                      <p className="mt-2 text-2xl font-bold tracking-tight">{item.value}</p>
+                  <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground truncate">{item.label}</p>
+                      <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-bold tracking-tight">{item.value}</p>
                     </div>
-                    <div className="rounded-2xl bg-primary/10 p-3 text-primary">
-                      <Icon className="h-5 w-5" />
+                    <div className="rounded-xl sm:rounded-2xl bg-primary/10 p-2 sm:p-3 text-primary shrink-0">
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
                   </CardContent>
                 </Card>

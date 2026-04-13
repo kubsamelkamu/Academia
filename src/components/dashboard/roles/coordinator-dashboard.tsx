@@ -649,71 +649,71 @@ export function CoordinatorDashboard() {
       </div>
 
       {/* ── KPI Cards — all theme-reactive ── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {/* Pending Titles */}
         <Card className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending Titles</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{pendingTitlesCount}</p>
-              <p className="mt-1 text-xs text-muted-foreground">From DC Committee</p>
-              <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">Pending Titles</p>
+              <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold tracking-tight">{pendingTitlesCount}</p>
+              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate">From DC Committee</p>
+              <div className="mt-2 sm:mt-3 h-1 rounded-full bg-muted overflow-hidden w-16 sm:w-24">
                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min((pendingTitlesCount / 10) * 100, 100)}%` }} />
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
-              <FileText className="h-5 w-5 text-primary" />
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
           </CardContent>
         </Card>
 
         {/* Active Projects */}
         <Card className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active Projects</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{activeProjectsCount}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Avg {avgActiveProjectProgress}% progress</p>
-              <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">Active Projects</p>
+              <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold tracking-tight">{activeProjectsCount}</p>
+              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate">Avg {avgActiveProjectProgress}% progress</p>
+              <div className="mt-2 sm:mt-3 h-1 rounded-full bg-muted overflow-hidden w-16 sm:w-24">
                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${avgActiveProjectProgress}%` }} />
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
-              <TrendingUp className="h-5 w-5 text-primary" />
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-primary/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
           </CardContent>
         </Card>
 
         {/* Pending Evaluations */}
         <Card className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending Evaluations</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{pendingEvaluations.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Awaiting submission</p>
-              <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">Pending Evals</p>
+              <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold tracking-tight">{pendingEvaluations.length}</p>
+              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate">Awaiting submission</p>
+              <div className="mt-2 sm:mt-3 h-1 rounded-full bg-muted overflow-hidden w-16 sm:w-24">
                 <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${Math.min((pendingEvaluations.length / 15) * 100, 100)}%` }} />
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
-              <ClipboardCheck className="h-5 w-5 text-foreground" />
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-muted flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
+              <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
             </div>
           </CardContent>
         </Card>
 
         {/* Open Complaints */}
         <Card className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-          <CardContent className="flex items-center justify-between p-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open Complaints</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{openComplaints.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Require resolution</p>
-              <div className="mt-3 h-1 rounded-full bg-muted overflow-hidden w-24">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">Open Complaints</p>
+              <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold tracking-tight">{openComplaints.length}</p>
+              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate">Require resolution</p>
+              <div className="mt-2 sm:mt-3 h-1 rounded-full bg-muted overflow-hidden w-16 sm:w-24">
                 <div className="h-full rounded-full bg-destructive/60 transition-all" style={{ width: `${Math.min((openComplaints.length / 10) * 100, 100)}%` }} />
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-destructive/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
             </div>
           </CardContent>
         </Card>
@@ -738,13 +738,13 @@ export function CoordinatorDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:items-center">
             {workflowStages.map((stage, index) => (
               <React.Fragment key={stage.label}>
-                <div className={`relative flex-1 rounded-xl border ${stage.border} ${stage.bg} p-4 text-center transition-all hover:shadow-sm`}>
-                  <stage.icon className={`h-6 w-6 mx-auto mb-2 ${stage.color}`} />
-                  <p className={`text-2xl font-bold ${stage.color}`}>{stage.count}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{stage.label}</p>
+                <div className={`relative flex-1 rounded-xl border ${stage.border} ${stage.bg} p-3 sm:p-4 text-center transition-all hover:shadow-sm`}>
+                  <stage.icon className={`h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1.5 sm:mb-2 ${stage.color}`} />
+                  <p className={`text-xl sm:text-2xl font-bold ${stage.color}`}>{stage.count}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 font-medium uppercase tracking-tight sm:tracking-normal">{stage.label}</p>
               </div>
                 {index < workflowStages.length - 1 && (
                   <ChevronRight className="hidden sm:block h-5 w-5 text-muted-foreground/40 shrink-0" />
@@ -801,18 +801,18 @@ export function CoordinatorDashboard() {
                   Timeline Alerts
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 p-3 sm:p-6">
                 {unreadAlerts.slice(0, 4).map((alert) => (
-                  <div key={alert.id} className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+                  <div key={alert.id} className="flex items-start gap-2 sm:gap-3 rounded-lg border bg-muted/30 p-2.5 sm:p-3 transition-colors hover:bg-muted/50">
                     <StatusIndicator
                       status={alert.severity === 'critical' ? 'overdue' : alert.severity === 'high' ? 'at_risk' : 'on_track'}
                       size="sm"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{alert.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
+                      <p className="text-xs sm:text-sm font-medium truncate">{alert.title}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1">{alert.message}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0 capitalize">{alert.severity}</Badge>
+                    <Badge variant="outline" className="text-[9px] sm:text-xs shrink-0 capitalize px-1 sm:px-2">{alert.severity}</Badge>
                   </div>
                 ))}
               </CardContent>
@@ -838,7 +838,7 @@ export function CoordinatorDashboard() {
               System Overview
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 p-4 sm:p-6">
             {[
               { label: "Title Approval Rate",  value: 78 },
               { label: "Project Completion",   value: 65 },
@@ -846,11 +846,11 @@ export function CoordinatorDashboard() {
               { label: "Grade Finalization",   value: gradeFinalizationPct },
             ].map((item, i) => (
               <div key={item.label} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-[10px] sm:text-xs">
                   <span className="text-muted-foreground">{item.label}</span>
                   <span className="font-semibold">{item.value}%</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-1 sm:h-1.5 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full bg-primary transition-all duration-500"
                     style={{ width: `${item.value}%`, opacity: 1 - i * 0.15 }}
@@ -859,9 +859,9 @@ export function CoordinatorDashboard() {
                 </div>
               ))}
             <Separator className="my-2" />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
               <span>Overall System Health</span>
-              <Badge variant="secondary" className="text-xs">Good</Badge>
+              <Badge variant="secondary" className="text-[9px] sm:text-xs">Good</Badge>
             </div>
           </CardContent>
         </Card>
@@ -869,34 +869,30 @@ export function CoordinatorDashboard() {
 
       {/* ── Project Timelines ── */}
       <Card className="border-none shadow-sm">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 px-4 sm:px-6">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Project Timelines</CardTitle>
-              <CardDescription>Countdown and progress tracking for active projects</CardDescription>
+              <CardTitle className="text-base sm:text-xl">Project Timelines</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Countdown and progress tracking</CardDescription>
             </div>
-            <Badge variant="outline" className="text-xs">{trackedTimelineTotal} tracked</Badge>
+            <Badge variant="outline" className="text-[10px] sm:text-xs">{trackedTimelineTotal} tracked</Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-6">
           {timelineTrackingQuery.isError ? (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
               {timelineTrackingQuery.error instanceof Error ? timelineTrackingQuery.error.message : "Failed to load project timelines."}
             </div>
           ) : timelineTrackingQuery.isLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {Array.from({ length: 4 }).map((_, index) => (
                 <Card key={index} className="border shadow-sm">
-                  <CardContent className="space-y-3 p-5">
+                  <CardContent className="space-y-3 p-4 sm:p-5">
                     <div className="h-5 w-2/3 rounded bg-muted/60" />
                     <div className="h-2 rounded bg-muted/50" />
                     <div className="flex justify-between gap-2">
                       <div className="h-4 w-24 rounded bg-muted/50" />
                       <div className="h-5 w-20 rounded bg-muted/50" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-5 rounded bg-muted/40" />
-                      <div className="h-5 rounded bg-muted/40" />
                     </div>
                   </CardContent>
                 </Card>
@@ -904,28 +900,30 @@ export function CoordinatorDashboard() {
             </div>
           ) : trackedTimelines.length > 0 ? (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                 {trackedTimelines.map((timeline) => (
                   <DashboardTimelineCard key={timeline.projectId} timeline={timeline} />
                 ))}
               </div>
               {trackedTimelinePages > 1 ? (
-                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
-                  <p className="text-xs text-muted-foreground">
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 sm:px-4 sm:py-3">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
                     Page <span className="font-semibold text-foreground">{timelinePage}</span> of {trackedTimelinePages}
                   </p>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-7 sm:h-8 text-[10px] sm:text-xs"
                       disabled={timelinePage <= 1 || timelineTrackingQuery.isFetching}
                       onClick={() => setTimelinePage((current) => Math.max(1, current - 1))}
                     >
-                      Previous
+                      Prev
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-7 sm:h-8 text-[10px] sm:text-xs"
                       disabled={timelinePage >= trackedTimelinePages || timelineTrackingQuery.isFetching}
                       onClick={() => setTimelinePage((current) => Math.min(trackedTimelinePages, current + 1))}
                     >
@@ -936,10 +934,10 @@ export function CoordinatorDashboard() {
               ) : null}
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/10 px-6 py-16 text-center">
-              <Timer className="mb-3 h-10 w-10 text-muted-foreground/30" />
-              <p className="font-medium text-foreground">No active project timelines found</p>
-              <p className="mt-1 text-xs text-muted-foreground">The live tracking endpoint returned no active projects for this department.</p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/10 px-6 py-10 sm:py-16 text-center">
+              <Timer className="mb-3 h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30" />
+              <p className="font-medium text-sm sm:text-base text-foreground">No active project timelines found</p>
+              <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">The live tracking endpoint returned no active projects.</p>
             </div>
           )}
         </CardContent>
@@ -947,63 +945,62 @@ export function CoordinatorDashboard() {
 
       {/* ── Main Tabs: Projects / Advisors / Evaluators / Grades / Complaints ── */}
       <Tabs defaultValue="projects" className="space-y-4">
-        <TabsList className="h-10 w-full sm:w-auto flex overflow-x-auto sm:overflow-visible">
-          <TabsTrigger value="projects" className="gap-1.5 text-xs sm:text-sm shrink-0">
-            <LayoutDashboard className="h-4 w-4 hidden sm:block" />
-            Projects
-            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{activeProjectsCount}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="advisors" className="gap-1.5 text-xs sm:text-sm shrink-0">
-            <Users className="h-4 w-4 hidden sm:block" />
-            Advisors
-            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{advisors.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="evaluators" className="gap-1.5 text-xs sm:text-sm shrink-0">
-            <Star className="h-4 w-4 hidden sm:block" />
-            Evaluators
-            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{evaluators.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="grades" className="gap-1.5 text-xs sm:text-sm shrink-0">
-            <Calculator className="h-4 w-4 hidden sm:block" />
-            Grades
-          </TabsTrigger>
-          <TabsTrigger value="complaints" className="gap-1.5 text-xs sm:text-sm shrink-0">
-            <AlertTriangle className="h-4 w-4 hidden sm:block" />
-            Complaints
-            {openComplaints.length > 0 && (
-              <Badge variant="destructive" className="ml-1 text-xs px-1.5 py-0">{openComplaints.length}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+          <TabsList className="h-9 sm:h-10 inline-flex w-auto bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger value="projects" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
+              Projects
+              <Badge variant="secondary" className="ml-1 text-[9px] sm:text-xs px-1 py-0">{activeProjectsCount}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="advisors" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
+              Advisors
+              <Badge variant="secondary" className="ml-1 text-[9px] sm:text-xs px-1 py-0">{advisors.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="evaluators" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
+              Evaluators
+              <Badge variant="secondary" className="ml-1 text-[9px] sm:text-xs px-1 py-0">{evaluators.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="grades" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
+              Grades
+            </TabsTrigger>
+            <TabsTrigger value="complaints" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
+              Complaints
+              {openComplaints.length > 0 && (
+                <Badge variant="destructive" className="ml-1 text-[9px] sm:text-xs px-1 py-0">{openComplaints.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Projects */}
         <TabsContent value="projects">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
               <div>
-                <CardTitle>Active Projects</CardTitle>
-                <CardDescription>Manage assignments and monitor progress</CardDescription>
+                <CardTitle className="text-base sm:text-xl">Active Projects</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Manage assignments and monitor progress</CardDescription>
               </div>
-              <div className="flex gap-2 shrink-0">
-              <Link href="/dashboard/coordinator/notify-advisors">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Bell className="h-4 w-4" /> Notify Advisors
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Link href="/dashboard/coordinator/notify-advisors" className="flex-1 sm:flex-none">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    <Bell className="h-3.5 w-3.5" /> Notify
                   </Button>
                 </Link>
-                <Link href="/dashboard/coordinator/projects">
-                  <Button size="sm" className="gap-1.5">
-                    View All <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                <Link href="/dashboard/coordinator/projects" className="flex-1 sm:flex-none">
+                  <Button size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    View All <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               {activeProjectsTableQuery.isError ? (
                 <div className="px-6 py-6 text-sm text-destructive">
                   {activeProjectsTableQuery.error instanceof Error ? activeProjectsTableQuery.error.message : "Failed to load active projects."}
                 </div>
               ) : (
-                <DataTable data={activeProjectRows} columns={projectColumns} />
+                <div className="min-w-[600px] sm:min-w-0">
+                  <DataTable data={activeProjectRows} columns={projectColumns} />
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1012,25 +1009,25 @@ export function CoordinatorDashboard() {
         {/* Advisors */}
         <TabsContent value="advisors">
           <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
               <div>
-                <CardTitle>Advisor Performance</CardTitle>
-                <CardDescription>Monitor advisor workload, progress, and performance metrics</CardDescription>
+                <CardTitle className="text-base sm:text-xl">Advisor Performance</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Monitor workload and metrics</CardDescription>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Link href="/dashboard/coordinator/notify-advisors">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Send className="h-4 w-4" /> Notify All
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Link href="/dashboard/coordinator/notify-advisors" className="flex-1 sm:flex-none">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    <Send className="h-3.5 w-3.5" /> Notify
                   </Button>
                 </Link>
-                <Link href="/dashboard/coordinator/advisor-progress">
-                  <Button size="sm" className="gap-1.5">
-                    Full Analytics <ArrowRight className="h-4 w-4" />
+                <Link href="/dashboard/coordinator/advisor-progress" className="flex-1 sm:flex-none">
+                  <Button size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    Analytics <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </Link>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6">
               {advisorOverviewQuery.isError ? (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                   {advisorOverviewQuery.error instanceof Error ? advisorOverviewQuery.error.message : "Failed to load advisor performance."}
@@ -1042,47 +1039,40 @@ export function CoordinatorDashboard() {
                       <div className="h-10 w-10 rounded-full bg-muted/60 shrink-0" />
                       <div className="flex-1 space-y-2">
                         <div className="h-4 w-40 rounded bg-muted/60" />
-                        <div className="h-3 w-32 rounded bg-muted/50" />
                       </div>
-                      <div className="hidden sm:block w-28 space-y-2 shrink-0">
-                        <div className="h-3 rounded bg-muted/50" />
-                        <div className="h-1.5 rounded bg-muted/50" />
-                      </div>
-                      <div className="h-5 w-20 rounded bg-muted/50 shrink-0" />
                     </div>
                   ))}
                 </div>
               ) : (advisorOverviewQuery.data?.advisors.length ?? 0) > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {advisorOverviewQuery.data?.advisors.map((advisor) => {
                     const avgProg = advisor.metrics.overallProjectProgress
                     const perfLabel = performanceLabel(avgProg)
                     return (
-                      <div key={advisor.advisorId} className="flex items-center gap-4 rounded-xl border p-3 hover:bg-muted/40 transition-colors">
-                        <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">{advisor.fullName.charAt(0)}</AvatarFallback>
+                      <div key={advisor.advisorId} className="flex items-center gap-3 sm:gap-4 rounded-xl border p-2.5 sm:p-3 hover:bg-muted/40 transition-colors">
+                        <Avatar className="h-8 w-8 sm:h-10 sm:w-10 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs sm:text-sm">{advisor.fullName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{advisor.fullName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{advisor.email}</p>
+                          <p className="font-medium text-xs sm:text-sm truncate">{advisor.fullName}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{advisor.email}</p>
                         </div>
-                        <div className="hidden sm:flex flex-col items-end gap-1 w-28 shrink-0">
-                          <div className="flex justify-between w-full text-xs">
+                        <div className="hidden xs:flex flex-col items-end gap-1 w-20 sm:w-28 shrink-0">
+                          <div className="flex justify-between w-full text-[9px] sm:text-xs">
                             <span className="text-muted-foreground">{advisor.metrics.totalProjectsAdvising} proj</span>
                             <span className="font-medium">{avgProg}%</span>
                           </div>
-                          <Progress value={avgProg} className="h-1.5 w-full" />
+                          <Progress value={avgProg} className="h-1 w-full" />
                         </div>
-                        <Badge variant={avgProg >= 50 ? 'secondary' : 'outline'} className="text-xs shrink-0">{perfLabel}</Badge>
+                        <Badge variant={avgProg >= 50 ? 'secondary' : 'outline'} className="text-[9px] sm:text-xs shrink-0 px-1.5 py-0">{perfLabel}</Badge>
                       </div>
                     )
                   })}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground font-medium">No advisor performance data found</p>
-                  <p className="text-xs text-muted-foreground mt-1">The live advisor overview endpoint returned no advisors for this department.</p>
+                  <Users className="h-8 w-8 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground font-medium text-sm">No advisor data found</p>
                 </div>
               )}
             </CardContent>
@@ -1092,94 +1082,71 @@ export function CoordinatorDashboard() {
         {/* Evaluators */}
         <TabsContent value="evaluators">
           <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                  <Star className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   Evaluator Progress
                 </CardTitle>
-                <CardDescription>Track evaluation submission status and evaluator workload</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Track submission status</CardDescription>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Link href="/dashboard/coordinator/notify-evaluators">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Send className="h-4 w-4" /> Notify All
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Link href="/dashboard/coordinator/notify-evaluators" className="flex-1 sm:flex-none">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    <Send className="h-3.5 w-3.5" /> Notify
                   </Button>
                 </Link>
-                <Link href="/dashboard/coordinator/evaluator-progress">
-                  <Button size="sm" className="gap-1.5">
-                    Full Analytics <ArrowRight className="h-4 w-4" />
+                <Link href="/dashboard/coordinator/evaluator-progress" className="flex-1 sm:flex-none">
+                  <Button size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                    Full Report <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </Link>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-3 sm:p-6 space-y-3">
               {evaluatorMetrics.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <Star className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground font-medium">No evaluators assigned yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Assign evaluators to projects from the Projects tab</p>
+                  <Star className="h-8 w-8 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground font-medium text-sm">No evaluators assigned yet</p>
                 </div>
               ) : (
                 evaluatorMetrics.map((ev) => {
                   const statusLabel = ev.completion >= 75 ? 'On Track' : ev.completion >= 40 ? 'In Progress' : ev.pending > 0 ? 'Pending' : 'No Tasks'
                   return (
-                    <div key={ev.id} className="flex items-center gap-4 rounded-xl border p-3 hover:bg-muted/40 transition-colors">
+                    <div key={ev.id} className="flex items-center gap-3 sm:gap-4 rounded-xl border p-2.5 sm:p-3 hover:bg-muted/40 transition-colors">
                       <div className="relative shrink-0">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">{ev.name.charAt(0)}</AvatarFallback>
+                        <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs sm:text-sm">{ev.name.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-background border flex items-center justify-center">
-                          <Star className="h-2.5 w-2.5 text-primary fill-primary" />
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 sm:h-4 sm:w-4 rounded-full bg-background border flex items-center justify-center">
+                          <Star className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-primary fill-primary" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{ev.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{ev.email}</p>
+                        <p className="font-medium text-xs sm:text-sm truncate">{ev.name}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{ev.email}</p>
                       </div>
-                      <div className="hidden md:flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
+                      <div className="hidden md:flex items-center gap-4 shrink-0 text-[10px] sm:text-xs text-muted-foreground">
                         <div className="text-center">
-                          <p className="font-semibold text-foreground text-sm">{ev.assigned}</p>
+                          <p className="font-semibold text-foreground text-xs sm:text-sm">{ev.assigned}</p>
                           <p>Assigned</p>
                         </div>
                         <div className="text-center">
-                          <p className="font-semibold text-primary text-sm">{ev.submitted}</p>
+                          <p className="font-semibold text-primary text-xs sm:text-sm">{ev.submitted}</p>
                           <p>Submitted</p>
                         </div>
-                        <div className="text-center">
-                          <p className={`font-semibold text-sm ${ev.pending > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{ev.pending}</p>
-                          <p>Pending</p>
-                        </div>
                       </div>
-                      <div className="hidden sm:block w-24 space-y-1 shrink-0">
-                        <div className="flex justify-between text-xs">
+                      <div className="hidden xs:block w-16 sm:w-24 space-y-1 shrink-0">
+                        <div className="flex justify-between text-[9px] sm:text-xs">
                           <span className="text-muted-foreground">Done</span>
                           <span className="font-medium">{ev.completion}%</span>
                         </div>
-                        <Progress value={ev.completion} className="h-1.5" />
+                        <Progress value={ev.completion} className="h-1" />
                       </div>
-                      <Badge variant="secondary" className="text-xs shrink-0">{statusLabel}</Badge>
+                      <Badge variant="secondary" className="text-[9px] sm:text-xs shrink-0 px-1.5 py-0">{statusLabel}</Badge>
                     </div>
                   )
                 })
-              )}
-
-              {evaluatorMetrics.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span><span className="font-semibold text-foreground">{evaluatorMetrics.reduce((s, e) => s + e.assigned, 0)}</span> assigned</span>
-                      <span><span className="font-semibold text-primary">{evaluatorMetrics.reduce((s, e) => s + e.submitted, 0)}</span> submitted</span>
-                      <span><span className={`font-semibold ${evaluatorMetrics.reduce((s, e) => s + e.pending, 0) > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{evaluatorMetrics.reduce((s, e) => s + e.pending, 0)}</span> pending</span>
-                    </div>
-                    <Link href="/dashboard/coordinator/evaluator-progress">
-                      <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
-                        <BarChart3 className="h-3.5 w-3.5" /> Detailed Report
-                      </Button>
-                    </Link>
-                  </div>
-                </>
               )}
             </CardContent>
           </Card>
@@ -1187,88 +1154,93 @@ export function CoordinatorDashboard() {
 
         {/* Grades */}
         <TabsContent value="grades">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
               <div>
-                <CardTitle>Grade Overview</CardTitle>
-                <CardDescription>Capstone I and Capstone II grades per student, with overall finalization status</CardDescription>
+                <CardTitle className="text-base sm:text-xl">Grade Overview</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Capstone I and II grades per student</CardDescription>
               </div>
-              <Link href="/dashboard/coordinator/grade-management">
-                <Button size="sm" className="gap-1.5 shrink-0">
-                  <Calculator className="h-4 w-4" /> Manage Grades
+              <Link href="/dashboard/coordinator/grade-management" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                  <Calculator className="h-3.5 w-3.5" /> Manage Grades
                 </Button>
               </Link>
             </CardHeader>
-            <CardContent className="p-0">
-              <DataTable data={capstoneGrades.slice(0, 5)} columns={gradeColumns} />
+            <CardContent className="p-0 overflow-x-auto">
+              <div className="min-w-[600px] sm:min-w-0">
+                <DataTable data={capstoneGrades.slice(0, 5)} columns={gradeColumns} />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Complaints */}
         <TabsContent value="complaints">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
               <div>
-                <CardTitle>Complaint Management</CardTitle>
-                <CardDescription>Review and resolve student disputes</CardDescription>
+                <CardTitle className="text-base sm:text-xl">Complaint Management</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Review and resolve student disputes</CardDescription>
               </div>
-              <Link href="/dashboard/coordinator/complaints">
-                <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-                  View All <ArrowRight className="h-4 w-4" />
+              <Link href="/dashboard/coordinator/complaints" className="w-full sm:w-auto">
+                <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
+                  View All <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
               </Link>
             </CardHeader>
-            <CardContent className="p-0">
-              <DataTable data={mockComplaints} columns={complaintColumns} />
+            <CardContent className="p-0 overflow-x-auto">
+              <div className="min-w-[600px] sm:min-w-0">
+                <DataTable data={mockComplaints} columns={complaintColumns} />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       {/* ── Quick Actions ── */}
-                <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Quick Actions</h2>
-          <p className="text-sm text-muted-foreground">Navigate to key features</p>
-                </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base sm:text-lg font-semibold">Quick Actions</h2>
+          <p className="text-[10px] sm:text-sm text-muted-foreground">Navigate to key features</p>
+        </div>
+        <div className="grid gap-3 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.href} href={action.href}>
-              <div className="group flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 cursor-pointer">
-                <div className={`h-10 w-10 rounded-xl ${action.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
-                  <action.icon className={`h-5 w-5 ${action.color}`} />
+              <div className="group flex items-center gap-3 rounded-xl border bg-card p-3 sm:p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 cursor-pointer h-full">
+                <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-xl ${action.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                  <action.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${action.color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{action.label}</p>
-                  <p className="text-xs text-muted-foreground truncate">{action.description}</p>
+                  <p className="font-semibold text-xs sm:text-sm">{action.label}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{action.description}</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0 transition-transform group-hover:translate-x-1" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 transition-transform group-hover:translate-x-1" />
               </div>
-        </Link>
+            </Link>
           ))}
-              </div>
+        </div>
       </div>
 
       <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-start gap-3">
-            <div className="rounded-full bg-primary p-2.5 text-primary-foreground shadow-sm">
-              <Shield className="h-4 w-4" />
+            <div className="rounded-full bg-primary p-2 sm:p-2.5 text-primary-foreground shadow-sm">
+              <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold leading-none">DC Committee Access</p>
-              <p className="text-sm text-muted-foreground">Jump into committee review assignments from the coordinator dashboard.</p>
+            <div className="space-y-0.5 sm:space-y-1">
+              <p className="text-xs sm:text-sm font-semibold leading-none">DC Committee Access</p>
+              <p className="text-[10px] sm:text-sm text-muted-foreground leading-tight">Jump into committee review assignments.</p>
             </div>
           </div>
-          <Button asChild className="w-full gap-1.5 sm:w-auto">
+          <Button asChild size="sm" className="w-full gap-1.5 sm:w-auto h-9 sm:h-10 text-xs sm:text-sm">
             <Link href="/dashboard/coordinator/dc-committee">
               Access DC Committee
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Link>
           </Button>
         </CardContent>
       </Card>
     </div>
+
   )
 }
