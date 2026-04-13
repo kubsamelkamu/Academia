@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -178,6 +179,7 @@ export function AdvisorMessagesPage() {
   const handleSelectProject = useCallback(
     (project: ApiAdvisorProject) => {
       setSelectedProjectId(project.id)
+      setShowMobileList(false)
       router.replace(`?group=${encodeURIComponent(project.id)}`, { scroll: false })
     },
     [router]
@@ -400,6 +402,7 @@ export function AdvisorMessagesPage() {
   const typingUserIdsRef = useRef<Set<string>>(new Set())
   const [typingUserIds, setTypingUserIds] = useState<string[]>([])
   const [openMessageActionsId, setOpenMessageActionsId] = useState<string | null>(null)
+  const [showMobileList, setShowMobileList] = useState(true)
 
   // ── Video call (Jitsi + call presence) ───────────────────────────────────
 
@@ -1727,695 +1730,711 @@ export function AdvisorMessagesPage() {
   return (
     <>
       <div className="flex h-[calc(100dvh-8rem)] min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background shadow-sm sm:min-h-[500px] sm:flex-row">
-
-      <div className="flex min-h-0 w-full sm:w-80 flex-shrink-0 flex-col border-b sm:border-b-0 sm:border-r">
-        <div className="border-b p-4">
-          <h2 className="mb-3 text-lg font-semibold">Group Chats</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              placeholder="Search projects…"
-              value={projectSearch}
-              onChange={(e) => setProjectSearch(e.target.value)}
-            />
+        <div className={cn(
+          "flex min-h-0 w-full sm:w-80 flex-shrink-0 flex-col border-b sm:border-b-0 sm:border-r",
+          !showMobileList && "hidden sm:flex"
+        )}>
+          <div className="border-b p-4">
+            <h2 className="mb-3 text-lg font-semibold">Group Chats</h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search projects…"
+                value={projectSearch}
+                onChange={(e) => setProjectSearch(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
 
-        <ScrollArea className="flex-1">
-          {advisorProjectsQuery.isLoading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
+          <ScrollArea className="flex-1">
+            {advisorProjectsQuery.isLoading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
 
-          {advisorProjectsQuery.isError && (
-            <div className="px-4 py-8 text-center text-sm text-destructive">
-              Failed to load projects.
-            </div>
-          )}
+            {advisorProjectsQuery.isError && (
+              <div className="px-4 py-8 text-center text-sm text-destructive">
+                Failed to load projects.
+              </div>
+            )}
 
-          {!advisorProjectsQuery.isLoading && filteredProjects.length === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No supervised groups found.
-            </div>
-          )}
+            {!advisorProjectsQuery.isLoading && filteredProjects.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No supervised groups found.
+              </div>
+            )}
 
-          <div className="space-y-0.5 p-2">
-            {filteredProjects.map((project) => {
-              const isSelected = project.id === selectedProjectId
-              const newest =
-                isSelected && displayMessages.length > 0
-                  ? displayMessages[displayMessages.length - 1]
-                  : null
+            <div className="space-y-0.5 p-2">
+              {filteredProjects.map((project) => {
+                const isSelected = project.id === selectedProjectId
+                const newest =
+                  isSelected && displayMessages.length > 0
+                    ? displayMessages[displayMessages.length - 1]
+                    : null
 
-              return (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() => handleSelectProject(project)}
-                  className={`flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/60 ${
-                    isSelected ? "bg-muted" : ""
-                  }`}
-                >
-                  <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <FolderKanban className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="truncate text-sm font-medium">{project.group.name}</span>
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => handleSelectProject(project)}
+                    className={`flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted/60 ${
+                      isSelected ? "bg-muted" : ""
+                    }`}
+                  >
+                    <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <FolderKanban className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-sm font-medium">{project.group.name}</span>
+                        {newest && (
+                          <span className="flex-shrink-0 text-xs text-muted-foreground">
+                            {formatMessageTime(newest.timestamp)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">{project.title}</p>
                       {newest && (
-                        <span className="flex-shrink-0 text-xs text-muted-foreground">
-                          {formatMessageTime(newest.timestamp)}
-                        </span>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {newest.content || (newest.attachments?.[0] ? `📎 ${newest.attachments[0].name}` : "")}
+                        </p>
                       )}
                     </div>
-                    <p className="truncate text-xs text-muted-foreground">{project.title}</p>
-                    {newest && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {newest.content || (newest.attachments?.[0] ? `📎 ${newest.attachments[0].name}` : "")}
-                      </p>
+                  </button>
+                )
+              })}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* ── Main chat area ─── */}
+        <div className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          showMobileList && "hidden sm:flex"
+        )}>
+          {!selectedProject ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
+              <MessageSquare className="h-16 w-16 opacity-30" />
+              <p className="text-lg font-medium">Select a project group to start chatting</p>
+              <p className="text-sm">Choose a supervised group from the left panel.</p>
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {/* ── Chat header ── */}
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 sm:hidden"
+                    onClick={() => setShowMobileList(true)}
+                  >
+                    <ChevronDown className="h-5 w-5 rotate-90" />
+                  </Button>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-semibold">{selectedProject.group.name}</span>
+                      {chatRoomQuery.isLoading && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] sm:text-xs text-muted-foreground">
+                      <span className="truncate max-w-[120px] sm:max-w-none">{selectedProject.title}</span>
+                      <span className="hidden xs:inline">·</span>
+                      <span>{memberCount} members</span>
+                      {onlineCount > 0 && (
+                        <>
+                          <span className="hidden xs:inline">·</span>
+                          <span className="flex items-center gap-1 text-green-600">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                            {onlineCount} online
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {SHOW_ADVISOR_VIDEO_UI && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-9"
+                      disabled={!roomId || chatRoomQuery.isLoading}
+                      onClick={() => {
+                        if (callPhase === "live") {
+                          setIsVideoDialogOpen(true)
+                          return
+                        }
+                        openVideoPrejoin()
+                      }}
+                      title="Video call"
+                    >
+                      <Video className="h-4 w-4" />
+                    </Button>
+                  )}
+
+                  {/* Member avatars */}
+                  <div className="hidden sm:flex -space-x-2">
+                    {groupMembersForHeader.slice(0, 5).map((member) => {
+                      const name = `${member.firstName} ${member.lastName}`.trim() || member.email
+                      const isOnline = onlineUserIds.includes(member.id)
+                      return (
+                        <div key={member.id} className="relative" title={name}>
+                          <Avatar className="h-8 w-8 border-2 border-background">
+                            {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={name} />}
+                            <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
+                          </Avatar>
+                          {isOnline && (
+                            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background bg-green-500" />
+                          )}
+                        </div>
+                      )
+                    })}
+                    {groupMembersForHeader.length > 5 && (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
+                        +{groupMembersForHeader.length - 5}
+                      </div>
                     )}
                   </div>
-                </button>
-              )
-            })}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* ── Main chat area ─── */}
-      {!selectedProject ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-          <MessageSquare className="h-16 w-16 opacity-30" />
-          <p className="text-lg font-medium">Select a project group to start chatting</p>
-          <p className="text-sm">Choose a supervised group from the left panel.</p>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* ── Chat header ── */}
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{selectedProject.group.name}</span>
-                  {chatRoomQuery.isLoading && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{selectedProject.title}</span>
-                  <span>·</span>
-                  <span>{memberCount} members</span>
-                  {onlineCount > 0 && (
-                    <>
-                      <span>·</span>
-                      <span className="flex items-center gap-1 text-green-600">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                        {onlineCount} online
-                      </span>
-                    </>
-                  )}
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              {SHOW_ADVISOR_VIDEO_UI && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  disabled={!roomId || chatRoomQuery.isLoading}
-                  onClick={() => {
-                    if (callPhase === "live") {
-                      setIsVideoDialogOpen(true)
-                      return
-                    }
-                    openVideoPrejoin()
-                  }}
-                  title="Video call"
-                >
-                  <Video className="h-4 w-4" />
-                </Button>
-              )}
-
-              {/* Member avatars */}
-              <div className="flex -space-x-2">
-                {groupMembersForHeader.slice(0, 5).map((member) => {
-                  const name = `${member.firstName} ${member.lastName}`.trim() || member.email
-                  const isOnline = onlineUserIds.includes(member.id)
-                  return (
-                    <div key={member.id} className="relative" title={name}>
-                      <Avatar className="h-8 w-8 border-2 border-background">
-                        {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={name} />}
-                        <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
-                      </Avatar>
-                      {isOnline && (
-                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background bg-green-500" />
-                      )}
-                    </div>
-                  )
-                })}
-                {groupMembersForHeader.length > 5 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                    +{groupMembersForHeader.length - 5}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Chat room loading / error states ── */}
-          {chatRoomQuery.isError && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-destructive">
-              <p className="font-medium">Could not load chat room</p>
-              <p className="text-sm text-muted-foreground">
-                {chatRoomQuery.error instanceof Error
-                  ? chatRoomQuery.error.message
-                  : "The group may not be approved yet."}
-              </p>
-              <Button variant="outline" size="sm" onClick={() => chatRoomQuery.refetch()}>
-                Retry
-              </Button>
-            </div>
-          )}
-
-          {chatRoomQuery.isLoading && (
-            <div className="flex flex-1 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {chatRoomQuery.isSuccess && roomId && (
-            <>
-              {ENABLE_ADVISOR_VIDEO_CALL && (callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
-                <div className="mx-4 mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">
-                    {waitingForSessionRoom ? "Video call is syncing..." : "Video call in progress"}
-                    {typeof groupCallParticipantCount === "number" && groupCallParticipantCount > 0
-                      ? ` • ${groupCallParticipantCount} participant${groupCallParticipantCount > 1 ? "s" : ""}`
-                      : ""}
+              {/* ── Chat room loading / error states ── */}
+              {chatRoomQuery.isError && (
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 text-destructive">
+                  <p className="font-medium">Could not load chat room</p>
+                  <p className="text-sm text-muted-foreground">
+                    {chatRoomQuery.error instanceof Error
+                      ? chatRoomQuery.error.message
+                      : "The group may not be approved yet."}
                   </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={waitingForSessionRoom}
-                    onClick={() => {
-                      if (callPhase === "live") {
-                        setIsVideoDialogOpen(true)
-                        return
-                      }
-                      openVideoPrejoin()
-                    }}
-                  >
-                    {callPhase === "live" ? "Return to call" : "Join call"}
+                  <Button variant="outline" size="sm" onClick={() => chatRoomQuery.refetch()}>
+                    Retry
                   </Button>
                 </div>
               )}
 
-              {/* ── Message list ── */}
-              <div ref={messagesScrollRootRef} className="relative min-h-0 flex-1 overflow-hidden">
-              <ScrollArea className="h-full min-h-0 px-4 py-2">
-                {/* Load more indicator */}
-                {(chatHasNextPage || chatIsFetchingNextPage) && (
-                  <div className="flex justify-center py-2">
-                    {chatIsFetchingNextPage ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : (
+              {chatRoomQuery.isLoading && (
+                <div className="flex flex-1 items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {chatRoomQuery.isSuccess && roomId && (
+                <>
+                  {ENABLE_ADVISOR_VIDEO_CALL && (callPhase === "live" || isGroupCallOngoing) && !isVideoDialogOpen && (
+                    <div className="mx-4 mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">
+                        {waitingForSessionRoom ? "Video call is syncing..." : "Video call in progress"}
+                        {typeof groupCallParticipantCount === "number" && groupCallParticipantCount > 0
+                          ? ` • ${groupCallParticipantCount} participant${groupCallParticipantCount > 1 ? "s" : ""}`
+                          : ""}
+                      </p>
                       <Button
-                        variant="ghost"
                         size="sm"
-                        className="h-7 gap-1 text-xs"
-                        onClick={() => void chatFetchNextPage()}
-                      >
-                        <ChevronDown className="h-3.5 w-3.5 rotate-180" />
-                        Load older messages
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {chatMessagesQuery.isLoading && (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-
-                {!chatMessagesQuery.isLoading && displayMessages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-                    <MessageSquare className="h-10 w-10 opacity-30" />
-                    <p className="text-sm">No messages yet. Start the conversation!</p>
-                  </div>
-                )}
-
-                <div className="space-y-1 pb-2">
-                  {displayMessages.map((msg, idx) => {
-                    const isMine = msg.senderId === "current"
-                    const prevMsg = idx > 0 ? displayMessages[idx - 1] : null
-                    const isGrouped = prevMsg?.senderId === msg.senderId
-                    const showAvatar = !isMine && !isGrouped
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`group flex ${isMine ? "justify-end" : "justify-start"} ${
-                          isGrouped ? "mt-0.5" : "mt-3"
-                        }`}
-                        onContextMenu={(e) => {
-                          e.preventDefault()
-                          setOpenMessageActionsId(msg.id)
+                        variant="outline"
+                        disabled={waitingForSessionRoom}
+                        onClick={() => {
+                          if (callPhase === "live") {
+                            setIsVideoDialogOpen(true)
+                            return
+                          }
+                          openVideoPrejoin()
                         }}
                       >
-                            {/* Avatar (other user) */}
-                            {!isMine && (
-                              <div className="mr-2 mt-auto w-8 flex-shrink-0">
-                                {showAvatar && (
-                                  <Avatar className="h-8 w-8">
-                                    {msg.senderAvatar && (
-                                      <AvatarImage src={msg.senderAvatar} alt={msg.senderName} />
-                                    )}
-                                    <AvatarFallback className="text-xs">
-                                      {getInitials(msg.senderName)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                )}
-                              </div>
-                            )}
+                        {callPhase === "live" ? "Return to call" : "Join call"}
+                      </Button>
+                    </div>
+                  )}
 
-                            <div className={`max-w-[65%] ${isMine ? "items-end" : "items-start"} flex flex-col`}>
-                              {/* Sender name */}
-                              {!isMine && !isGrouped && (
-                                <span className="mb-0.5 ml-1 text-xs font-medium text-muted-foreground">
-                                  {msg.senderName}
-                                </span>
+                  {/* ── Message list ── */}
+                  <div ref={messagesScrollRootRef} className="relative min-h-0 flex-1 overflow-hidden">
+                    <ScrollArea className="h-full min-h-0 px-4 py-2">
+                      {/* Load more indicator */}
+                      {(chatHasNextPage || chatIsFetchingNextPage) && (
+                        <div className="flex justify-center py-2">
+                          {chatIsFetchingNextPage ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1 text-xs"
+                              onClick={() => void chatFetchNextPage()}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5 rotate-180" />
+                              Load older messages
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {chatMessagesQuery.isLoading && (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+
+                      {!chatMessagesQuery.isLoading && displayMessages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+                          <MessageSquare className="h-10 w-10 opacity-30" />
+                          <p className="text-sm">No messages yet. Start the conversation!</p>
+                        </div>
+                      )}
+
+                      <div className="space-y-1 pb-2">
+                        {displayMessages.map((msg, idx) => {
+                          const isMine = msg.senderId === "current"
+                          const prevMsg = idx > 0 ? displayMessages[idx - 1] : null
+                          const isGrouped = prevMsg?.senderId === msg.senderId
+                          const showAvatar = !isMine && !isGrouped
+
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`group flex ${isMine ? "justify-end" : "justify-start"} ${
+                                isGrouped ? "mt-0.5" : "mt-3"
+                              }`}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                                setOpenMessageActionsId(msg.id)
+                              }}
+                            >
+                              {/* Avatar (other user) */}
+                              {!isMine && (
+                                <div className="mr-2 mt-auto w-8 flex-shrink-0">
+                                  {showAvatar && (
+                                    <Avatar className="h-8 w-8">
+                                      {msg.senderAvatar && (
+                                        <AvatarImage src={msg.senderAvatar} alt={msg.senderName} />
+                                      )}
+                                      <AvatarFallback className="text-xs">
+                                        {getInitials(msg.senderName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                </div>
                               )}
 
-                              {/* Reply-to preview */}
-                              {msg.replyTo && (
-                                <div
-                                  className={`mb-1 max-w-full rounded border-l-2 border-primary/60 bg-muted/60 px-2 py-1 text-xs ${
-                                    isMine ? "self-end" : "self-start"
-                                  }`}
-                                >
-                                  <span className="font-medium text-primary/80">
-                                    {msg.replyTo.senderName}
+                              <div className={`max-w-[85%] sm:max-w-[65%] ${isMine ? "items-end" : "items-start"} flex flex-col`}>
+                                {/* Sender name */}
+                                {!isMine && !isGrouped && (
+                                  <span className="mb-0.5 ml-1 text-xs font-medium text-muted-foreground">
+                                    {msg.senderName}
                                   </span>
-                                  {msg.replyTo.content && (
-                                    <p className="text-muted-foreground line-clamp-1">
-                                      {msg.replyTo.content}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                                )}
 
-                              {/* Bubble + actions (dropdown, not context menu — avoids React 19 portal crashes) */}
-                              <div
-                                className={
-                                  "flex items-start gap-1 " + (isMine ? "flex-row-reverse" : "")
-                                }
-                              >
-                                <div
-                                  className={`relative min-w-0 flex-1 rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                                    isMine
-                                      ? "rounded-br-sm bg-primary text-primary-foreground"
-                                      : "rounded-bl-sm bg-muted"
-                                  } ${msg.isPinned ? "ring-1 ring-yellow-400/70" : ""}`}
-                                >
-                                  {msg.isPinned && (
-                                    <Pin className="absolute -top-2 right-1 h-3 w-3 text-yellow-500" />
-                                  )}
-
-                                  {msg.attachments?.[0] && (
-                                    <div
-                                      className={`mb-1 flex cursor-pointer items-center gap-2 rounded-lg p-2 text-xs ${
-                                        isMine ? "bg-primary-foreground/10" : "bg-background/60"
-                                      }`}
-                                      onClick={() => {
-                                        const att = msg.attachments![0]!
-                                        void downloadAttachment({
-                                          url: att.url,
-                                          name: att.name,
-                                          mimeType: att.mimeType,
-                                        })
-                                      }}
-                                    >
-                                      <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
-                                      <div className="min-w-0">
-                                        <p className="truncate font-medium">{msg.attachments[0].name}</p>
-                                        <p className="text-muted-foreground">
-                                          {formatBytes(msg.attachments[0].sizeBytes)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {msg.content && <span className="break-words">{msg.content}</span>}
-
-                                  {msg.editedAt && (
-                                    <span className="ml-1 text-xs opacity-60">(edited)</span>
-                                  )}
-                                </div>
-
-                                <div className="relative shrink-0" data-message-actions-root="true">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className={
-                                      "h-7 w-7 shrink-0 " +
-                                      (isMine
-                                        ? "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
-                                        : "")
-                                    }
-                                    aria-label="Message actions"
-                                    onClick={() => {
-                                      setOpenMessageActionsId((id) => (id === msg.id ? null : msg.id))
-                                    }}
+                                {/* Reply-to preview */}
+                                {msg.replyTo && (
+                                  <div
+                                    className={`mb-1 max-w-full rounded border-l-2 border-primary/60 bg-muted/60 px-2 py-1 text-xs ${
+                                      isMine ? "self-end" : "self-start"
+                                    }`}
                                   >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
+                                    <span className="font-medium text-primary/80">
+                                      {msg.replyTo.senderName}
+                                    </span>
+                                    {msg.replyTo.content && (
+                                      <p className="text-muted-foreground line-clamp-1">
+                                        {msg.replyTo.content}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
 
-                                  {openMessageActionsId === msg.id && (
-                                    <div
-                                      className={
-                                        "absolute z-20 mt-1 w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-md " +
-                                        (isMine ? "right-0" : "left-0")
-                                      }
-                                    >
-                                      <button
-                                        type="button"
-                                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                {/* Bubble + actions */}
+                                <div
+                                  className={
+                                    "flex items-start gap-1 " + (isMine ? "flex-row-reverse" : "")
+                                  }
+                                >
+                                  <div
+                                    className={`relative min-w-0 flex-1 rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                                      isMine
+                                        ? "rounded-br-sm bg-primary text-primary-foreground"
+                                        : "rounded-bl-sm bg-muted"
+                                    } ${msg.isPinned ? "ring-1 ring-yellow-400/70" : ""}`}
+                                  >
+                                    {msg.isPinned && (
+                                      <Pin className="absolute -top-2 right-1 h-3 w-3 text-yellow-500" />
+                                    )}
+
+                                    {msg.attachments?.[0] && (
+                                      <div
+                                        className={`mb-1 flex cursor-pointer items-center gap-2 rounded-lg p-2 text-xs ${
+                                          isMine ? "bg-primary-foreground/10" : "bg-background/60"
+                                        }`}
                                         onClick={() => {
-                                          setOpenMessageActionsId(null)
-                                          toggleReplyTo(msg.id, {
-                                            senderName: msg.senderName,
-                                            content: msg.content || msg.attachments?.[0]?.name,
+                                          const att = msg.attachments![0]!
+                                          void downloadAttachment({
+                                            url: att.url,
+                                            name: att.name,
+                                            mimeType: att.mimeType,
                                           })
                                         }}
                                       >
-                                        <Reply className="mr-2 h-4 w-4" />
-                                        Reply
-                                      </button>
-
-                                      <div className="my-1 rounded-sm px-2 py-1.5">
-                                        <div className="mb-2 flex items-center text-xs text-muted-foreground">
-                                          <SmilePlus className="mr-2 h-4 w-4" />
-                                          React
+                                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                                        <div className="min-w-0">
+                                          <p className="truncate font-medium">{msg.attachments[0].name}</p>
+                                          <p className="text-muted-foreground">
+                                            {formatBytes(msg.attachments[0].sizeBytes)}
+                                          </p>
                                         </div>
-                                        <div className="flex flex-wrap gap-1">
-                                          {COMMON_EMOJIS.map((emoji) => (
+                                      </div>
+                                    )}
+
+                                    {msg.content && <span className="break-words">{msg.content}</span>}
+
+                                    {msg.editedAt && (
+                                      <span className="ml-1 text-xs opacity-60">(edited)</span>
+                                    )}
+                                  </div>
+
+                                  <div className="relative shrink-0" data-message-actions-root="true">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className={
+                                        "h-7 w-7 shrink-0 " +
+                                        (isMine
+                                          ? "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                                          : "")
+                                      }
+                                      aria-label="Message actions"
+                                      onClick={() => {
+                                        setOpenMessageActionsId((id) => (id === msg.id ? null : msg.id))
+                                      }}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+
+                                    {openMessageActionsId === msg.id && (
+                                      <div
+                                        className={
+                                          "absolute z-20 mt-1 w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-md " +
+                                          (isMine ? "right-0" : "left-0")
+                                        }
+                                      >
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                          onClick={() => {
+                                            setOpenMessageActionsId(null)
+                                            toggleReplyTo(msg.id, {
+                                              senderName: msg.senderName,
+                                              content: msg.content || msg.attachments?.[0]?.name,
+                                            })
+                                          }}
+                                        >
+                                          <Reply className="mr-2 h-4 w-4" />
+                                          Reply
+                                        </button>
+
+                                        <div className="my-1 rounded-sm px-2 py-1.5">
+                                          <div className="mb-2 flex items-center text-xs text-muted-foreground">
+                                            <SmilePlus className="mr-2 h-4 w-4" />
+                                            React
+                                          </div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {COMMON_EMOJIS.map((emoji) => (
+                                              <button
+                                                key={emoji}
+                                                type="button"
+                                                className={`rounded p-1 text-base hover:bg-muted ${
+                                                  msg.reactions?.myReaction === emoji ? "bg-primary/10" : ""
+                                                }`}
+                                                onClick={() => {
+                                                  setOpenMessageActionsId(null)
+                                                  void setReactionOnMessage({ messageId: msg.id, emoji })
+                                                }}
+                                              >
+                                                {emoji}
+                                              </button>
+                                            ))}
+                                          </div>
+                                          {msg.reactions?.myReaction && (
                                             <button
-                                              key={emoji}
                                               type="button"
-                                              className={`rounded p-1 text-base hover:bg-muted ${
-                                                msg.reactions?.myReaction === emoji ? "bg-primary/10" : ""
-                                              }`}
+                                              className="mt-2 flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
                                               onClick={() => {
                                                 setOpenMessageActionsId(null)
-                                                void setReactionOnMessage({ messageId: msg.id, emoji })
+                                                void setReactionOnMessage({ messageId: msg.id, emoji: null })
                                               }}
                                             >
-                                              {emoji}
+                                              Remove my reaction
                                             </button>
-                                          ))}
+                                          )}
                                         </div>
-                                        {msg.reactions?.myReaction && (
-                                          <button
-                                            type="button"
-                                            className="mt-2 flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
-                                            onClick={() => {
-                                              setOpenMessageActionsId(null)
-                                              void setReactionOnMessage({ messageId: msg.id, emoji: null })
-                                            }}
-                                          >
-                                            Remove my reaction
-                                          </button>
+
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                          onClick={() => {
+                                            setOpenMessageActionsId(null)
+                                            void togglePinMessage(msg.id)
+                                          }}
+                                        >
+                                          <Pin className="mr-2 h-4 w-4" />
+                                          {msg.isPinned ? "Unpin" : "Pin"}
+                                        </button>
+
+                                        {msg.senderId === "current" && (
+                                          <>
+                                            <div className="my-1 h-px bg-border" />
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                                              onClick={() => {
+                                                setOpenMessageActionsId(null)
+                                                void editMessage({
+                                                  messageId: msg.id,
+                                                  fallbackText: msg.content,
+                                                })
+                                              }}
+                                            >
+                                              <Pencil className="mr-2 h-4 w-4" />
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                                              onClick={() => {
+                                                setOpenMessageActionsId(null)
+                                                void deleteMessage(msg.id)
+                                              }}
+                                            >
+                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              Delete
+                                            </button>
+                                          </>
                                         )}
                                       </div>
+                                    )}
+                                  </div>
+                                </div>
 
+                                {/* Reactions */}
+                                {msg.reactions && msg.reactions.items.length > 0 && (
+                                  <div
+                                    className={`mt-0.5 flex flex-wrap gap-1 ${isMine ? "justify-end" : "justify-start"}`}
+                                  >
+                                    {msg.reactions.items.map((r) => (
                                       <button
+                                        key={r.emoji}
                                         type="button"
-                                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
-                                        onClick={() => {
-                                          setOpenMessageActionsId(null)
-                                          void togglePinMessage(msg.id)
-                                        }}
+                                        onClick={() =>
+                                          void setReactionOnMessage({ messageId: msg.id, emoji: r.emoji })
+                                        }
+                                        className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-muted ${
+                                          msg.reactions?.myReaction === r.emoji
+                                            ? "border-primary/50 bg-primary/10"
+                                            : "border-border bg-background"
+                                        }`}
                                       >
-                                        <Pin className="mr-2 h-4 w-4" />
-                                        {msg.isPinned ? "Unpin" : "Pin"}
+                                        <span>{r.emoji}</span>
+                                        <span>{r.count}</span>
                                       </button>
+                                    ))}
+                                  </div>
+                                )}
 
-                                      {msg.senderId === "current" && (
-                                        <>
-                                          <div className="my-1 h-px bg-border" />
-                                          <button
-                                            type="button"
-                                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
-                                            onClick={() => {
-                                              setOpenMessageActionsId(null)
-                                              void editMessage({
-                                                messageId: msg.id,
-                                                fallbackText: msg.content,
-                                              })
-                                            }}
-                                          >
-                                            <Pencil className="mr-2 h-4 w-4" />
-                                            Edit
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
-                                            onClick={() => {
-                                              setOpenMessageActionsId(null)
-                                              void deleteMessage(msg.id)
-                                            }}
-                                          >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
+                                {/* Timestamp + status */}
+                                <div
+                                  className={`mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground ${
+                                    isMine ? "justify-end" : "justify-start"
+                                  }`}
+                                >
+                                  <span>{formatMessageTime(msg.timestamp)}</span>
+                                  {isMine && (
+                                    <span>
+                                      {msg.status === "read" ? "✓✓" : msg.status === "delivered" ? "✓✓" : "✓"}
+                                    </span>
                                   )}
                                 </div>
-                              </div>
 
-                              {/* Reactions */}
-                              {msg.reactions && msg.reactions.items.length > 0 && (
-                                <div
-                                  className={`mt-0.5 flex flex-wrap gap-1 ${isMine ? "justify-end" : "justify-start"}`}
-                                >
-                                  {msg.reactions.items.map((r) => (
-                                    <button
-                                      key={r.emoji}
-                                      type="button"
-                                      onClick={() =>
-                                        void setReactionOnMessage({ messageId: msg.id, emoji: r.emoji })
-                                      }
-                                      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-muted ${
-                                        msg.reactions?.myReaction === r.emoji
-                                          ? "border-primary/50 bg-primary/10"
-                                          : "border-border bg-background"
-                                      }`}
-                                    >
-                                      <span>{r.emoji}</span>
-                                      <span>{r.count}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Timestamp + status */}
-                              <div
-                                className={`mt-0.5 flex items-center gap-1 text-xs text-muted-foreground ${
-                                  isMine ? "justify-end" : "justify-start"
-                                }`}
-                              >
-                                <span>{formatMessageTime(msg.timestamp)}</span>
-                                {isMine && (
-                                  <span>
-                                    {msg.status === "read" ? "✓✓" : msg.status === "delivered" ? "✓✓" : "✓"}
-                                  </span>
+                                {/* Read by */}
+                                {isMine && msg.readBy && msg.readBy.length > 0 && (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Read by {msg.readBy.join(", ")}
+                                  </p>
                                 )}
                               </div>
-
-                              {/* Read by */}
-                              {isMine && msg.readBy && msg.readBy.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  Read by {msg.readBy.join(", ")}
-                                </p>
-                              )}
                             </div>
-                          </div>
-                    )
-                  })}
-                </div>
+                          )
+                        })}
+                      </div>
 
-                {/* Scroll to bottom button */}
-                {!isAtBottom && displayMessages.length > 0 && (
-                  <div className="sticky bottom-0 flex justify-center pb-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 gap-1 rounded-full shadow-md text-xs"
-                      onClick={() => {
-                        const root = messagesScrollRootRef.current
-                        const viewport = root?.querySelector<HTMLDivElement>(
-                          '[data-slot="scroll-area-viewport"]'
-                        )
-                        viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
-                      }}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                      Scroll to bottom
-                    </Button>
+                      {/* Scroll to bottom button */}
+                      {!isAtBottom && displayMessages.length > 0 && (
+                        <div className="sticky bottom-0 flex justify-center pb-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 gap-1 rounded-full shadow-md text-xs"
+                            onClick={() => {
+                              const root = messagesScrollRootRef.current
+                              const viewport = root?.querySelector<HTMLDivElement>(
+                                '[data-slot="scroll-area-viewport"]'
+                              )
+                              viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
+                            }}
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                            Scroll to bottom
+                          </Button>
+                        </div>
+                      )}
+                    </ScrollArea>
                   </div>
-                )}
-              </ScrollArea>
-              </div>
 
-              {/* ── Typing indicator ── */}
-              {typingLabel && (
-                <div className="px-4 pb-1 text-xs text-muted-foreground italic">{typingLabel}</div>
-              )}
-
-              {/* ── Reply preview banner ── */}
-              {activeReplyPreview && replyToMessageId && (
-                <div className="flex items-center gap-2 border-t bg-muted/40 px-4 py-2 text-sm">
-                  <Reply className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <span className="font-medium text-primary">{activeReplyPreview.senderName}</span>
-                    {activeReplyPreview.content && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {activeReplyPreview.content}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => setReplyToMessageId(null)}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-
-              {/* ── Queued attachment banner ── */}
-              {queuedAttachment && (
-                <div className="flex items-center gap-2 border-t bg-muted/40 px-4 py-2 text-sm">
-                  <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <span className="truncate font-medium">{queuedAttachment.name}</span>
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      {formatBytes(queuedAttachment.size)}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => setQueuedAttachment(null)}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-
-              {/* ── Connection status banner ── */}
-              {!isConnected && roomId && (
-                <div className="flex items-center justify-center gap-1.5 border-t bg-yellow-50 px-4 py-1.5 text-xs text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Reconnecting…
-                </div>
-              )}
-
-              {/* ── Message input ── */}
-              <div className="border-t px-4 py-3">
-                {/* Hidden file input */}
-                <input
-                  ref={attachmentInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.docx,.pptx,.xlsx,.zip,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,image/jpeg,image/png"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null
-                    void handleAttachmentSelected(file)
-                    e.target.value = ""
-                  }}
-                />
-
-                <div className="flex items-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 flex-shrink-0"
-                    disabled={isUploadingAttachment || !roomId}
-                    onClick={handlePickAttachment}
-                    title="Attach file (PDF, DOCX, PPTX, XLSX, ZIP, JPG, PNG — max 5 MB)"
-                  >
-                    {isUploadingAttachment ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Paperclip className="h-4 w-4" />
-                    )}
-                  </Button>
-
-                  <Input
-                    ref={messageInputRef}
-                    className="flex-1"
-                    placeholder={`Message ${selectedProject.group.name}…`}
-                    value={messageInput}
-                    disabled={!roomId || chatRoomQuery.isLoading}
-                    onChange={(e) => handleMessageInputChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                  />
-
-                  <Button
-                    size="icon"
-                    className="h-9 w-9 flex-shrink-0"
-                    disabled={
-                      (!messageInput.trim() && !queuedAttachment) ||
-                      !roomId ||
-                      chatRoomQuery.isLoading
-                    }
-                    onClick={handleSendMessage}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Online / connection pill */}
-                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {isConnected ? (
-                    <>
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                      <span>
-                        {onlineCount > 0 ? `${onlineCount} online` : "Connected"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-                      <span>Connecting…</span>
-                    </>
+                  {/* ── Typing indicator ── */}
+                  {typingLabel && (
+                    <div className="px-4 pb-1 text-xs text-muted-foreground italic">{typingLabel}</div>
                   )}
-                  <span>· Press Enter to send</span>
-                </div>
-              </div>
-            </>
+
+                  {/* ── Reply preview banner ── */}
+                  {activeReplyPreview && replyToMessageId && (
+                    <div className="flex items-center gap-2 border-t bg-muted/40 px-4 py-2 text-sm">
+                      <Reply className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium text-primary">{activeReplyPreview.senderName}</span>
+                        {activeReplyPreview.content && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {activeReplyPreview.content}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setReplyToMessageId(null)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* ── Queued attachment banner ── */}
+                  {queuedAttachment && (
+                    <div className="flex items-center gap-2 border-t bg-muted/40 px-4 py-2 text-sm">
+                      <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate font-medium">{queuedAttachment.name}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {formatBytes(queuedAttachment.size)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setQueuedAttachment(null)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* ── Connection status banner ── */}
+                  {!isConnected && roomId && (
+                    <div className="flex items-center justify-center gap-1.5 border-t bg-yellow-50 px-4 py-1.5 text-xs text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Reconnecting…
+                    </div>
+                  )}
+
+                  {/* ── Message input ── */}
+                  <div className="border-t px-4 py-3">
+                    {/* Hidden file input */}
+                    <input
+                      ref={attachmentInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.docx,.pptx,.xlsx,.zip,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,image/jpeg,image/png"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null
+                        void handleAttachmentSelected(file)
+                        e.target.value = ""
+                      }}
+                    />
+
+                    <div className="flex items-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 flex-shrink-0"
+                        disabled={isUploadingAttachment || !roomId}
+                        onClick={handlePickAttachment}
+                        title="Attach file (PDF, DOCX, PPTX, XLSX, ZIP, JPG, PNG — max 5 MB)"
+                      >
+                        {isUploadingAttachment ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Paperclip className="h-4 w-4" />
+                        )}
+                      </Button>
+
+                      <Input
+                        ref={messageInputRef}
+                        className="flex-1"
+                        placeholder={`Message ${selectedProject.group.name}…`}
+                        value={messageInput}
+                        disabled={!roomId || chatRoomQuery.isLoading}
+                        onChange={(e) => handleMessageInputChange(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSendMessage()
+                          }
+                        }}
+                      />
+
+                      <Button
+                        size="icon"
+                        className="h-9 w-9 flex-shrink-0"
+                        disabled={
+                          (!messageInput.trim() && !queuedAttachment) ||
+                          !roomId ||
+                          chatRoomQuery.isLoading
+                        }
+                        onClick={handleSendMessage}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Online / connection pill */}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+                      {isConnected ? (
+                        <>
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                          <span>
+                            {onlineCount > 0 ? `${onlineCount} online` : "Connected"}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                          <span>Connecting…</span>
+                        </>
+                      )}
+                      <span className="hidden xs:inline">· Press Enter to send</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
       </div>
 
       {SHOW_ADVISOR_VIDEO_UI && isVideoDialogOpen ? (
