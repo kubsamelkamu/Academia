@@ -480,7 +480,7 @@ function ProjectDetailSheet({
               <Card className="border-none shadow-sm">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Evaluation sources</CardTitle>
-                  <CardDescription>Advisor and evaluator submissions that feed the backend preview calculation.</CardDescription>
+                  <CardDescription>Advisor and evaluator submissions used for final grade review.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="rounded-xl border bg-muted/20 p-4">
@@ -569,13 +569,13 @@ function ProjectDetailSheet({
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Coordinator preview step</CardTitle>
                   <CardDescription>
-                    Use backend preview to review final grades before the separate finalize step sends the project to department-head review.
+                    Review final grades before the separate finalize step sends the project to department-head review.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">
                     {readyForPreview
-                      ? "This project is ready for backend preview generation."
+                      ? "This project is ready for final grade preview."
                       : previewBlockedMessage(detail, derivedAggregationStatus ?? detail.aggregationStatus)}
                   </div>
 
@@ -625,7 +625,7 @@ function PreviewDialog({
         <DialogHeader>
           <DialogTitle>Final grade preview</DialogTitle>
           <DialogDescription>
-            Backend-generated preview for {preview?.project.title ?? "selected project"}. Review this snapshot before finalization.
+            Review the final grade snapshot for {preview?.project.title ?? "selected project"} before finalization.
           </DialogDescription>
         </DialogHeader>
 
@@ -658,7 +658,7 @@ function PreviewDialog({
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Per-student final grades</CardTitle>
                 <CardDescription>
-                  Final grade and letter grade come directly from backend preview. The frontend does not recalculate them.
+                  Final grade and letter grade are shown here for review before finalization.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -803,7 +803,7 @@ export default function GradeManagementPage() {
       setPreviewData(result)
       setPreviewOpen(true)
       toast.success("Preview generated", {
-        description: `Backend preview is ready for ${result.project.title}.`,
+        description: `Final grade preview is ready for ${result.project.title}.`,
       })
     },
     onError: (error) => {
@@ -1249,7 +1249,7 @@ export default function GradeManagementPage() {
               {
                 icon: Eye,
                 title: "Projects ready for preview",
-                desc: `${derivedProjects.filter((project) => project.aggregationStatus === "READY_FOR_AGGREGATION").length} project group(s) are ready for backend preview generation.`,
+                desc: `${derivedProjects.filter((project) => project.aggregationStatus === "READY_FOR_AGGREGATION").length} project group(s) are ready for final grade preview.`,
                 cta: "Refresh status",
                 action: () => dashboardQuery.refetch(),
                 disabled: dashboardQuery.isFetching,
