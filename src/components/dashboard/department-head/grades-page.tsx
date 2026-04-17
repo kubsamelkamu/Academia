@@ -249,7 +249,7 @@ function ProjectDetailDialog({
         <DialogHeader>
           <DialogTitle>{detail?.project.title ?? summaryProject?.projectTitle ?? "Project review"}</DialogTitle>
           <DialogDescription>
-            Review the finalized backend snapshot, raw advisor and evaluator comments, and chronological review history.
+            Review the finalized grade snapshot, raw advisor and evaluator comments, and chronological review history.
           </DialogDescription>
         </DialogHeader>
 
@@ -321,7 +321,7 @@ function ProjectDetailDialog({
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Final result summary</CardTitle>
                 <CardDescription>
-                  Finalized metadata and department-head review context from the backend snapshot.
+                  Finalized metadata and department-head review context for this result.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -386,7 +386,7 @@ function ProjectDetailDialog({
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Per-student final grades</CardTitle>
                 <CardDescription>
-                  Final grades, letter grades, and raw advisor and evaluator comments from the finalized backend result.
+                  Final grades, letter grades, and raw advisor and evaluator comments from the finalized result.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -897,7 +897,7 @@ export function DepartmentHeadGradesPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">Finalized project groups</CardTitle>
-                  <CardDescription>Backend-driven list of finalized results for department-head review.</CardDescription>
+                  <CardDescription>List of finalized results currently in department-head review.</CardDescription>
                 </div>
                 <Badge variant="secondary">{filteredProjects.length} items</Badge>
               </div>
