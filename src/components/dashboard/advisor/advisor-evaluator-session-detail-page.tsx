@@ -432,12 +432,6 @@ function SessionDetailContent({ session }: { session: ScheduledSessionDetail }) 
                   <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </Link>
               </Button>
-              <Button variant="outline" size="lg" className="h-12 min-h-12 rounded-xl" asChild>
-                <Link href="/dashboard/advisor/evaluator/documents">
-                  <FileText className="mr-2 h-5 w-5" aria-hidden />
-                  Document library
-                </Link>
-              </Button>
               <Button variant="secondary" size="lg" className="h-12 min-h-12 rounded-xl" asChild>
                 <Link href="/dashboard/advisor/evaluator/scheduled">
                   <CheckCircle className="mr-2 h-5 w-5" aria-hidden />

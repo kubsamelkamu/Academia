@@ -1,10 +1,11 @@
 "use client"
 
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { useSidebarStore } from "@/store/sidebar-store"
 import { Sidebar } from "./sidebar"
 import { type UserRole } from "@/config/navigation"
-import { useEffect, useRef, useState, startTransition } from "react"
+import { useEffect, useRef, startTransition } from "react"
 import { usePathname } from "next/navigation"
 
 interface MobileSidebarProps {
@@ -18,10 +19,10 @@ interface MobileSidebarProps {
 }
 
 export function MobileSidebar({ user }: MobileSidebarProps) {
-  const [isClient, setIsClient] = useState(false)
   const { isOpen, close } = useSidebarStore()
   const pathname = usePathname()
   const previousPathnameRef = useRef(pathname)
+  const isMobileViewport = useMediaQuery("(max-width: 1023px)")
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -30,9 +31,12 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsClient(true)
-  }, [])
+    if (isMobileViewport || !isOpen) {
+      return
+    }
+
+    close()
+  }, [close, isMobileViewport, isOpen])
 
   useEffect(() => {
     const previousPathname = previousPathnameRef.current
@@ -48,14 +52,14 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
     // Defer close so route + portal trees finish reconciling (avoids removeChild on null with React 19 / Radix).
     startTransition(() => close())
-  }, [close, isOpen, pathname])
+  }, [close, isMobileViewport, isOpen, pathname])
 
-  if (!isClient) {
+  if (!isMobileViewport) {
     return null
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
+    <Sheet open={isOpen} onOpenChange={handleOpenChange} modal={false}>
       <SheetContent side="left" className="flex h-full w-72 flex-col gap-0 overflow-hidden p-0 sm:max-w-sm">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <SheetDescription className="sr-only">

@@ -1,19 +1,16 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ArrowLeft,
   BadgeCheck,
   CheckCircle2,
   ClipboardCheck,
-  Clock,
   Eye,
-  Filter,
-  History,
   Scale,
-  Search,
   Settings2,
   ShieldAlert,
   Sparkles,
@@ -22,14 +19,17 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { getErrorMessage } from "@/lib/api/errors"
+import {
+  getCoordinatorEvaluationWeights,
+  updateCoordinatorEvaluationWeights,
+  type CoordinatorEvaluationStage,
+} from "@/lib/api/coordinator-evaluations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -46,16 +46,9 @@ interface RubricCriterion {
   category: string
 }
 
-interface EvaluationHistoryItem {
-  id: string
-  projectTitle: string
-  groupName: string
-  phase: EvaluationPhase
-  evaluator: string
-  role: EvaluatorType
-  action: "draft_saved" | "submitted" | "reviewed" | "adjusted"
-  timestamp: string
-  score: number
+interface WeightDraft {
+  advisorWeight: number
+  examinerWeight: number
 }
 
 const DEFAULT_CRITERIA: RubricCriterion[] = [
@@ -68,29 +61,44 @@ const DEFAULT_CRITERIA: RubricCriterion[] = [
   { id: "c7", label: "Defense presentation and Q&A", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Defense Performance" },
 ]
 
-const INITIAL_HISTORY: EvaluationHistoryItem[] = [
-  { id: "h1", projectTitle: "AI-Driven Academic Assistant", groupName: "AI Research Group", phase: "documentation", evaluator: "Prof. Lisa Anderson", role: "advisor", action: "submitted", timestamp: "2026-03-28 09:30", score: 36 },
-  { id: "h2", projectTitle: "AI-Driven Academic Assistant", groupName: "AI Research Group", phase: "documentation", evaluator: "Dr. David Martinez", role: "examiner", action: "reviewed", timestamp: "2026-03-29 13:10", score: 41 },
-  { id: "h3", projectTitle: "Campus Energy Monitoring Dashboard", groupName: "Data Analytics Team", phase: "demonstration", evaluator: "Dr. Robert Taylor", role: "advisor", action: "adjusted", timestamp: "2026-03-31 16:45", score: 28 },
-  { id: "h4", projectTitle: "Smart Campus Navigation System", groupName: "Mobile Dev Team", phase: "demonstration", evaluator: "Dr. Michael Brown", role: "examiner", action: "draft_saved", timestamp: "2026-04-01 08:05", score: 34 },
-]
-
-const ACTION_LABELS: Record<EvaluationHistoryItem["action"], string> = {
-  draft_saved: "Draft Saved",
-  submitted: "Submitted",
-  reviewed: "Reviewed",
-  adjusted: "Adjusted",
-}
+const CAPSTONE_ONE_STAGE: CoordinatorEvaluationStage = "CAPSTONE_I"
 
 export default function EvaluationSetupPage() {
+  const queryClient = useQueryClient()
   const [criteria, setCriteria] = useState<RubricCriterion[]>(DEFAULT_CRITERIA)
-  const [advisorWeight, setAdvisorWeight] = useState(40)
-  const [examinerWeight, setExaminerWeight] = useState(60)
-  const [historySearch, setHistorySearch] = useState("")
-  const [historyRoleFilter, setHistoryRoleFilter] = useState<EvaluatorType | "all">("all")
+  const [weightDraft, setWeightDraft] = useState<WeightDraft | null>(null)
   const [policyNote, setPolicyNote] = useState(
     "One instructor can be advisor or examiner, but not both for the same project. Keep documentation and demonstration rubrics balanced by phase."
   )
+
+  const weightsQuery = useQuery({
+    queryKey: ["coordinator", "evaluation-weights", CAPSTONE_ONE_STAGE],
+    queryFn: () => getCoordinatorEvaluationWeights(CAPSTONE_ONE_STAGE),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const saveWeightsMutation = useMutation({
+    mutationFn: updateCoordinatorEvaluationWeights,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["coordinator", "evaluation-weights", data.stage], data)
+      setWeightDraft({
+        advisorWeight: data.advisorPercentage,
+        examinerWeight: data.evaluatorPercentage,
+      })
+      toast.success("Weight profile saved", {
+        description: `Capstone I weights updated to advisor ${data.advisorPercentage}% and examiner ${data.evaluatorPercentage}%.`,
+      })
+    },
+    onError: (error) => {
+      toast.error("Failed to save weight profile", {
+        description: getErrorMessage(error, "Please try again."),
+      })
+    },
+  })
+
+  const advisorWeight = weightDraft?.advisorWeight ?? weightsQuery.data?.advisorPercentage ?? 40
+  const examinerWeight = weightDraft?.examinerWeight ?? weightsQuery.data?.evaluatorPercentage ?? 60
 
   const totalWeight = advisorWeight + examinerWeight
   const advisorCriteria = criteria.filter((item) => item.evaluator === "advisor")
@@ -98,31 +106,35 @@ export default function EvaluationSetupPage() {
   const advisorCriteriaTotal = advisorCriteria.reduce((sum, item) => sum + item.weight, 0)
   const examinerCriteriaTotal = examinerCriteria.reduce((sum, item) => sum + item.weight, 0)
 
-  const filteredHistory = useMemo(() => {
-    const q = historySearch.trim().toLowerCase()
-    return INITIAL_HISTORY.filter((item) => {
-      const matchesQuery =
-        !q ||
-        item.projectTitle.toLowerCase().includes(q) ||
-        item.groupName.toLowerCase().includes(q) ||
-        item.evaluator.toLowerCase().includes(q)
-      const matchesRole = historyRoleFilter === "all" || item.role === historyRoleFilter
-      return matchesQuery && matchesRole
-    })
-  }, [historyRoleFilter, historySearch])
-
   const handleWeightChange = (role: EvaluatorType, value: number) => {
     if (role === "advisor") {
-      setAdvisorWeight(value)
-      setExaminerWeight(100 - value)
+      setWeightDraft({
+        advisorWeight: value,
+        examinerWeight: 100 - value,
+      })
     } else {
-      setExaminerWeight(value)
-      setAdvisorWeight(100 - value)
+      setWeightDraft({
+        advisorWeight: 100 - value,
+        examinerWeight: value,
+      })
     }
   }
 
   const updateCriterionWeight = (id: string, nextWeight: number) => {
     setCriteria((current) => current.map((item) => (item.id === id ? { ...item, weight: nextWeight } : item)))
+  }
+
+  const handleSaveWeightProfile = () => {
+    if (totalWeight !== 100) {
+      toast.error("Weight total must equal 100%")
+      return
+    }
+
+    saveWeightsMutation.mutate({
+      stage: CAPSTONE_ONE_STAGE,
+      advisorPercentage: advisorWeight,
+      evaluatorPercentage: examinerWeight,
+    })
   }
 
   return (
@@ -153,21 +165,20 @@ export default function EvaluationSetupPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         {[
           { label: "Advisor Weight", value: `${advisorWeight}%`, icon: Users },
           { label: "Examiner Weight", value: `${examinerWeight}%`, icon: ClipboardCheck },
-          { label: "History Events", value: filteredHistory.length, icon: History },
           { label: "Policy Health", value: totalWeight === 100 ? "Balanced" : "Review", icon: totalWeight === 100 ? CheckCircle2 : AlertTriangle },
         ].map((item) => (
           <Card key={item.label} className="border-none shadow-sm">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <CardContent className="flex min-h-28 items-start gap-4 p-4 sm:min-h-32 sm:items-center sm:p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 sm:h-12 sm:w-12">
                 <item.icon className="h-5 w-5 text-primary" />
               </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight">{item.value}</p>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
+              <div className="space-y-1.5">
+                <p className="text-2xl font-bold tracking-tight sm:text-3xl">{item.value}</p>
+                <p className="text-sm text-muted-foreground">{item.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -175,11 +186,25 @@ export default function EvaluationSetupPage() {
       </div>
 
       <Tabs defaultValue="weights" className="space-y-4">
-        <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap">
-          <TabsTrigger value="weights" className="gap-1.5 text-xs"><Scale className="h-3.5 w-3.5" /> Weights</TabsTrigger>
-          <TabsTrigger value="rubric" className="gap-1.5 text-xs"><Target className="h-3.5 w-3.5" /> Rubric Setup</TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5 text-xs"><History className="h-3.5 w-3.5" /> History</TabsTrigger>
-          <TabsTrigger value="policy" className="gap-1.5 text-xs"><ShieldAlert className="h-3.5 w-3.5" /> Policy Guard</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
+          <TabsTrigger
+            value="weights"
+            className="h-11 gap-1.5 rounded-lg border border-border/60 bg-background px-4 text-xs shadow-sm transition-all data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm"
+          >
+            <Scale className="h-3.5 w-3.5" /> Weights
+          </TabsTrigger>
+          <TabsTrigger
+            value="rubric"
+            className="h-11 gap-1.5 rounded-lg border border-border/60 bg-background px-4 text-xs shadow-sm transition-all data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm"
+          >
+            <Target className="h-3.5 w-3.5" /> Rubric Setup
+          </TabsTrigger>
+          <TabsTrigger
+            value="policy"
+            className="h-11 gap-1.5 rounded-lg border border-border/60 bg-background px-4 text-xs shadow-sm transition-all data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" /> Policy Guard
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="weights">
@@ -187,7 +212,7 @@ export default function EvaluationSetupPage() {
             <Card className="border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Role Weight Configuration</CardTitle>
-                <CardDescription>UI-only controls for the final score contribution of advisor and examiner roles.</CardDescription>
+                <CardDescription>Capstone I role weights are loaded from and saved to the backend configuration.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -195,14 +220,14 @@ export default function EvaluationSetupPage() {
                     <span>Advisor weight</span>
                     <span className="font-semibold text-primary">{advisorWeight}%</span>
                   </div>
-                  <Slider value={[advisorWeight]} min={10} max={90} step={5} onValueChange={([value]) => handleWeightChange("advisor", value)} />
+                  <Slider value={[advisorWeight]} min={10} max={90} step={5} onValueChange={([value]) => handleWeightChange("advisor", value)} disabled={saveWeightsMutation.isPending || weightsQuery.isLoading} />
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span>Examiner weight</span>
                     <span className="font-semibold text-primary">{examinerWeight}%</span>
                   </div>
-                  <Slider value={[examinerWeight]} min={10} max={90} step={5} onValueChange={([value]) => handleWeightChange("examiner", value)} />
+                  <Slider value={[examinerWeight]} min={10} max={90} step={5} onValueChange={([value]) => handleWeightChange("examiner", value)} disabled={saveWeightsMutation.isPending || weightsQuery.isLoading} />
                 </div>
                 <div className="rounded-xl border bg-muted/20 p-4">
                   <div className="flex items-center justify-between text-sm">
@@ -213,9 +238,10 @@ export default function EvaluationSetupPage() {
                 </div>
                 <Button
                   className="gap-2"
-                  onClick={() => toast.success("Weight profile saved", { description: `Advisor ${advisorWeight}% and examiner ${examinerWeight}% were stored in the UI preset.` })}
+                  onClick={handleSaveWeightProfile}
+                  disabled={saveWeightsMutation.isPending || weightsQuery.isLoading}
                 >
-                  <BadgeCheck className="h-4 w-4" /> Save weight profile
+                  <BadgeCheck className="h-4 w-4" /> {saveWeightsMutation.isPending ? "Saving weight profile..." : "Save weight profile"}
                 </Button>
               </CardContent>
             </Card>
@@ -287,61 +313,6 @@ export default function EvaluationSetupPage() {
                       </span>
                     </div>
                     <Progress value={(item.value / Math.max(item.target, 1)) * 100} className="h-2" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="history">
-          <div className="space-y-4">
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-3 md:flex-row">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Search evaluation history..." className="pl-9" />
-                  </div>
-                  <Select value={historyRoleFilter} onValueChange={(value) => setHistoryRoleFilter(value as EvaluatorType | "all")}>
-                    <SelectTrigger className="w-full md:w-44">
-                      <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="advisor">Advisor</SelectItem>
-                      <SelectItem value="examiner">Examiner</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Evaluation History</CardTitle>
-                <CardDescription>Timeline of UI-visible evaluator and advisor actions.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {filteredHistory.map((item, index) => (
-                  <div key={item.id}>
-                    {index > 0 && <Separator className="mb-3" />}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <p className="font-medium">{item.projectTitle}</p>
-                        <p className="text-sm text-muted-foreground">{item.groupName} · {item.evaluator}</p>
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <Badge variant="outline">{item.phase}</Badge>
-                          <Badge variant="outline">{item.role}</Badge>
-                          <Badge variant="outline">{ACTION_LABELS[item.action]}</Badge>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm">
-                        <p className="font-semibold text-primary">{item.score}%</p>
-                        <p className="text-xs text-muted-foreground">{item.timestamp}</p>
-                      </div>
-                    </div>
                   </div>
                 ))}
               </CardContent>

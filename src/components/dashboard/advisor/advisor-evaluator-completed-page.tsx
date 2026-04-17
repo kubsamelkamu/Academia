@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   ArrowLeft,
@@ -37,8 +38,18 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { mockEvaluations, mockProjects, formatDate, type Evaluation } from "@/data/mockData"
+import { type AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
+
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
 
 function maxScore(e: Evaluation): number {
   return (e as Evaluation & { maxScore?: number }).maxScore ?? 100
@@ -55,6 +66,12 @@ function projectLabel(projectId: string): { title: string; group: string } {
 type StatusFilter = "all" | "submitted" | "reviewed"
 
 export function AdvisorEvaluatorCompletedPage() {
+  const searchParams = useSearchParams()
+  const activeStage = React.useMemo(
+    () => normalizeDashboardStage(searchParams.get("stage")),
+    [searchParams],
+  )
+  const stageLabel = formatDashboardStageLabel(activeStage)
   const completedEvaluations = React.useMemo(
     () => mockEvaluations.filter((e) => e.status === "submitted" || e.status === "reviewed"),
     [],
@@ -188,8 +205,8 @@ export function AdvisorEvaluatorCompletedPage() {
             </Link>
           </Button>
           <PageHeader
-            title="Completed evaluations"
-            description="Submitted and reviewed records in your advisor evaluator workspace — search, filter, and open detail views."
+            title={`Completed ${stageLabel} evaluations`}
+            description={`Submitted and reviewed ${stageLabel} records in your advisor evaluator workspace — search, filter, and open detail views.`}
           />
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -200,7 +217,7 @@ export function AdvisorEvaluatorCompletedPage() {
             </Link>
           </Button>
           <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/pending">
+            <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>
               <ClipboardCheck className="h-4 w-4" aria-hidden />
               Pending queue
             </Link>
@@ -280,9 +297,9 @@ export function AdvisorEvaluatorCompletedPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" aria-hidden />
-                    <CardTitle className="text-base">Most recent</CardTitle>
+                    <CardTitle className="text-base">Most recent {stageLabel}</CardTitle>
                   </div>
-                  <CardDescription>Newest submissions first (demo data).</CardDescription>
+                  <CardDescription>Newest {stageLabel} submissions first.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 pt-0">
                   {recentEvaluations.map((e) => {
@@ -317,7 +334,7 @@ export function AdvisorEvaluatorCompletedPage() {
             <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b border-border/50 bg-muted/10 pb-3">
                 <CardTitle className="text-base">Find evaluations</CardTitle>
-                <CardDescription>Filter the table by project text or submission status.</CardDescription>
+                <CardDescription>Filter the {stageLabel} table by project text or submission status.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-end">
                 <div className="relative flex-1">
@@ -355,13 +372,13 @@ export function AdvisorEvaluatorCompletedPage() {
                 <div>
                   <CardTitle className="text-lg">Evaluation history</CardTitle>
                   <CardDescription>
-                    {filteredEvaluations.length} record{filteredEvaluations.length === 1 ? "" : "s"}
+                    {filteredEvaluations.length} {stageLabel} record{filteredEvaluations.length === 1 ? "" : "s"}
                     {search.trim() || statusFilter !== "all" ? " (filtered)" : ""} — add server pagination when your API
                     is ready.
                   </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" className="h-10 w-full shrink-0 sm:w-auto" asChild>
-                  <Link href="/dashboard/advisor/evaluator/pending">
+                  <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>
                     <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
                     Pending queue
                   </Link>
@@ -372,12 +389,12 @@ export function AdvisorEvaluatorCompletedPage() {
                   {completedEvaluations.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
                       <FileText className="h-10 w-10 text-muted-foreground/40" aria-hidden />
-                      <p className="font-medium">No completed evaluations yet</p>
+                      <p className="font-medium">No completed {stageLabel} evaluations yet</p>
                       <p className="max-w-sm text-sm text-muted-foreground">
-                        Finished reviews will appear here once submitted.
+                        Finished {stageLabel} reviews will appear here once submitted.
                       </p>
                       <Button variant="outline" size="sm" className="mt-2" asChild>
-                        <Link href="/dashboard/advisor/evaluator/pending">Review pending</Link>
+                        <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>Review pending</Link>
                       </Button>
                     </div>
                   ) : filteredEvaluations.length === 0 ? (
@@ -442,12 +459,6 @@ export function AdvisorEvaluatorCompletedPage() {
               records.
             </p>
             <div className="flex flex-col gap-2">
-              <Button variant="outline" size="sm" className="justify-start rounded-lg" asChild>
-                <Link href="/dashboard/advisor/evaluator/documents">
-                  <FileText className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                  Documents
-                </Link>
-              </Button>
               <Button variant="outline" size="sm" className="justify-start rounded-lg" asChild>
                 <Link href="/dashboard/advisor/evaluator/projects">
                   <FolderKanban className="mr-2 h-4 w-4 shrink-0" aria-hidden />

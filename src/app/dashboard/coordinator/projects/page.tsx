@@ -100,6 +100,7 @@ function formatAdvisorName(advisor: DepartmentProjectAdvisorDirectoryItem) {
   return fullName || advisor.user?.email?.trim() || 'Advisor'
 }
 
+
 function formatEligibleEvaluatorName(firstName?: string | null, lastName?: string | null, email?: string | null) {
   const first = firstName?.trim() ?? ''
   const last = lastName?.trim() ?? ''

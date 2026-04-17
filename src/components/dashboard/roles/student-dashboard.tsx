@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { getErrorMessage } from "@/lib/api/errors"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,11 +12,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyGroupAnnouncements, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
+import {
+  getStudentFinalGrade,
+  type StudentFinalGradeResponse,
+} from "@/lib/api/student-final-grades"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useMyGroupProposals } from "@/lib/hooks/use-project-proposals"
 import { useProjectDetails } from "@/lib/hooks/use-projects"
-import type { ProjectDetail } from "@/types/projects"
 import {
   addDays,
   getActiveMilestoneTemplate,
@@ -25,6 +30,7 @@ import {
   toProposalMilestoneState,
 } from "@/lib/student-milestone-helpers"
 import {
+  AlertTriangle,
   BarChart3,
   Calendar,
   CheckCircle2,
@@ -39,21 +45,6 @@ interface Milestone {
   status: "pending" | "submitted" | "approved" | "overdue"
   dueDate: string
   sequence?: number
-}
-
-type CapstoneGradeSlice = {
-  letter: string | null
-  percent: number | null
-}
-
-interface GradeSummary {
-  advisorScore: number
-  evaluatorScores: number[]
-  finalScore: number
-  grade: string
-  status: "final" | "provisional" | "pending"
-  capstone1: CapstoneGradeSlice
-  capstone2: CapstoneGradeSlice
 }
 
 interface TeamMember {
@@ -75,7 +66,6 @@ interface StudentProjectOverview {
 
 interface StudentDashboardData {
   project: StudentProjectOverview
-  grade: GradeSummary | null
 }
 
 function useLiveTime(intervalMs = 1000): Date {
@@ -105,26 +95,6 @@ function mapMilestoneStatus(status: string): Milestone["status"] {
   if (normalized === "submitted") return "submitted"
   if (normalized === "overdue" || normalized === "rejected") return "overdue"
   return "pending"
-}
-
-function getAnnouncementActionLabel(
-  actionType: string | null | undefined,
-  actionLabel: string | null | undefined
-): string {
-  if (actionLabel?.trim()) return actionLabel.trim()
-
-  switch (actionType) {
-    case "FORM_PROJECT_GROUP":
-      return "Form Group"
-    case "SUBMIT_PROPOSAL":
-      return "Submit Proposal"
-    case "UPLOAD_DOCUMENT":
-      return "Upload Document"
-    case "REGISTER_PRESENTATION":
-      return "Register Presentation"
-    default:
-      return "Open Announcement"
-  }
 }
 
 type CountdownParts = {
@@ -192,62 +162,30 @@ function buildEmptyDashboardData(): StudentDashboardData {
       nextDeadlineLabel: "",
       nextDeadlineDays: 0,
     },
-    grade: null,
   }
 }
 
-function formatCapstoneGradeLine(slice: CapstoneGradeSlice | undefined): string {
-  if (!slice) return "—"
-  const { letter, percent } = slice
-  if (letter?.trim() && percent != null && !Number.isNaN(percent)) {
-    return `${letter.trim()} (${Math.round(percent)}%)`
-  }
-  if (letter?.trim()) return letter.trim()
-  if (percent != null && !Number.isNaN(percent)) return `${Math.round(percent)}%`
-  return "—"
+function hasProjectContext(response: StudentFinalGradeResponse | null | undefined) {
+  return Boolean(response && "project" in response)
 }
 
-function buildGradeSummaryFromProject(pd: ProjectDetail | null | undefined): GradeSummary | null {
-  if (!pd) return null
+function formatDateTime(dateString: string | null | undefined): string {
+  if (!dateString) return "Not available"
 
-  const capstone1: CapstoneGradeSlice = {
-    letter: pd.capstone1Grade?.trim() ? pd.capstone1Grade.trim() : null,
-    percent:
-      pd.capstone1FinalScore != null && !Number.isNaN(Number(pd.capstone1FinalScore))
-        ? Number(pd.capstone1FinalScore)
-        : null,
-  }
-  const capstone2: CapstoneGradeSlice = {
-    letter: pd.capstone2Grade?.trim() ? pd.capstone2Grade.trim() : null,
-    percent:
-      pd.capstone2FinalScore != null && !Number.isNaN(Number(pd.capstone2FinalScore))
-        ? Number(pd.capstone2FinalScore)
-        : null,
-  }
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return dateString
 
-  const hasCapstone =
-    capstone1.letter != null ||
-    capstone1.percent != null ||
-    capstone2.letter != null ||
-    capstone2.percent != null
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
 
-  if (!hasCapstone) return null
-
-  const percents = [capstone1.percent, capstone2.percent].filter(
-    (n): n is number => n != null && !Number.isNaN(n)
-  )
-  const finalScore =
-    percents.length > 0 ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : 0
-
-  return {
-    advisorScore: 0,
-    evaluatorScores: [],
-    finalScore,
-    grade: "—",
-    status: "pending",
-    capstone1,
-    capstone2,
-  }
+function formatFinalGradeValue(value: number, digits: number): string {
+  return value.toFixed(digits)
 }
 
 interface StudentDashboardProps {
@@ -311,6 +249,14 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     enabled: Boolean(accessToken),
     page: 1,
     limit: 20,
+  })
+
+  const studentFinalGradeQuery = useQuery({
+    queryKey: ["student", "final-grade", "CAPSTONE_I"],
+    queryFn: () => getStudentFinalGrade("CAPSTONE_I"),
+    enabled: Boolean(accessToken),
+    staleTime: 30_000,
+    retry: 1,
   })
 
   const backendMilestones = useMemo<Milestone[]>(() => {
@@ -388,17 +334,9 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     })
   }, [milestonesData?.items, myGroupProposalsQuery.data, templatesData?.templates])
 
-  const gradeFromProject = useMemo(
-    () => buildGradeSummaryFromProject(projectDetailsQuery.data ?? null),
-    [projectDetailsQuery.data]
-  )
-
   const data = useMemo(() => {
     const emptyData = buildEmptyDashboardData()
-    const base: StudentDashboardData = {
-      ...emptyData,
-      grade: gradeFromProject,
-    }
+    const base: StudentDashboardData = { ...emptyData }
 
     if (!backendMilestones.length) return base
 
@@ -427,7 +365,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         nextDeadlineDays,
       },
     }
-  }, [backendMilestones, gradeFromProject])
+  }, [backendMilestones])
 
   const activeTemplate = useMemo(() => {
     const templates = templatesData?.templates ?? []
@@ -628,22 +566,60 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const completedMilestones = backendMilestones.filter((milestone) => milestone.status === "approved").length
   const totalMilestones = backendMilestones.length
 
-  const evaluatorAverage =
-    data.grade && data.grade.evaluatorScores.length > 0
-      ? data.grade.evaluatorScores.reduce((sum, n) => sum + n, 0) /
-        data.grade.evaluatorScores.length
+  const studentFinalGrade = studentFinalGradeQuery.data ?? null
+  const studentGradeErrorMessage = studentFinalGradeQuery.isError
+    ? getErrorMessage(studentFinalGradeQuery.error, "Failed to load your final grade.")
+    : null
+  const publishedStudentFinalGrade =
+    studentFinalGrade && studentFinalGrade.isPublished && studentFinalGrade.status === "APPROVED"
+      ? studentFinalGrade
       : null
+  const studentGradeStatusLabel = studentFinalGradeQuery.isLoading
+    ? "Loading"
+    : studentFinalGradeQuery.isError
+      ? "Unavailable"
+      : studentFinalGrade?.status === "APPROVED"
+        ? "Published"
+        : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+          ? "Pending approval"
+          : studentFinalGrade?.status === "REJECTED"
+            ? "Under review"
+            : "Not available"
+  const studentGradeStatusTone = studentFinalGradeQuery.isError
+    ? "destructive"
+    : publishedStudentFinalGrade
+      ? "default"
+      : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+        ? "secondary"
+        : "outline"
+  const studentGradeProject = hasProjectContext(studentFinalGrade) ? studentFinalGrade.project : null
+  const studentGradeGroup = hasProjectContext(studentFinalGrade) ? studentFinalGrade.group : null
+  const studentGradeKpiMessage = studentFinalGradeQuery.isLoading
+    ? "Checking publication status for your final result."
+    : studentFinalGradeQuery.isError
+      ? "Your final-grade status could not be loaded right now."
+      : publishedStudentFinalGrade
+        ? `Published ${formatDate(publishedStudentFinalGrade.publishedAt ?? publishedStudentFinalGrade.finalizedAt)}`
+        : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+          ? "Your final grade has been prepared and is awaiting department-head approval."
+          : studentFinalGrade?.status === "REJECTED"
+            ? "Your final grade is being reviewed again and is not published yet."
+            : "Your final grade is not available yet."
+    const capstone1KpiValue = publishedStudentFinalGrade
+      ? `${publishedStudentFinalGrade.scores.letterGrade} (${formatFinalGradeValue(
+          publishedStudentFinalGrade.scores.finalGrade,
+          publishedStudentFinalGrade.roundedToDecimalPlaces
+        )}%)`
+      : studentGradeStatusLabel
+    const capstone2KpiValue = "Not available"
+    const studentGradesFootnote = publishedStudentFinalGrade
+      ? `Capstone I published ${formatDate(publishedStudentFinalGrade.publishedAt ?? publishedStudentFinalGrade.finalizedAt)}.`
+      : "Capstone II final grades will appear here when that stage is supported."
 
   const handleViewProject = () => {
     toast.message("Tip", {
       description:
         "Open the My Project section from the left sidebar to see full project details and submissions.",
-    })
-  }
-
-  const handleFileConcern = () => {
-    toast.warning("Grade concern submitted", {
-      description: "Your coordinator will review your concern and get back to you.",
     })
   }
 
@@ -724,21 +700,19 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           </CardHeader>
           <CardContent className="space-y-2 px-3 pb-0 pt-0 sm:space-y-2.5 sm:px-6 sm:pb-6">
             <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
-              <span className="shrink-0 text-muted-foreground">Capstone 1</span>
-              <span className="min-w-0 text-right font-semibold tabular-nums text-foreground">
-                {formatCapstoneGradeLine(data.grade?.capstone1)}
+              <span className="shrink-0 text-muted-foreground">Capstone I</span>
+              <span className="min-w-0 break-words text-right font-semibold tabular-nums text-foreground">
+                {capstone1KpiValue}
               </span>
             </div>
             <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
-              <span className="shrink-0 text-muted-foreground">Capstone 2</span>
-              <span className="min-w-0 text-right font-semibold tabular-nums text-foreground">
-                {formatCapstoneGradeLine(data.grade?.capstone2)}
+              <span className="shrink-0 text-muted-foreground">Capstone II</span>
+              <span className="min-w-0 break-words text-right font-semibold tabular-nums text-muted-foreground">
+                {capstone2KpiValue}
               </span>
             </div>
-            <p className="border-t border-border/60 pt-2 text-[9px] text-muted-foreground sm:text-[10px]">
-              {data.grade
-                ? "Official grades appear when your department publishes them."
-                : "Capstone I & II grades will show here when published."}
+            <p className="border-t border-border/60 pt-2 text-[9px] leading-relaxed text-muted-foreground sm:text-[10px]">
+              {publishedStudentFinalGrade ? studentGradesFootnote : `${studentGradeKpiMessage} ${studentGradesFootnote}`}
             </p>
           </CardContent>
         </Card>
@@ -998,89 +972,153 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         {/* Grades */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <CardTitle className="flex flex-col items-start gap-2 text-base sm:flex-row sm:items-center sm:justify-between">
               <span className="min-w-0">My Grades</span>
-              {data.grade ? (
+              {!studentFinalGradeQuery.isLoading ? (
                 <Badge
-                  variant={
-                    data.grade.status === "provisional"
-                      ? "secondary"
-                      : data.grade.status === "final"
-                        ? "default"
-                        : "outline"
-                  }
-                  className="capitalize"
+                  variant={studentGradeStatusTone}
+                  className="capitalize self-start sm:self-auto"
                 >
-                  {data.grade.status}
+                  {studentGradeStatusLabel}
                 </Badge>
               ) : null}
             </CardTitle>
+            <CardDescription>
+              Read-only final grade visibility for Capstone I.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {data.grade ? (
+            {studentFinalGradeQuery.isLoading ? (
+              <div className="space-y-3">
+                <div className="h-24 animate-pulse rounded-lg bg-muted" />
+                <div className="h-28 animate-pulse rounded-lg bg-muted" />
+              </div>
+            ) : studentGradeErrorMessage ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Unable to load your final grade</p>
+                    <p className="text-xs text-muted-foreground">{studentGradeErrorMessage}</p>
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => studentFinalGradeQuery.refetch()}>
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : publishedStudentFinalGrade ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Capstone I</p>
-                    <p className="mt-1 text-lg font-semibold sm:text-xl">
-                      {formatCapstoneGradeLine(data.grade.capstone1)}
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-lg border bg-primary/10 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Final grade</p>
+                    <p className="mt-1 break-words text-xl font-semibold text-primary sm:text-2xl">
+                      {formatFinalGradeValue(
+                        publishedStudentFinalGrade.scores.finalGrade,
+                        publishedStudentFinalGrade.roundedToDecimalPlaces
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-emerald-50 p-3 dark:bg-emerald-900/20">
+                    <p className="text-xs font-medium text-muted-foreground">Letter grade</p>
+                    <p className="mt-1 break-words text-xl font-semibold text-emerald-600 dark:text-emerald-400 sm:text-2xl">
+                      {publishedStudentFinalGrade.scores.letterGrade}
                     </p>
                   </div>
                   <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Capstone II</p>
-                    <p className="mt-1 text-lg font-semibold sm:text-xl">
-                      {formatCapstoneGradeLine(data.grade.capstone2)}
+                    <p className="text-xs font-medium text-muted-foreground">Advisor score</p>
+                    <p className="mt-1 break-words text-lg font-semibold">
+                      {publishedStudentFinalGrade.scores.advisorScore}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Evaluator average</p>
+                    <p className="mt-1 break-words text-lg font-semibold">
+                      {publishedStudentFinalGrade.scores.evaluatorAverageScore}
                     </p>
                   </div>
                 </div>
 
-                {(data.grade.advisorScore > 0 ||
-                  data.grade.evaluatorScores.length > 0 ||
-                  (data.grade.grade && data.grade.grade !== "—")) ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg bg-muted/40 p-3">
-                      <p className="text-xs text-muted-foreground">Advisor score</p>
-                      <p className="mt-1 text-xl font-semibold">
-                        {data.grade.advisorScore}/40
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Project</p>
+                    <p className="mt-1 break-words text-sm font-semibold">{publishedStudentFinalGrade.project.title}</p>
+                    <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
+                      {publishedStudentFinalGrade.group?.name ?? "No group assigned"}
+                      {publishedStudentFinalGrade.group
+                        ? ` · ${publishedStudentFinalGrade.group.totalMembers} members`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Weights</p>
+                    <p className="mt-1 break-words text-sm font-semibold leading-relaxed">
+                      Advisor {publishedStudentFinalGrade.weights.advisorPercentage}% · Evaluator {publishedStudentFinalGrade.weights.evaluatorPercentage}%
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Weighted breakdown from the approved final result.</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Published at</p>
+                    <p className="mt-1 break-words text-sm font-semibold leading-relaxed">
+                      {formatDateTime(publishedStudentFinalGrade.publishedAt ?? publishedStudentFinalGrade.finalizedAt)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Finalized at</p>
+                    <p className="mt-1 break-words text-sm font-semibold leading-relaxed">
+                      {formatDateTime(publishedStudentFinalGrade.finalizedAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                  <p className="font-medium text-emerald-700 dark:text-emerald-400">Your final grade is published.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This view is read-only and only shows the approved final result for your own record.
+                  </p>
+                </div>
+              </div>
+            ) : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD" || studentFinalGrade?.status === "REJECTED" ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border p-4 bg-muted/20">
+                  <div className="flex items-start gap-3">
+                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <div>
+                      <p className="text-sm font-medium leading-relaxed">
+                        {studentFinalGrade.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+                          ? "Your final grade has been prepared and is awaiting department-head approval."
+                          : "Your final grade is being reviewed again and is not published yet."}
                       </p>
-                    </div>
-                    <div className="rounded-lg bg-muted/40 p-3">
-                      <p className="text-xs text-muted-foreground">Evaluators avg.</p>
-                      <p className="mt-1 text-xl font-semibold">
-                        {evaluatorAverage != null
-                          ? `${evaluatorAverage.toFixed(1)}/40`
-                          : "-"}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-primary/10 p-3">
-                      <p className="text-xs text-muted-foreground">Final score</p>
-                      <p className="mt-1 text-xl font-semibold text-primary">
-                        {data.grade.finalScore}%
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/20">
-                      <p className="text-xs text-muted-foreground">Grade</p>
-                      <p className="mt-1 text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                        {data.grade.grade}
-                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{studentFinalGrade.message}</p>
                     </div>
                   </div>
-                ) : null}
+                </div>
 
-                {data.grade.status === "provisional" && (
-                  <Button
-                    variant="outline"
-                    className="mt-1 w-full text-xs sm:text-sm"
-                    onClick={handleFileConcern}
-                  >
-                    Raise a concern about this grade
-                  </Button>
-                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Project</p>
+                    <p className="mt-1 break-words text-sm font-semibold">{studentGradeProject?.title ?? projectDisplayName}</p>
+                    <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">Status {studentGradeProject?.status ?? projectStatusLabel}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Group</p>
+                    <p className="mt-1 break-words text-sm font-semibold">{studentGradeGroup?.name ?? myGroup?.name ?? "No group assigned"}</p>
+                    <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
+                      {studentGradeGroup ? `${studentGradeGroup.totalMembers} members` : "Group details are not available yet."}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Final numeric grades stay hidden until the result is approved and published.
+                </p>
               </div>
             ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Grades are not yet published for this cycle.
-              </p>
+              <div className="rounded-lg border border-dashed p-6 text-center">
+                <p className="text-sm font-medium">Your final grade is not available yet.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {studentFinalGrade?.message ?? "No finalized result is available for this stage yet."}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

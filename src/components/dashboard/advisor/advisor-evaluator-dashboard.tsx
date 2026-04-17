@@ -50,6 +50,7 @@ type WorkspacePendingProject = {
   groupName: string
   advisorName: string
   status: string
+  evaluationState: "pending" | "evaluated"
   progress: number
   membersCount: number
   documentsCount: number
@@ -79,6 +80,10 @@ type WorkspaceScheduleSession = {
 function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
   const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
   return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
 }
 
 function normalizeStatusToken(status?: string | null, fallback = "pending") {
@@ -149,6 +154,26 @@ function getCompletedEvaluationStatus(submittedAt: string | null, status?: strin
   }
 
   return "submitted"
+}
+
+function getEvaluationState(evaluation: {
+  studentsEvaluated: number
+  lastSavedAt?: string | null
+  submittedAt?: string | null
+  status?: string | null
+}): WorkspacePendingProject["evaluationState"] {
+  const normalizedStatus = normalizeStatusToken(evaluation.status)
+
+  if (
+    evaluation.studentsEvaluated > 0 ||
+    Boolean(evaluation.lastSavedAt) ||
+    Boolean(evaluation.submittedAt) ||
+    ["submitted", "completed", "reviewed"].includes(normalizedStatus)
+  ) {
+    return "evaluated"
+  }
+
+  return "pending"
 }
 
 function isUpcomingScheduleItem(date: string, status?: string | null) {
@@ -226,6 +251,7 @@ export function AdvisorEvaluatorDashboard() {
           groupName: project?.group.name ?? projectGroup.group.name,
           advisorName: projectGroup.advisor.fullName,
           status: normalizeStatusToken(project?.status ?? projectGroup.projectStatus, "active"),
+          evaluationState: getEvaluationState(projectGroup.evaluation),
           progress,
           membersCount: project?.group.studentCount ?? projectGroup.group.totalMembers ?? projectGroup.groupMembers.length,
           documentsCount: documentCountByProject.get(projectGroup.projectId) ?? 0,
@@ -304,6 +330,7 @@ export function AdvisorEvaluatorDashboard() {
   const pendingTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
   const completedTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
   const scheduleTabLoading = authHydrated && scheduleQuery.isLoading
+  const evaluatedButtonLabel = `Evaluated ${formatDashboardStageLabel(dashboardStage)}`
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-2 animate-in fade-in duration-500 sm:gap-8 lg:gap-10">
@@ -544,24 +571,37 @@ export function AdvisorEvaluatorDashboard() {
 
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                             <Button variant="outline" size="sm" className="w-full rounded-lg sm:w-auto" asChild>
-                              <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>
+                              <Link href={`/dashboard/advisor/evaluator/projects/${project.id}?stage=${dashboardStage}`}>
                                 <Eye className="mr-2 h-4 w-4" aria-hidden />
                                 View project
                               </Link>
                             </Button>
-                            <AdvisorEvaluatorStageMenu
-                              projectId={project.id}
-                              trigger={
-                                <Button
-                                  className="group w-full rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
-                                  size="sm"
-                                >
-                                  <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                                  Start evaluation
-                                  <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                                </Button>
-                              }
-                            />
+                            {project.evaluationState === "evaluated" ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full rounded-xl sm:w-auto"
+                                type="button"
+                                disabled
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                                {evaluatedButtonLabel}
+                              </Button>
+                            ) : (
+                              <AdvisorEvaluatorStageMenu
+                                projectId={project.id}
+                                trigger={
+                                  <Button
+                                    className="group w-full rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
+                                    size="sm"
+                                  >
+                                    <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                                    Start evaluation
+                                    <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                                  </Button>
+                                }
+                              />
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -573,7 +613,7 @@ export function AdvisorEvaluatorDashboard() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-foreground">Recent completed</p>
                   <Button variant="outline" size="sm" className="w-full rounded-lg sm:w-auto" asChild>
-                    <Link href="/dashboard/advisor/evaluator/completed">Full history</Link>
+                    <Link href={`/dashboard/advisor/evaluator/completed?stage=${dashboardStage}`}>Full history</Link>
                   </Button>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -597,7 +637,7 @@ export function AdvisorEvaluatorDashboard() {
                               <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium leading-snug">Project evaluation</p>
+                              <p className="font-medium leading-snug">{formatDashboardStageLabel(dashboardStage)} evaluation</p>
                               <p className="text-sm text-muted-foreground">
                                 {evaluation.submittedAt
                                   ? `Submitted ${formatDate(evaluation.submittedAt)}`
@@ -621,7 +661,7 @@ export function AdvisorEvaluatorDashboard() {
                               <StatusBadge status={evaluation.status} />
                               <Button variant="outline" size="icon" className="shrink-0 rounded-lg" asChild>
                                 <Link
-                                  href={`/dashboard/advisor/evaluator/projects/${evaluation.projectId}`}
+                                  href={`/dashboard/advisor/evaluator/projects/${evaluation.projectId}?stage=${dashboardStage}`}
                                   aria-label="View evaluation details"
                                 >
                                   <Eye className="h-4 w-4" aria-hidden />
@@ -731,7 +771,7 @@ export function AdvisorEvaluatorDashboard() {
                 </Link>
               </Button>
               <Button variant="outline" size="sm" className="rounded-full" asChild>
-                <Link href="/dashboard/advisor/evaluator/completed">
+                <Link href={`/dashboard/advisor/evaluator/completed?stage=${dashboardStage}`}>
                   <CheckCircle className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Completed list
                 </Link>

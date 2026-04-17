@@ -1,5 +1,5 @@
-import { CoordinatorAnnouncementsManagementPage } from "@/components/dashboard/coordinator/announcements-management-page"
+import { redirect } from "next/navigation"
 
 export default function MessagesPage() {
-  return <CoordinatorAnnouncementsManagementPage />
+  redirect("/dashboard/coordinator/announcement")
 }

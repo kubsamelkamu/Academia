@@ -9,6 +9,7 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  CheckCircle,
   ClipboardCheck,
   Download,
   Eye,
@@ -56,6 +57,7 @@ type PendingQueueProject = {
   groupName: string
   advisorName: string
   status: string
+  evaluationState: "pending" | "evaluated"
   progress: number
   membersCount: number
   documentsCount: number
@@ -69,9 +71,33 @@ function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDash
   return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
 }
 
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
 function normalizeStatusToken(status?: string | null, fallback = "pending") {
   const value = status?.trim().toLowerCase().replace(/[_\s]+/g, "-")
   return value || fallback
+}
+
+function getEvaluationState(evaluation: {
+  studentsEvaluated: number
+  lastSavedAt?: string | null
+  submittedAt?: string | null
+  status?: string | null
+}): PendingQueueProject["evaluationState"] {
+  const normalizedStatus = normalizeStatusToken(evaluation.status)
+
+  if (
+    evaluation.studentsEvaluated > 0 ||
+    Boolean(evaluation.lastSavedAt) ||
+    Boolean(evaluation.submittedAt) ||
+    ["submitted", "completed", "reviewed"].includes(normalizedStatus)
+  ) {
+    return "evaluated"
+  }
+
+  return "pending"
 }
 
 function getNextMilestoneDueDate(details: Array<{ dueDate: string; status: string }> | undefined): string | null {
@@ -184,6 +210,7 @@ export function AdvisorEvaluatorPendingPage() {
 
     return capstoneTwoQuery
   }, [capstoneOneQuery, capstoneTwoQuery, explicitStage])
+  const activeStage = explicitStage ?? evaluatorDashboardQuery.data?.stage ?? "CAPSTONE_I"
 
   const projectMap = React.useMemo(
     () => new Map((projectsQuery.data ?? []).map((project) => [project.id, project])),
@@ -221,6 +248,7 @@ export function AdvisorEvaluatorPendingPage() {
           groupName: project?.group.name ?? projectGroup.group.name,
           advisorName: projectGroup.advisor.fullName,
           status: normalizeStatusToken(project?.status ?? projectGroup.projectStatus, "in-progress"),
+          evaluationState: getEvaluationState(projectGroup.evaluation),
           progress,
           membersCount: project?.group.studentCount ?? projectGroup.group.totalMembers ?? projectGroup.groupMembers.length,
           documentsCount: documentCountByProject.get(projectGroup.projectId) ?? 0,
@@ -393,7 +421,7 @@ export function AdvisorEvaluatorPendingPage() {
             ) : (
               <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                 {filtered.map((project) => (
-                  <PendingProjectCard key={project.id} project={project} />
+                  <PendingProjectCard key={project.id} project={project} activeStage={activeStage} />
                 ))}
               </div>
             )}
@@ -437,8 +465,15 @@ export function AdvisorEvaluatorPendingPage() {
   )
 }
 
-function PendingProjectCard({ project }: { project: PendingQueueProject }) {
+function PendingProjectCard({
+  project,
+  activeStage,
+}: {
+  project: PendingQueueProject
+  activeStage: AdvisorEvaluationDashboardStage
+}) {
   const dueSoon = project.daysRemaining !== null && project.daysRemaining >= 0 && project.daysRemaining <= 7 && project.progress < 100
+  const evaluatedButtonLabel = `Evaluated ${formatDashboardStageLabel(activeStage)}`
 
   return (
     <Card className="flex min-w-0 flex-col overflow-hidden border-border/80 shadow-sm transition-[box-shadow,transform] hover:shadow-md">
@@ -495,21 +530,34 @@ function PendingProjectCard({ project }: { project: PendingQueueProject }) {
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button variant="outline" size="sm" className="h-10 w-full sm:min-w-0 sm:flex-1" asChild>
-            <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>
+            <Link href={`/dashboard/advisor/evaluator/projects/${project.id}?stage=${activeStage}`}>
               <Eye className="mr-2 h-4 w-4" aria-hidden />
               View project
             </Link>
           </Button>
-          <AdvisorEvaluatorStageMenu
-            projectId={project.id}
-            trigger={
-              <Button className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:min-w-0 sm:flex-[1.15]" size="sm">
-                <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                Evaluate now
-                <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </Button>
-            }
-          />
+          {project.evaluationState === "evaluated" ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-10 w-full sm:min-w-0 sm:flex-[1.15]"
+              type="button"
+              disabled
+            >
+              <CheckCircle className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+              {evaluatedButtonLabel}
+            </Button>
+          ) : (
+            <AdvisorEvaluatorStageMenu
+              projectId={project.id}
+              trigger={
+                <Button className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:min-w-0 sm:flex-[1.15]" size="sm">
+                  <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                  Evaluate now
+                  <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </Button>
+              }
+            />
+          )}
         </div>
       </CardContent>
     </Card>
