@@ -305,6 +305,165 @@ export interface AdvisorProjectEvaluationDashboard {
   projectGroups: AdvisorProjectEvaluationDashboardProjectGroup[]
 }
 
+export interface EvaluatorProjectEvaluationDashboardSummary {
+  totalAssignedProjectGroups: number
+  totalAssignedStudents: number
+  studentsEvaluated: number
+  studentsPendingEvaluation: number
+  averageScoreGiven: number
+  pendingProjectGroups: number
+  completedProjectGroups: number
+  overallMilestoneProgressPercent: number
+}
+
+export interface EvaluatorProjectEvaluationDashboardProjectGroup {
+  projectId: string
+  projectTitle: string
+  projectStatus: string
+  group: {
+    id: string
+    name: string
+    status: string
+    technologies: string[]
+    totalMembers: number
+  }
+  advisor: {
+    id: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  }
+  evaluation: {
+    stage: AdvisorEvaluationDashboardStage
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    averageScoreGiven: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  milestones: {
+    total: number
+    approved: number
+    submitted: number
+    pending: number
+    rejected: number
+    progressPercent: number
+  }
+  groupMembers: Array<{
+    userId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+    evaluationStatus: string
+  }>
+}
+
+export interface EvaluatorProjectEvaluationDashboard {
+  stage: AdvisorEvaluationDashboardStage
+  generatedAt: string
+  summary: EvaluatorProjectEvaluationDashboardSummary
+  projectGroups: EvaluatorProjectEvaluationDashboardProjectGroup[]
+}
+
+export interface EvaluatorProjectEvaluationDetail {
+  stage: AdvisorEvaluationDashboardStage
+  generatedAt: string
+  project: {
+    id: string
+    title: string
+    status: string
+    createdAt: string
+  }
+  advisor: {
+    id: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+  }
+  group: {
+    id: string
+    name: string
+    status: string
+    objectives: string
+    technologies: string[]
+    totalMembers: number
+    leader: {
+      id: string
+      firstName: string
+      lastName: string
+      fullName: string
+      email: string
+      avatarUrl: string | null
+    } | null
+  }
+  evaluation: {
+    stage: AdvisorEvaluationDashboardStage
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    averageScoreGiven: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  milestoneProgress: {
+    total: number
+    approved: number
+    submitted: number
+    pending: number
+    rejected: number
+    progressPercent: number
+  }
+  milestones: Array<{
+    id: string
+    title: string
+    description: string
+    dueDate: string
+    status: string
+    submittedAt: string | null
+    approvedSubmission: {
+      submissionId: string
+      fileName: string
+      mimeType: string
+      sizeBytes: number
+      fileUrl: string
+      filePublicId: string
+      resourceType: string
+      approvedAt: string
+      approvedBy: {
+        id: string
+        firstName: string
+        lastName: string
+        fullName: string
+        email: string
+        avatarUrl: string | null
+      }
+    } | null
+  }>
+  students: Array<{
+    userId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+    evaluation: {
+      status: string
+      score: number | null
+      comment: string | null
+      savedAt: string | null
+    }
+  }>
+}
+
 export interface AdvisorProjectEvaluationDetail {
   stage: AdvisorEvaluationDashboardStage
   generatedAt: string
@@ -420,10 +579,67 @@ export interface SaveAdvisorProjectEvaluationDraftResult {
   }>
 }
 
+export interface SaveEvaluatorProjectEvaluationDraftStudentInput {
+  studentUserId: string
+  score: number
+  comment?: string
+}
+
+export interface SaveEvaluatorProjectEvaluationDraftInput {
+  students: SaveEvaluatorProjectEvaluationDraftStudentInput[]
+}
+
+export interface EvaluatorProjectEvaluationMutationSummary {
+  status: "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED"
+  totalStudents: number
+  studentsEvaluated: number
+  studentsPendingEvaluation: number
+  averageScoreGiven: number
+  lastSavedAt: string | null
+  submittedAt: string | null
+}
+
+export interface EvaluatorProjectEvaluationMutationStudent {
+  studentUserId: string
+  score: number
+  comment: string | null
+  status: "EVALUATED"
+}
+
+export interface SaveEvaluatorProjectEvaluationDraftResult {
+  message: string
+  stage: AdvisorEvaluationDashboardStage
+  projectId: string
+  evaluation: EvaluatorProjectEvaluationMutationSummary
+  savedStudents: EvaluatorProjectEvaluationMutationStudent[]
+}
+
+export interface SubmitEvaluatorProjectEvaluationResult {
+  message: string
+  stage: AdvisorEvaluationDashboardStage
+  projectId: string
+  evaluation: EvaluatorProjectEvaluationMutationSummary
+  submittedStudents: EvaluatorProjectEvaluationMutationStudent[]
+}
+
 interface AdvisorProjectEvaluationDashboardEnvelope {
   success: boolean
   message: string
   data: AdvisorProjectEvaluationDashboard
+  timestamp: string
+}
+
+interface EvaluatorProjectEvaluationDashboardEnvelope {
+  success: boolean
+  message: string
+  data: EvaluatorProjectEvaluationDashboard
+  timestamp: string
+}
+
+interface EvaluatorProjectEvaluationDetailEnvelope {
+  success: boolean
+  message: string
+  data: EvaluatorProjectEvaluationDetail
   timestamp: string
 }
 
@@ -438,6 +654,20 @@ interface SaveAdvisorProjectEvaluationDraftEnvelope {
   success: boolean
   message: string
   data: SaveAdvisorProjectEvaluationDraftResult
+  timestamp: string
+}
+
+interface SaveEvaluatorProjectEvaluationDraftEnvelope {
+  success: boolean
+  message: string
+  data: SaveEvaluatorProjectEvaluationDraftResult
+  timestamp: string
+}
+
+interface SubmitEvaluatorProjectEvaluationEnvelope {
+  success: boolean
+  message: string
+  data: SubmitEvaluatorProjectEvaluationResult
   timestamp: string
 }
 
@@ -731,6 +961,63 @@ export async function getAdvisorProjectEvaluationDashboard(
   return payload
 }
 
+export async function getEvaluatorProjectEvaluationDashboard(
+  stage: AdvisorEvaluationDashboardStage
+): Promise<EvaluatorProjectEvaluationDashboard> {
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.get<EvaluatorProjectEvaluationDashboardEnvelope | EvaluatorProjectEvaluationDashboard>(
+    "/project-evaluations/evaluators/me/dashboard",
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function getEvaluatorProjectEvaluationDetail(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage
+): Promise<EvaluatorProjectEvaluationDetail> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.get<EvaluatorProjectEvaluationDetailEnvelope | EvaluatorProjectEvaluationDetail>(
+    `/project-evaluations/evaluators/me/projects/${encodeURIComponent(trimmedProjectId)}`,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
 export async function getAdvisorProjectEvaluationDetail(
   projectId: string,
   stage: AdvisorEvaluationDashboardStage
@@ -785,6 +1072,77 @@ export async function saveAdvisorProjectEvaluationDraft(
   const response = await apiClient.post<SaveAdvisorProjectEvaluationDraftEnvelope | SaveAdvisorProjectEvaluationDraftResult>(
     `/project-evaluations/advisors/me/projects/${encodeURIComponent(trimmedProjectId)}/draft`,
     input,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function saveEvaluatorProjectEvaluationDraft(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage,
+  input: SaveEvaluatorProjectEvaluationDraftInput
+): Promise<SaveEvaluatorProjectEvaluationDraftResult> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  if (!input.students.length) {
+    throw new Error("at least one student evaluation is required")
+  }
+
+  const response = await apiClient.post<SaveEvaluatorProjectEvaluationDraftEnvelope | SaveEvaluatorProjectEvaluationDraftResult>(
+    `/project-evaluations/evaluators/me/projects/${encodeURIComponent(trimmedProjectId)}/draft`,
+    input,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function submitEvaluatorProjectEvaluation(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage
+): Promise<SubmitEvaluatorProjectEvaluationResult> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.post<SubmitEvaluatorProjectEvaluationEnvelope | SubmitEvaluatorProjectEvaluationResult>(
+    `/project-evaluations/evaluators/me/projects/${encodeURIComponent(trimmedProjectId)}/submit`,
+    undefined,
     {
       params: {
         stage,

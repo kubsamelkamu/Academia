@@ -140,9 +140,9 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       ],
     },
     {
-      title: "Messages",
-      href: "/dashboard/coordinator/messages",
-      icon: MessageSquare,
+      title: "Announcements",
+      href: "/dashboard/coordinator/announcement",
+      icon: Megaphone,
     },
     {
       title: "Reports",
@@ -235,11 +235,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
           title: "Projects",
           href: "/dashboard/advisor/evaluator/projects",
           icon: FolderKanban,
-        },
-        {
-          title: "Documents",
-          href: "/dashboard/advisor/evaluator/documents",
-          icon: FileText,
         },
         {
           title: "Rubric",

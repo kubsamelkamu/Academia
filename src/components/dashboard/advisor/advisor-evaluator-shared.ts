@@ -4,7 +4,6 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  FileText,
   FolderKanban,
   LayoutDashboard,
 } from "lucide-react"
@@ -15,7 +14,6 @@ export type AdvisorEvaluatorView = "dashboard" | "pending" | "scheduled" | "comp
 export type AdvisorEvaluatorHubKey =
   | AdvisorEvaluatorView
   | "projects"
-  | "documents"
   | "rubric"
 
 export type AdvisorEvaluatorNavItem = {
@@ -61,13 +59,6 @@ export const ADVISOR_EVALUATOR_LINKS: AdvisorEvaluatorNavItem[] = [
     href: "/dashboard/advisor/evaluator/projects",
     description: "Browse projects and open detail views",
     icon: FolderKanban,
-  },
-  {
-    key: "documents",
-    title: "Documents",
-    href: "/dashboard/advisor/evaluator/documents",
-    description: "Document library for evaluator review",
-    icon: FileText,
   },
   {
     key: "rubric",

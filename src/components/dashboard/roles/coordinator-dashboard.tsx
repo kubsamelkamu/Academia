@@ -38,6 +38,7 @@ import {
   Activity,
   ChevronRight,
   MessageSquare,
+  Megaphone,
   Shield,
   Star,
   ExternalLink,
@@ -444,10 +445,10 @@ export function CoordinatorDashboard() {
   const quickActions = [
     { href: "/dashboard/coordinator/title-management",  icon: Shield,       label: "Title Management",   description: "Forward validated titles to DC",  bg: "bg-primary/10",  color: "text-primary" },
     { href: "/dashboard/coordinator/advisor-progress",  icon: BarChart3,    label: "Advisor Analytics",  description: "Monitor advisor performance",       bg: "bg-primary/10",  color: "text-primary" },
-    { href: "/dashboard/coordinator/evaluator-progress",icon: Star,         label: "Evaluator Progress", description: "Track evaluation submissions",      bg: "bg-primary/[0.06]", color: "text-primary/80" },
+    { href: "/dashboard/coordinator/evaluation-setup", icon: Star,         label: "Evaluation Setup",   description: "Configure advisor and evaluator weights", bg: "bg-primary/[0.06]", color: "text-primary/80" },
     { href: "/dashboard/coordinator/grade-management",  icon: Calculator,   label: "Grade Management",   description: "Calculate & publish grades",        bg: "bg-muted",       color: "text-foreground" },
     { href: "/dashboard/coordinator/reports",           icon: FileCheck,    label: "Reports",            description: "Generate department reports",       bg: "bg-muted",       color: "text-foreground" },
-    { href: "/dashboard/coordinator/messages",          icon: MessageSquare,label: "Messages",           description: "Communication center",             bg: "bg-muted",       color: "text-foreground" },
+    { href: "/dashboard/coordinator/announcement",      icon: Megaphone,    label: "Announcements",      description: "Manage coordinator announcements", bg: "bg-muted",       color: "text-foreground" },
   ]
 
   const projectColumns: Column<DashboardActiveProjectRow>[] = [

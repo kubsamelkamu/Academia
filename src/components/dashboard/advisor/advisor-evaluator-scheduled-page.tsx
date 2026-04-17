@@ -141,12 +141,6 @@ export function AdvisorEvaluatorScheduledPage() {
               Pending evaluations
             </Link>
           </Button>
-          <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <FileText className="h-4 w-4" aria-hidden />
-              Document library
-            </Link>
-          </Button>
         </div>
       </div>
 
@@ -297,12 +291,6 @@ export function AdvisorEvaluatorScheduledPage() {
             <Link href="/dashboard/advisor/evaluator/pending">
               <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
               Pending queue
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="rounded-full" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <FileText className="mr-2 h-4 w-4" aria-hidden />
-              Document library
             </Link>
           </Button>
           <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" asChild>

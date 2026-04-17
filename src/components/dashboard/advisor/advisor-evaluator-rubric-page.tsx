@@ -1,6 +1,8 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { ArrowLeft, BookOpen, ClipboardCheck, FileText, Layers, ListOrdered, Scale } from "lucide-react"
 
 import PageHeader from "@/components/shared/PageHeader"
@@ -8,37 +10,48 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
+import { type AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
 
 import { EVALUATION_CRITERIA, RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 
 const TOP_WEIGHTS = [...EVALUATION_CRITERIA].sort((a, b) => b.maxPercent - a.maxPercent).slice(0, 5)
 
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
 export function AdvisorEvaluatorRubricPage() {
+  const searchParams = useSearchParams()
+  const activeStage = React.useMemo(
+    () => normalizeDashboardStage(searchParams.get("stage")),
+    [searchParams],
+  )
+  const stageLabel = formatDashboardStageLabel(activeStage)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-10 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5 text-muted-foreground" asChild>
-          <Link href="/dashboard/advisor/evaluator">
+          <Link href={`/dashboard/advisor/evaluator?stage=${activeStage}`}>
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Evaluator overview
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/advisor/evaluator/pending">Pending queue</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <FileText className="mr-2 h-4 w-4" aria-hidden />
-              Documents
-            </Link>
+            <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>Pending queue</Link>
           </Button>
         </div>
       </div>
 
       <PageHeader
-        title="Evaluation rubric"
-        description={`Weighted criteria for the advisor evaluator workspace. Each line shows its share of the ${RUBRIC_TOTAL_MAX_PERCENT}% rubric total.`}
+        title={`${stageLabel} evaluation rubric`}
+        description={`Weighted criteria for the ${stageLabel} advisor evaluator workspace. Each line shows its share of the ${RUBRIC_TOTAL_MAX_PERCENT}% rubric total.`}
       />
 
       <div className="flex min-w-0 flex-col gap-8">
@@ -138,15 +151,15 @@ export function AdvisorEvaluatorRubricPage() {
             </div>
             <div className="flex flex-col gap-2">
               <Button className="btn-gradient w-full gap-2 rounded-xl" size="sm" asChild>
-                <Link href="/dashboard/advisor/evaluator/pending">
+                <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>
                   <ClipboardCheck className="h-4 w-4" aria-hidden />
-                  Pending
+                  {stageLabel} pending
                 </Link>
               </Button>
               <Button variant="outline" className="w-full gap-2 rounded-xl" size="sm" asChild>
-                <Link href="/dashboard/advisor/evaluator/projects">
+                <Link href={`/dashboard/advisor/evaluator/projects?stage=${activeStage}`}>
                   <FileText className="h-4 w-4 shrink-0" aria-hidden />
-                  Projects
+                  {stageLabel} projects
                 </Link>
               </Button>
             </div>

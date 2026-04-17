@@ -12,6 +12,12 @@ export interface EvaluatorProjectMilestone {
   status: MilestoneStatus
   dueDate: string
   completedDate: string | null
+  file?: {
+    name: string
+    url: string
+    size?: string
+    mimeType?: string
+  } | null
 }
 
 export interface EvaluatorProjectDocument {
@@ -21,6 +27,8 @@ export interface EvaluatorProjectDocument {
   size: string
   uploadedAt: string
   status: "approved" | "pending_review" | "rejected"
+  url?: string
+  note?: string
 }
 
 export interface EvaluatorProjectEvaluationEntry {

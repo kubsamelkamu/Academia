@@ -2,34 +2,31 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BookOpen,
   Calendar,
+  CheckCircle,
   ClipboardCheck,
-  Clock,
   Download,
   Eye,
   FileText,
-  Filter,
   FolderKanban,
   LayoutDashboard,
-  ListChecks,
   Search,
   Users,
 } from "lucide-react"
 
 import PageHeader from "@/components/shared/PageHeader"
-import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -37,74 +34,266 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { mockProjects, formatDate } from "@/data/mockData"
-import { mockProjectTimelines } from "@/data/timelineData"
-import type { Project } from "@/data/mockData"
+import { formatDate } from "@/data/mockData"
+import {
+  getAdvisorSubmittedDocuments,
+  type AdvisorEvaluationDashboardStage,
+} from "@/lib/api/advisor"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
+import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
+import { useEvaluatorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-evaluator-project-evaluation-dashboard"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
 import {
-  DueBadge,
   TimelineStatusRow,
-  filterAdvisorPendingProjects,
-  getNextMilestoneDueDate,
-  timelineStatusForProject,
 } from "./advisor-evaluator-timeline"
 
 type SortKey = "due" | "title" | "progress"
 
+type PendingQueueProject = {
+  id: string
+  title: string
+  groupName: string
+  advisorName: string
+  status: string
+  evaluationState: "pending" | "evaluated"
+  progress: number
+  membersCount: number
+  documentsCount: number
+  nextDue: string | null
+  daysRemaining: number | null
+  timelineStatus: "on_track" | "at_risk" | "overdue" | "completed" | "pending"
+}
+
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
+function normalizeStatusToken(status?: string | null, fallback = "pending") {
+  const value = status?.trim().toLowerCase().replace(/[_\s]+/g, "-")
+  return value || fallback
+}
+
+function getEvaluationState(evaluation: {
+  studentsEvaluated: number
+  lastSavedAt?: string | null
+  submittedAt?: string | null
+  status?: string | null
+}): PendingQueueProject["evaluationState"] {
+  const normalizedStatus = normalizeStatusToken(evaluation.status)
+
+  if (
+    evaluation.studentsEvaluated > 0 ||
+    Boolean(evaluation.lastSavedAt) ||
+    Boolean(evaluation.submittedAt) ||
+    ["submitted", "completed", "reviewed"].includes(normalizedStatus)
+  ) {
+    return "evaluated"
+  }
+
+  return "pending"
+}
+
+function getNextMilestoneDueDate(details: Array<{ dueDate: string; status: string }> | undefined): string | null {
+  const candidates = (details ?? [])
+    .filter((detail) => !["approved", "completed"].includes(normalizeStatusToken(detail.status)))
+    .map((detail) => detail.dueDate)
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())
+
+  return candidates[0] ?? null
+}
+
+function getDaysRemaining(isoDate: string | null): number | null {
+  if (!isoDate) return null
+
+  const dueDate = new Date(isoDate)
+  if (Number.isNaN(dueDate.getTime())) return null
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+  const diff = startOfDueDate.getTime() - startOfToday.getTime()
+
+  return Math.round(diff / 86_400_000)
+}
+
+function getTimelineStatus(progress: number, daysRemaining: number | null): PendingQueueProject["timelineStatus"] {
+  if (progress >= 100) return "completed"
+  if (daysRemaining === null) return "pending"
+  if (daysRemaining < 0) return "overdue"
+  if (daysRemaining <= 7 || progress < 35) return "at_risk"
+  return "on_track"
+}
+
+function DueSummary({ daysRemaining, projectProgress }: { daysRemaining: number | null; projectProgress: number }) {
+  if (daysRemaining === null) {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  if (projectProgress >= 100) {
+    return <span className="text-muted-foreground">Complete</span>
+  }
+
+  if (daysRemaining < 0) {
+    return <span className="font-medium text-destructive">Overdue {Math.abs(daysRemaining)}d</span>
+  }
+
+  if (daysRemaining === 0) {
+    return <span className="font-medium text-amber-600 dark:text-amber-500">Due today</span>
+  }
+
+  return <span className="text-muted-foreground">{daysRemaining}d left</span>
+}
+
 export function AdvisorEvaluatorPendingPage() {
-  const baseList = React.useMemo(() => filterAdvisorPendingProjects(mockProjects), [])
+  const authHydrated = useAuthStoreHydrated()
+  const searchParams = useSearchParams()
+  const requestedStage = searchParams.get("stage")
+  const explicitStage = React.useMemo(
+    () => (requestedStage ? normalizeDashboardStage(requestedStage) : null),
+    [requestedStage],
+  )
+  const capstoneOneQuery = useEvaluatorProjectEvaluationDashboardWithOptions("CAPSTONE_I", {
+    enabled: authHydrated && (!explicitStage || explicitStage === "CAPSTONE_I"),
+  })
+  const capstoneTwoQuery = useEvaluatorProjectEvaluationDashboardWithOptions("CAPSTONE_II", {
+    enabled: authHydrated && (!explicitStage || explicitStage === "CAPSTONE_II"),
+  })
+  const projectsQuery = useAdvisorProjectsWithOptions({ enabled: authHydrated })
+  const submittedDocumentsQuery = useQuery({
+    queryKey: ["advisor", "submitted-documents", "evaluator-pending"],
+    queryFn: getAdvisorSubmittedDocuments,
+    enabled: authHydrated,
+    staleTime: 30_000,
+    retry: 1,
+  })
   const [search, setSearch] = React.useState("")
   const [sort, setSort] = React.useState<SortKey>("due")
 
+  const evaluatorDashboardQuery = React.useMemo(() => {
+    if (explicitStage === "CAPSTONE_I") {
+      return capstoneOneQuery
+    }
+
+    if (explicitStage === "CAPSTONE_II") {
+      return capstoneTwoQuery
+    }
+
+    const capstoneOneCount = capstoneOneQuery.data?.projectGroups.filter(
+      (projectGroup) => projectGroup.evaluation.studentsPendingEvaluation > 0,
+    ).length ?? 0
+    const capstoneTwoCount = capstoneTwoQuery.data?.projectGroups.filter(
+      (projectGroup) => projectGroup.evaluation.studentsPendingEvaluation > 0,
+    ).length ?? 0
+
+    if (capstoneOneCount > 0 || capstoneTwoCount > 0) {
+      return capstoneTwoCount > capstoneOneCount ? capstoneTwoQuery : capstoneOneQuery
+    }
+
+    const capstoneOneProjects = capstoneOneQuery.data?.projectGroups.length ?? 0
+    const capstoneTwoProjects = capstoneTwoQuery.data?.projectGroups.length ?? 0
+
+    if (capstoneOneProjects > 0 || capstoneTwoProjects > 0) {
+      return capstoneTwoProjects > capstoneOneProjects ? capstoneTwoQuery : capstoneOneQuery
+    }
+
+    if (capstoneOneQuery.data) {
+      return capstoneOneQuery
+    }
+
+    return capstoneTwoQuery
+  }, [capstoneOneQuery, capstoneTwoQuery, explicitStage])
+  const activeStage = explicitStage ?? evaluatorDashboardQuery.data?.stage ?? "CAPSTONE_I"
+
+  const projectMap = React.useMemo(
+    () => new Map((projectsQuery.data ?? []).map((project) => [project.id, project])),
+    [projectsQuery.data],
+  )
+
+  const documentCountByProject = React.useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const document of submittedDocumentsQuery.data?.documents ?? []) {
+      const projectId = document.project.id.trim()
+      counts.set(projectId, (counts.get(projectId) ?? 0) + 1)
+    }
+
+    return counts
+  }, [submittedDocumentsQuery.data?.documents])
+
+  const baseList = React.useMemo<PendingQueueProject[]>(() => {
+    const projectGroups = evaluatorDashboardQuery.data?.projectGroups ?? []
+    const strictlyPendingGroups = projectGroups.filter(
+      (projectGroup) => projectGroup.evaluation.studentsPendingEvaluation > 0,
+    )
+    const sourceGroups = strictlyPendingGroups.length > 0 ? strictlyPendingGroups : projectGroups
+
+    return sourceGroups
+      .map((projectGroup) => {
+        const project = projectMap.get(projectGroup.projectId)
+        const progress = project?.milestones.progressPercent ?? projectGroup.milestones.progressPercent
+        const nextDue = getNextMilestoneDueDate(project?.milestones.details)
+        const daysRemaining = getDaysRemaining(nextDue)
+
+        return {
+          id: projectGroup.projectId,
+          title: projectGroup.projectTitle,
+          groupName: project?.group.name ?? projectGroup.group.name,
+          advisorName: projectGroup.advisor.fullName,
+          status: normalizeStatusToken(project?.status ?? projectGroup.projectStatus, "in-progress"),
+          evaluationState: getEvaluationState(projectGroup.evaluation),
+          progress,
+          membersCount: project?.group.studentCount ?? projectGroup.group.totalMembers ?? projectGroup.groupMembers.length,
+          documentsCount: documentCountByProject.get(projectGroup.projectId) ?? 0,
+          nextDue,
+          daysRemaining,
+          timelineStatus: getTimelineStatus(progress, daysRemaining),
+        }
+      })
+  }, [documentCountByProject, evaluatorDashboardQuery.data?.projectGroups, projectMap])
+
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase()
-    let rows = baseList.filter((p) => {
+    let rows = baseList.filter((project) => {
       if (!q) return true
       return (
-        p.title.toLowerCase().includes(q) ||
-        (p.groupName?.toLowerCase().includes(q) ?? false) ||
-        (p.advisorName?.toLowerCase().includes(q) ?? false)
+        project.title.toLowerCase().includes(q) ||
+        project.groupName.toLowerCase().includes(q) ||
+        project.advisorName.toLowerCase().includes(q)
       )
     })
 
     rows = [...rows].sort((a, b) => {
-      const ta = mockProjectTimelines.find((t) => t.projectId === a.id)
-      const tb = mockProjectTimelines.find((t) => t.projectId === b.id)
       if (sort === "title") {
         return a.title.localeCompare(b.title)
       }
       if (sort === "progress") {
-        return (b.progress ?? 0) - (a.progress ?? 0)
+        return b.progress - a.progress
       }
-      const da = ta?.daysRemaining ?? 999
-      const db = tb?.daysRemaining ?? 999
+      const da = a.daysRemaining ?? Number.MAX_SAFE_INTEGER
+      const db = b.daysRemaining ?? Number.MAX_SAFE_INTEGER
       return da - db
     })
 
     return rows
   }, [baseList, search, sort])
 
-  const dueSoonProjects = React.useMemo(() => {
-    return baseList.filter((p) => {
-      const t = mockProjectTimelines.find((x) => x.projectId === p.id)
-      const d = t?.daysRemaining
-      return d !== undefined && d >= 0 && d <= 7
-    })
-  }, [baseList])
-
-  const dueSoonCount = dueSoonProjects.length
-
-  const atRiskCount = React.useMemo(() => {
-    return baseList.filter((p) => {
-      const t = mockProjectTimelines.find((x) => x.projectId === p.id)
-      return t?.status === "at_risk"
-    }).length
-  }, [baseList])
+  const hasSearch = search.trim().length > 0
+  const isLoading = !authHydrated || (
+    explicitStage
+      ? evaluatorDashboardQuery.isLoading
+      : !capstoneOneQuery.data && !capstoneTwoQuery.data && (capstoneOneQuery.isLoading || capstoneTwoQuery.isLoading)
+  )
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 pb-8 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
+    <div className="flex w-full min-w-0 overflow-x-hidden flex-col gap-6 pb-8 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 flex-1 space-y-4">
           <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5 text-muted-foreground" asChild>
@@ -136,125 +325,26 @@ export function AdvisorEvaluatorPendingPage() {
               All projects
             </Link>
           </Button>
-          <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <Download className="h-4 w-4" aria-hidden />
-              Document library
-            </Link>
-          </Button>
         </div>
       </div>
 
-      <section aria-label="Queue summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="In queue"
-          value={baseList.length}
-          subtitle="Match advisor filters"
-          icon={ClipboardCheck}
-          iconClassName="bg-primary/10 text-primary"
-        />
-        <StatCard
-          title="Due within 7 days"
-          value={dueSoonCount}
-          subtitle="By timeline mock"
-          icon={Calendar}
-          iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        />
-        <StatCard
-          title="At risk"
-          value={atRiskCount}
-          subtitle="Timeline status"
-          icon={Filter}
-          iconClassName="bg-rose-500/10 text-rose-600 dark:text-rose-400"
-        />
-        <StatCard
-          title="Showing"
-          value={filtered.length}
-          subtitle={search.trim() ? "After search" : "All in queue"}
-          icon={Search}
-          iconClassName="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-        />
-      </section>
-
-      {dueSoonCount > 0 ? (
-        <section aria-label="Due soon spotlight">
-          <Card className="border-amber-500/25 bg-gradient-to-br from-amber-500/[0.06] via-background to-background shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400">
-                    <Clock className="h-4 w-4" aria-hidden />
-                  </span>
-                  <div>
-                    <CardTitle className="text-base">Due within 7 days</CardTitle>
-                    <CardDescription>
-                      {dueSoonCount} project{dueSoonCount === 1 ? "" : "s"} — consider reviewing these first.
-                    </CardDescription>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ul className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {dueSoonProjects.map((p) => (
-                  <li key={p.id} className="min-w-0 flex-1 sm:min-w-[240px]">
-                    <Link
-                      href={`/dashboard/advisor/evaluator/evaluate/${p.id}`}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/80 px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-muted/40"
-                    >
-                      <span className="min-w-0 truncate font-medium">{p.title}</span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </section>
+      {evaluatorDashboardQuery.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{evaluatorDashboardQuery.error.message}</p>
+          </CardContent>
+        </Card>
       ) : null}
 
-      <section
-        aria-label="Queue insights"
-        className="rounded-2xl border border-border/60 bg-muted/20 p-1 sm:bg-muted/25"
-      >
-        <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 sm:px-4 md:grid md:grid-cols-3 md:overflow-visible md:p-4 [&::-webkit-scrollbar]:hidden">
-          <div className="min-w-[min(100%,17.5rem)] shrink-0 snap-start rounded-xl border border-border/50 bg-background/90 p-4 shadow-sm md:min-w-0">
-            <div className="flex items-center gap-2 text-primary">
-              <Filter className="h-4 w-4 shrink-0" aria-hidden />
-              <p className="text-sm font-semibold text-foreground">How the queue is built</p>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Demo: under 100% progress and in-scope status in mock data. Swap for real assignment rules when you connect
-              APIs.
+      {projectsQuery.error || submittedDocumentsQuery.error ? (
+        <Card className="border-border/70">
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Some queue details could not be loaded. Project titles and evaluation status are shown with available backend data.
             </p>
-          </div>
-          <div className="min-w-[min(100%,17.5rem)] shrink-0 snap-start rounded-xl border border-border/50 bg-background/90 p-4 shadow-sm md:min-w-0">
-            <div className="flex items-center gap-2 text-primary">
-              <Clock className="h-4 w-4 shrink-0" aria-hidden />
-              <p className="text-sm font-semibold text-foreground">Reading each card</p>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Timeline strip = mock milestone health. Due soon = ≤7 days and not complete. Sort by soonest deadline when the
-              list grows.
-            </p>
-          </div>
-          <div className="min-w-[min(100%,17.5rem)] shrink-0 snap-start rounded-xl border border-primary/20 bg-primary/[0.04] p-4 shadow-sm md:min-w-0">
-            <div className="flex items-center gap-2 text-primary">
-              <ListChecks className="h-4 w-4 shrink-0" aria-hidden />
-              <p className="text-sm font-semibold text-foreground">Scores &amp; rubric</p>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Comments follow department policy. The form uses the shared {RUBRIC_TOTAL_MAX_PERCENT}% program rubric.
-            </p>
-            <Button variant="secondary" size="sm" className="mt-3 h-8 w-full text-xs" asChild>
-              <Link href="/dashboard/advisor/evaluator/rubric">
-                <BookOpen className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                Rubric
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="min-w-0 space-y-6">
           <section aria-label="Filters and sort">
@@ -297,27 +387,41 @@ export function AdvisorEvaluatorPendingPage() {
             <div className="flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-lg font-semibold tracking-tight">Queue</h2>
               <p className="text-sm text-muted-foreground">
-                {filtered.length} project{filtered.length === 1 ? "" : "s"}
+                {isLoading ? "Loading..." : `${filtered.length} project${filtered.length === 1 ? "" : "s"}`}
               </p>
             </div>
 
-            {filtered.length === 0 ? (
+            {isLoading ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                   <ClipboardCheck className="h-10 w-10 text-muted-foreground/40" aria-hidden />
-                  <p className="font-medium">Nothing matches</p>
+                  <p className="font-medium">Loading pending queue</p>
                   <p className="max-w-sm text-sm text-muted-foreground">
-                    Clear the search to see projects in the queue again.
+                    Fetching evaluator assignments from the backend.
                   </p>
-                  <Button variant="outline" size="sm" className="mt-2" onClick={() => setSearch("")}>
-                    Clear search
-                  </Button>
+                </CardContent>
+              </Card>
+            ) : filtered.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                  <ClipboardCheck className="h-10 w-10 text-muted-foreground/40" aria-hidden />
+                  <p className="font-medium">{hasSearch ? "Nothing matches" : "No pending evaluations found"}</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    {hasSearch
+                      ? "Clear the search to see projects in the queue again."
+                      : "No backend queue items are available for this stage right now."}
+                  </p>
+                  {hasSearch ? (
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => setSearch("")}>
+                      Clear search
+                    </Button>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                 {filtered.map((project) => (
-                  <PendingProjectCard key={project.id} project={project} />
+                  <PendingProjectCard key={project.id} project={project} activeStage={activeStage} />
                 ))}
               </div>
             )}
@@ -327,7 +431,7 @@ export function AdvisorEvaluatorPendingPage() {
           aria-label="Workspace links and API note"
           className="rounded-2xl border border-dashed border-border/70 bg-gradient-to-br from-muted/30 via-background to-background p-5 sm:p-6"
         >
-          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-10">
+          <div className="grid gap-6 lg:gap-10">
             <div className="flex flex-wrap gap-2 sm:gap-3">
               <Button variant="outline" size="sm" className="rounded-full" asChild>
                 <Link href="/dashboard/advisor/evaluator">
@@ -354,13 +458,6 @@ export function AdvisorEvaluatorPendingPage() {
                 </Link>
               </Button>
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-4 py-3 text-sm text-muted-foreground lg:max-w-sm">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" aria-hidden />
-              <p>
-                <span className="font-medium text-foreground">Mock data.</span> Wire APIs so queue ordering (SLA, assignee
-                load) is enforced server-side for a consistent priority view.
-              </p>
-            </div>
           </div>
         </footer>
       </div>
@@ -368,29 +465,31 @@ export function AdvisorEvaluatorPendingPage() {
   )
 }
 
-function PendingProjectCard({ project }: { project: Project }) {
-  const timeline = mockProjectTimelines.find((t) => t.projectId === project.id)
-  const tStatus = timelineStatusForProject(timeline, project.progress ?? 0)
-  const nextDue = getNextMilestoneDueDate(project.id)
-  const progress = project.progress ?? 0
-  const dueSoon =
-    timeline?.daysRemaining !== undefined && timeline.daysRemaining <= 7 && progress < 100
+function PendingProjectCard({
+  project,
+  activeStage,
+}: {
+  project: PendingQueueProject
+  activeStage: AdvisorEvaluationDashboardStage
+}) {
+  const dueSoon = project.daysRemaining !== null && project.daysRemaining >= 0 && project.daysRemaining <= 7 && project.progress < 100
+  const evaluatedButtonLabel = `Evaluated ${formatDashboardStageLabel(activeStage)}`
 
   return (
-    <Card className="flex flex-col overflow-hidden border-border/80 shadow-sm transition-[box-shadow,transform] hover:shadow-md">
+    <Card className="flex min-w-0 flex-col overflow-hidden border-border/80 shadow-sm transition-[box-shadow,transform] hover:shadow-md">
       <CardHeader className="space-y-3 pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <CardTitle className="text-base leading-snug sm:text-lg">{project.title}</CardTitle>
             <CardDescription className="mt-1.5 line-clamp-2">
-              {project.groupName ?? "Group"} · Advisor: {project.advisorName ?? "—"}
+              {project.groupName} · Advisor: {project.advisorName}
             </CardDescription>
           </div>
           <StatusBadge status={project.status} />
         </div>
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <TimelineStatusRow status={tStatus} />
+            <TimelineStatusRow status={project.timelineStatus} />
             {dueSoon ? (
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
                 Due soon
@@ -400,9 +499,9 @@ function PendingProjectCard({ project }: { project: Project }) {
           <div>
             <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>Progress</span>
-              <span className="tabular-nums font-medium text-foreground">{progress}%</span>
+              <span className="tabular-nums font-medium text-foreground">{project.progress}%</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={project.progress} className="h-2" />
           </div>
         </div>
       </CardHeader>
@@ -410,51 +509,55 @@ function PendingProjectCard({ project }: { project: Project }) {
         <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 shrink-0" aria-hidden />
-            <span>3 members</span>
+            <span>{project.membersCount} members</span>
           </div>
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 shrink-0" aria-hidden />
-            <span>5 documents</span>
+            <span>{project.documentsCount} documents</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Calendar className="h-4 w-4 shrink-0" aria-hidden />
-            {nextDue ? (
+            {project.nextDue ? (
               <span>
-                Next milestone: <span className="font-medium text-foreground">{formatDate(nextDue)}</span>
+                Next milestone: <span className="font-medium text-foreground">{formatDate(project.nextDue)}</span>
               </span>
             ) : (
               <span>Schedule: see timeline</span>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:ml-0">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Window</span>
-            <DueBadge timeline={timeline} projectProgress={progress} />
-          </div>
+          <DueSummary daysRemaining={project.daysRemaining} projectProgress={project.progress} />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button variant="outline" size="sm" className="h-10 w-full sm:min-w-0 sm:flex-1" asChild>
-            <Link href={`/dashboard/advisor/evaluator/projects/${project.id}`}>
+            <Link href={`/dashboard/advisor/evaluator/projects/${project.id}?stage=${activeStage}`}>
               <Eye className="mr-2 h-4 w-4" aria-hidden />
               View project
             </Link>
           </Button>
-          <Button variant="outline" size="sm" className="h-10 w-full sm:min-w-0 sm:flex-1" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <Download className="mr-2 h-4 w-4" aria-hidden />
-              Documents
-            </Link>
-          </Button>
-          <AdvisorEvaluatorStageMenu
-            projectId={project.id}
-            trigger={
-              <Button className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:min-w-0 sm:flex-[1.15]" size="sm">
-                <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                Evaluate now
-                <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </Button>
-            }
-          />
+          {project.evaluationState === "evaluated" ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-10 w-full sm:min-w-0 sm:flex-[1.15]"
+              type="button"
+              disabled
+            >
+              <CheckCircle className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+              {evaluatedButtonLabel}
+            </Button>
+          ) : (
+            <AdvisorEvaluatorStageMenu
+              projectId={project.id}
+              trigger={
+                <Button className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:min-w-0 sm:flex-[1.15]" size="sm">
+                  <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                  Evaluate now
+                  <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </Button>
+              }
+            />
+          )}
         </div>
       </CardContent>
     </Card>

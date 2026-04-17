@@ -28,6 +28,7 @@ import {
   Users,
   TrendingUp,
   AlertTriangle,
+  Megaphone,
   Send,
   MessageSquare,
   BarChart3,
@@ -778,16 +779,16 @@ export default function AdvisorProgressPage() {
       </div>
 
       {/* KPI row */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpi.map(s => (
           <Card key={s.label} className="group border-none shadow-sm transition-all hover:shadow-md">
-            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-4">
-              <div className={`h-8 w-8 sm:h-11 sm:w-11 rounded-full ${s.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
-                <s.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.color}`} />
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className={`h-11 w-11 rounded-full ${s.bg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-110`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
               </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold tracking-tight">{s.value}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{s.label}</p>
+              <div>
+                <p className="text-2xl font-bold tracking-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -1076,11 +1077,11 @@ export default function AdvisorProgressPage() {
                   cta: 'Send Reminders',
                 },
                 {
-                  href: '/dashboard/coordinator/messages',
-                  icon: MessageSquare,
-                  title: 'Direct Message',
-                  desc: 'Open the messages inbox to send a direct message to a specific advisor.',
-                  cta: 'Open Messages',
+                  href: '/dashboard/coordinator/announcement',
+                  icon: Megaphone,
+                  title: 'Announcement Center',
+                  desc: 'Open coordinator announcements to publish updates and reminders for advisors.',
+                  cta: 'Open Announcements',
                 },
                 {
                   href: '/dashboard/coordinator/reports',

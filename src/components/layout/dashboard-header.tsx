@@ -157,7 +157,7 @@ export function DashboardHeader({ user, notificationCount = 0 }: DashboardHeader
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-sm border-border" align="end" forceMount>
+            <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-sm border-border" align="end">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">{user.name}</p>

@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   AlertTriangle,
@@ -33,11 +35,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockProjects } from "@/data/mockData"
+import {
+  getAdvisorSubmittedDocuments,
+  getEvaluatorProjectEvaluationDetail,
+  type AdvisorEvaluationDashboardStage,
+} from "@/lib/api/advisor"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
 import { cn } from "@/lib/utils"
 
 import {
-  getEvaluatorProjectDetail,
   type EvaluatorProjectDetail,
   type EvaluatorProjectDocument,
   type MilestoneStatus,
@@ -114,37 +120,230 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
+function formatBytes(sizeBytes: number) {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return "—"
+  }
+
+  if (sizeBytes >= 1_000_000) {
+    return `${(sizeBytes / 1_000_000).toFixed(1)} MB`
+  }
+
+  if (sizeBytes >= 1_000) {
+    return `${Math.round(sizeBytes / 1_000)} KB`
+  }
+
+  return `${sizeBytes} B`
+}
+
+function normalizeProjectStatus(status: string) {
+  const normalized = status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+  if (normalized === "active") {
+    return "in_progress"
+  }
+
+  return normalized.replace(/-/g, "_")
+}
+
+function toMilestoneStatus(status: string): MilestoneStatus {
+  const normalized = status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+  if (["approved", "completed", "evaluated", "submitted"].includes(normalized)) {
+    return normalized === "submitted" ? "in-progress" : "completed"
+  }
+  if (["in-progress", "inprogress"].includes(normalized)) {
+    return "in-progress"
+  }
+  if (["rejected", "overdue"].includes(normalized)) {
+    return "overdue"
+  }
+  return "pending"
+}
+
+function toDocumentType(mimeType: string, fileName: string): EvaluatorProjectDocument["type"] {
+  const normalizedMimeType = mimeType.toLowerCase()
+  const normalizedFileName = fileName.toLowerCase()
+
+  if (normalizedMimeType.includes("pdf") || normalizedFileName.endsWith(".pdf")) {
+    return "pdf"
+  }
+  if (normalizedMimeType.includes("word") || normalizedFileName.endsWith(".doc") || normalizedFileName.endsWith(".docx")) {
+    return "docx"
+  }
+  if (normalizedMimeType.startsWith("image/")) {
+    return "image"
+  }
+  if (normalizedMimeType.includes("zip") || normalizedFileName.endsWith(".zip")) {
+    return "zip"
+  }
+  return "other"
+}
+
+function mapDetailToProjectView(
+  detail: Awaited<ReturnType<typeof getEvaluatorProjectEvaluationDetail>>,
+  submittedDocuments: Awaited<ReturnType<typeof getAdvisorSubmittedDocuments>>["documents"],
+): EvaluatorProjectDetail {
+  const nextMilestone = [...detail.milestones]
+    .filter((milestone) => !["approved", "completed"].includes(milestone.status.trim().toLowerCase()))
+    .sort((left, right) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime())[0]
+
+  const evaluationHistory = detail.evaluation.submittedAt || detail.evaluation.lastSavedAt
+    ? [{
+        date: detail.evaluation.submittedAt ?? detail.evaluation.lastSavedAt ?? detail.generatedAt,
+        evaluator: detail.advisor.fullName,
+        type: `${detail.stage.replace("_", " ")} evaluation`,
+        score: detail.evaluation.averageScoreGiven,
+        scoreMax: 100,
+        feedback:
+          detail.evaluation.studentsEvaluated > 0
+            ? `${detail.evaluation.studentsEvaluated} of ${detail.evaluation.totalStudents} students evaluated.`
+            : "Evaluation draft saved.",
+      }]
+    : []
+
+  const milestoneDocuments: EvaluatorProjectDocument[] = detail.milestones
+    .filter((milestone) => milestone.approvedSubmission)
+    .map((milestone) => ({
+      id: `milestone-${milestone.id}-${milestone.approvedSubmission!.submissionId}`,
+      name: milestone.approvedSubmission!.fileName,
+      type: toDocumentType(milestone.approvedSubmission!.mimeType, milestone.approvedSubmission!.fileName),
+      size: formatBytes(milestone.approvedSubmission!.sizeBytes),
+      uploadedAt: milestone.approvedSubmission!.approvedAt,
+      status: "approved",
+      url: milestone.approvedSubmission!.fileUrl,
+      note: `${milestone.title} milestone`,
+    }))
+
+  const submittedProjectDocuments: EvaluatorProjectDocument[] = submittedDocuments
+    .filter((document) => document.project.id === detail.project.id)
+    .map((document) => ({
+      id: document.submissionId,
+      name: document.documentName,
+      type: toDocumentType(document.mimeType, document.documentName),
+      size: formatBytes(document.sizeBytes),
+      uploadedAt: document.uploadedAt,
+      status: document.approvedAt ? "approved" : document.status.toLowerCase().includes("reject") ? "rejected" : "pending_review",
+      url: document.fileUrl,
+    }))
+
+  const dedupedDocuments = new Map<string, EvaluatorProjectDocument>()
+
+  for (const document of [...milestoneDocuments, ...submittedProjectDocuments]) {
+    const documentKey = [document.name.trim().toLowerCase(), document.url?.trim().toLowerCase() ?? "", document.status].join("::")
+    if (!dedupedDocuments.has(documentKey)) {
+      dedupedDocuments.set(documentKey, document)
+    }
+  }
+
+  return {
+    id: detail.project.id,
+    title: detail.project.title,
+    description: detail.group.objectives || "No project summary is available yet.",
+    group: detail.group.name,
+    advisor: detail.advisor.fullName,
+    status: normalizeProjectStatus(detail.project.status),
+    progress: detail.milestoneProgress.progressPercent,
+    dueDate: nextMilestone?.dueDate ?? detail.project.createdAt,
+    startDate: detail.project.createdAt,
+    category: detail.stage.replace("_", " "),
+    technologies: detail.group.technologies,
+    teamMembers: detail.students.map((student) => ({
+      name: student.fullName,
+      role: detail.group.leader?.id === student.userId ? "Leader" : "Member",
+      email: student.email,
+    })),
+    milestones: detail.milestones.map((milestone) => ({
+      name: milestone.title,
+      status: toMilestoneStatus(milestone.status),
+      dueDate: milestone.dueDate,
+      completedDate: milestone.approvedSubmission?.approvedAt ?? milestone.submittedAt,
+      file: milestone.approvedSubmission
+        ? {
+            name: milestone.approvedSubmission.fileName,
+            url: milestone.approvedSubmission.fileUrl,
+            size: formatBytes(milestone.approvedSubmission.sizeBytes),
+            mimeType: milestone.approvedSubmission.mimeType,
+          }
+        : null,
+    })),
+    documents: [...dedupedDocuments.values()].sort(
+      (left, right) => new Date(right.uploadedAt).getTime() - new Date(left.uploadedAt).getTime(),
+    ),
+    evaluationHistory,
+    nextEvaluation: {
+      date: nextMilestone?.dueDate ?? detail.generatedAt,
+      type: nextMilestone?.title ?? `${detail.stage.replace("_", " ")} review`,
+      evaluator: detail.advisor.fullName,
+      venue: detail.group.name,
+    },
+    linkedSessionId: "",
+  }
+}
+
 export function AdvisorEvaluatorProjectDetailPage({ projectId }: { projectId: string }) {
+  const authHydrated = useAuthStoreHydrated()
+  const searchParams = useSearchParams()
+  const stage = React.useMemo(
+    () => normalizeDashboardStage(searchParams.get("stage")),
+    [searchParams],
+  )
+  const detailQuery = useQuery({
+    queryKey: ["advisor", "evaluator-project-detail", projectId, stage],
+    queryFn: () => getEvaluatorProjectEvaluationDetail(projectId, stage),
+    enabled: authHydrated && Boolean(projectId),
+    staleTime: 30_000,
+    retry: 1,
+  })
+  const submittedDocumentsQuery = useQuery({
+    queryKey: ["advisor", "submitted-documents", "evaluator-project-detail", projectId],
+    queryFn: getAdvisorSubmittedDocuments,
+    enabled: authHydrated && Boolean(projectId),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
   const detail = React.useMemo(() => {
-    const rich = getEvaluatorProjectDetail(projectId)
-    if (rich) return rich
-    const summary = mockProjects.find((p) => p.id === projectId)
-    if (!summary) return null
-    return {
-      id: summary.id,
-      title: summary.title,
-      description: "No extended evaluator brief is available for this project yet. Use the advisor project hub for full history.",
-      group: summary.groupName ?? "—",
-      advisor: summary.advisorName ?? "—",
-      status: summary.status,
-      progress: summary.progress ?? 0,
-      dueDate: "2026-12-31",
-      startDate: "2026-01-01",
-      category: "General",
-      technologies: [] as string[],
-      teamMembers: [] as EvaluatorProjectDetail["teamMembers"],
-      milestones: [] as EvaluatorProjectDetail["milestones"],
-      documents: [] as EvaluatorProjectDetail["documents"],
-      evaluationHistory: [] as EvaluatorProjectDetail["evaluationHistory"],
-      nextEvaluation: {
-        date: "2026-08-25",
-        type: "Evaluation TBD",
-        evaluator: "—",
-        venue: "TBD",
-      },
-      linkedSessionId: "1",
-    } satisfies EvaluatorProjectDetail
-  }, [projectId])
+    if (!detailQuery.data) return null
+    return mapDetailToProjectView(detailQuery.data, submittedDocumentsQuery.data?.documents ?? [])
+  }, [detailQuery.data, submittedDocumentsQuery.data?.documents])
+
+  if (!authHydrated || detailQuery.isLoading) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-16 text-center animate-in fade-in">
+        <FileText className="h-12 w-12 text-muted-foreground" aria-hidden />
+        <div>
+          <h1 className="text-xl font-semibold">Loading project</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Fetching evaluator project details from the backend.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (detailQuery.error) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-16 text-center animate-in fade-in">
+        <FileText className="h-12 w-12 text-muted-foreground" aria-hidden />
+        <div>
+          <h1 className="text-xl font-semibold">Project could not be loaded</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{detailQuery.error.message}</p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+            Back to projects
+          </Link>
+        </Button>
+      </div>
+    )
+  }
 
   if (!detail) {
     return (
@@ -157,7 +356,7 @@ export function AdvisorEvaluatorProjectDetailPage({ projectId }: { projectId: st
           </p>
         </div>
         <Button variant="outline" asChild>
-          <Link href="/dashboard/advisor/evaluator/projects">
+          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
             Back to projects
           </Link>
@@ -166,10 +365,16 @@ export function AdvisorEvaluatorProjectDetailPage({ projectId }: { projectId: st
     )
   }
 
-  return <ProjectDetailBody detail={detail} />
+  return <ProjectDetailBody detail={detail} stage={stage} />
 }
 
-function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
+function ProjectDetailBody({
+  detail,
+  stage,
+}: {
+  detail: EvaluatorProjectDetail
+  stage: AdvisorEvaluationDashboardStage
+}) {
   const avgPast =
     detail.evaluationHistory.length > 0
       ? (
@@ -181,19 +386,22 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
     <div className="flex w-full max-w-none flex-col gap-8 pb-10 animate-in fade-in duration-300">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="outline" size="sm" className="w-fit gap-2" asChild>
-          <Link href="/dashboard/advisor/evaluator/projects">
+          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Back to projects
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/advisor/evaluator">Evaluator hub</Link>
+            <Link href={`/dashboard/advisor/evaluator?stage=${stage}`}>Evaluator hub</Link>
           </Button>
         </div>
       </div>
 
-      <PageHeader title={detail.title} description={`Project by ${detail.group} · Advisor: ${detail.advisor}`} />
+      <PageHeader
+        title={detail.title}
+        description={`${formatDashboardStageLabel(stage)} project by ${detail.group} · Advisor: ${detail.advisor}`}
+      />
 
       <section aria-label="Overview" className="grid gap-6 lg:grid-cols-3">
         <Card className="border-border/80 lg:col-span-2">
@@ -272,12 +480,14 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <span>{detail.nextEvaluation.venue}</span>
             </div>
-            <Button className="mt-2 w-full btn-gradient" size="sm" asChild>
-              <Link href={`/dashboard/advisor/evaluator/scheduled/${detail.linkedSessionId}`}>
-                <Eye className="mr-2 h-4 w-4" aria-hidden />
-                View session details
-              </Link>
-            </Button>
+            {detail.linkedSessionId ? (
+              <Button className="mt-2 w-full btn-gradient" size="sm" asChild>
+                <Link href={`/dashboard/advisor/evaluator/scheduled/${detail.linkedSessionId}`}>
+                  <Eye className="mr-2 h-4 w-4" aria-hidden />
+                  View session details
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </section>
@@ -395,6 +605,25 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
                           <span>Due {formatDate(m.dueDate)}</span>
                           {m.completedDate ? <span>Completed {formatDate(m.completedDate)}</span> : null}
                         </div>
+                        {m.file ? (
+                          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border/60 bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex items-start gap-3">
+                              <DocTypeIcon type={toDocumentType(m.file.mimeType ?? "", m.file.name)} />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-foreground">{m.file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {m.file.size ? `${m.file.size} · ` : ""}Milestone file
+                                </p>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={m.file.url} target="_blank" rel="noreferrer">
+                                <Download className="mr-2 h-4 w-4" aria-hidden />
+                                Download
+                              </Link>
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))
@@ -405,11 +634,8 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
 
           <TabsContent value="documents" className="mt-0 outline-none">
             <Card>
-              <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <CardHeader>
                 <CardTitle className="text-lg">Documents</CardTitle>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/advisor/evaluator/documents">Open document library</Link>
-                </Button>
               </CardHeader>
               <CardContent className="space-y-3">
                 {detail.documents.length === 0 ? (
@@ -427,21 +653,31 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
                           <p className="text-sm text-muted-foreground">
                             {doc.size} · Uploaded {formatDate(doc.uploadedAt)}
                           </p>
+                          {doc.note ? <p className="text-xs text-muted-foreground">{doc.note}</p> : null}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                         <StatusBadge status={doc.status} />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          onClick={() =>
-                            toast.message("Download", { description: `${doc.name} — connect storage API.` })
-                          }
-                        >
-                          <Download className="mr-2 h-4 w-4" aria-hidden />
-                          Download
-                        </Button>
+                        {doc.url ? (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={doc.url} target="_blank" rel="noreferrer">
+                              <Download className="mr-2 h-4 w-4" aria-hidden />
+                              Download
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() =>
+                              toast.message("Download", { description: `${doc.name} — connect storage API.` })
+                            }
+                          >
+                            <Download className="mr-2 h-4 w-4" aria-hidden />
+                            Download
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -536,15 +772,9 @@ function ProjectDetailBody({ detail }: { detail: EvaluatorProjectDetail }) {
                 }
               />
               <Button variant="outline" size="lg" className="h-12 min-h-12 rounded-xl border-primary/25 bg-background/90" asChild>
-                <Link href="/dashboard/advisor/evaluator/rubric">
+                <Link href={`/dashboard/advisor/evaluator/rubric?stage=${stage}`}>
                   <BookOpen className="mr-2 h-5 w-5" aria-hidden />
                   View rubric
-                </Link>
-              </Button>
-              <Button variant="secondary" size="lg" className="h-12 min-h-12 rounded-xl" asChild>
-                <Link href="/dashboard/advisor/evaluator/documents">
-                  <FileText className="mr-2 h-5 w-5" aria-hidden />
-                  Document library
                 </Link>
               </Button>
             </div>

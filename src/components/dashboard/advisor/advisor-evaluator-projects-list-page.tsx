@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/select"
 import { mockProjects, formatDate, type Project } from "@/data/mockData"
 import { mockProjectTimelines } from "@/data/timelineData"
+import { type AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
@@ -49,7 +51,22 @@ import {
 type StatusFilter = "all" | "in_progress" | "completed"
 type SortKey = "title" | "progress"
 
+function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDashboardStage {
+  const normalized = rawStage?.trim().toUpperCase().replace(/-/g, "_")
+  return normalized === "CAPSTONE_II" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
 export function AdvisorEvaluatorProjectsListPage() {
+  const searchParams = useSearchParams()
+  const activeStage = React.useMemo(
+    () => normalizeDashboardStage(searchParams.get("stage")),
+    [searchParams],
+  )
+  const stageLabel = formatDashboardStageLabel(activeStage)
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all")
   const [sort, setSort] = React.useState<SortKey>("title")
@@ -97,27 +114,21 @@ export function AdvisorEvaluatorProjectsListPage() {
             </Link>
           </Button>
           <PageHeader
-            title="Projects"
-            description="Browse projects you can evaluate — open detail for milestones and files, or jump straight to the scoring form."
+            title={`${stageLabel} projects`}
+            description={`Browse projects you can evaluate for ${stageLabel} — open detail for milestones and files, or jump straight to the scoring form.`}
           />
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button variant="default" size="sm" className="btn-gradient gap-2 shadow-md shadow-primary/20" asChild>
-            <Link href="/dashboard/advisor/evaluator/rubric">
+            <Link href={`/dashboard/advisor/evaluator/rubric?stage=${activeStage}`}>
               <BookOpen className="h-4 w-4" aria-hidden />
               Open rubric
             </Link>
           </Button>
           <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/pending">
+            <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>
               <ClipboardCheck className="h-4 w-4" aria-hidden />
               Pending queue
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/documents">
-              <FileText className="h-4 w-4" aria-hidden />
-              Documents
             </Link>
           </Button>
         </div>
@@ -127,7 +138,7 @@ export function AdvisorEvaluatorProjectsListPage() {
         <StatCard
           title="Total projects"
           value={stats.total}
-          subtitle="In evaluator list"
+          subtitle={`In ${stageLabel} evaluator list`}
           icon={FolderKanban}
           iconClassName="bg-primary/10 text-primary"
         />
@@ -158,10 +169,10 @@ export function AdvisorEvaluatorProjectsListPage() {
         <section aria-label="Evaluation queue shortcut">
           <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/[0.06] via-background to-background shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Ready for evaluation</CardTitle>
+              <CardTitle className="text-base">Ready for {stageLabel} evaluation</CardTitle>
               <CardDescription>
-                {pendingQueueProjects.length} project{pendingQueueProjects.length === 1 ? "" : "s"} match the pending
-                queue — same set as the pending page.
+                {pendingQueueProjects.length} project{pendingQueueProjects.length === 1 ? "" : "s"} match the {stageLabel}
+                pending queue.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
@@ -178,7 +189,7 @@ export function AdvisorEvaluatorProjectsListPage() {
                 ))}
               </div>
               <Button variant="link" className="mt-3 h-auto p-0 text-sm" asChild>
-                <Link href="/dashboard/advisor/evaluator/pending">Open full pending list</Link>
+                <Link href={`/dashboard/advisor/evaluator/pending?stage=${activeStage}`}>Open full pending list</Link>
               </Button>
             </CardContent>
           </Card>
@@ -189,7 +200,7 @@ export function AdvisorEvaluatorProjectsListPage() {
           <Card className="border-border/80 shadow-sm">
             <CardHeader className="border-b border-border/50 bg-muted/10 pb-3">
               <CardTitle className="text-base">Find projects</CardTitle>
-              <CardDescription>Search and filter the grid below.</CardDescription>
+              <CardDescription>Search and filter the {stageLabel} grid below.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-5 lg:flex-row lg:items-end">
               <div className="relative flex-1">
@@ -255,13 +266,13 @@ export function AdvisorEvaluatorProjectsListPage() {
                 </div>
               </div>
               <p className="rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-xs leading-relaxed sm:text-sm">
-                <strong className="text-foreground">In queue</strong> matches the pending page filter; finished capstones
-                drop the badge but stay open for audits.
+                <strong className="text-foreground">In queue</strong> matches the {stageLabel} pending page filter; finished
+                capstones drop the badge but stay open for audits.
               </p>
             </div>
             <div className="flex w-full shrink-0 flex-col justify-center gap-2 border-t border-border/50 pt-4 sm:w-52 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
               <Button variant="secondary" size="sm" className="w-full rounded-xl" asChild>
-                <Link href="/dashboard/advisor/evaluator/rubric">
+                <Link href={`/dashboard/advisor/evaluator/rubric?stage=${activeStage}`}>
                   <BookOpen className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Rubric
                 </Link>
@@ -279,14 +290,14 @@ export function AdvisorEvaluatorProjectsListPage() {
                 </Link>
               </Button>
               <Button variant="outline" size="sm" className="w-full rounded-xl" asChild>
-                <Link href="/dashboard/advisor/evaluator/completed">Completed</Link>
+                <Link href={`/dashboard/advisor/evaluator/completed?stage=${activeStage}`}>Completed</Link>
               </Button>
             </div>
           </div>
 
           <section aria-label="Project grid" className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-2">
-              <h2 className="text-lg font-semibold tracking-tight">All projects</h2>
+              <h2 className="text-lg font-semibold tracking-tight">All {stageLabel} projects</h2>
               <p className="text-sm text-muted-foreground">
                 {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"}
               </p>
@@ -318,6 +329,7 @@ export function AdvisorEvaluatorProjectsListPage() {
                     key={project.id}
                     project={project}
                     inPendingQueue={pendingProjectIds.has(project.id)}
+                    activeStage={activeStage}
                   />
                 ))}
               </div>
@@ -331,9 +343,11 @@ export function AdvisorEvaluatorProjectsListPage() {
 function EvaluatorProjectCard({
   project,
   inPendingQueue,
+  activeStage,
 }: {
   project: Project
   inPendingQueue: boolean
+  activeStage: AdvisorEvaluationDashboardStage
 }) {
   const timeline = mockProjectTimelines.find((t) => t.projectId === project.id)
   const tStatus = timelineStatusForProject(timeline, project.progress ?? 0)
@@ -395,7 +409,7 @@ function EvaluatorProjectCard({
                 trigger={
                   <Button variant="default" size="sm" className="rounded-lg">
                     <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
-                    Evaluate now
+                    Evaluate {formatDashboardStageLabel(activeStage)}
                   </Button>
                 }
               />

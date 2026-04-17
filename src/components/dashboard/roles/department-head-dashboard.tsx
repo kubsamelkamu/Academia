@@ -18,7 +18,6 @@ import {
   ClipboardCheck,
   UserCheck,
   TrendingUp,
-  Award,
   CheckCircle2,
   XCircle,
   FileText,
@@ -42,7 +41,7 @@ import {
   Trash2,
   Send,
 } from "lucide-react"
-import { mockGrades } from "@/data/mockData"
+import { getDepartmentHeadEvaluationDashboard } from "@/lib/api/department-head-evaluations"
 import {
   DEPARTMENT_ACTIVITY_EVENT_TYPES,
   normalizeDepartmentActivity,
@@ -52,6 +51,7 @@ import { useNotificationsList } from "@/lib/hooks/use-notifications"
 import { useDepartmentProjectsOverview } from "@/lib/hooks/use-projects"
 import { useTenantUsers } from "@/lib/hooks/use-users"
 import { useTenantInvitationsList } from "@/lib/hooks/use-invitations"
+import { useQuery } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -153,6 +153,7 @@ function getActivityBadgeClasses(badge: DepartmentActivityBadge): string {
 export function DepartmentHeadDashboard() {
   const authUser = useAuthStore((s) => s.user)
   const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
+  const reviewStage = "CAPSTONE_I" as const
   const [userSearchQuery, setUserSearchQuery] = useState("")
   const [userRoleFilter, setUserRoleFilter] = useState("all")
   const [usersPage, setUsersPage] = useState(1)
@@ -193,6 +194,13 @@ export function DepartmentHeadDashboard() {
   const { data: pendingInvitations = [] } =
     useTenantInvitationsList({ status: "PENDING" })
 
+  const departmentHeadReviewQuery = useQuery({
+    queryKey: ["department-head", "home-review-summary", reviewStage],
+    queryFn: () => getDepartmentHeadEvaluationDashboard(reviewStage),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
   const departmentName = authUser?.departmentName ?? authUser?.department?.name ?? "Software Engineering"
   const universityName = authUser?.tenant?.name ?? "Haramaya University"
   const academicYearLabel = getCurrentAcademicYearLabel()
@@ -208,9 +216,15 @@ export function DepartmentHeadDashboard() {
     .format(new Date())
     .replace(",", "")
 
-  const pendingProjectGrades = mockGrades.filter((g) => g.status === "provisional")
-  const approvedGrades = mockGrades.filter((g) => g.status === "final")
-  const completionRate = (approvedGrades.length / mockGrades.length) * 100
+  const pendingReviewCount = departmentHeadReviewQuery.data?.summary.pendingReviewCount ?? 0
+  const approvedReviewCount = departmentHeadReviewQuery.data?.summary.approvedCount ?? 0
+  const rejectedReviewCount = departmentHeadReviewQuery.data?.summary.rejectedCount ?? 0
+  const totalReviewItems = departmentHeadReviewQuery.data?.summary.totalFinalizedProjectGroups ?? 0
+  const reviewCompletionRate = totalReviewItems > 0 ? ((approvedReviewCount + rejectedReviewCount) / totalReviewItems) * 100 : 0
+  const pendingReviewProjects = useMemo(
+    () => (departmentHeadReviewQuery.data?.projectGroups ?? []).filter((project) => project.finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD"),
+    [departmentHeadReviewQuery.data?.projectGroups]
+  )
 
   const dashboardUsers = useMemo<DepartmentUserRow[]>(
     () =>
@@ -280,13 +294,6 @@ export function DepartmentHeadDashboard() {
     safeUsersPage * DASHBOARD_USERS_PAGE_SIZE
   )
 
-  const handleApproveGrades = useCallback(() => {
-    toast.success("Grades approved for publication", {
-      description: "All provisional grades have been marked as approved.",
-      duration: 5000,
-    })
-  }, [])
-
   const openEdit = useCallback((user: DepartmentUserRow) => {
     setEditUser(user)
     setEditName(user.name)
@@ -322,20 +329,6 @@ export function DepartmentHeadDashboard() {
     toast.success(`${deleteUser.name} has been deactivated`)
     setDeleteUser(null)
   }, [deleteUser])
-
-  const handleApproveGrade = useCallback((gradeId: string) => {
-    const grade = mockGrades.find((g) => g.id === gradeId)
-    toast.success("Grade approved", {
-      description: grade ? `${grade.studentName}'s grade has been approved.` : "Grade approved.",
-    })
-  }, [])
-
-  const handleRejectGrade = useCallback((gradeId: string) => {
-    const grade = mockGrades.find((g) => g.id === gradeId)
-    toast.warning("Grade rejected", {
-      description: grade ? `${grade.studentName}'s grade has been rejected.` : "Grade rejected.",
-    })
-  }, [])
 
   const kpiCards: KpiCard[] = [
     {
@@ -429,10 +422,10 @@ export function DepartmentHeadDashboard() {
         {/* Left column ── Tabs */}
         <div className="lg:col-span-2 space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full h-auto justify-start rounded-xl border border-border bg-muted/40 p-1.5 gap-1">
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-muted/40 p-1.5 whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <TabsTrigger
                 value="overview"
-                className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
+                className="shrink-0 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
                   data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm
                   data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-background/60"
               >
@@ -441,7 +434,7 @@ export function DepartmentHeadDashboard() {
               </TabsTrigger>
               <TabsTrigger
                 value="team"
-                className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
+                className="shrink-0 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
                   data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm
                   data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-background/60"
               >
@@ -450,15 +443,15 @@ export function DepartmentHeadDashboard() {
               </TabsTrigger>
               <TabsTrigger
                 value="grades"
-                className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
+                className="shrink-0 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all
                   data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm
                   data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-background/60"
               >
-                <Award className="h-4 w-4 shrink-0" />
+                <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Grades</span>
-                {pendingProjectGrades.length > 0 && (
+                {pendingReviewCount > 0 && (
                   <Badge variant="destructive" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px] font-semibold">
-                    {pendingProjectGrades.length}
+                    {pendingReviewCount}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -466,7 +459,7 @@ export function DepartmentHeadDashboard() {
 
             {/* ── Overview Tab ── */}
             <TabsContent value="overview" className="space-y-4 mt-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {/* Quick Actions */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -482,8 +475,8 @@ export function DepartmentHeadDashboard() {
                       {
                         href: "/dashboard/department-head/review",
                         icon: ClipboardCheck,
-                        label: "Review Pending Grades",
-                        badge: pendingProjectGrades.length > 0 ? pendingProjectGrades.length : null,
+                        label: "Review Finalized Results",
+                        badge: pendingReviewCount > 0 ? pendingReviewCount : null,
                       },
                       { href: "/dashboard/department-head/group-leader-requests", icon: Users2, label: "Group Leader Requests", badge: null },
                       { href: "/dashboard/department-head/announcements", icon: FileText, label: "Announcements", badge: null },
@@ -493,7 +486,7 @@ export function DepartmentHeadDashboard() {
                       <Button
                         key={action.href}
                         variant="outline"
-                        className="w-full justify-start gap-2 text-sm"
+                        className="h-auto w-full justify-start gap-2 py-2.5 text-left text-sm whitespace-normal"
                         asChild
                       >
                         <Link href={action.href}>
@@ -522,10 +515,10 @@ export function DepartmentHeadDashboard() {
                   <CardContent className="space-y-4">
                     <div>
                       <div className="flex justify-between text-sm mb-1.5">
-                        <span className="text-muted-foreground">Grade Completion</span>
-                        <span className="font-medium">{completionRate.toFixed(0)}%</span>
+                        <span className="text-muted-foreground">Review Completion</span>
+                        <span className="font-medium">{reviewCompletionRate.toFixed(0)}%</span>
                       </div>
-                      <Progress value={completionRate} className="h-1.5" />
+                      <Progress value={reviewCompletionRate} className="h-1.5" />
                     </div>
                     <div>
                       <div className="flex justify-between text-sm mb-1.5">
@@ -537,13 +530,58 @@ export function DepartmentHeadDashboard() {
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-3">
                         <p className="text-xs text-muted-foreground">Approved</p>
-                        <p className="mt-1 text-xl font-semibold text-emerald-600">{approvedGrades.length}</p>
+                        <p className="mt-1 text-xl font-semibold text-emerald-600">{approvedReviewCount}</p>
                       </div>
                       <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3">
                         <p className="text-xs text-muted-foreground">Pending Review</p>
-                        <p className="mt-1 text-xl font-semibold text-amber-600">{pendingProjectGrades.length}</p>
+                        <p className="mt-1 text-xl font-semibold text-amber-600">{pendingReviewCount}</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 shadow-sm md:col-span-2 xl:col-span-1">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-primary" />
+                      Pending Review Queue
+                    </CardTitle>
+                    <CardDescription>Direct access to finalized results awaiting your decision.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-3xl font-bold tracking-tight text-foreground">{pendingReviewCount}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {departmentHeadReviewQuery.isLoading
+                            ? "Loading current review count..."
+                            : pendingReviewCount === 1
+                              ? "finalized result is awaiting your review"
+                              : "finalized results are awaiting your review"}
+                        </p>
+                      </div>
+                      <div className="rounded-full bg-amber-500/10 p-3 text-amber-600">
+                        <Clock className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">Approved</p>
+                        <p className="mt-1 text-lg font-semibold text-emerald-600">{approvedReviewCount}</p>
+                      </div>
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">Rejected</p>
+                        <p className="mt-1 text-lg font-semibold text-destructive">{rejectedReviewCount}</p>
+                      </div>
+                    </div>
+
+                    <Button asChild className="w-full gap-1.5">
+                      <Link href="/dashboard/department-head/review">
+                        Open Review Queue
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </div>
@@ -551,7 +589,7 @@ export function DepartmentHeadDashboard() {
               {/* Recent Activity */}
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-base flex items-center gap-2">
                         <Activity className="h-4 w-4 text-primary" />
@@ -559,7 +597,7 @@ export function DepartmentHeadDashboard() {
                       </CardTitle>
                       <CardDescription>Latest updates from your department</CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7" asChild>
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 self-start text-xs sm:self-auto" asChild>
                       <Link href="/dashboard/notifications">
                       View All
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -697,7 +735,7 @@ export function DepartmentHeadDashboard() {
                         {pagedDashboardUsers.map((member) => (
                         <div
                             key={member.id} 
-                          className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 hover:shadow-sm transition-shadow"
+                          className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 transition-shadow hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <Avatar className="h-10 w-10 shrink-0">
@@ -716,7 +754,7 @@ export function DepartmentHeadDashboard() {
                               <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex flex-wrap items-center gap-2 shrink-0 sm:justify-end">
                             <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
                             <Badge
                               variant={member.status === "active" ? "default" : "secondary"}
@@ -729,7 +767,7 @@ export function DepartmentHeadDashboard() {
                         ))}
                       </div>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       {pagedDashboardUsers.map((member) => (
                         <Card key={member.id} className="transition-shadow hover:shadow-lg overflow-hidden">
                           <CardContent className="pt-6 px-5">
@@ -796,13 +834,13 @@ export function DepartmentHeadDashboard() {
                   )}
 
                       {usersTotalPages > 1 && (
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                    <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-muted-foreground">
                         {(safeUsersPage - 1) * DASHBOARD_USERS_PAGE_SIZE + 1}–
                             {Math.min(safeUsersPage * DASHBOARD_USERS_PAGE_SIZE, filteredDashboardUsers.length)} of{" "}
                             {filteredDashboardUsers.length}
                           </p>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 self-start sm:self-auto">
                         <Button variant="outline" size="sm" onClick={() => setUsersPage((p) => Math.max(1, p - 1))} disabled={safeUsersPage <= 1}>
                               Previous
                             </Button>
@@ -820,66 +858,78 @@ export function DepartmentHeadDashboard() {
             <TabsContent value="grades" className="space-y-4 mt-4">
               <Card>
                 <CardHeader className="border-b pb-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <CardTitle className="text-base">Grade Review Queue</CardTitle>
+                      <CardTitle className="text-base">Finalized Review Queue</CardTitle>
                       <CardDescription>
-                        {pendingProjectGrades.length} grades awaiting approval
+                        {pendingReviewCount} finalized result{pendingReviewCount !== 1 ? "s" : ""} awaiting department-head review
                       </CardDescription>
                     </div>
-                    {pendingProjectGrades.length > 0 && (
-                      <Button size="sm" onClick={handleApproveGrades} className="gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Approve All
-                      </Button>
-                    )}
+                    <Button size="sm" className="gap-1.5 self-start sm:self-auto" asChild>
+                      <Link href="/dashboard/department-head/review">
+                        <Eye className="h-3.5 w-3.5" /> Open review page
+                      </Link>
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  {pendingProjectGrades.length === 0 ? (
+                  {departmentHeadReviewQuery.isLoading ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div key={index} className="h-20 animate-pulse rounded-lg bg-muted" />
+                      ))}
+                    </div>
+                  ) : pendingReviewProjects.length === 0 ? (
                     <div className="text-center py-12">
                       <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/20 mb-3">
                         <CheckCircle2 className="h-7 w-7 text-emerald-600" />
                       </div>
-                      <p className="text-sm font-medium">All grades reviewed</p>
-                      <p className="text-xs text-muted-foreground mt-1">No pending grades require your attention</p>
+                      <p className="text-sm font-medium">All finalized results reviewed</p>
+                      <p className="text-xs text-muted-foreground mt-1">No department-head review items are pending right now</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {pendingProjectGrades.slice(0, 8).map((grade) => (
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3">
+                          <p className="text-xs text-muted-foreground">Pending review</p>
+                          <p className="mt-1 text-xl font-semibold text-amber-600">{pendingReviewCount}</p>
+                        </div>
+                        <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-3">
+                          <p className="text-xs text-muted-foreground">Approved</p>
+                          <p className="mt-1 text-xl font-semibold text-emerald-600">{approvedReviewCount}</p>
+                        </div>
+                        <div className="rounded-lg bg-destructive/10 p-3">
+                          <p className="text-xs text-muted-foreground">Rejected</p>
+                          <p className="mt-1 text-xl font-semibold text-destructive">{rejectedReviewCount}</p>
+                        </div>
+                      </div>
+
+                      {pendingReviewProjects.slice(0, 8).map((project) => (
                         <div
-                          key={grade.id}
-                          className="group flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5"
+                          key={project.finalResultId}
+                          className="group flex flex-col gap-3 rounded-lg bg-muted/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                              <GraduationCap className="h-4 w-4 text-primary" />
+                              <ClipboardCheck className="h-4 w-4 text-primary" />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{grade.studentName}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <Progress value={grade.finalScore} className="h-1 w-20" />
-                                <span className="text-xs text-muted-foreground">{grade.finalScore}%</span>
-                                <Badge variant="outline" className="text-[10px]">{grade.grade}</Badge>
+                              <p className="text-sm font-medium truncate">{project.projectTitle}</p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-900 border-amber-200">
+                                  Pending review
+                                </Badge>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  {project.group?.name ?? "No group assigned"} · finalized by {project.finalizedBy.fullName}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              onClick={() => handleApproveGrade(grade.id)}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleRejectGrade(grade.id)}
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
+                          <div className="flex gap-2 self-end shrink-0 sm:self-auto">
+                            <Button size="sm" variant="outline" className="gap-1.5" asChild>
+                              <Link href="/dashboard/department-head/review">
+                                <Eye className="h-3.5 w-3.5" /> Review
+                              </Link>
                             </Button>
                           </div>
                         </div>
@@ -923,7 +973,7 @@ export function DepartmentHeadDashboard() {
                 </div>
                 ))}
                 </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-wrap gap-2 pt-1">
                 <Badge variant="secondary" className="text-xs">Active</Badge>
                 <Badge variant="outline" className="text-xs">{academicYearLabel}</Badge>
               </div>
@@ -943,7 +993,7 @@ export function DepartmentHeadDashboard() {
               {deadlines.map((deadline, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
+                  className="flex flex-col gap-2 rounded-lg bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{deadline.title}</p>
