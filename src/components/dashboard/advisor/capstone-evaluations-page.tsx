@@ -53,8 +53,66 @@ type GroupRow = {
   progress: number
   pending: number
   evaluated: number
+  evaluationStatus: string
+  nextAction: string
   dueLabel: string
   criteria: string[]
+}
+
+function formatEvaluationStatusLabel(status: string) {
+  return status.toLowerCase().replace(/_/g, " ")
+}
+
+function formatOptionalDateTime(value: string | null) {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function nextActionLabel(nextAction: string) {
+  switch (nextAction) {
+    case "START_EVALUATION":
+      return "Start evaluation"
+    case "COMPLETE_STUDENT_EVALUATION":
+      return "Complete remaining scores"
+    case "VIEW_SUBMITTED_EVALUATION":
+      return "View submitted evaluation"
+    default:
+      return "Open evaluation"
+  }
+}
+
+function nextActionCta(nextAction: string, fallback: string) {
+  switch (nextAction) {
+    case "START_EVALUATION":
+      return fallback
+    case "COMPLETE_STUDENT_EVALUATION":
+      return "Continue scoring"
+    case "VIEW_SUBMITTED_EVALUATION":
+      return "View submitted"
+    default:
+      return fallback
+  }
+}
+
+function evaluationStatusBadgeClass(status: string) {
+  switch (status) {
+    case "SUBMITTED":
+      return "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800"
+    case "IN_PROGRESS":
+      return "bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800"
+    default:
+      return "bg-muted text-foreground border-border"
+  }
 }
 
 function toApiStage(stage: CapstoneStage): AdvisorEvaluationDashboardStage {
@@ -69,14 +127,22 @@ function criteriaForStage(stage: CapstoneStage) {
 
 function formatDueLabel(submittedAt: string | null, nextAction: string) {
   if (submittedAt) {
-    const submittedDate = new Date(submittedAt)
-    if (!Number.isNaN(submittedDate.getTime())) {
-      return `Submitted ${submittedDate.toLocaleDateString()}`
+    const formatted = formatOptionalDateTime(submittedAt)
+    if (formatted) {
+      return `Submitted ${formatted}`
     }
   }
 
   if (nextAction === "START_EVALUATION") {
     return "Ready to evaluate"
+  }
+
+  if (nextAction === "COMPLETE_STUDENT_EVALUATION") {
+    return "Partially scored"
+  }
+
+  if (nextAction === "VIEW_SUBMITTED_EVALUATION") {
+    return "Submitted"
   }
 
   return "Awaiting update"
@@ -125,6 +191,8 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
       progress: group.milestones.progressPercent,
       pending: group.evaluation.studentsPendingEvaluation,
       evaluated: group.evaluation.studentsEvaluated,
+      evaluationStatus: group.evaluation.status,
+      nextAction: group.nextAction,
       dueLabel: formatDueLabel(group.evaluation.submittedAt, group.nextAction),
       criteria: stageCriteria,
     }))
@@ -213,7 +281,7 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
 
       <DashboardPageHeader
         title={`${stage} Evaluation Dashboard`}
-        description="Use the stage-specific rubric to review groups and evaluate students in sequence."
+        description="Review advised groups, track scoring progress, and open the next advisor action for this stage."
         badge={`${groups.length} groups`}
       />
 
@@ -276,7 +344,12 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   </CardTitle>
                   <CardDescription className="mt-1 line-clamp-2">{group.projectTitle}</CardDescription>
                 </div>
-                <Badge variant="outline" className={cfg.chip}>{group.stage}</Badge>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Badge variant="outline" className={cfg.chip}>{group.stage}</Badge>
+                  <Badge variant="outline" className={evaluationStatusBadgeClass(group.evaluationStatus)}>
+                    {formatEvaluationStatusLabel(group.evaluationStatus)}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -286,6 +359,11 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   <span className="font-semibold">{group.progress}%</span>
                 </div>
                 <Progress value={group.progress} className="h-2" />
+              </div>
+
+              <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-sm">
+                <p className="text-xs text-muted-foreground">Next action</p>
+                <p className="mt-1 font-medium">{nextActionLabel(group.nextAction)}</p>
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-1">
@@ -308,7 +386,7 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                     <DropdownMenuItem asChild>
                       <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/open`}>
                         <PlayCircle className="h-4 w-4 mr-2" />
-                        {cfg.cta}
+                        {nextActionCta(group.nextAction, cfg.cta)}
                       </Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>

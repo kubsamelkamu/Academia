@@ -1,6 +1,6 @@
 import apiClient from "@/lib/api/client"
 
-export type StudentFinalGradeStage = "CAPSTONE_I"
+export type StudentFinalGradeStage = "CAPSTONE_I" | "CAPSTONE_II"
 
 export type StudentFinalGradeStatus =
   | "NOT_AVAILABLE"

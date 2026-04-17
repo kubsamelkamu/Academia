@@ -1,5 +1,5 @@
-import { EvaluatorDashboard } from "@/components/dashboard/roles/evaluator-dashboard"
+import { redirect } from "next/navigation"
 
 export default function EvaluatorPage() {
-  return <EvaluatorDashboard />
+  redirect("/dashboard/advisor/evaluator?stage=capstone-ii")
 }

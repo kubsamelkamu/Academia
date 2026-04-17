@@ -73,6 +73,10 @@ function phaseLabel(phase: CapstonePhase) {
   return phase === "capstone1" ? "Capstone I" : "Capstone II"
 }
 
+function phaseSetupHref(phase: CapstonePhase) {
+  return `/dashboard/coordinator/evaluation-setup?stage=${phase === "capstone2" ? "capstone-ii" : "capstone-i"}`
+}
+
 function formatDateTime(value: string | null) {
   if (!value) return "Not available"
 
@@ -111,22 +115,6 @@ function isAdvisorScoringComplete(detail: CoordinatorEvaluationProjectDetail) {
   return detail.advisorEvaluation.studentsEvaluated > 0 && detail.advisorEvaluation.studentsPendingEvaluation === 0
 }
 
-function deriveAggregationStatusFromProject(project: CoordinatorDashboardProjectGroup): CoordinatorAggregationStatus {
-  if (project.weights.advisorPercentage === null || project.weights.evaluatorPercentage === null) {
-    return "WAITING_FOR_WEIGHTS"
-  }
-
-  if (!isAdvisorSubmitted(project.advisorEvaluation.status, project.advisorEvaluation.submittedAt)) {
-    return "WAITING_FOR_ADVISOR"
-  }
-
-  if (!project.evaluatorEvaluation.allSubmitted) {
-    return "WAITING_FOR_EVALUATORS"
-  }
-
-  return "READY_FOR_AGGREGATION"
-}
-
 function deriveAggregationStatusFromDetail(detail: CoordinatorEvaluationProjectDetail): CoordinatorAggregationStatus {
   if (!detail.weights.isConfigured) {
     return "WAITING_FOR_WEIGHTS"
@@ -141,26 +129,6 @@ function deriveAggregationStatusFromDetail(detail: CoordinatorEvaluationProjectD
   }
 
   return "READY_FOR_AGGREGATION"
-}
-
-function deriveNextAction(
-  aggregationStatus: CoordinatorAggregationStatus,
-  finalizationStatus: CoordinatorFinalizationStatus
-): CoordinatorNextAction {
-  if (finalizationStatus === "APPROVED") return "VIEW_APPROVED_RESULT"
-  if (finalizationStatus === "REJECTED") return "REVIEW_REJECTED_RESULT"
-  if (finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD") return "VIEW_FINALIZED_RESULT"
-
-  switch (aggregationStatus) {
-    case "WAITING_FOR_WEIGHTS":
-      return "CONFIGURE_WEIGHTS"
-    case "WAITING_FOR_ADVISOR":
-      return "WAIT_FOR_ADVISOR_SUBMISSION"
-    case "WAITING_FOR_EVALUATORS":
-      return "WAIT_FOR_EVALUATOR_SUBMISSIONS"
-    case "READY_FOR_AGGREGATION":
-      return "OPEN_PREVIEW"
-  }
 }
 
 function advisorEvaluationDetailLabel(detail: CoordinatorEvaluationProjectDetail) {
@@ -279,15 +247,16 @@ function previewBlockedMessage(
 
 function ProjectAggregationCard({
   project,
+  phase,
   onOpenAction,
 }: {
   project: CoordinatorDashboardProjectGroup
+  phase: CapstonePhase
   onOpenAction: (project: CoordinatorDashboardProjectGroup) => void
 }) {
-  const derivedAggregationStatus = deriveAggregationStatusFromProject(project)
-  const derivedNextAction = deriveNextAction(derivedAggregationStatus, project.finalizationStatus)
-  const aggregation = aggregationStatusConfig(derivedAggregationStatus)
+  const aggregation = aggregationStatusConfig(project.aggregationStatus)
   const finalization = finalizationStatusConfig(project.finalizationStatus)
+  const nextAction = project.nextAction
 
   return (
     <div className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
@@ -341,20 +310,20 @@ function ProjectAggregationCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {derivedNextAction === "CONFIGURE_WEIGHTS" ? (
-            <Link href="/dashboard/coordinator/evaluation-setup">
-              <Button size="sm" variant={actionButtonVariant(derivedNextAction)} className="gap-1.5">
-                <Scale className="h-3.5 w-3.5" /> {nextActionLabel(derivedNextAction)}
+          {nextAction === "CONFIGURE_WEIGHTS" ? (
+            <Link href={phaseSetupHref(phase)}>
+              <Button size="sm" variant={actionButtonVariant(nextAction)} className="gap-1.5">
+                <Scale className="h-3.5 w-3.5" /> {nextActionLabel(nextAction)}
               </Button>
             </Link>
           ) : (
             <Button
               size="sm"
-              variant={actionButtonVariant(derivedNextAction)}
+              variant={actionButtonVariant(nextAction)}
               className="gap-1.5"
               onClick={() => onOpenAction(project)}
             >
-              <Eye className="h-3.5 w-3.5" /> {nextActionLabel(derivedNextAction)}
+              <Eye className="h-3.5 w-3.5" /> {nextActionLabel(nextAction)}
             </Button>
           )}
         </div>
@@ -391,9 +360,7 @@ function ProjectDetailSheet({
   const derivedAggregationStatus = detail ? deriveAggregationStatusFromDetail(detail) : null
   const effectiveAggregation = derivedAggregationStatus ? aggregationStatusConfig(derivedAggregationStatus) : null
   const effectiveFinalization = detail ? finalizationStatusConfig(detail.finalizationStatus) : null
-  const readyForPreview = detail
-    ? derivedAggregationStatus === "READY_FOR_AGGREGATION" && detail.finalizationStatus === "NOT_FINALIZED"
-    : false
+  const readyForPreview = detail ? detail.readyForPreview && detail.finalizationStatus === "NOT_FINALIZED" : false
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -776,7 +743,17 @@ export default function GradeManagementPage() {
   const [previewData, setPreviewData] = useState<CoordinatorEvaluationPreviewResult | null>(null)
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null)
   const [finalizeErrorMessage, setFinalizeErrorMessage] = useState<string | null>(null)
-  const coordinatorStage: CoordinatorEvaluationStage = "CAPSTONE_I"
+  const coordinatorStage: CoordinatorEvaluationStage =
+    selectedCapstone === "capstone2" ? "CAPSTONE_II" : "CAPSTONE_I"
+
+  React.useEffect(() => {
+    setSelectedProject(null)
+    setDetailOpen(false)
+    setPreviewOpen(false)
+    setPreviewData(null)
+    setPreviewErrorMessage(null)
+    setFinalizeErrorMessage(null)
+  }, [coordinatorStage])
 
   const dashboardQuery = useQuery({
     queryKey: ["coordinator", "evaluation-dashboard", coordinatorStage],
@@ -838,18 +815,7 @@ export default function GradeManagementPage() {
   })
 
   const dashboard = dashboardQuery.data
-  const derivedProjects = useMemo(
-    () =>
-      (dashboard?.projectGroups ?? []).map((project) => {
-        const aggregationStatus = deriveAggregationStatusFromProject(project)
-        return {
-          ...project,
-          aggregationStatus,
-          nextAction: deriveNextAction(aggregationStatus, project.finalizationStatus),
-        }
-      }),
-    [dashboard?.projectGroups]
-  )
+  const derivedProjects = useMemo(() => dashboard?.projectGroups ?? [], [dashboard?.projectGroups])
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -1008,7 +974,7 @@ export default function GradeManagementPage() {
             <RefreshCw className={`h-4 w-4 ${dashboardQuery.isFetching ? "animate-spin" : ""}`} />
             Refresh dashboard
           </Button>
-          <Link href="/dashboard/coordinator/evaluation-setup">
+          <Link href={phaseSetupHref(selectedCapstone)}>
             <Button size="sm" className="gap-1.5">
               <Scale className="h-4 w-4" /> Configure weights
             </Button>
@@ -1019,7 +985,7 @@ export default function GradeManagementPage() {
       <Tabs value={selectedCapstone} onValueChange={(value) => setSelectedCapstone(value as CapstonePhase)}>
         <TabsList>
           <TabsTrigger value="capstone1">Capstone I</TabsTrigger>
-          <TabsTrigger value="capstone2" disabled>Capstone II</TabsTrigger>
+          <TabsTrigger value="capstone2">Capstone II</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -1047,7 +1013,7 @@ export default function GradeManagementPage() {
             Final grade aggregation depends on configured advisor/evaluator weights and complete advisor + evaluator submissions.
           </p>
           <p className="text-xs text-muted-foreground">
-            Active stage: {phaseLabel(selectedCapstone)} {selectedCapstone === "capstone2" ? "(not supported yet)" : ""}
+            Active stage: {phaseLabel(selectedCapstone)}
           </p>
         </div>
       </div>
@@ -1172,7 +1138,12 @@ export default function GradeManagementPage() {
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredProjects.map((project) => (
-                  <ProjectAggregationCard key={project.projectId} project={project} onOpenAction={handleOpenAction} />
+                  <ProjectAggregationCard
+                    key={`${coordinatorStage}-${project.projectId}`}
+                    project={project}
+                    phase={selectedCapstone}
+                    onOpenAction={handleOpenAction}
+                  />
                 ))}
               </div>
             </>
@@ -1244,7 +1215,7 @@ export default function GradeManagementPage() {
                   ? `Weights are configured at ${dashboard?.weights.advisorPercentage ?? 0}% advisor and ${dashboard?.weights.evaluatorPercentage ?? 0}% evaluator.`
                   : "The coordinator must configure department grading weights before preview/finalize can work.",
                 cta: dashboard?.weights.isConfigured ? "Review weights" : "Configure weights",
-                href: "/dashboard/coordinator/evaluation-setup",
+                href: phaseSetupHref(selectedCapstone),
               },
               {
                 icon: Eye,

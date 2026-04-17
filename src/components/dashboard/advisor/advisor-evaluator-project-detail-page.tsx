@@ -48,7 +48,6 @@ import {
   type EvaluatorProjectDocument,
   type MilestoneStatus,
 } from "./advisor-evaluator-project-detail-data"
-import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
 
 function formatDate(dateString: string) {
@@ -722,8 +721,7 @@ function ProjectDetailBody({
           <CardHeader className="space-y-2 pb-2">
             <CardTitle className="text-xl tracking-tight">Ready to evaluate</CardTitle>
             <CardDescription className="text-pretty text-sm leading-relaxed">
-              Score this project using the {RUBRIC_TOTAL_MAX_PERCENT}% rubric: one line per criterion on the form, with a
-              running total at the top.
+              Open the evaluator form for this stage, enter one 0–100 score per student, save drafts as needed, then submit once the full review is complete.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -752,7 +750,7 @@ function ProjectDetailBody({
                 </div>
                 <div>
                   <p className="text-sm font-semibold">Score each line</p>
-                  <p className="mt-1 text-xs text-muted-foreground">The evaluation form tracks your total out of {RUBRIC_TOTAL_MAX_PERCENT}%.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">The evaluator form records one final 0–100 score and optional comment for each student.</p>
                 </div>
               </div>
             </div>
