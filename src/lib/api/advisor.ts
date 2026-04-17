@@ -579,6 +579,28 @@ export interface SaveAdvisorProjectEvaluationDraftResult {
   }>
 }
 
+export interface AdvisorProjectEvaluationMutationStudent {
+  studentUserId: string
+  score: number
+  comment: string | null
+  status: "EVALUATED"
+}
+
+export interface SubmitAdvisorProjectEvaluationResult {
+  message: string
+  stage: AdvisorEvaluationDashboardStage
+  projectId: string
+  evaluation: {
+    status: string
+    totalStudents: number
+    studentsEvaluated: number
+    studentsPendingEvaluation: number
+    lastSavedAt: string | null
+    submittedAt: string | null
+  }
+  submittedStudents: AdvisorProjectEvaluationMutationStudent[]
+}
+
 export interface SaveEvaluatorProjectEvaluationDraftStudentInput {
   studentUserId: string
   score: number
@@ -654,6 +676,13 @@ interface SaveAdvisorProjectEvaluationDraftEnvelope {
   success: boolean
   message: string
   data: SaveAdvisorProjectEvaluationDraftResult
+  timestamp: string
+}
+
+interface SubmitAdvisorProjectEvaluationEnvelope {
+  success: boolean
+  message: string
+  data: SubmitAdvisorProjectEvaluationResult
   timestamp: string
 }
 
@@ -1072,6 +1101,39 @@ export async function saveAdvisorProjectEvaluationDraft(
   const response = await apiClient.post<SaveAdvisorProjectEvaluationDraftEnvelope | SaveAdvisorProjectEvaluationDraftResult>(
     `/project-evaluations/advisors/me/projects/${encodeURIComponent(trimmedProjectId)}/draft`,
     input,
+    {
+      params: {
+        stage,
+      },
+    }
+  )
+
+  const payload = response.data
+
+  if ("data" in payload && payload.data) {
+    return payload.data
+  }
+
+  return payload
+}
+
+export async function submitAdvisorProjectEvaluation(
+  projectId: string,
+  stage: AdvisorEvaluationDashboardStage
+): Promise<SubmitAdvisorProjectEvaluationResult> {
+  const trimmedProjectId = projectId.trim()
+
+  if (!trimmedProjectId) {
+    throw new Error("projectId is required")
+  }
+
+  if (!stage.trim()) {
+    throw new Error("stage is required")
+  }
+
+  const response = await apiClient.post<SubmitAdvisorProjectEvaluationEnvelope | SubmitAdvisorProjectEvaluationResult>(
+    `/project-evaluations/advisors/me/projects/${encodeURIComponent(trimmedProjectId)}/submit`,
+    undefined,
     {
       params: {
         stage,
