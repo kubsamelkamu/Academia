@@ -93,6 +93,88 @@ function formatNumber(value: number | null | undefined) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2)
 }
 
+function normalizeEvaluationStatus(status: string | null | undefined) {
+  return String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[-\s]+/g, "_")
+}
+
+function isAdvisorSubmitted(status: string, submittedAt: string | null) {
+  if (submittedAt) return true
+
+  const normalized = normalizeEvaluationStatus(status)
+  return ["SUBMITTED", "COMPLETED", "FINALIZED", "APPROVED"].includes(normalized)
+}
+
+function isAdvisorScoringComplete(detail: CoordinatorEvaluationProjectDetail) {
+  return detail.advisorEvaluation.studentsEvaluated > 0 && detail.advisorEvaluation.studentsPendingEvaluation === 0
+}
+
+function deriveAggregationStatusFromProject(project: CoordinatorDashboardProjectGroup): CoordinatorAggregationStatus {
+  if (project.weights.advisorPercentage === null || project.weights.evaluatorPercentage === null) {
+    return "WAITING_FOR_WEIGHTS"
+  }
+
+  if (!isAdvisorSubmitted(project.advisorEvaluation.status, project.advisorEvaluation.submittedAt)) {
+    return "WAITING_FOR_ADVISOR"
+  }
+
+  if (!project.evaluatorEvaluation.allSubmitted) {
+    return "WAITING_FOR_EVALUATORS"
+  }
+
+  return "READY_FOR_AGGREGATION"
+}
+
+function deriveAggregationStatusFromDetail(detail: CoordinatorEvaluationProjectDetail): CoordinatorAggregationStatus {
+  if (!detail.weights.isConfigured) {
+    return "WAITING_FOR_WEIGHTS"
+  }
+
+  if (!isAdvisorSubmitted(detail.advisorEvaluation.status, detail.advisorEvaluation.submittedAt)) {
+    return "WAITING_FOR_ADVISOR"
+  }
+
+  if (!detail.evaluatorEvaluation.allSubmitted) {
+    return "WAITING_FOR_EVALUATORS"
+  }
+
+  return "READY_FOR_AGGREGATION"
+}
+
+function deriveNextAction(
+  aggregationStatus: CoordinatorAggregationStatus,
+  finalizationStatus: CoordinatorFinalizationStatus
+): CoordinatorNextAction {
+  if (finalizationStatus === "APPROVED") return "VIEW_APPROVED_RESULT"
+  if (finalizationStatus === "REJECTED") return "REVIEW_REJECTED_RESULT"
+  if (finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD") return "VIEW_FINALIZED_RESULT"
+
+  switch (aggregationStatus) {
+    case "WAITING_FOR_WEIGHTS":
+      return "CONFIGURE_WEIGHTS"
+    case "WAITING_FOR_ADVISOR":
+      return "WAIT_FOR_ADVISOR_SUBMISSION"
+    case "WAITING_FOR_EVALUATORS":
+      return "WAIT_FOR_EVALUATOR_SUBMISSIONS"
+    case "READY_FOR_AGGREGATION":
+      return "OPEN_PREVIEW"
+  }
+}
+
+function advisorEvaluationDetailLabel(detail: CoordinatorEvaluationProjectDetail) {
+  if (isAdvisorSubmitted(detail.advisorEvaluation.status, detail.advisorEvaluation.submittedAt)) {
+    return "SUBMITTED"
+  }
+
+  if (isAdvisorScoringComplete(detail)) {
+    return "SCORING COMPLETE"
+  }
+
+  return detail.advisorEvaluation.status.replace(/_/g, " ")
+}
+
 function aggregationStatusConfig(status: CoordinatorAggregationStatus) {
   switch (status) {
     case "WAITING_FOR_WEIGHTS":
@@ -168,7 +250,10 @@ function actionButtonVariant(action: CoordinatorNextAction): "default" | "outlin
   return "outline"
 }
 
-function previewBlockedMessage(detail: CoordinatorEvaluationProjectDetail) {
+function previewBlockedMessage(
+  detail: CoordinatorEvaluationProjectDetail,
+  aggregationStatus: CoordinatorAggregationStatus
+) {
   if (!detail.weights.isConfigured) {
     return "Configure department grading weights before previewing final grades."
   }
@@ -177,15 +262,15 @@ function previewBlockedMessage(detail: CoordinatorEvaluationProjectDetail) {
     return "This project is already in a finalized review state, so preview is no longer editable."
   }
 
-  if (detail.aggregationStatus === "WAITING_FOR_ADVISOR") {
+  if (aggregationStatus === "WAITING_FOR_ADVISOR") {
     return "Advisor evaluation must be submitted before preview is available."
   }
 
-  if (detail.aggregationStatus === "WAITING_FOR_EVALUATORS") {
+  if (aggregationStatus === "WAITING_FOR_EVALUATORS") {
     return "All evaluator submissions must be completed before preview is available."
   }
 
-  if (detail.aggregationStatus === "WAITING_FOR_WEIGHTS") {
+  if (aggregationStatus === "WAITING_FOR_WEIGHTS") {
     return "Weights must be configured before preview is available."
   }
 
@@ -199,7 +284,9 @@ function ProjectAggregationCard({
   project: CoordinatorDashboardProjectGroup
   onOpenAction: (project: CoordinatorDashboardProjectGroup) => void
 }) {
-  const aggregation = aggregationStatusConfig(project.aggregationStatus)
+  const derivedAggregationStatus = deriveAggregationStatusFromProject(project)
+  const derivedNextAction = deriveNextAction(derivedAggregationStatus, project.finalizationStatus)
+  const aggregation = aggregationStatusConfig(derivedAggregationStatus)
   const finalization = finalizationStatusConfig(project.finalizationStatus)
 
   return (
@@ -254,20 +341,20 @@ function ProjectAggregationCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {project.nextAction === "CONFIGURE_WEIGHTS" ? (
+          {derivedNextAction === "CONFIGURE_WEIGHTS" ? (
             <Link href="/dashboard/coordinator/evaluation-setup">
-              <Button size="sm" variant={actionButtonVariant(project.nextAction)} className="gap-1.5">
-                <Scale className="h-3.5 w-3.5" /> {nextActionLabel(project.nextAction)}
+              <Button size="sm" variant={actionButtonVariant(derivedNextAction)} className="gap-1.5">
+                <Scale className="h-3.5 w-3.5" /> {nextActionLabel(derivedNextAction)}
               </Button>
             </Link>
           ) : (
             <Button
               size="sm"
-              variant={actionButtonVariant(project.nextAction)}
+              variant={actionButtonVariant(derivedNextAction)}
               className="gap-1.5"
               onClick={() => onOpenAction(project)}
             >
-              <Eye className="h-3.5 w-3.5" /> {nextActionLabel(project.nextAction)}
+              <Eye className="h-3.5 w-3.5" /> {nextActionLabel(derivedNextAction)}
             </Button>
           )}
         </div>
@@ -301,8 +388,12 @@ function ProjectDetailSheet({
   isPreviewPending: boolean
   previewErrorMessage: string | null
 }) {
-  const effectiveAggregation = detail ? aggregationStatusConfig(detail.aggregationStatus) : null
+  const derivedAggregationStatus = detail ? deriveAggregationStatusFromDetail(detail) : null
+  const effectiveAggregation = derivedAggregationStatus ? aggregationStatusConfig(derivedAggregationStatus) : null
   const effectiveFinalization = detail ? finalizationStatusConfig(detail.finalizationStatus) : null
+  const readyForPreview = detail
+    ? derivedAggregationStatus === "READY_FOR_AGGREGATION" && detail.finalizationStatus === "NOT_FINALIZED"
+    : false
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -367,7 +458,7 @@ function ProjectDetailSheet({
                 <Card className="border-none shadow-sm">
                   <CardContent className="space-y-1 p-4 text-sm">
                     <p className="text-xs text-muted-foreground">Advisor evaluation</p>
-                    <p className="font-semibold">{detail.advisorEvaluation.status.replace(/_/g, " ")}</p>
+                    <p className="font-semibold">{advisorEvaluationDetailLabel(detail)}</p>
                     <p className="text-xs text-muted-foreground">
                       {detail.advisorEvaluation.studentsEvaluated} evaluated · {detail.advisorEvaluation.studentsPendingEvaluation} pending
                     </p>
@@ -483,15 +574,15 @@ function ProjectDetailSheet({
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">
-                    {detail.readyForPreview && detail.finalizationStatus === "NOT_FINALIZED"
+                    {readyForPreview
                       ? "This project is ready for backend preview generation."
-                      : previewBlockedMessage(detail)}
+                      : previewBlockedMessage(detail, derivedAggregationStatus ?? detail.aggregationStatus)}
                   </div>
 
                   <Button
                     className="gap-1.5"
                     onClick={onPreview}
-                    disabled={!detail.readyForPreview || detail.finalizationStatus !== "NOT_FINALIZED" || isPreviewPending}
+                    disabled={!readyForPreview || isPreviewPending}
                   >
                     <Eye className="h-4 w-4" /> {isPreviewPending ? "Generating preview..." : "Preview final grades"}
                   </Button>
@@ -747,10 +838,22 @@ export default function GradeManagementPage() {
   })
 
   const dashboard = dashboardQuery.data
+  const derivedProjects = useMemo(
+    () =>
+      (dashboard?.projectGroups ?? []).map((project) => {
+        const aggregationStatus = deriveAggregationStatusFromProject(project)
+        return {
+          ...project,
+          aggregationStatus,
+          nextAction: deriveNextAction(aggregationStatus, project.finalizationStatus),
+        }
+      }),
+    [dashboard?.projectGroups]
+  )
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const projects = dashboard?.projectGroups ?? []
+    const projects = derivedProjects
 
     return projects.filter((project) => {
       const matchesSearch =
@@ -763,81 +866,82 @@ export default function GradeManagementPage() {
 
       return matchesSearch && matchesAggregation && matchesFinalization
     })
-  }, [aggregationFilter, dashboard?.projectGroups, finalizationFilter, search])
+  }, [aggregationFilter, derivedProjects, finalizationFilter, search])
 
   const aggregationDistribution = useMemo(() => {
-    const summary = dashboard?.summary
+    const total = derivedProjects.length
     return [
       {
         label: "Waiting for weights",
-        count: summary?.waitingForWeightsCount ?? 0,
-        total: summary?.totalProjectGroups ?? 0,
+        count: derivedProjects.filter((project) => project.aggregationStatus === "WAITING_FOR_WEIGHTS").length,
+        total,
         className: "bg-amber-50 text-amber-900 border-amber-200",
       },
       {
         label: "Waiting for advisor",
-        count: summary?.waitingForAdvisorCount ?? 0,
-        total: summary?.totalProjectGroups ?? 0,
+        count: derivedProjects.filter((project) => project.aggregationStatus === "WAITING_FOR_ADVISOR").length,
+        total,
         className: "bg-muted text-foreground border-border",
       },
       {
         label: "Waiting for evaluators",
-        count: summary?.waitingForEvaluatorsCount ?? 0,
-        total: summary?.totalProjectGroups ?? 0,
+        count: derivedProjects.filter((project) => project.aggregationStatus === "WAITING_FOR_EVALUATORS").length,
+        total,
         className: "bg-primary/[0.06] text-primary/80 border-primary/10",
       },
       {
         label: "Ready for aggregation",
-        count: summary?.readyForAggregationCount ?? 0,
-        total: summary?.totalProjectGroups ?? 0,
+        count: derivedProjects.filter((project) => project.aggregationStatus === "READY_FOR_AGGREGATION").length,
+        total,
         className: "bg-primary/10 text-primary border-primary/20",
       },
     ]
-  }, [dashboard?.summary])
+  }, [derivedProjects])
 
   const finalizationDistribution = useMemo(() => {
-    const summary = dashboard?.summary
     return [
       {
         label: "Pending department head",
-        count: summary?.finalizedPendingApprovalCount ?? 0,
+        count: derivedProjects.filter((project) => project.finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD").length,
       },
       {
         label: "Approved",
-        count: summary?.approvedCount ?? 0,
+        count: derivedProjects.filter((project) => project.finalizationStatus === "APPROVED").length,
       },
       {
         label: "Rejected",
-        count: summary?.rejectedCount ?? 0,
+        count: derivedProjects.filter((project) => project.finalizationStatus === "REJECTED").length,
       },
     ]
-  }, [dashboard?.summary])
+  }, [derivedProjects])
 
   const kpi = [
     {
       label: "Project Groups",
-      value: dashboard?.summary.totalProjectGroups ?? 0,
+      value: derivedProjects.length,
       icon: Users,
       bg: "bg-primary/10",
       color: "text-primary",
     },
     {
       label: "Waiting Review Inputs",
-      value: (dashboard?.summary.waitingForAdvisorCount ?? 0) + (dashboard?.summary.waitingForEvaluatorsCount ?? 0),
+      value:
+        derivedProjects.filter((project) => project.aggregationStatus === "WAITING_FOR_ADVISOR").length +
+        derivedProjects.filter((project) => project.aggregationStatus === "WAITING_FOR_EVALUATORS").length,
       icon: Clock,
       bg: "bg-primary/[0.06]",
       color: "text-primary/80",
     },
     {
       label: "Ready for Aggregation",
-      value: dashboard?.summary.readyForAggregationCount ?? 0,
+      value: derivedProjects.filter((project) => project.aggregationStatus === "READY_FOR_AGGREGATION").length,
       icon: Target,
       bg: "bg-primary/10",
       color: "text-primary",
     },
     {
       label: "Pending Approval",
-      value: dashboard?.summary.finalizedPendingApprovalCount ?? 0,
+      value: derivedProjects.filter((project) => project.finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD").length,
       icon: FileCheck,
       bg: "bg-muted",
       color: "text-foreground",
@@ -1145,7 +1249,7 @@ export default function GradeManagementPage() {
               {
                 icon: Eye,
                 title: "Projects ready for preview",
-                desc: `${dashboard?.summary.readyForAggregationCount ?? 0} project group(s) are ready for backend preview generation once project detail integration is connected.`,
+                desc: `${derivedProjects.filter((project) => project.aggregationStatus === "READY_FOR_AGGREGATION").length} project group(s) are ready for backend preview generation.`,
                 cta: "Refresh status",
                 action: () => dashboardQuery.refetch(),
                 disabled: dashboardQuery.isFetching,
@@ -1153,7 +1257,7 @@ export default function GradeManagementPage() {
               {
                 icon: ShieldAlert,
                 title: "Blocked projects",
-                desc: `${(dashboard?.summary.waitingForWeightsCount ?? 0) + (dashboard?.summary.waitingForAdvisorCount ?? 0) + (dashboard?.summary.waitingForEvaluatorsCount ?? 0)} project group(s) are still missing prerequisites before final aggregation.`,
+                desc: `${derivedProjects.filter((project) => project.aggregationStatus !== "READY_FOR_AGGREGATION").length} project group(s) are still missing prerequisites before final aggregation.`,
                 cta: "View overview",
                 action: () => toast.info("Use the overview filters", {
                   description: "Filter by waiting states to inspect blocked projects before preview/finalize integration.",
@@ -1163,7 +1267,7 @@ export default function GradeManagementPage() {
               {
                 icon: FileText,
                 title: "Department-head queue",
-                desc: `${dashboard?.summary.finalizedPendingApprovalCount ?? 0} project group(s) are currently pending department-head review.`,
+                desc: `${derivedProjects.filter((project) => project.finalizationStatus === "FINALIZED_PENDING_DEPARTMENT_HEAD").length} project group(s) are currently pending department-head review.`,
                 cta: "Review status",
                 action: () => toast.info("Finalized review state loaded", {
                   description: "Approved and rejected results are already visible through the dashboard summary and project cards.",

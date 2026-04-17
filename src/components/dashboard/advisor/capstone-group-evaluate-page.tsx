@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ArrowLeft, CheckCircle2, Clock, FolderKanban, PlayCircle, ShieldAlert, Users } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Clock, FolderKanban, PlayCircle, Send, ShieldAlert, Users } from "lucide-react"
 
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +23,7 @@ import { advisorProjectEvaluationDashboardKeys, useAdvisorProjectEvaluationDashb
 import { advisorProjectEvaluationDetailKeys, useAdvisorProjectEvaluationDetail } from "@/lib/hooks/use-advisor-project-evaluation-detail"
 import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
 import { useSaveAdvisorProjectEvaluationDraft } from "@/lib/hooks/use-save-advisor-project-evaluation-draft"
+import { useSubmitAdvisorProjectEvaluation } from "@/lib/hooks/use-submit-advisor-project-evaluation"
 import { CAPSTONE_GROUPS, type CapstoneCriterion, type CapstoneGroup, type CapstoneStage, type EvaluationStatus } from "./capstone-evaluation-data"
 
 const STATUS_CLASSES: Record<EvaluationStatus, string> = {
@@ -147,6 +148,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const [advisorScore, setAdvisorScore] = React.useState("")
   const [feedback, setFeedback] = React.useState("")
   const saveDraftMutation = useSaveAdvisorProjectEvaluationDraft()
+  const submitEvaluationMutation = useSubmitAdvisorProjectEvaluation()
 
   React.useEffect(() => {
     if (detailQuery.data) {
@@ -267,6 +269,41 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const pendingStudents = group?.pending ?? 0
   const evaluatedStudents = group?.evaluated ?? 0
   const lockedStudents = stage === "Capstone II" ? (group?.students.filter((student) => student.capstone1Status !== "Evaluated").length ?? 0) : 0
+  const evaluationSummary = detailQuery.data?.evaluation ?? null
+  const isSubmitted = Boolean(evaluationSummary?.submittedAt) || evaluationSummary?.status === "SUBMITTED"
+  const canSubmitEvaluation =
+    Boolean(resolvedProjectId) &&
+    !isSubmitted &&
+    (evaluationSummary?.studentsPendingEvaluation ?? pendingStudents) === 0 &&
+    (evaluationSummary?.studentsEvaluated ?? evaluatedStudents) > 0
+
+  const handleSubmitEvaluation = async () => {
+    if (!resolvedProjectId) return
+
+    try {
+      const result = await submitEvaluationMutation.mutateAsync({
+        projectId: resolvedProjectId,
+        stage: dashboardStage,
+      })
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: advisorProjectEvaluationDetailKeys.detail(resolvedProjectId, dashboardStage),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: advisorProjectEvaluationDashboardKeys.root,
+        }),
+      ])
+
+      toast.success(`${stage} evaluation submitted`, {
+        description: `Submitted ${result.evaluation.studentsEvaluated}/${result.evaluation.totalStudents} students for coordinator aggregation.`,
+      })
+    } catch (error) {
+      toast.error(`Failed to submit ${stage} evaluation`, {
+        description: error instanceof Error ? error.message : "Please try again.",
+      })
+    }
+  }
 
   return (
     <div className="space-y-8 animate-fade-in pb-8">
@@ -379,6 +416,25 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
               </CardContent>
             </Card>
           </div>
+
+          <div className="rounded-xl border bg-muted/20 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Advisor submission</p>
+                <p className="text-sm text-muted-foreground">
+                  {isSubmitted
+                    ? `Submitted for coordinator aggregation${evaluationSummary?.submittedAt ? ` on ${new Date(evaluationSummary.submittedAt).toLocaleString()}` : "."}`
+                    : canSubmitEvaluation
+                      ? "All students are scored. Submit this evaluation so coordinator preview can generate final grades."
+                      : "Score every student first, then submit the evaluation for coordinator aggregation."}
+                </p>
+              </div>
+
+              <Button className="gap-1.5 self-start sm:self-auto" onClick={handleSubmitEvaluation} disabled={!canSubmitEvaluation || submitEvaluationMutation.isPending}>
+                <Send className="h-4 w-4" /> {submitEvaluationMutation.isPending ? "Submitting..." : isSubmitted ? "Submitted" : "Submit evaluation"}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -443,11 +499,11 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                         size="sm"
                         className="gap-1.5"
                         variant={actionStatus === "Pending Review" && !isLocked ? "default" : "outline"}
-                        disabled={actionStatus !== "Pending Review" || isLocked}
+                        disabled={actionStatus !== "Pending Review" || isLocked || isSubmitted}
                         onClick={() => openEvaluationSheet(student.id)}
                       >
                         <PlayCircle className="h-4 w-4" />
-                        {isLocked ? "Locked" : actionStatus === "Pending Review" ? student.name : "Evaluated"}
+                        {isSubmitted ? "Submitted" : isLocked ? "Locked" : actionStatus === "Pending Review" ? student.name : "Evaluated"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -514,9 +570,15 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
               />
             </div>
 
-            <Button className="w-full" onClick={handleSaveEvaluation} disabled={saveDraftMutation.isPending || !activeStudent}>
+            <Button className="w-full" onClick={handleSaveEvaluation} disabled={saveDraftMutation.isPending || !activeStudent || isSubmitted}>
               {saveDraftMutation.isPending ? "Saving..." : `Save ${stage} Evaluation`}
             </Button>
+
+            {isSubmitted ? (
+              <p className="text-sm text-muted-foreground">
+                This advisor evaluation has already been submitted and is now read-only.
+              </p>
+            ) : null}
           </div>
         </SheetContent>
       </Sheet>
