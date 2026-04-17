@@ -34,6 +34,47 @@ const STATUS_CLASSES: Record<EvaluationStatus, string> = {
 
 const ADVISOR_MAX_SCORE = 100
 
+function activeStageLabel(stage: CapstoneStage) {
+  return stage === "Capstone I" ? "Capstone I" : "Capstone II"
+}
+
+function getStudentStageStatus(student: CapstoneGroup["students"][number], stage: CapstoneStage) {
+  return stage === "Capstone I" ? student.capstone1Status : student.capstone2Status
+}
+
+function getStudentStageScore(student: CapstoneGroup["students"][number], stage: CapstoneStage) {
+  return stage === "Capstone I" ? student.capstone1Score : student.capstone2Score
+}
+
+function parseMissingStudentIdsFromError(message: string) {
+  const marker = "Missing studentUserIds:"
+  const markerIndex = message.indexOf(marker)
+  if (markerIndex === -1) {
+    return []
+  }
+
+  return message
+    .slice(markerIndex + marker.length)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+function formatOptionalDateTime(value: string | null | undefined) {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
 function StatusBadge({ status }: { status: EvaluationStatus }) {
   const icon = status === "Evaluated" ? CheckCircle2 : status === "Needs Revision" ? ShieldAlert : Clock
   const Icon = icon
@@ -89,7 +130,6 @@ function buildDueLabel(detail: AdvisorProjectEvaluationDetail): string {
 
 function mapDetailToGroup(detail: AdvisorProjectEvaluationDetail, stage: CapstoneStage): CapstoneGroup {
   const currentCriteria = criteriaForStage(stage)
-  const stageStatus = toEvaluationStatus(detail.evaluation.status)
 
   return {
     id: detail.group.id,
@@ -147,6 +187,8 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const [activeStudentId, setActiveStudentId] = React.useState<string | null>(null)
   const [advisorScore, setAdvisorScore] = React.useState("")
   const [feedback, setFeedback] = React.useState("")
+  const [submitErrorMessage, setSubmitErrorMessage] = React.useState<string | null>(null)
+  const [submitMissingStudentIds, setSubmitMissingStudentIds] = React.useState<string[]>([])
   const saveDraftMutation = useSaveAdvisorProjectEvaluationDraft()
   const submitEvaluationMutation = useSubmitAdvisorProjectEvaluation()
 
@@ -169,15 +211,10 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
     const student = group.students.find((item) => item.id === studentId)
     if (!student) return
 
-    if (stage === "Capstone II" && student.capstone1Status !== "Evaluated") {
-      toast.error("Capstone II is locked", {
-        description: "Finish the Capstone I evaluation for this student first.",
-      })
-      return
-    }
-
-    setAdvisorScore("")
-    setFeedback("")
+    const detailStudent = detailQuery.data?.students.find((item) => item.userId === studentId)
+    setAdvisorScore(detailStudent?.evaluation.score !== null && detailStudent?.evaluation.score !== undefined ? String(detailStudent.evaluation.score) : "")
+    setFeedback(detailStudent?.evaluation.comment ?? "")
+    setSubmitErrorMessage(null)
     setActiveStudentId(studentId)
     setSheetOpen(true)
   }
@@ -256,31 +293,48 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       setAdvisorScore("")
       setFeedback("")
       setActiveStudentId(null)
+      setSubmitErrorMessage(null)
+      setSubmitMissingStudentIds([])
       toast.success(`${stage} evaluation recorded`, {
         description: `${activeStudent.name} scored ${finalScore}/100.`,
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Please try again."
+
+      if (errorMessage.includes("cannot be edited")) {
+        await Promise.all([
+          detailQuery.refetch(),
+          dashboardQuery.refetch(),
+        ])
+      }
+
       toast.error(`Failed to save ${stage} evaluation`, {
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: errorMessage,
       })
     }
   }
 
   const pendingStudents = group?.pending ?? 0
   const evaluatedStudents = group?.evaluated ?? 0
-  const lockedStudents = stage === "Capstone II" ? (group?.students.filter((student) => student.capstone1Status !== "Evaluated").length ?? 0) : 0
   const evaluationSummary = detailQuery.data?.evaluation ?? null
   const isSubmitted = Boolean(evaluationSummary?.submittedAt) || evaluationSummary?.status === "SUBMITTED"
+  const studentsMissingScore = React.useMemo(() => {
+    return (group?.students ?? []).filter((student) => getStudentStageScore(student, stage) === undefined)
+  }, [group?.students, stage])
+  const missingStudentNames = studentsMissingScore.map((student) => student.name)
   const canSubmitEvaluation =
     Boolean(resolvedProjectId) &&
     !isSubmitted &&
-    (evaluationSummary?.studentsPendingEvaluation ?? pendingStudents) === 0 &&
-    (evaluationSummary?.studentsEvaluated ?? evaluatedStudents) > 0
+    studentsMissingScore.length === 0 &&
+    (group?.students.length ?? 0) > 0
 
   const handleSubmitEvaluation = async () => {
     if (!resolvedProjectId) return
 
     try {
+      setSubmitErrorMessage(null)
+      setSubmitMissingStudentIds([])
+
       const result = await submitEvaluationMutation.mutateAsync({
         projectId: resolvedProjectId,
         stage: dashboardStage,
@@ -299,8 +353,20 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
         description: `Submitted ${result.evaluation.studentsEvaluated}/${result.evaluation.totalStudents} students for coordinator aggregation.`,
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Please try again."
+      const missingIds = parseMissingStudentIdsFromError(errorMessage)
+      setSubmitErrorMessage(errorMessage)
+      setSubmitMissingStudentIds(missingIds)
+
+      if (errorMessage.includes("cannot be edited")) {
+        await Promise.all([
+          detailQuery.refetch(),
+          dashboardQuery.refetch(),
+        ])
+      }
+
       toast.error(`Failed to submit ${stage} evaluation`, {
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: errorMessage,
       })
     }
   }
@@ -310,7 +376,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <DashboardPageHeader
           title={`${stage} Evaluation`}
-          description="Review the group, take insight from the rubric, and record student-level evaluation scores."
+          description="Review the group, use the rubric as scoring guidance, and record advisor scores for each student."
           badge={isLoading ? "Loading..." : group?.groupName ?? "—"}
         />
         <Button asChild variant="outline" size="sm">
@@ -355,7 +421,6 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="outline">{stage}</Badge>
             <Badge variant="secondary">{group?.students.length ?? 0} students</Badge>
-            {lockedStudents > 0 ? <Badge variant="outline" className="border-amber-200 bg-amber-500/10 text-amber-700">{lockedStudents} locked</Badge> : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -380,7 +445,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
               <div className="flex items-start gap-3">
                 <Clock className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Due Label</p>
+                  <p className="text-sm text-muted-foreground">Milestone Timeline</p>
                   <p className="font-medium">{group?.dueLabel ?? "—"}</p>
                 </div>
               </div>
@@ -423,11 +488,19 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                 <p className="text-sm font-medium">Advisor submission</p>
                 <p className="text-sm text-muted-foreground">
                   {isSubmitted
-                    ? `Submitted for coordinator aggregation${evaluationSummary?.submittedAt ? ` on ${new Date(evaluationSummary.submittedAt).toLocaleString()}` : "."}`
+                    ? `Submitted for coordinator aggregation${evaluationSummary?.submittedAt ? ` on ${formatOptionalDateTime(evaluationSummary.submittedAt)}` : "."}`
                     : canSubmitEvaluation
                       ? "All students are scored. Submit this evaluation so coordinator preview can generate final grades."
                       : "Score every student first, then submit the evaluation for coordinator aggregation."}
                 </p>
+                {!isSubmitted && evaluationSummary?.lastSavedAt ? (
+                  <p className="text-xs text-muted-foreground">Last saved {formatOptionalDateTime(evaluationSummary.lastSavedAt)}</p>
+                ) : null}
+                {!isSubmitted && studentsMissingScore.length > 0 ? (
+                  <p className="text-xs text-amber-700">
+                    Missing scores for {studentsMissingScore.length} student{studentsMissingScore.length === 1 ? "" : "s"}: {missingStudentNames.join(", ")}
+                  </p>
+                ) : null}
               </div>
 
               <Button className="gap-1.5 self-start sm:self-auto" onClick={handleSubmitEvaluation} disabled={!canSubmitEvaluation || submitEvaluationMutation.isPending}>
@@ -435,6 +508,20 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
               </Button>
             </div>
           </div>
+
+          {submitErrorMessage ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
+              <CardContent className="space-y-2 p-4 text-sm">
+                <p className="font-medium text-foreground">Submission blocked</p>
+                <p className="text-muted-foreground">{submitErrorMessage}</p>
+                {submitMissingStudentIds.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Backend still expects scores for: {submitMissingStudentIds.join(", ")}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -458,7 +545,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Students</CardTitle>
-          <CardDescription>Evaluate each member separately and keep Capstone II locked until Capstone I is done.</CardDescription>
+          <CardDescription>Evaluate each member separately, save partial drafts, and submit only after every student is scored.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -466,23 +553,27 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
               <TableRow>
                 <TableHead>Student</TableHead>
                 <TableHead>Group Progress</TableHead>
-                <TableHead>Capstone I</TableHead>
+                <TableHead>{activeStageLabel(stage)} Status</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(group?.students ?? []).map((student) => {
-                const canEvaluateCapstoneII = student.capstone1Status === "Evaluated"
-                const actionStage: "capstone1" | "capstone2" = stage === "Capstone I" ? "capstone1" : "capstone2"
-                const isLocked = actionStage === "capstone2" && !canEvaluateCapstoneII
-                const actionStatus = actionStage === "capstone1" ? student.capstone1Status : student.capstone2Status
+                const actionStatus = getStudentStageStatus(student, stage)
+                const savedScore = getStudentStageScore(student, stage)
+                const canEdit = actionStatus === "Pending Review" || savedScore !== undefined
+                const isMissingLocally = studentsMissingScore.some((item) => item.id === student.id)
+                const isMissingFromSubmitError = submitMissingStudentIds.includes(student.id)
 
                 return (
-                  <TableRow key={student.id}>
+                  <TableRow key={student.id} className={isMissingLocally || isMissingFromSubmitError ? "bg-amber-50/60" : undefined}>
                     <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">{student.name}</p>
-                        <p className="text-xs text-muted-foreground">{student.studentId}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {student.studentId}
+                          {isMissingLocally ? " • score required" : ""}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -492,18 +583,18 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                       </div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={student.capstone1Status} />
+                      <StatusBadge status={actionStatus} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
                         className="gap-1.5"
-                        variant={actionStatus === "Pending Review" && !isLocked ? "default" : "outline"}
-                        disabled={actionStatus !== "Pending Review" || isLocked || isSubmitted}
+                        variant={actionStatus === "Pending Review" ? "default" : "outline"}
+                        disabled={!canEdit || isSubmitted}
                         onClick={() => openEvaluationSheet(student.id)}
                       >
                         <PlayCircle className="h-4 w-4" />
-                        {isSubmitted ? "Submitted" : isLocked ? "Locked" : actionStatus === "Pending Review" ? student.name : "Evaluated"}
+                        {isSubmitted ? "Submitted" : actionStatus === "Pending Review" ? "Evaluate" : "Edit saved score"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -556,6 +647,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                 placeholder="Enter score out of 100"
                 value={advisorScore}
                 onChange={(event) => setAdvisorScore(event.target.value)}
+                disabled={isSubmitted}
               />
               <p className="text-sm text-muted-foreground">Enter one final mark from 0 to {ADVISOR_MAX_SCORE}. The rubric above is read-only guidance.</p>
             </div>
@@ -567,6 +659,7 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                 value={feedback}
                 onChange={(event) => setFeedback(event.target.value)}
                 className="min-h-[100px]"
+                disabled={isSubmitted}
               />
             </div>
 

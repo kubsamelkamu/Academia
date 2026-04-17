@@ -21,6 +21,15 @@ import type { CapstoneStage } from "./capstone-evaluation-data"
 
 type EvaluationStatus = "Pending Review" | "Evaluated" | "Needs Revision"
 
+type DetailStudentRow = {
+  id: string
+  name: string
+  email: string
+  avatarUrl: string | null
+  progress: number
+  evaluationStatus: EvaluationStatus
+}
+
 function toApiStage(stage: CapstoneStage): AdvisorEvaluationDashboardStage {
   return stage === "Capstone I" ? "CAPSTONE_I" : "CAPSTONE_II"
 }
@@ -50,6 +59,25 @@ function formatOptionalDate(value?: string | null) {
   }
 
   return date.toLocaleDateString()
+}
+
+function formatOptionalDateTime(value?: string | null) {
+  if (!value) {
+    return "—"
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 function milestoneProgressValue(status?: string | null) {
@@ -132,7 +160,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
   const avgProgress = detail?.milestoneProgress.progressPercent ?? 0
   const isLoading = !authHydrated || projectsQuery.isLoading || dashboardQuery.isLoading || (Boolean(resolvedProjectId) && detailQuery.isLoading)
 
-  const students = React.useMemo(() => {
+  const students = React.useMemo<DetailStudentRow[]>(() => {
     return (detail?.students ?? []).map((student) => {
       const currentStageStatus = toEvaluationStatus(student.evaluation.status)
       const progress = currentStageStatus === "Evaluated" ? 100 : avgProgress
@@ -142,18 +170,21 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
         name: student.fullName,
         email: student.email,
         avatarUrl: student.avatarUrl,
-        progress: avgProgress,
-        capstone1Status: stage === "Capstone I" ? currentStageStatus : "Evaluated",
+        progress,
+        evaluationStatus: currentStageStatus,
       }
     })
   }, [avgProgress, detail?.students, stage])
+
+  const evaluationStatusLabel = detail?.evaluation.status.toLowerCase().replace(/_/g, " ") ?? "not started"
+  const submittedAtLabel = formatOptionalDateTime(detail?.evaluation.submittedAt)
 
   return (
     <div className="space-y-8 animate-fade-in pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <DashboardPageHeader
           title={`${stage} Group Detail`}
-          description="Review all project information, milestones, and student members for this group."
+          description="Review project context, approved milestones, and the current advisor evaluation state for this group."
           badge={isLoading ? "Loading..." : detail?.group.name ?? "—"}
         />
         <Button asChild variant="outline" size="sm">
@@ -238,7 +269,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
 
           <Separator />
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Pending Students</p>
@@ -253,8 +284,17 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Average Progress</p>
+                <p className="text-xs text-muted-foreground">Milestone Progress</p>
                 <p className="text-2xl font-semibold text-primary">{avgProgress}%</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Evaluation Status</p>
+                <p className="text-2xl font-semibold text-primary capitalize">{evaluationStatusLabel}</p>
+                <p className="text-xs text-muted-foreground">
+                  {detail?.evaluation.submittedAt ? `Submitted ${submittedAtLabel}` : "Not submitted yet"}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -264,7 +304,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Milestones</CardTitle>
-          <CardDescription>Stage-specific milestones for this group.</CardDescription>
+          <CardDescription>Approved and in-flight milestones that provide context for advisor scoring.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {(detail?.milestones ?? []).map((milestone) => (
@@ -304,7 +344,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Members</CardTitle>
-          <CardDescription>All students in the selected group.</CardDescription>
+          <CardDescription>Current advisor scoring state for each student in this stage.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -313,7 +353,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
                 <TableHead>Student</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Progress</TableHead>
-                <TableHead>Capstone I</TableHead>
+                <TableHead>{stage} Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -336,7 +376,7 @@ export function AdvisorCapstoneGroupDetailPage({ stage, projectId }: { stage: Ca
                     </div>
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={student.capstone1Status} />
+                    <StatusBadge status={student.evaluationStatus} />
                   </TableCell>
                 </TableRow>
               ))}

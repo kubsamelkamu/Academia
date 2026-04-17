@@ -50,7 +50,6 @@ import {
 import { useNotificationsList } from "@/lib/hooks/use-notifications"
 import { useDepartmentProjectsOverview } from "@/lib/hooks/use-projects"
 import { useTenantUsers } from "@/lib/hooks/use-users"
-import { useTenantInvitationsList } from "@/lib/hooks/use-invitations"
 import { useQuery } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth-store"
 import { toast } from "sonner"
@@ -153,7 +152,8 @@ function getActivityBadgeClasses(badge: DepartmentActivityBadge): string {
 export function DepartmentHeadDashboard() {
   const authUser = useAuthStore((s) => s.user)
   const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
-  const reviewStage = "CAPSTONE_I" as const
+  const reviewStage = "CAPSTONE_II" as const
+  const reviewHref = "/dashboard/department-head/review?stage=capstone-ii"
   const [userSearchQuery, setUserSearchQuery] = useState("")
   const [userRoleFilter, setUserRoleFilter] = useState("all")
   const [usersPage, setUsersPage] = useState(1)
@@ -191,9 +191,6 @@ export function DepartmentHeadDashboard() {
     }
   )
   
-  const { data: pendingInvitations = [] } =
-    useTenantInvitationsList({ status: "PENDING" })
-
   const departmentHeadReviewQuery = useQuery({
     queryKey: ["department-head", "home-review-summary", reviewStage],
     queryFn: () => getDepartmentHeadEvaluationDashboard(reviewStage),
@@ -285,7 +282,6 @@ export function DepartmentHeadDashboard() {
 
   const activeProjectsCount = departmentOverviewQuery.data?.activeProjects ?? 0
   const activeAdvisorsKpiValue = departmentOverviewQuery.data?.activeAdvisors ?? activeAdvisorsCount
-  const pendingApprovalsCount = pendingInvitations.length
 
   const usersTotalPages = Math.max(1, Math.ceil(filteredDashboardUsers.length / DASHBOARD_USERS_PAGE_SIZE))
   const safeUsersPage = Math.min(usersPage, usersTotalPages)
@@ -351,7 +347,7 @@ export function DepartmentHeadDashboard() {
     },
     {
       title: "Pending Reviews",
-      value: pendingApprovalsCount,
+      value: pendingReviewCount,
       icon: ClipboardCheck,
       href: undefined as string | undefined,
       onClick: () => setActiveTab("grades"),
@@ -473,7 +469,7 @@ export function DepartmentHeadDashboard() {
                     {[
                       { href: "/dashboard/department-head/invitations", icon: Mail, label: "Invite New Users", badge: null },
                       {
-                        href: "/dashboard/department-head/review",
+                        href: reviewHref,
                         icon: ClipboardCheck,
                         label: "Review Finalized Results",
                         badge: pendingReviewCount > 0 ? pendingReviewCount : null,
@@ -577,7 +573,7 @@ export function DepartmentHeadDashboard() {
                     </div>
 
                     <Button asChild className="w-full gap-1.5">
-                      <Link href="/dashboard/department-head/review">
+                      <Link href={reviewHref}>
                         Open Review Queue
                         <ChevronRight className="h-4 w-4" />
                       </Link>
@@ -866,7 +862,7 @@ export function DepartmentHeadDashboard() {
                       </CardDescription>
                     </div>
                     <Button size="sm" className="gap-1.5 self-start sm:self-auto" asChild>
-                      <Link href="/dashboard/department-head/review">
+                      <Link href={reviewHref}>
                         <Eye className="h-3.5 w-3.5" /> Open review page
                       </Link>
                     </Button>
@@ -927,7 +923,7 @@ export function DepartmentHeadDashboard() {
                           </div>
                           <div className="flex gap-2 self-end shrink-0 sm:self-auto">
                             <Button size="sm" variant="outline" className="gap-1.5" asChild>
-                              <Link href="/dashboard/department-head/review">
+                              <Link href={reviewHref}>
                                 <Eye className="h-3.5 w-3.5" /> Review
                               </Link>
                             </Button>

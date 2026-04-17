@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   AlertTriangle,
@@ -28,6 +29,8 @@ import {
   rejectDepartmentHeadEvaluationProject,
   type DepartmentHeadDashboardProjectGroup,
   type DepartmentHeadEvaluationProjectDetail,
+  type DepartmentHeadProjectDetailStudent,
+  type DepartmentHeadReviewHistoryItem,
   type DepartmentHeadEvaluationStage,
   type DepartmentHeadFinalizationStatus,
   type DepartmentHeadNextAction,
@@ -66,6 +69,48 @@ type CapstonePhase = "capstone1" | "capstone2"
 
 function phaseLabel(phase: CapstonePhase) {
   return phase === "capstone1" ? "Capstone I" : "Capstone II"
+}
+
+function normalizeStageQuery(value: string | null): CapstonePhase {
+  const normalized = value?.trim().toLowerCase()
+
+  if (normalized === "capstone-ii" || normalized === "capstone_ii") {
+    return "capstone2"
+  }
+
+  return "capstone1"
+}
+
+function stageQueryValue(phase: CapstonePhase) {
+  return phase === "capstone2" ? "capstone-ii" : "capstone-i"
+}
+
+function stageFromPhase(phase: CapstonePhase): DepartmentHeadEvaluationStage {
+  return phase === "capstone2" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function getEvaluatorCommentSnapshot(student: DepartmentHeadProjectDetailStudent) {
+  if (student.finalizedEvaluatorScores.length > 0) {
+    return student.finalizedEvaluatorScores.map((score) => ({
+      ...score,
+      status: "FINALIZED_SNAPSHOT",
+    }))
+  }
+
+  return student.evaluatorScores
+}
+
+function sortReviewHistoryChronologically(reviewHistory: DepartmentHeadReviewHistoryItem[]) {
+  return [...reviewHistory].sort((left, right) => {
+    const leftTime = new Date(left.actedAt).getTime()
+    const rightTime = new Date(right.actedAt).getTime()
+
+    if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) {
+      return 0
+    }
+
+    return leftTime - rightTime
+  })
 }
 
 function formatDateTime(value: string | null) {
@@ -242,6 +287,7 @@ function ProjectDetailDialog({
     : summaryProject
       ? finalizationStatusConfig(summaryProject.finalizationStatus)
       : null
+  const sortedReviewHistory = detail ? sortReviewHistoryChronologically(detail.reviewHistory) : []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -417,10 +463,10 @@ function ProjectDetailDialog({
                           <p className="font-medium">Evaluator comments</p>
                           <p className="text-xs text-muted-foreground">Average {formatNumber(student.evaluatorAverageScore)}</p>
                         </div>
-                        {student.evaluatorScores.length === 0 ? (
-                          <div className="rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground">No evaluator comments were returned.</div>
+                        {getEvaluatorCommentSnapshot(student).length === 0 ? (
+                          <div className="rounded-lg bg-muted/30 p-3 text-sm text-muted-foreground">No evaluator comments were returned in the finalized snapshot.</div>
                         ) : (
-                          student.evaluatorScores.map((score) => (
+                          getEvaluatorCommentSnapshot(student).map((score) => (
                             <div key={score.evaluatorUserId} className="rounded-lg border bg-muted/20 p-3 text-sm">
                               <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -446,10 +492,10 @@ function ProjectDetailDialog({
                 <CardDescription>Chronological actions on this finalized result.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {detail.reviewHistory.length === 0 ? (
+                {sortedReviewHistory.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No review history has been recorded yet.</p>
                 ) : (
-                  detail.reviewHistory.map((item, index) => (
+                  sortedReviewHistory.map((item, index) => (
                     <div key={`${item.action}-${item.actedAt}-${index}`} className="rounded-lg border bg-muted/20 p-3 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -553,13 +599,31 @@ function ProjectDetailDialog({
 }
 
 export function DepartmentHeadGradesPage() {
-  const [selectedCapstone, setSelectedCapstone] = useState<CapstonePhase>("capstone1")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const selectedCapstone = useMemo(
+    () => normalizeStageQuery(searchParams.get("stage")),
+    [searchParams]
+  )
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<DepartmentHeadFinalizationStatus | "all">("all")
   const [selectedProject, setSelectedProject] = useState<DepartmentHeadDashboardProjectGroup | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null)
-  const stage: DepartmentHeadEvaluationStage = "CAPSTONE_I"
+  const stage = stageFromPhase(selectedCapstone)
+
+  const setSelectedCapstone = (phase: CapstonePhase) => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.set("stage", stageQueryValue(phase))
+    router.replace(`${pathname}?${nextParams.toString()}`)
+  }
+
+  React.useEffect(() => {
+    setSelectedProject(null)
+    setDetailOpen(false)
+    setActionErrorMessage(null)
+  }, [stage])
 
   const dashboardQuery = useQuery({
     queryKey: ["department-head", "evaluation-dashboard", stage],
@@ -762,7 +826,7 @@ export function DepartmentHeadGradesPage() {
       <Tabs value={selectedCapstone} onValueChange={(value) => setSelectedCapstone(value as CapstonePhase)}>
         <TabsList className="h-auto w-full justify-start overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsTrigger value="capstone1">Capstone I</TabsTrigger>
-          <TabsTrigger value="capstone2" disabled>Capstone II</TabsTrigger>
+          <TabsTrigger value="capstone2">Capstone II</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -791,7 +855,7 @@ export function DepartmentHeadGradesPage() {
             This dashboard only reviews finalized coordinator results. Approval publishes the result, while rejection sends it back for coordinator re-finalization.
           </p>
           <p className="text-xs text-muted-foreground">
-            Active stage: {phaseLabel(selectedCapstone)} {selectedCapstone === "capstone2" ? "(not supported yet)" : ""}
+            Active stage: {phaseLabel(selectedCapstone)}
           </p>
         </div>
       </div>

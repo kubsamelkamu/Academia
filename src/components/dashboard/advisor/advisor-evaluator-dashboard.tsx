@@ -347,7 +347,7 @@ export function AdvisorEvaluatorDashboard() {
                 className="btn-gradient h-10 w-full min-h-11 shrink-0 sm:h-9 sm:w-auto sm:min-h-9"
                 asChild
               >
-                <Link href="/dashboard/advisor/evaluator/pending">Full pending list</Link>
+                <Link href={`/dashboard/advisor/evaluator/pending?stage=${dashboardStage}`}>Full pending list</Link>
               </Button>
             }
           />
@@ -364,19 +364,19 @@ export function AdvisorEvaluatorDashboard() {
             className="btn-gradient h-11 w-full min-h-11 justify-center shadow-sm shadow-primary/15 sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1"
             asChild
           >
-            <Link href="/dashboard/advisor/evaluator/pending">
+            <Link href={`/dashboard/advisor/evaluator/pending?stage=${dashboardStage}`}>
               <Clock className="mr-2 h-4 w-4 shrink-0" aria-hidden />
               Review pending
             </Link>
           </Button>
           <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
-            <Link href="/dashboard/advisor/evaluator/projects">
+            <Link href={`/dashboard/advisor/evaluator/projects?stage=${dashboardStage}`}>
               <FolderKanban className="mr-2 h-4 w-4 shrink-0" aria-hidden />
               All projects
             </Link>
           </Button>
           <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
-            <Link href="/dashboard/advisor/evaluator/rubric">
+            <Link href={`/dashboard/advisor/evaluator/rubric?stage=${dashboardStage}`}>
               <BookOpen className="mr-2 h-4 w-4 shrink-0" aria-hidden />
               Rubric
             </Link>
@@ -461,7 +461,7 @@ export function AdvisorEvaluatorDashboard() {
                 className="h-10 min-h-10 w-full shrink-0 gap-2 border-primary/20 bg-background/80 hover:bg-primary/5 sm:h-9 sm:min-h-9 sm:w-auto"
                 asChild
               >
-                <Link href="/dashboard/advisor/evaluator/rubric">
+                <Link href={`/dashboard/advisor/evaluator/rubric?stage=${dashboardStage}`}>
                   <BookOpen className="h-4 w-4" aria-hidden />
                   Open rubric page
                 </Link>
@@ -504,10 +504,10 @@ export function AdvisorEvaluatorDashboard() {
                 </TabsList>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-                    <Link href="/dashboard/advisor/evaluator/pending">Open pending page</Link>
+                    <Link href={`/dashboard/advisor/evaluator/pending?stage=${dashboardStage}`}>Open pending page</Link>
                   </Button>
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-                    <Link href="/dashboard/advisor/evaluator/scheduled">Open schedule page</Link>
+                    <Link href={`/dashboard/advisor/evaluator/scheduled?stage=${dashboardStage}`}>Open schedule page</Link>
                   </Button>
                 </div>
               </div>
@@ -680,7 +680,7 @@ export function AdvisorEvaluatorDashboard() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-foreground">Upcoming sessions</p>
                   <Button variant="outline" size="sm" className="w-full rounded-lg sm:w-auto" asChild>
-                    <Link href="/dashboard/advisor/evaluator/scheduled">All sessions</Link>
+                    <Link href={`/dashboard/advisor/evaluator/scheduled?stage=${dashboardStage}`}>All sessions</Link>
                   </Button>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -765,7 +765,7 @@ export function AdvisorEvaluatorDashboard() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" className="rounded-full" asChild>
-                <Link href="/dashboard/advisor/evaluator/scheduled">
+                <Link href={`/dashboard/advisor/evaluator/scheduled?stage=${dashboardStage}`}>
                   <Calendar className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Full schedule
                 </Link>

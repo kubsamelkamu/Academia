@@ -92,6 +92,11 @@ function getEvaluationStatusLabel(status?: string | null) {
   return String(status ?? "NOT_STARTED").replace(/_/g, " ")
 }
 
+function isSubmittedEvaluationStatus(status?: string | null) {
+  const normalized = String(status ?? "").trim().toUpperCase()
+  return normalized === "SUBMITTED" || normalized === "COMPLETED" || normalized === "REVIEWED"
+}
+
 type StudentEvaluationDraft = {
   studentUserId: string
   score: number | null
@@ -152,7 +157,20 @@ export function AdvisorEvaluatorEvaluatePage({
   React.useEffect(() => {
     if (!detail?.evaluation) return
 
-    setEvaluationSummary((prev) => prev ?? detail.evaluation)
+    setEvaluationSummary((prev) => {
+      if (!prev) {
+        return detail.evaluation
+      }
+
+      if (
+        (detail.evaluation.submittedAt && !prev.submittedAt) ||
+        (isSubmittedEvaluationStatus(detail.evaluation.status) && !isSubmittedEvaluationStatus(prev.status))
+      ) {
+        return detail.evaluation
+      }
+
+      return prev
+    })
   }, [detail?.evaluation])
 
   React.useEffect(() => {
@@ -175,7 +193,9 @@ export function AdvisorEvaluatorEvaluatePage({
   }, [detail?.students])
 
   const effectiveEvaluationSummary = evaluationSummary ?? detail?.evaluation ?? null
-  const isSubmitted = effectiveEvaluationSummary?.status === "SUBMITTED"
+  const isSubmitted =
+    Boolean(effectiveEvaluationSummary?.submittedAt) ||
+    isSubmittedEvaluationStatus(effectiveEvaluationSummary?.status)
   const submittedAt = effectiveEvaluationSummary?.submittedAt ?? null
   const totalStudents = effectiveEvaluationSummary?.totalStudents ?? detail?.evaluation.totalStudents ?? teamMembers.length
 
@@ -199,6 +219,8 @@ export function AdvisorEvaluatorEvaluatePage({
       if (isSubmitted) return
 
       const nextScore = normalizeScoreInput(rawValue)
+      setSubmitErrorMessage(null)
+      setSubmitMissingStudentIds([])
       setStudentEvaluations((prev) => ({
         ...prev,
         [studentId]: {
@@ -217,6 +239,8 @@ export function AdvisorEvaluatorEvaluatePage({
     (studentId: string, value: string) => {
       if (isSubmitted) return
 
+      setSubmitErrorMessage(null)
+      setSubmitMissingStudentIds([])
       setStudentEvaluations((prev) => ({
         ...prev,
         [studentId]: {
@@ -288,6 +312,10 @@ export function AdvisorEvaluatorEvaluatePage({
       })
     },
     onError: (error: Error) => {
+      if (error.message.includes("cannot be edited")) {
+        void detailQuery.refetch()
+      }
+
       toast.error("Draft save failed", {
         description: error.message,
       })
@@ -329,6 +357,10 @@ export function AdvisorEvaluatorEvaluatePage({
       const missingIds = parseMissingStudentIdsFromError(error.message)
       setSubmitErrorMessage(error.message)
       setSubmitMissingStudentIds(missingIds)
+
+      if (error.message.includes("cannot be edited")) {
+        void detailQuery.refetch()
+      }
 
       toast.error("Submit failed", {
         description: error.message,
@@ -506,6 +538,9 @@ export function AdvisorEvaluatorEvaluatePage({
             <p className="font-medium text-foreground">Evaluator evaluation submitted</p>
             <p className="mt-1 text-muted-foreground">
               Submitted at {formatSavedAtLabel(submittedAt)}. Scores and comments are now read-only.
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              This submit action is final for the current evaluator record. Re-submit is not expected in the Capstone II flow.
             </p>
           </CardContent>
         </Card>
@@ -699,7 +734,14 @@ export function AdvisorEvaluatorEvaluatePage({
                   const isMissing = submitMissingStudentIds.includes(member.id)
 
                   return (
-                    <div key={member.id} className="rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm">
+                    <div
+                      key={member.id}
+                      className={
+                        isMissing
+                          ? "rounded-2xl border border-amber-300 bg-amber-50/70 p-4 shadow-sm dark:border-amber-800 dark:bg-amber-950/20"
+                          : "rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm"
+                      }
+                    >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -776,6 +818,12 @@ export function AdvisorEvaluatorEvaluatePage({
                   {missingStudentIds.length > 0
                     ? ` · Missing ${missingStudentIds.map((student) => student.name).join(", ")}`
                     : " · All students scored"}
+                </div>
+              ) : null}
+
+              {!isSubmitted ? (
+                <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-muted-foreground">
+                  Save drafts as often as needed, then submit once after the full Capstone II evaluator review is complete.
                 </div>
               ) : null}
 

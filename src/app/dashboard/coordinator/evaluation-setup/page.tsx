@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ArrowLeft,
   BadgeCheck,
+  BookmarkCheck,
   CheckCircle2,
   ClipboardCheck,
   Eye,
@@ -51,29 +53,83 @@ interface WeightDraft {
   examinerWeight: number
 }
 
-const DEFAULT_CRITERIA: RubricCriterion[] = [
-  { id: "c1", label: "Problem definition and scope", weight: 15, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
-  { id: "c2", label: "Literature review and references", weight: 10, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
-  { id: "c3", label: "Methodology and feasibility", weight: 15, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
-  { id: "c4", label: "Implementation quality", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
-  { id: "c5", label: "UI and user workflow", weight: 10, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
-  { id: "c6", label: "Exception handling and resilience", weight: 10, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
-  { id: "c7", label: "Defense presentation and Q&A", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Defense Performance" },
-]
+const DEFAULT_CRITERIA_BY_STAGE: Record<CoordinatorEvaluationStage, RubricCriterion[]> = {
+  CAPSTONE_I: [
+    { id: "c1", label: "Problem definition and scope", weight: 15, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
+    { id: "c2", label: "Literature review and references", weight: 10, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
+    { id: "c3", label: "Methodology and feasibility", weight: 15, evaluator: "advisor", phase: "documentation", category: "Proposal Quality" },
+    { id: "c4", label: "Implementation quality", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
+    { id: "c5", label: "UI and user workflow", weight: 10, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
+    { id: "c6", label: "Exception handling and resilience", weight: 10, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
+    { id: "c7", label: "Defense presentation and Q&A", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Defense Performance" },
+  ],
+  CAPSTONE_II: [
+    { id: "c1", label: "Implementation completeness", weight: 15, evaluator: "advisor", phase: "documentation", category: "Delivery Quality" },
+    { id: "c2", label: "Testing and validation evidence", weight: 10, evaluator: "advisor", phase: "documentation", category: "Delivery Quality" },
+    { id: "c3", label: "Final report and deployment readiness", weight: 10, evaluator: "advisor", phase: "documentation", category: "Delivery Quality" },
+    { id: "c4", label: "Defense execution and live demo", weight: 20, evaluator: "examiner", phase: "demonstration", category: "Defense Performance" },
+    { id: "c5", label: "Technical depth during Q&A", weight: 15, evaluator: "examiner", phase: "demonstration", category: "Defense Performance" },
+    { id: "c6", label: "System robustness and usability", weight: 15, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
+    { id: "c7", label: "Project impact and completion quality", weight: 15, evaluator: "examiner", phase: "demonstration", category: "Technical Execution" },
+  ],
+}
 
-const CAPSTONE_ONE_STAGE: CoordinatorEvaluationStage = "CAPSTONE_I"
+const DEFAULT_POLICY_NOTES: Record<CoordinatorEvaluationStage, string> = {
+  CAPSTONE_I:
+    "One instructor can be advisor or evaluator, but not both for the same project. Keep documentation and demonstration rubrics balanced by phase.",
+  CAPSTONE_II:
+    "One instructor can be advisor or evaluator, but not both for the same project. For Capstone II, keep the submit path final and ensure evaluator weighting reflects defense evidence.",
+}
+
+function normalizeStageQuery(value: string | null): CoordinatorEvaluationStage {
+  const normalized = value?.trim().toLowerCase()
+
+  if (normalized === "capstone-ii" || normalized === "capstone_ii") {
+    return "CAPSTONE_II"
+  }
+
+  return "CAPSTONE_I"
+}
+
+function formatStageLabel(stage: CoordinatorEvaluationStage) {
+  return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
+function stageQueryValue(stage: CoordinatorEvaluationStage) {
+  return stage === "CAPSTONE_II" ? "capstone-ii" : "capstone-i"
+}
+
+function evaluatorRoleLabel(role: EvaluatorType) {
+  return role === "examiner" ? "evaluator" : role
+}
 
 export default function EvaluationSetupPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const [criteria, setCriteria] = useState<RubricCriterion[]>(DEFAULT_CRITERIA)
-  const [weightDraft, setWeightDraft] = useState<WeightDraft | null>(null)
-  const [policyNote, setPolicyNote] = useState(
-    "One instructor can be advisor or examiner, but not both for the same project. Keep documentation and demonstration rubrics balanced by phase."
+  const selectedStage = useMemo(
+    () => normalizeStageQuery(searchParams.get("stage")),
+    [searchParams],
   )
+  const [criteriaByStage, setCriteriaByStage] = useState<Record<CoordinatorEvaluationStage, RubricCriterion[]>>(
+    DEFAULT_CRITERIA_BY_STAGE,
+  )
+  const [weightDrafts, setWeightDrafts] = useState<Partial<Record<CoordinatorEvaluationStage, WeightDraft>>>({})
+  const [policyNotes, setPolicyNotes] = useState<Record<CoordinatorEvaluationStage, string>>(DEFAULT_POLICY_NOTES)
+
+  const criteria = criteriaByStage[selectedStage]
+  const policyNote = policyNotes[selectedStage]
+
+  const setSelectedStage = (stage: CoordinatorEvaluationStage) => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.set("stage", stageQueryValue(stage))
+    router.replace(`${pathname}?${nextParams.toString()}`)
+  }
 
   const weightsQuery = useQuery({
-    queryKey: ["coordinator", "evaluation-weights", CAPSTONE_ONE_STAGE],
-    queryFn: () => getCoordinatorEvaluationWeights(CAPSTONE_ONE_STAGE),
+    queryKey: ["coordinator", "evaluation-weights", selectedStage],
+    queryFn: () => getCoordinatorEvaluationWeights(selectedStage),
     staleTime: 30_000,
     retry: 1,
   })
@@ -82,12 +138,15 @@ export default function EvaluationSetupPage() {
     mutationFn: updateCoordinatorEvaluationWeights,
     onSuccess: (data) => {
       queryClient.setQueryData(["coordinator", "evaluation-weights", data.stage], data)
-      setWeightDraft({
-        advisorWeight: data.advisorPercentage,
-        examinerWeight: data.evaluatorPercentage,
-      })
+      setWeightDrafts((current) => ({
+        ...current,
+        [data.stage]: {
+          advisorWeight: data.advisorPercentage,
+          examinerWeight: data.evaluatorPercentage,
+        },
+      }))
       toast.success("Weight profile saved", {
-        description: `Capstone I weights updated to advisor ${data.advisorPercentage}% and examiner ${data.evaluatorPercentage}%.`,
+        description: `${formatStageLabel(data.stage)} weights updated to advisor ${data.advisorPercentage}% and evaluator ${data.evaluatorPercentage}%.`,
       })
     },
     onError: (error) => {
@@ -97,8 +156,8 @@ export default function EvaluationSetupPage() {
     },
   })
 
-  const advisorWeight = weightDraft?.advisorWeight ?? weightsQuery.data?.advisorPercentage ?? 40
-  const examinerWeight = weightDraft?.examinerWeight ?? weightsQuery.data?.evaluatorPercentage ?? 60
+  const advisorWeight = weightDrafts[selectedStage]?.advisorWeight ?? weightsQuery.data?.advisorPercentage ?? 40
+  const examinerWeight = weightDrafts[selectedStage]?.examinerWeight ?? weightsQuery.data?.evaluatorPercentage ?? 60
 
   const totalWeight = advisorWeight + examinerWeight
   const advisorCriteria = criteria.filter((item) => item.evaluator === "advisor")
@@ -108,20 +167,29 @@ export default function EvaluationSetupPage() {
 
   const handleWeightChange = (role: EvaluatorType, value: number) => {
     if (role === "advisor") {
-      setWeightDraft({
-        advisorWeight: value,
-        examinerWeight: 100 - value,
-      })
+      setWeightDrafts((current) => ({
+        ...current,
+        [selectedStage]: {
+          advisorWeight: value,
+          examinerWeight: 100 - value,
+        },
+      }))
     } else {
-      setWeightDraft({
-        advisorWeight: 100 - value,
-        examinerWeight: value,
-      })
+      setWeightDrafts((current) => ({
+        ...current,
+        [selectedStage]: {
+          advisorWeight: 100 - value,
+          examinerWeight: value,
+        },
+      }))
     }
   }
 
   const updateCriterionWeight = (id: string, nextWeight: number) => {
-    setCriteria((current) => current.map((item) => (item.id === id ? { ...item, weight: nextWeight } : item)))
+    setCriteriaByStage((current) => ({
+      ...current,
+      [selectedStage]: current[selectedStage].map((item) => (item.id === id ? { ...item, weight: nextWeight } : item)),
+    }))
   }
 
   const handleSaveWeightProfile = () => {
@@ -131,7 +199,7 @@ export default function EvaluationSetupPage() {
     }
 
     saveWeightsMutation.mutate({
-      stage: CAPSTONE_ONE_STAGE,
+      stage: selectedStage,
       advisorPercentage: advisorWeight,
       evaluatorPercentage: examinerWeight,
     })
@@ -151,11 +219,14 @@ export default function EvaluationSetupPage() {
               Evaluation Setup
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Configure rubrics, advisor and examiner weights, and review evaluation activity
+              Configure rubrics, advisor and evaluator weights, and review evaluation activity for {formatStageLabel(selectedStage)}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 pl-11 sm:pl-0">
+          <Badge variant="outline" className="gap-1.5">
+            <BookmarkCheck className="h-3.5 w-3.5" /> {formatStageLabel(selectedStage)}
+          </Badge>
           <Badge variant="outline" className="gap-1.5">
             <Settings2 className="h-3.5 w-3.5" /> {criteria.length} rubric criteria
           </Badge>
@@ -168,7 +239,7 @@ export default function EvaluationSetupPage() {
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         {[
           { label: "Advisor Weight", value: `${advisorWeight}%`, icon: Users },
-          { label: "Examiner Weight", value: `${examinerWeight}%`, icon: ClipboardCheck },
+          { label: "Evaluator Weight", value: `${examinerWeight}%`, icon: ClipboardCheck },
           { label: "Policy Health", value: totalWeight === 100 ? "Balanced" : "Review", icon: totalWeight === 100 ? CheckCircle2 : AlertTriangle },
         ].map((item) => (
           <Card key={item.label} className="border-none shadow-sm">
@@ -184,6 +255,21 @@ export default function EvaluationSetupPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="border-none shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Evaluation Stage</CardTitle>
+          <CardDescription>Switch between Capstone I and Capstone II weight profiles without leaving the coordinator setup workspace.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={selectedStage} onValueChange={(value) => setSelectedStage(value as CoordinatorEvaluationStage)}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="CAPSTONE_I">Capstone I</TabsTrigger>
+              <TabsTrigger value="CAPSTONE_II">Capstone II</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="weights" className="space-y-4">
         <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
@@ -212,7 +298,7 @@ export default function EvaluationSetupPage() {
             <Card className="border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Role Weight Configuration</CardTitle>
-                <CardDescription>Capstone I role weights are loaded from and saved to the backend configuration.</CardDescription>
+                <CardDescription>{formatStageLabel(selectedStage)} role weights are loaded from and saved to the backend configuration.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -224,7 +310,7 @@ export default function EvaluationSetupPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span>Examiner weight</span>
+                    <span>Evaluator weight</span>
                     <span className="font-semibold text-primary">{examinerWeight}%</span>
                   </div>
                   <Slider value={[examinerWeight]} min={10} max={90} step={5} onValueChange={([value]) => handleWeightChange("examiner", value)} disabled={saveWeightsMutation.isPending || weightsQuery.isLoading} />
@@ -249,7 +335,7 @@ export default function EvaluationSetupPage() {
             <Card className="border-none shadow-sm h-fit">
               <CardHeader>
                 <CardTitle className="text-base">Recommended Split</CardTitle>
-                <CardDescription>Suggested CCI-style balance between mentorship and defense scoring.</CardDescription>
+                <CardDescription>Suggested balance between mentorship scoring and evaluator defense scoring for {formatStageLabel(selectedStage)}.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="rounded-lg border bg-primary/5 px-3 py-2">
@@ -258,7 +344,7 @@ export default function EvaluationSetupPage() {
                 </div>
                 <div className="rounded-lg border bg-muted/20 px-3 py-2">
                   <p className="font-medium">Capstone II</p>
-                  <p className="text-muted-foreground mt-1">Increase examiner share for live defense and implementation evidence.</p>
+                  <p className="text-muted-foreground mt-1">Increase evaluator share for live defense evidence and final system delivery.</p>
                 </div>
               </CardContent>
             </Card>
@@ -278,7 +364,7 @@ export default function EvaluationSetupPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{criterion.label}</p>
-                        <p className="text-xs text-muted-foreground">{criterion.category} · {criterion.phase} · {criterion.evaluator}</p>
+                        <p className="text-xs text-muted-foreground">{criterion.category} · {criterion.phase} · {evaluatorRoleLabel(criterion.evaluator)}</p>
                       </div>
                       <Badge variant="outline">{criterion.weight}%</Badge>
                     </div>
@@ -288,7 +374,7 @@ export default function EvaluationSetupPage() {
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={() => toast.success("Rubric preset updated", { description: "Criterion weights were updated in the coordinator UI." })}
+                  onClick={() => toast.success("Rubric preset updated", { description: `${formatStageLabel(selectedStage)} criterion weights were updated in the coordinator UI.` })}
                 >
                   <Sparkles className="h-4 w-4" /> Save rubric setup
                 </Button>
@@ -303,7 +389,7 @@ export default function EvaluationSetupPage() {
               <CardContent className="space-y-4">
                 {[
                   { label: "Advisor criteria total", value: advisorCriteriaTotal, target: advisorWeight },
-                  { label: "Examiner criteria total", value: examinerCriteriaTotal, target: examinerWeight },
+                  { label: "Evaluator criteria total", value: examinerCriteriaTotal, target: examinerWeight },
                 ].map((item) => (
                   <div key={item.label} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -324,7 +410,7 @@ export default function EvaluationSetupPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
             <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base">Advisor vs Examiner Guardrail</CardTitle>
+                <CardTitle className="text-base">Advisor vs Evaluator Guardrail</CardTitle>
                 <CardDescription>UI-only policy note to avoid assigning the same instructor twice on one project.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -333,15 +419,25 @@ export default function EvaluationSetupPage() {
                     <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                     <div>
                       <p className="font-medium">Conflict policy</p>
-                      <p className="mt-1">One instructor can be advisor or examiner, but not both for the same project. Use this note to guide assignment and review decisions until backend enforcement is added.</p>
+                      <p className="mt-1">One instructor can be advisor or evaluator, but not both for the same project. Use this note to guide assignment and review decisions until backend enforcement is added.</p>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="policy-note">Coordinator policy note</Label>
-                  <Textarea id="policy-note" value={policyNote} onChange={(event) => setPolicyNote(event.target.value)} className="min-h-[120px] resize-none" />
+                  <Textarea
+                    id="policy-note"
+                    value={policyNote}
+                    onChange={(event) =>
+                      setPolicyNotes((current) => ({
+                        ...current,
+                        [selectedStage]: event.target.value,
+                      }))
+                    }
+                    className="min-h-[120px] resize-none"
+                  />
                 </div>
-                <Button className="gap-2" onClick={() => toast.success("Policy guidance saved", { description: "The coordinator-side UI note was updated." })}>
+                <Button className="gap-2" onClick={() => toast.success("Policy guidance saved", { description: `The coordinator-side ${formatStageLabel(selectedStage)} policy note was updated.` })}>
                   <CheckCircle2 className="h-4 w-4" /> Save policy note
                 </Button>
               </CardContent>

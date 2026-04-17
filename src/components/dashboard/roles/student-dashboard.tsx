@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { getErrorMessage } from "@/lib/api/errors"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -9,12 +10,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
 import { useMyGroupAnnouncements, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import {
   getStudentFinalGrade,
   type StudentFinalGradeResponse,
+  type StudentFinalGradeStage,
 } from "@/lib/api/student-final-grades"
 import { useProjectMilestones, useStudentProjects } from "@/lib/hooks/use-student-milestones"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
@@ -66,6 +69,23 @@ interface StudentProjectOverview {
 
 interface StudentDashboardData {
   project: StudentProjectOverview
+}
+
+type StudentGradePhase = "capstone1" | "capstone2"
+
+type StudentGradeStatusTone = "default" | "secondary" | "destructive" | "outline"
+
+interface StudentFinalGradeViewState {
+  response: StudentFinalGradeResponse | null
+  errorMessage: string | null
+  publishedGrade: Extract<StudentFinalGradeResponse, { isPublished: true; status: "APPROVED" }> | null
+  statusLabel: string
+  statusTone: StudentGradeStatusTone
+  project: { id: string; title: string; status: string } | null
+  group: { id: string; name: string; status: string; totalMembers: number } | null
+  kpiMessage: string
+  footnote: string
+  kpiValue: string
 }
 
 function useLiveTime(intervalMs = 1000): Date {
@@ -188,11 +208,115 @@ function formatFinalGradeValue(value: number, digits: number): string {
   return value.toFixed(digits)
 }
 
+function gradePhaseLabel(phase: StudentGradePhase) {
+  return phase === "capstone2" ? "Capstone II" : "Capstone I"
+}
+
+function studentGradePhaseToStage(phase: StudentGradePhase): StudentFinalGradeStage {
+  return phase === "capstone2" ? "CAPSTONE_II" : "CAPSTONE_I"
+}
+
+function normalizeStudentGradePhaseQuery(value: string | null): StudentGradePhase {
+  const normalized = value?.trim().toLowerCase()
+
+  if (normalized === "capstone1" || normalized === "capstone-i" || normalized === "capstone_i") {
+    return "capstone1"
+  }
+
+  return "capstone2"
+}
+
+function studentGradePhaseQueryValue(phase: StudentGradePhase) {
+  return phase === "capstone1" ? "capstone-i" : "capstone-ii"
+}
+
+function buildStudentFinalGradeViewState({
+  response,
+  isLoading,
+  isError,
+  error,
+  phase,
+}: {
+  response: StudentFinalGradeResponse | null
+  isLoading: boolean
+  isError: boolean
+  error: unknown
+  phase: StudentGradePhase
+}): StudentFinalGradeViewState {
+  const publishedGrade =
+    response && response.isPublished && response.status === "APPROVED" ? response : null
+  const phaseLabel = gradePhaseLabel(phase)
+  const errorMessage = isError
+    ? getErrorMessage(error, "Failed to load your final grade.")
+    : null
+  const statusLabel = isLoading
+    ? "Loading"
+    : isError
+      ? "Unavailable"
+      : response?.status === "APPROVED"
+        ? "Published"
+        : response?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+          ? "Pending approval"
+          : response?.status === "REJECTED"
+            ? "Under review"
+            : "Not available"
+  const statusTone: StudentGradeStatusTone = isError
+    ? "destructive"
+    : publishedGrade
+      ? "default"
+      : response?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+        ? "secondary"
+        : "outline"
+  const project = hasProjectContext(response) ? response.project : null
+  const group = hasProjectContext(response) ? response.group : null
+  const kpiMessage = isLoading
+    ? `Checking publication status for your ${phaseLabel} final result.`
+    : isError
+      ? "Your final-grade status could not be loaded right now."
+      : publishedGrade
+        ? `Published ${formatDate(publishedGrade.publishedAt ?? publishedGrade.finalizedAt)}`
+        : response?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
+          ? `Your ${phaseLabel} final grade has been prepared and is awaiting department-head approval.`
+          : response?.status === "REJECTED"
+            ? `Your ${phaseLabel} final grade is being reviewed again and is not published yet.`
+            : `Your ${phaseLabel} final grade is not available yet.`
+  const footnote = publishedGrade
+    ? `${phaseLabel} published ${formatDate(publishedGrade.publishedAt ?? publishedGrade.finalizedAt)}.`
+    : `${phaseLabel} final grades will appear here when they are approved and published.`
+  const kpiValue = publishedGrade
+    ? `${publishedGrade.scores.letterGrade} (${formatFinalGradeValue(
+        publishedGrade.scores.finalGrade,
+        publishedGrade.roundedToDecimalPlaces
+      )}%)`
+    : statusLabel
+
+  return {
+    response,
+    errorMessage,
+    publishedGrade,
+    statusLabel,
+    statusTone,
+    project,
+    group,
+    kpiMessage,
+    footnote,
+    kpiValue,
+  }
+}
+
 interface StudentDashboardProps {
   userName?: string
 }
 
 export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const gradesSectionRef = useRef<HTMLDivElement | null>(null)
+  const selectedGradePhase = useMemo(
+    () => normalizeStudentGradePhaseQuery(searchParams.get("grade-stage")),
+    [searchParams]
+  )
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useAuthStore((s) => s.user)
   const myProjectGroupQuery = useMyProjectGroup(Boolean(user))
@@ -251,9 +375,17 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     limit: 20,
   })
 
-  const studentFinalGradeQuery = useQuery({
+  const studentFinalGradeCapstoneOneQuery = useQuery({
     queryKey: ["student", "final-grade", "CAPSTONE_I"],
     queryFn: () => getStudentFinalGrade("CAPSTONE_I"),
+    enabled: Boolean(accessToken),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const studentFinalGradeCapstoneTwoQuery = useQuery({
+    queryKey: ["student", "final-grade", "CAPSTONE_II"],
+    queryFn: () => getStudentFinalGrade("CAPSTONE_II"),
     enabled: Boolean(accessToken),
     staleTime: 30_000,
     retry: 1,
@@ -566,55 +698,45 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const completedMilestones = backendMilestones.filter((milestone) => milestone.status === "approved").length
   const totalMilestones = backendMilestones.length
 
-  const studentFinalGrade = studentFinalGradeQuery.data ?? null
-  const studentGradeErrorMessage = studentFinalGradeQuery.isError
-    ? getErrorMessage(studentFinalGradeQuery.error, "Failed to load your final grade.")
-    : null
-  const publishedStudentFinalGrade =
-    studentFinalGrade && studentFinalGrade.isPublished && studentFinalGrade.status === "APPROVED"
-      ? studentFinalGrade
-      : null
-  const studentGradeStatusLabel = studentFinalGradeQuery.isLoading
-    ? "Loading"
-    : studentFinalGradeQuery.isError
-      ? "Unavailable"
-      : studentFinalGrade?.status === "APPROVED"
-        ? "Published"
-        : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
-          ? "Pending approval"
-          : studentFinalGrade?.status === "REJECTED"
-            ? "Under review"
-            : "Not available"
-  const studentGradeStatusTone = studentFinalGradeQuery.isError
-    ? "destructive"
-    : publishedStudentFinalGrade
-      ? "default"
-      : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
-        ? "secondary"
-        : "outline"
-  const studentGradeProject = hasProjectContext(studentFinalGrade) ? studentFinalGrade.project : null
-  const studentGradeGroup = hasProjectContext(studentFinalGrade) ? studentFinalGrade.group : null
-  const studentGradeKpiMessage = studentFinalGradeQuery.isLoading
-    ? "Checking publication status for your final result."
-    : studentFinalGradeQuery.isError
-      ? "Your final-grade status could not be loaded right now."
-      : publishedStudentFinalGrade
-        ? `Published ${formatDate(publishedStudentFinalGrade.publishedAt ?? publishedStudentFinalGrade.finalizedAt)}`
-        : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
-          ? "Your final grade has been prepared and is awaiting department-head approval."
-          : studentFinalGrade?.status === "REJECTED"
-            ? "Your final grade is being reviewed again and is not published yet."
-            : "Your final grade is not available yet."
-    const capstone1KpiValue = publishedStudentFinalGrade
-      ? `${publishedStudentFinalGrade.scores.letterGrade} (${formatFinalGradeValue(
-          publishedStudentFinalGrade.scores.finalGrade,
-          publishedStudentFinalGrade.roundedToDecimalPlaces
-        )}%)`
-      : studentGradeStatusLabel
-    const capstone2KpiValue = "Not available"
-    const studentGradesFootnote = publishedStudentFinalGrade
-      ? `Capstone I published ${formatDate(publishedStudentFinalGrade.publishedAt ?? publishedStudentFinalGrade.finalizedAt)}.`
-      : "Capstone II final grades will appear here when that stage is supported."
+  const capstoneOneGradeState = buildStudentFinalGradeViewState({
+    response: studentFinalGradeCapstoneOneQuery.data ?? null,
+    isLoading: studentFinalGradeCapstoneOneQuery.isLoading,
+    isError: studentFinalGradeCapstoneOneQuery.isError,
+    error: studentFinalGradeCapstoneOneQuery.error,
+    phase: "capstone1",
+  })
+  const capstoneTwoGradeState = buildStudentFinalGradeViewState({
+    response: studentFinalGradeCapstoneTwoQuery.data ?? null,
+    isLoading: studentFinalGradeCapstoneTwoQuery.isLoading,
+    isError: studentFinalGradeCapstoneTwoQuery.isError,
+    error: studentFinalGradeCapstoneTwoQuery.error,
+    phase: "capstone2",
+  })
+  const activeGradeState = selectedGradePhase === "capstone2" ? capstoneTwoGradeState : capstoneOneGradeState
+  const activeGradeQuery = selectedGradePhase === "capstone2"
+    ? studentFinalGradeCapstoneTwoQuery
+    : studentFinalGradeCapstoneOneQuery
+  const studentFinalGrade = activeGradeState.response
+  const studentGradeErrorMessage = activeGradeState.errorMessage
+  const publishedStudentFinalGrade = activeGradeState.publishedGrade
+  const studentGradeStatusLabel = activeGradeState.statusLabel
+  const studentGradeStatusTone = activeGradeState.statusTone
+  const studentGradeProject = activeGradeState.project
+  const studentGradeGroup = activeGradeState.group
+  const studentGradeKpiMessage = activeGradeState.kpiMessage
+  const capstone1KpiValue = capstoneOneGradeState.kpiValue
+  const capstone2KpiValue = capstoneTwoGradeState.kpiValue
+  const studentGradesFootnote = activeGradeState.footnote
+  const setSelectedGradePhase = (phase: StudentGradePhase) => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.set("grade-stage", studentGradePhaseQueryValue(phase))
+    router.replace(`${pathname}?${nextParams.toString()}`)
+  }
+
+  const focusGradePhase = (phase: StudentGradePhase) => {
+    setSelectedGradePhase(phase)
+    gradesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   const handleViewProject = () => {
     toast.message("Tip", {
@@ -701,15 +823,25 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
           <CardContent className="space-y-2 px-3 pb-0 pt-0 sm:space-y-2.5 sm:px-6 sm:pb-6">
             <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
               <span className="shrink-0 text-muted-foreground">Capstone I</span>
-              <span className="min-w-0 break-words text-right font-semibold tabular-nums text-foreground">
+              <button
+                type="button"
+                onClick={() => focusGradePhase("capstone1")}
+                className="min-w-0 break-words text-right font-semibold tabular-nums text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-pressed={selectedGradePhase === "capstone1"}
+              >
                 {capstone1KpiValue}
-              </span>
+              </button>
             </div>
             <div className="flex min-w-0 items-start justify-between gap-2 text-[10px] leading-tight sm:text-xs">
               <span className="shrink-0 text-muted-foreground">Capstone II</span>
-              <span className="min-w-0 break-words text-right font-semibold tabular-nums text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => focusGradePhase("capstone2")}
+                className="min-w-0 break-words text-right font-semibold tabular-nums text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-pressed={selectedGradePhase === "capstone2"}
+              >
                 {capstone2KpiValue}
-              </span>
+              </button>
             </div>
             <p className="border-t border-border/60 pt-2 text-[9px] leading-relaxed text-muted-foreground sm:text-[10px]">
               {publishedStudentFinalGrade ? studentGradesFootnote : `${studentGradeKpiMessage} ${studentGradesFootnote}`}
@@ -970,11 +1102,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         </Link>
 
         {/* Grades */}
+        <div ref={gradesSectionRef} id="my-grades">
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex flex-col items-start gap-2 text-base sm:flex-row sm:items-center sm:justify-between">
               <span className="min-w-0">My Grades</span>
-              {!studentFinalGradeQuery.isLoading ? (
+              {!activeGradeQuery.isLoading ? (
                 <Badge
                   variant={studentGradeStatusTone}
                   className="capitalize self-start sm:self-auto"
@@ -984,11 +1117,17 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               ) : null}
             </CardTitle>
             <CardDescription>
-              Read-only final grade visibility for Capstone I.
+              Read-only final grade visibility for {gradePhaseLabel(selectedGradePhase)}.
             </CardDescription>
+            <Tabs value={selectedGradePhase} onValueChange={(value) => setSelectedGradePhase(value as StudentGradePhase)}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="capstone1">Capstone I</TabsTrigger>
+                <TabsTrigger value="capstone2">Capstone II</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
-            {studentFinalGradeQuery.isLoading ? (
+            {activeGradeQuery.isLoading ? (
               <div className="space-y-3">
                 <div className="h-24 animate-pulse rounded-lg bg-muted" />
                 <div className="h-28 animate-pulse rounded-lg bg-muted" />
@@ -1000,7 +1139,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Unable to load your final grade</p>
                     <p className="text-xs text-muted-foreground">{studentGradeErrorMessage}</p>
-                    <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => studentFinalGradeQuery.refetch()}>
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => activeGradeQuery.refetch()}>
                       Retry
                     </Button>
                   </div>
@@ -1071,22 +1210,30 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 </div>
 
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-900/10">
-                  <p className="font-medium text-emerald-700 dark:text-emerald-400">Your final grade is published.</p>
+                  <p className="font-medium text-emerald-700 dark:text-emerald-400">Your {gradePhaseLabel(selectedGradePhase)} final grade is published.</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    This view is read-only and only shows the approved final result for your own record.
+                    This view is read-only and only shows the approved {gradePhaseLabel(selectedGradePhase)} final result for your own record.
                   </p>
                 </div>
               </div>
             ) : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD" || studentFinalGrade?.status === "REJECTED" ? (
               <div className="space-y-4">
-                <div className="rounded-lg border p-4 bg-muted/20">
+                <div className={
+                  studentFinalGrade.status === "REJECTED"
+                    ? "rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+                    : "rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10"
+                }>
                   <div className="flex items-start gap-3">
-                    <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    {studentFinalGrade.status === "REJECTED" ? (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    ) : (
+                      <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    )}
                     <div>
                       <p className="text-sm font-medium leading-relaxed">
                         {studentFinalGrade.status === "FINALIZED_PENDING_DEPARTMENT_HEAD"
-                          ? "Your final grade has been prepared and is awaiting department-head approval."
-                          : "Your final grade is being reviewed again and is not published yet."}
+                          ? `Your ${gradePhaseLabel(selectedGradePhase)} final grade has been prepared and is awaiting department-head approval.`
+                          : `Your ${gradePhaseLabel(selectedGradePhase)} final grade is being reviewed again and is not published yet.`}
                       </p>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{studentFinalGrade.message}</p>
                     </div>
@@ -1109,12 +1256,12 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                 </div>
 
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Final numeric grades stay hidden until the result is approved and published.
+                  Final numeric grades stay hidden until the {gradePhaseLabel(selectedGradePhase)} result is approved and published.
                 </p>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-center">
-                <p className="text-sm font-medium">Your final grade is not available yet.</p>
+                <p className="text-sm font-medium">Your {gradePhaseLabel(selectedGradePhase)} final grade is not available yet.</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   {studentFinalGrade?.message ?? "No finalized result is available for this stage yet."}
                 </p>
@@ -1122,6 +1269,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   )
