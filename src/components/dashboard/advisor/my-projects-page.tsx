@@ -484,17 +484,17 @@ interface StatCardProps {
 
 const StatCard = ({ title, value, icon: Icon, color = 'blue' }: StatCardProps) => (
   <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/30">
-    <CardContent className="p-6">
+    <CardContent className="p-4 sm:p-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-3xl font-bold tracking-tight">{value}</p>
+        <div className="space-y-0.5 sm:space-y-1">
+          <p className="text-[10px] sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
+          <p className="text-xl sm:text-3xl font-bold tracking-tight">{value}</p>
         </div>
         <div className={cn(
-          "h-12 w-12 rounded-xl flex items-center justify-center transition-all group-hover:scale-110",
+          "h-9 w-9 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl flex items-center justify-center transition-all group-hover:scale-110 shadow-sm",
           `bg-${color}-100 text-${color}-600 dark:bg-${color}-900/30 dark:text-${color}-400`
         )}>
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
       </div>
     </CardContent>
@@ -544,46 +544,48 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
   const StatusIcon = statusConfig?.icon || FolderOpen
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2 flex-1">
+    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 bg-gradient-to-br from-background to-muted/20 shadow-md">
+      <CardHeader className="p-4 sm:p-5 pb-2 sm:pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle 
-                className="text-xl font-semibold hover:text-primary transition-colors cursor-pointer line-clamp-1"
+                className="text-lg sm:text-xl font-bold hover:text-primary transition-colors cursor-pointer line-clamp-1 leading-tight"
                 onClick={() => onViewDetails(project)}
               >
                 {project.title}
               </CardTitle>
-              <Badge className={cn(getStatusColor(statusConfig?.color || 'gray'), "text-xs")}>
+              <Badge className={cn(getStatusColor(statusConfig?.color || 'gray'), "text-[10px] font-bold uppercase tracking-wider h-5")}>
                 <StatusIcon className="h-3 w-3 mr-1" />
                 {statusConfig?.label || project.status}
               </Badge>
             </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" />
-                <span>{project.groupName}</span>
+            <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground font-medium">
+              <div className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-primary/70" />
+                <span className="truncate">{project.groupName}</span>
               </div>
             </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-primary/10">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onViewDetails(project)}>
-                <Eye className="h-4 w-4 mr-2" />
+            <DropdownMenuContent align="end" className="w-[180px]">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onViewDetails(project)} className="text-sm font-medium">
+                <Eye className="h-4 w-4 mr-2 text-primary" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onMessage(project)}>
-                <MessageSquare className="h-4 w-4 mr-2" />
+              <DropdownMenuItem onClick={() => onMessage(project)} className="text-sm font-medium">
+                <MessageSquare className="h-4 w-4 mr-2 text-primary" />
                 Message Team
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onClearance(project)}>
+              <DropdownMenuItem onClick={() => onClearance(project)} className="text-sm font-medium text-green-600 focus:text-green-600">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Clear for Evaluation
               </DropdownMenuItem>
@@ -592,65 +594,65 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
         </div>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground line-clamp-2">
+      <CardContent className="p-4 sm:p-5 pt-0 space-y-4">
+        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed font-medium">
           {project.description}
         </p>
 
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">Progress</span>
-            <span className="text-muted-foreground">{project.progress}%</span>
+        <div className="space-y-2 bg-muted/30 p-3 rounded-xl border border-primary/5">
+          <div className="flex justify-between text-[11px] sm:text-xs">
+            <span className="font-bold uppercase tracking-wider text-muted-foreground">Overall Progress</span>
+            <span className="font-bold text-primary">{project.progress}%</span>
           </div>
-          <Progress value={project.progress} className="h-2" />
+          <Progress value={project.progress} className="h-1.5 sm:h-2" />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="text-center p-2.5 rounded-xl bg-background/50 border border-primary/5 shadow-sm">
+            <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
+              <Users className="h-3.5 w-3.5 text-primary" />
               <span>{project.members.length}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Members</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Members</p>
           </div>
-          <div className="text-center p-2 rounded-lg bg-muted/30">
-            <div className="flex items-center justify-center gap-1 text-sm font-medium">
-              <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="text-center p-2.5 rounded-xl bg-background/50 border border-primary/5 shadow-sm">
+            <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
+              <ListChecks className="h-3.5 w-3.5 text-primary" />
               <span>{completedMilestones}/{project.milestones.length}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">Milestones</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Milestones</p>
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           <Button
             variant="default"
             size="sm"
-            className="flex-1"
+            className="flex-1 h-9 text-xs font-bold uppercase tracking-wider"
             onClick={() => onViewDetails(project)}
           >
-            <Eye className="h-4 w-4 mr-2" />
+            <Eye className="h-3.5 w-3.5 mr-1.5" />
             Details
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="flex-1 h-9 text-xs font-bold uppercase tracking-wider"
             onClick={() => onMessage(project)}
           >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message
+            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+            Chat
           </Button>
           <Button
             variant="outline"
             size="sm"
             className={cn(
-              "flex-1",
+              "flex-1 h-9 text-xs font-bold uppercase tracking-wider",
               project.status === 'cleared' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30"
             )}
             onClick={() => onClearance(project)}
           >
-            <CheckCircle className="h-4 w-4 mr-2" />
+            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
             {project.status === 'cleared' ? 'Cleared' : 'Clear'}
           </Button>
         </div>
@@ -745,33 +747,34 @@ export function AdvisorMyProjectsPage() {
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
         <div className="space-y-6 animate-in fade-in duration-500 px-4 py-8">
           {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+            <div className="space-y-1">
+              <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 My Projects
               </h1>
-              <p className="text-muted-foreground mt-2">
+              <p className="text-xs sm:text-base text-muted-foreground">
                 Supervise and track your assigned student projects
               </p>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={handleScheduleMeeting}
-                className="gap-2"
+                className="flex-1 sm:flex-none gap-1.5 sm:gap-2 h-9 text-xs sm:text-sm"
               >
-                <CalendarDays className="h-4 w-4" />
-                Schedule Meeting
+                <CalendarDays className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="whitespace-nowrap">Schedule Meeting</span>
               </Button>
               
-              <Button className="gap-2 relative">
-                <ClipboardCheck className="h-4 w-4" />
-                Review Requests
+              <Button size="sm" className="flex-1 sm:flex-none gap-1.5 sm:gap-2 h-9 text-xs sm:text-sm relative">
+                <ClipboardCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="whitespace-nowrap">Review Requests</span>
                 {reviewRequestCount > 0 && (
                   <Badge 
                     variant="destructive" 
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
+                    className="absolute -top-1.5 -right-1.5 h-4 w-4 sm:h-5 sm:w-5 p-0 flex items-center justify-center text-[9px] sm:text-[10px]"
                   >
                     {reviewRequestCount}
                   </Badge>
@@ -781,17 +784,17 @@ export function AdvisorMyProjectsPage() {
           </div>
 
           {(summaryQuery.error || projectsQuery.error) && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="py-2 sm:py-3">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Could not load advisor data</AlertTitle>
-              <AlertDescription>
+              <AlertTitle className="text-sm">Could not load advisor data</AlertTitle>
+              <AlertDescription className="text-xs">
                 {getErrorMessage(summaryQuery.error ?? projectsQuery.error)}
               </AlertDescription>
             </Alert>
           )}
 
           {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-4 mb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4 mb-6 sm:mb-8">
             <StatCard title="Total Projects" value={stats.total} icon={FolderOpen} color="blue" />
             <StatCard title="Active" value={stats.active} icon={Activity} color="indigo" />
             <StatCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" />
@@ -799,58 +802,62 @@ export function AdvisorMyProjectsPage() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search projects..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    {filterStatus === 'all'
-                      ? 'All Status'
-                      : FILTER_STATUS_OPTIONS.find((option) => option.key === filterStatus)?.label}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFilterStatus('all')}>
-                    All Status
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {FILTER_STATUS_OPTIONS.map((option) => (
-                    <DropdownMenuItem key={option.key} onClick={() => setFilterStatus(option.key)}>
-                      {option.label}
+          <div className="flex flex-col gap-3 sm:gap-4 mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  className="pl-9 h-9 sm:h-10 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none gap-1.5 sm:gap-2 h-9 sm:h-10 text-xs sm:text-sm">
+                      <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="truncate">
+                        {filterStatus === 'all'
+                          ? 'All Status'
+                          : FILTER_STATUS_OPTIONS.find((option) => option.key === filterStatus)?.label}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[180px]">
+                    <DropdownMenuItem onClick={() => setFilterStatus('all')}>
+                      All Status
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuSeparator />
+                    {FILTER_STATUS_OPTIONS.map((option) => (
+                      <DropdownMenuItem key={option.key} onClick={() => setFilterStatus(option.key)}>
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              <div className="flex border rounded-md overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  className="rounded-none h-9 w-9"
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+                <div className="flex border rounded-md overflow-hidden shrink-0">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="icon"
+                    className="rounded-none h-9 w-9 sm:h-10 sm:w-10"
+                    onClick={() => setViewMode('grid')}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="icon"
+                    className="rounded-none h-9 w-9 sm:h-10 sm:w-10"
+                    onClick={() => setViewMode('list')}
+                  >
+                    <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -912,133 +919,140 @@ export function AdvisorMyProjectsPage() {
 
           {/* Project Details Dialog */}
           <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
-            <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden p-0">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 rounded-2xl border-primary/20 shadow-2xl">
               {selectedProject && (
                 <>
-                  <DialogHeader className="p-6 pb-0">
-                    <div className="flex items-start justify-between pr-8">
-                      <div>
-                        <DialogTitle className="text-2xl">{selectedProject.title}</DialogTitle>
-                        <DialogDescription className="flex items-center gap-2 mt-1">
+                  <DialogHeader className="p-4 sm:p-6 pb-0 bg-muted/30 border-b">
+                    <div className="flex items-start justify-between pr-8 mb-4">
+                      <div className="space-y-1">
+                        <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">{selectedProject.title}</DialogTitle>
+                        <DialogDescription className="flex items-center gap-2 mt-1 font-medium text-primary">
                           <Users className="h-4 w-4" />
                           {selectedProject.groupName}
                         </DialogDescription>
                       </div>
-                      <Badge className={getStatusColor(STATUS_CONFIG[selectedProject.status]?.color || 'gray')}>
+                      <Badge className={cn(getStatusColor(STATUS_CONFIG[selectedProject.status]?.color || 'gray'), "font-bold uppercase tracking-wider text-[10px] h-6")}>
                         {STATUS_CONFIG[selectedProject.status]?.label}
                       </Badge>
                     </div>
                   </DialogHeader>
 
-                  <ScrollArea className="max-h-[calc(85vh-8rem)] px-6 pb-6">
-                    <div className="space-y-6 py-4">
+                  <ScrollArea className="max-h-[calc(90vh-8rem)]">
+                    <div className="p-4 sm:p-6 space-y-6">
                       {/* Stats */}
-                      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold text-primary">{selectedProject.progress}%</p>
-                            <p className="text-sm text-muted-foreground">Progress</p>
-                            <Progress value={selectedProject.progress} className="mt-2 h-1.5" />
+                      <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+                        <Card className="bg-primary/5 border-primary/10 shadow-sm">
+                          <CardContent className="p-4 text-center">
+                            <p className="text-xl sm:text-2xl font-bold text-primary">{selectedProject.progress}%</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Progress</p>
+                            <Progress value={selectedProject.progress} className="mt-2.5 h-1.5" />
                           </CardContent>
                         </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold">{selectedProject.members.length}</p>
-                            <p className="text-sm text-muted-foreground">Members</p>
+                        <Card className="bg-muted/30 border-border shadow-sm">
+                          <CardContent className="p-4 text-center">
+                            <p className="text-xl sm:text-2xl font-bold text-foreground">{selectedProject.members.length}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Members</p>
                           </CardContent>
                         </Card>
-                        <Card>
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-2xl font-bold">
+                        <Card className="bg-muted/30 border-border shadow-sm col-span-2 md:col-span-1">
+                          <CardContent className="p-4 text-center">
+                            <p className="text-xl sm:text-2xl font-bold text-foreground">
                               {selectedProject.milestones.filter(m => m.status === 'approved' || m.status === 'completed').length}
+                              <span className="text-sm text-muted-foreground ml-1">/ {selectedProject.milestones.length}</span>
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                              / {selectedProject.milestones.length} Milestones
-                            </p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">Milestones</p>
                           </CardContent>
                         </Card>
                       </div>
 
                       <Tabs defaultValue="overview" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-                          <TabsTrigger value="overview">Overview</TabsTrigger>
-                          <TabsTrigger value="milestones">Milestones</TabsTrigger>
-                          <TabsTrigger value="team">Team</TabsTrigger>
-                          <TabsTrigger value="documents">Documents</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto p-1 bg-muted/50 rounded-xl">
+                          <TabsTrigger value="overview" className="rounded-lg py-2 text-xs font-bold uppercase tracking-wider">Overview</TabsTrigger>
+                          <TabsTrigger value="milestones" className="rounded-lg py-2 text-xs font-bold uppercase tracking-wider">Milestones</TabsTrigger>
+                          <TabsTrigger value="team" className="rounded-lg py-2 text-xs font-bold uppercase tracking-wider">Team</TabsTrigger>
+                          <TabsTrigger value="documents" className="rounded-lg py-2 text-xs font-bold uppercase tracking-wider">Docs</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="overview" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Description</CardTitle>
+                        <TabsContent value="overview" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Description</CardTitle>
                             </CardHeader>
-                            <CardContent>
-                              <p className="text-muted-foreground">{selectedProject.description}</p>
+                            <CardContent className="p-5">
+                              <p className="text-sm sm:text-base text-foreground/80 leading-relaxed font-medium">{selectedProject.description}</p>
                             </CardContent>
                           </Card>
 
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Technologies</CardTitle>
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Technologies</CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-5">
                               <div className="flex flex-wrap gap-2">
                                 {selectedProject.technologies?.map(tech => (
-                                  <Badge key={tech} variant="secondary">{tech}</Badge>
+                                  <Badge key={tech} variant="secondary" className="font-bold text-[10px] uppercase tracking-wider px-2 py-0.5">{tech}</Badge>
                                 ))}
                               </div>
                             </CardContent>
                           </Card>
 
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Recent Messages</CardTitle>
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Recent Messages</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                              {selectedProject.messages.map((msg) => (
-                                <div key={msg.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
-                                  <MessageSquare className="h-4 w-4 text-primary mt-0.5" />
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-medium">{msg.sender}</p>
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatDateTime(msg.timestamp)}
-                                      </span>
+                            <CardContent className="p-4 space-y-3">
+                              {selectedProject.messages.length > 0 ? (
+                                selectedProject.messages.map((msg) => (
+                                  <div key={msg.id} className="flex gap-3 p-3 bg-muted/30 rounded-xl border border-transparent hover:border-primary/10 transition-colors">
+                                    <MessageSquare className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-foreground truncate">{msg.sender}</p>
+                                        <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                                          {formatDateTime(msg.timestamp)}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1 font-medium leading-relaxed">{msg.content}</p>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mt-1">{msg.content}</p>
                                   </div>
-                                </div>
-                              ))}
+                                ))
+                              ) : (
+                                <p className="text-xs text-center py-6 text-muted-foreground font-medium italic">No recent messages.</p>
+                              )}
                             </CardContent>
                           </Card>
                         </TabsContent>
 
-                        <TabsContent value="milestones" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Milestones</CardTitle>
+                        <TabsContent value="milestones" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Project Milestones</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="p-4 space-y-3">
                               {selectedProject.milestones.map((milestone) => {
                                 const config = MILESTONE_STATUS_CONFIG[milestone.status]
                                 const StatusIcon = config?.icon || Clock
                                 return (
-                                  <div key={milestone.id} className="p-4 border rounded-lg">
-                                    <div className="flex items-start justify-between">
-                                      <div className="space-y-2 flex-1">
+                                  <div key={milestone.id} className="p-4 border rounded-xl bg-background hover:bg-muted/10 transition-colors shadow-sm">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="space-y-2 flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <h4 className="font-semibold">{milestone.name}</h4>
-                                          <Badge className={getStatusColor(config?.color || 'gray')}>
+                                          <h4 className="font-bold text-sm sm:text-base text-foreground leading-tight">{milestone.name}</h4>
+                                          <Badge className={cn(getStatusColor(config?.color || 'gray'), "text-[9px] font-bold uppercase tracking-widest h-5")}>
                                             <StatusIcon className="h-3 w-3 mr-1" />
                                             {config?.label}
                                           </Badge>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground font-medium leading-relaxed">{milestone.description}</p>
+                                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
+                                          <span className="flex items-center gap-1.5 text-muted-foreground">
+                                            <Calendar className="h-3 w-3" />
+                                            Due: {formatDate(milestone.dueDate)}
+                                          </span>
                                           {milestone.completedDate && (
-                                            <span className="flex items-center gap-1 text-green-600">
+                                            <span className="flex items-center gap-1.5 text-green-600">
                                               <CheckCircle className="h-3 w-3" />
-                                              Completed: {formatDate(milestone.completedDate)}
+                                              Done: {formatDate(milestone.completedDate)}
                                             </span>
                                           )}
                                         </div>
@@ -1051,52 +1065,64 @@ export function AdvisorMyProjectsPage() {
                           </Card>
                         </TabsContent>
 
-                        <TabsContent value="team" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Team Members</CardTitle>
+                        <TabsContent value="team" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Team Members</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="p-4 space-y-3">
                               {selectedProject.members.map((member) => (
-                                <div key={member.id} className="flex items-center p-3 border rounded-lg">
+                                <div key={member.id} className="flex items-center justify-between p-3 border rounded-xl bg-background hover:bg-muted/10 transition-all shadow-sm">
                                   <div className="flex items-center gap-3">
-                                    <Avatar className="h-10 w-10">
+                                    <Avatar className="h-10 w-10 border-2 border-primary/10 shadow-sm">
                                       <AvatarImage src={member.avatar} alt={member.name} />
-                                      <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
+                                      <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(member.name)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium">{member.name}</p>
-                                      <p className="text-sm text-muted-foreground">{member.role}</p>
+                                      <p className="text-sm font-bold text-foreground">{member.name}</p>
+                                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.role}</p>
                                     </div>
                                   </div>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10">
+                                    <Mail className="h-4 w-4 text-primary" />
+                                  </Button>
                                 </div>
                               ))}
                             </CardContent>
                           </Card>
                         </TabsContent>
 
-                        <TabsContent value="documents" className="space-y-4">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Documents</CardTitle>
+                        <TabsContent value="documents" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <Card className="border-primary/10 shadow-sm">
+                            <CardHeader className="py-4 px-5 border-b bg-muted/10">
+                              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Project Documents</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                              {selectedProject.documents.map((doc) => (
-                                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                    <div>
-                                      <p className="font-medium">{doc.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {doc.type} • {doc.size} • Uploaded by {doc.uploadedBy}
-                                      </p>
+                            <CardContent className="p-4 space-y-3">
+                              {selectedProject.documents.length > 0 ? (
+                                selectedProject.documents.map((doc) => (
+                                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-xl bg-background hover:bg-muted/10 transition-all shadow-sm">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
+                                        <FileText className="h-5 w-5 text-primary" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-bold text-foreground truncate">{doc.name}</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                          {doc.type} • {doc.size}
+                                        </p>
+                                      </div>
                                     </div>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10">
+                                      <Download className="h-4 w-4 text-primary" />
+                                    </Button>
                                   </div>
-                                  <Button variant="ghost" size="icon">
-                                    <Download className="h-4 w-4" />
-                                  </Button>
+                                ))
+                              ) : (
+                                <div className="text-center py-12 bg-muted/5 rounded-xl border border-dashed">
+                                  <FileText className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No documents uploaded.</p>
                                 </div>
-                              ))}
+                              )}
                             </CardContent>
                           </Card>
                         </TabsContent>

@@ -81,7 +81,6 @@ export default function RootLayout({
         <meta name="twitter:image" content="/favicon.png" />
       </head>
       <body style={fallbackFontVariables}>
-        <Favicon />
         <Providers>{children}</Providers>
       </body>
     </html>
