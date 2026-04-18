@@ -14,7 +14,6 @@ import {
   Download,
   Eye,
   FileText,
-  FolderKanban,
   LayoutDashboard,
   Search,
   Users,
@@ -319,12 +318,6 @@ export function AdvisorEvaluatorPendingPage() {
               Open rubric
             </Link>
           </Button>
-          <Button variant="outline" size="sm" className="gap-2" asChild>
-            <Link href="/dashboard/advisor/evaluator/projects">
-              <LayoutDashboard className="h-4 w-4" aria-hidden />
-              All projects
-            </Link>
-          </Button>
         </div>
       </div>
 
@@ -437,12 +430,6 @@ export function AdvisorEvaluatorPendingPage() {
                 <Link href="/dashboard/advisor/evaluator">
                   <LayoutDashboard className="mr-2 h-4 w-4" aria-hidden />
                   Overview
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-full" asChild>
-                <Link href="/dashboard/advisor/evaluator/projects">
-                  <FolderKanban className="mr-2 h-4 w-4" aria-hidden />
-                  All projects
                 </Link>
               </Button>
               <Button variant="outline" size="sm" className="rounded-full" asChild>

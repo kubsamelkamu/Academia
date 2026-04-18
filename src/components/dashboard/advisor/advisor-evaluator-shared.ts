@@ -4,7 +4,6 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  FolderKanban,
   LayoutDashboard,
 } from "lucide-react"
 
@@ -13,7 +12,6 @@ export type AdvisorEvaluatorView = "dashboard" | "pending" | "scheduled" | "comp
 /** Keys for hub quick links (sidebar + dashboard tiles); section switcher uses {@link AdvisorEvaluatorView} only. */
 export type AdvisorEvaluatorHubKey =
   | AdvisorEvaluatorView
-  | "projects"
   | "rubric"
 
 export type AdvisorEvaluatorNavItem = {
@@ -52,13 +50,6 @@ export const ADVISOR_EVALUATOR_LINKS: AdvisorEvaluatorNavItem[] = [
     href: "/dashboard/advisor/evaluator/completed",
     description: "Finished evaluations and sessions",
     icon: CheckCircle2,
-  },
-  {
-    key: "projects",
-    title: "Projects",
-    href: "/dashboard/advisor/evaluator/projects",
-    description: "Browse projects and open detail views",
-    icon: FolderKanban,
   },
   {
     key: "rubric",

@@ -335,9 +335,9 @@ export function AdvisorEvaluatorProjectDetailPage({ projectId }: { projectId: st
           <p className="mt-1 text-sm text-muted-foreground">{detailQuery.error.message}</p>
         </div>
         <Button variant="outline" asChild>
-          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
+          <Link href={`/dashboard/advisor/evaluator/pending?stage=${stage}`}>
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
-            Back to projects
+            Back to pending
           </Link>
         </Button>
       </div>
@@ -355,9 +355,9 @@ export function AdvisorEvaluatorProjectDetailPage({ projectId }: { projectId: st
           </p>
         </div>
         <Button variant="outline" asChild>
-          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
+          <Link href={`/dashboard/advisor/evaluator/pending?stage=${stage}`}>
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
-            Back to projects
+            Back to pending
           </Link>
         </Button>
       </div>
@@ -385,9 +385,9 @@ function ProjectDetailBody({
     <div className="flex w-full max-w-none flex-col gap-8 pb-10 animate-in fade-in duration-300">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="outline" size="sm" className="w-fit gap-2" asChild>
-          <Link href={`/dashboard/advisor/evaluator/projects?stage=${stage}`}>
+          <Link href={`/dashboard/advisor/evaluator/pending?stage=${stage}`}>
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to projects
+            Back to pending
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2">

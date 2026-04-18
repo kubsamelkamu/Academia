@@ -232,11 +232,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
           icon: CheckSquare,
         },
         {
-          title: "Projects",
-          href: "/dashboard/advisor/evaluator/projects",
-          icon: FolderKanban,
-        },
-        {
           title: "Rubric",
           href: "/dashboard/advisor/evaluator/rubric",
           icon: BookOpen,

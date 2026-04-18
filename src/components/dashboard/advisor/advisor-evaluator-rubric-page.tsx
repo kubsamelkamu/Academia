@@ -156,12 +156,6 @@ export function AdvisorEvaluatorRubricPage() {
                   {stageLabel} pending
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full gap-2 rounded-xl" size="sm" asChild>
-                <Link href={`/dashboard/advisor/evaluator/projects?stage=${activeStage}`}>
-                  <FileText className="h-4 w-4 shrink-0" aria-hidden />
-                  {stageLabel} projects
-                </Link>
-              </Button>
             </div>
           </div>
         </section>

@@ -460,12 +460,6 @@ export function AdvisorEvaluatorCompletedPage() {
             </p>
             <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="justify-start rounded-lg" asChild>
-                <Link href="/dashboard/advisor/evaluator/projects">
-                  <FolderKanban className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                  Projects
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start rounded-lg" asChild>
                 <Link href="/dashboard/advisor/evaluator/pending">
                   <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Pending
