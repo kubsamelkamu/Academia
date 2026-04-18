@@ -75,13 +75,6 @@ function MemberPopup({
             onClick={onClose}
             className="absolute top-3 left-3 h-7 text-xs bg-background/60 hover:bg-background/80 backdrop-blur-sm border-0 shadow-none"
           />
-          <Button size="sm" asChild
-            className="absolute top-3 right-3 h-7 text-xs gap-1.5"
-          >
-            <Link href="/dashboard/department-head/messages">
-              <MessageSquare className="h-3.5 w-3.5" /> Message
-            </Link>
-          </Button>
           {/* Avatar overlap */}
           <div className="absolute -bottom-6 left-5">
             <div className="h-12 w-12 rounded-full bg-primary/15 border-2 border-background flex items-center justify-center font-bold text-primary text-base shadow-sm">
@@ -207,11 +200,6 @@ export function ProjectsTeamDetailPage() {
         description={team.projectTitle}
         actions={
           <div className="flex gap-2">
-            <Button size="sm" className="gap-1.5" asChild>
-              <Link href="/dashboard/department-head/messages">
-                <MessageSquare className="h-3.5 w-3.5" /> Message Team
-              </Link>
-            </Button>
             <DashboardBackLink href="/dashboard/department-head/projects/teams" variant="outline" />
           </div>
         }
@@ -268,11 +256,6 @@ export function ProjectsTeamDetailPage() {
               <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" asChild>
                 <Link href="/dashboard/department-head/projects">
                   <FolderOpen className="h-3.5 w-3.5" /> View Project
-                </Link>
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" asChild>
-                <Link href="/dashboard/department-head/messages">
-                  <MessageSquare className="h-3.5 w-3.5" /> Contact Team
                 </Link>
               </Button>
             </div>
@@ -352,12 +335,6 @@ export function ProjectsTeamDetailPage() {
                     onClick={() => setSelectedMember(member)}
                   >
                     <Eye className="h-3.5 w-3.5" /> View
-                  </Button>
-                  <Button size="sm" className="h-7 text-xs gap-1.5" asChild>
-                    <Link href="/dashboard/department-head/messages">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Message</span>
-                    </Link>
                   </Button>
                 </div>
               </li>

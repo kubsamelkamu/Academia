@@ -67,14 +67,6 @@ export function ProjectsTeamMemberDetailPage() {
             className="absolute top-2 left-2 h-6 text-[11px] px-2 bg-background/60 hover:bg-background/80 backdrop-blur-sm border-0 shadow-none"
           />
 
-          <Button size="sm" asChild
-            className="absolute top-2 right-2 h-6 text-[11px] gap-1 px-2"
-          >
-            <Link href="/dashboard/department-head/messages">
-              <MessageSquare className="h-3 w-3" /> Message
-            </Link>
-          </Button>
-
           {/* Avatar */}
           <div className="absolute -bottom-5 left-4">
             <div className="h-10 w-10 rounded-full bg-primary/15 border-2 border-background flex items-center justify-center font-bold text-primary text-sm shadow-sm">

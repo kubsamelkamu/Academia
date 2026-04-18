@@ -1,6 +1,5 @@
 "use client"
 
-import { AdvisorEvaluatorCompletedPage } from "@/components/dashboard/advisor/advisor-evaluator-completed-page"
 import { AdvisorEvaluatorDashboard } from "@/components/dashboard/advisor/advisor-evaluator-dashboard"
 import { AdvisorEvaluatorPendingPage } from "@/components/dashboard/advisor/advisor-evaluator-pending-page"
 import { AdvisorEvaluatorScheduledPage } from "@/components/dashboard/advisor/advisor-evaluator-scheduled-page"
@@ -31,14 +30,6 @@ export function AdvisorEvaluatorSectionPage({ view }: { view: AdvisorEvaluatorVi
     return (
       <AdvisorEvaluatorShell>
         <AdvisorEvaluatorScheduledPage />
-      </AdvisorEvaluatorShell>
-    )
-  }
-
-  if (view === "completed") {
-    return (
-      <AdvisorEvaluatorShell>
-        <AdvisorEvaluatorCompletedPage />
       </AdvisorEvaluatorShell>
     )
   }
