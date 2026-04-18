@@ -21,36 +21,24 @@ import { toast } from "sonner"
 
 import type { AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
 import { useAdvisorProjectEvaluationDashboard } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
-import { useAdvisorSummary } from "@/lib/hooks/use-advisor-summary"
 
 export function AdvisorEvaluationsPage() {
   const evaluationStage: AdvisorEvaluationDashboardStage = "CAPSTONE_I"
-  const summaryQuery = useAdvisorSummary()
   const evaluationDashboardQuery = useAdvisorProjectEvaluationDashboard(evaluationStage)
 
   const [isLoading, setIsLoading] = React.useState(false)
   const evaluationSummary = evaluationDashboardQuery.data?.summary
-  const pendingStudents = evaluationSummary?.studentsPendingEvaluation ?? 0
-  const evaluatedStudents = evaluationSummary?.studentsEvaluated ?? 0
-  const evaluatedGroupsCount = evaluationSummary?.fullyEvaluatedProjectGroups ?? 0
-  const completionRate = evaluationSummary?.totalStudents
-    ? Math.round((evaluatedStudents / evaluationSummary.totalStudents) * 100)
-    : 0
-  const activeProjectsCount = summaryQuery.data?.metrics.projectStatusCounts.ACTIVE ?? 0
   const groupsBadge = evaluationDashboardQuery.isLoading
     ? "Loading groups"
     : `${evaluationSummary?.totalProjectGroups ?? 0} Groups`
 
   const handleRefresh = async () => {
     setIsLoading(true)
-    const [summaryResult, evaluationDashboardResult] = await Promise.all([
-      summaryQuery.refetch(),
-      evaluationDashboardQuery.refetch(),
-    ])
+    const evaluationDashboardResult = await evaluationDashboardQuery.refetch()
 
     setIsLoading(false)
 
-    if (summaryResult.error || evaluationDashboardResult.error) {
+    if (evaluationDashboardResult.error) {
       toast.error("Failed to refresh group evaluations")
       return
     }
@@ -94,48 +82,6 @@ export function AdvisorEvaluationsPage() {
             </Tooltip>
           </TooltipProvider>
         </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeProjectsCount}</div>
-            <p className="text-xs text-muted-foreground">Currently supervising</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Students</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{pendingStudents}</div>
-            <p className="text-xs text-muted-foreground">Need evaluation now</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Evaluated Students</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{evaluatedStudents}</div>
-            <p className="text-xs text-muted-foreground">{completionRate}% completion rate</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Evaluated Groups</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{evaluatedGroupsCount}</div>
-            <p className="text-xs text-muted-foreground">Fully evaluated groups</p>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

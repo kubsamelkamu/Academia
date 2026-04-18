@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import {
   ArrowRight,
@@ -84,6 +84,10 @@ function normalizeDashboardStage(rawStage: string | null): AdvisorEvaluationDash
 
 function formatDashboardStageLabel(stage: AdvisorEvaluationDashboardStage) {
   return stage === "CAPSTONE_II" ? "Capstone II" : "Capstone I"
+}
+
+function stageQueryValue(stage: AdvisorEvaluationDashboardStage) {
+  return stage === "CAPSTONE_II" ? "capstone-ii" : "capstone-i"
 }
 
 function normalizeStatusToken(status?: string | null, fallback = "pending") {
@@ -193,10 +197,21 @@ function isUpcomingScheduleItem(date: string, status?: string | null) {
 
 export function AdvisorEvaluatorDashboard() {
   const authHydrated = useAuthStoreHydrated()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const dashboardStage = React.useMemo(
     () => normalizeDashboardStage(searchParams.get("stage")),
     [searchParams],
+  )
+  const stageLabel = formatDashboardStageLabel(dashboardStage)
+  const stageHref = React.useCallback(
+    (nextStage: AdvisorEvaluationDashboardStage) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("stage", stageQueryValue(nextStage))
+      const query = params.toString()
+      return query ? `${pathname}?${query}` : pathname
+    },
+    [pathname, searchParams],
   )
   const evaluatorDashboardQuery = useEvaluatorProjectEvaluationDashboardWithOptions(dashboardStage, {
     enabled: authHydrated,
@@ -324,9 +339,9 @@ export function AdvisorEvaluatorDashboard() {
   const averageScoreValue = evaluatorSummary ? formatAverageScore(evaluatorSummary.averageScoreGiven) : "—"
   const averageScoreSubtitle = evaluatorSummary
     ? evaluatorSummary.studentsEvaluated > 0
-      ? `Across ${evaluatorSummary.studentsEvaluated} reviews`
-      : "No scores yet"
-    : "No scores yet"
+      ? `Across ${evaluatorSummary.studentsEvaluated} ${stageLabel} reviews`
+      : `No ${stageLabel} scores yet`
+    : `No ${stageLabel} scores yet`
   const pendingTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
   const completedTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
   const scheduleTabLoading = authHydrated && scheduleQuery.isLoading
@@ -339,16 +354,39 @@ export function AdvisorEvaluatorDashboard() {
           <DashboardPageHeader
             title="Evaluator overview"
             description="Review pending work, completed scores, and upcoming sessions — each primary action opens its own page."
-            badge="Advisor · Evaluator"
+            badge={`${stageLabel} · Advisor Evaluator`}
             actions={
-              <Button
-                variant="default"
-                size="sm"
-                className="btn-gradient h-10 w-full min-h-11 shrink-0 sm:h-9 sm:w-auto sm:min-h-9"
-                asChild
-              >
-                <Link href={`/dashboard/advisor/evaluator/pending?stage=${dashboardStage}`}>Full pending list</Link>
-              </Button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div
+                  className="inline-flex h-auto w-full rounded-xl border border-border/60 bg-muted/50 p-1 shadow-sm sm:w-auto"
+                  aria-label="Capstone stage switcher"
+                >
+                  <Button
+                    variant={dashboardStage === "CAPSTONE_I" ? "default" : "ghost"}
+                    size="sm"
+                    className="h-9 flex-1 rounded-lg sm:flex-none"
+                    asChild
+                  >
+                    <Link href={stageHref("CAPSTONE_I")}>Capstone I</Link>
+                  </Button>
+                  <Button
+                    variant={dashboardStage === "CAPSTONE_II" ? "default" : "ghost"}
+                    size="sm"
+                    className="h-9 flex-1 rounded-lg sm:flex-none"
+                    asChild
+                  >
+                    <Link href={stageHref("CAPSTONE_II")}>Capstone II</Link>
+                  </Button>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="btn-gradient h-10 w-full min-h-11 shrink-0 sm:h-9 sm:w-auto sm:min-h-9"
+                  asChild
+                >
+                  <Link href={`/dashboard/advisor/evaluator/pending?stage=${dashboardStage}`}>Full pending list</Link>
+                </Button>
+              </div>
             }
           />
         </div>
@@ -370,12 +408,6 @@ export function AdvisorEvaluatorDashboard() {
             </Link>
           </Button>
           <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
-            <Link href={`/dashboard/advisor/evaluator/projects?stage=${dashboardStage}`}>
-              <FolderKanban className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-              All projects
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-11 min-h-11 w-full justify-center sm:h-10 sm:min-h-10 md:flex-1 md:min-w-[10rem] lg:max-w-none xl:flex-1" asChild>
             <Link href={`/dashboard/advisor/evaluator/rubric?stage=${dashboardStage}`}>
               <BookOpen className="mr-2 h-4 w-4 shrink-0" aria-hidden />
               Rubric
@@ -393,21 +425,21 @@ export function AdvisorEvaluatorDashboard() {
           <StatCard
             title="Pending evaluations"
             value={pendingEvaluationCount}
-            subtitle="Awaiting your review"
+            subtitle={`${stageLabel} awaiting your review`}
             icon={Clock}
             iconClassName="bg-amber-500/15 text-amber-600 dark:text-amber-400"
           />
           <StatCard
             title="Completed"
             value={completedCount}
-            subtitle="Submitted or reviewed"
+            subtitle={`${stageLabel} submitted or reviewed`}
             icon={CheckCircle}
             iconClassName="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
           />
           <StatCard
             title="Scheduled sessions"
             value={authHydrated && scheduleQuery.isLoading ? "—" : upcomingScheduleCount}
-            subtitle="Upcoming"
+            subtitle={`${stageLabel} upcoming`}
             icon={Calendar}
             iconClassName="bg-sky-500/15 text-sky-600 dark:text-sky-400"
           />

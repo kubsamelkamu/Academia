@@ -513,12 +513,6 @@ export function AdvisorDocumentsPage({ variant = "advisor" }: { variant?: Adviso
                   Pending queue
                 </Link>
               </Button>
-              <Button variant="outline" size="sm" className="gap-2" asChild>
-                <Link href="/dashboard/advisor/evaluator/projects">
-                  <FolderKanban className="h-4 w-4" aria-hidden />
-                  Projects
-                </Link>
-              </Button>
             </div>
           </div>
 
