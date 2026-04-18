@@ -2,12 +2,11 @@ import type { LucideIcon } from "lucide-react"
 import {
   BookOpen,
   Calendar,
-  CheckCircle2,
   Clock,
   LayoutDashboard,
 } from "lucide-react"
 
-export type AdvisorEvaluatorView = "dashboard" | "pending" | "scheduled" | "completed"
+export type AdvisorEvaluatorView = "dashboard" | "pending" | "scheduled"
 
 /** Keys for hub quick links (sidebar + dashboard tiles); section switcher uses {@link AdvisorEvaluatorView} only. */
 export type AdvisorEvaluatorHubKey =
@@ -43,13 +42,6 @@ export const ADVISOR_EVALUATOR_LINKS: AdvisorEvaluatorNavItem[] = [
     href: "/dashboard/advisor/evaluator/scheduled",
     description: "Upcoming evaluation meetings",
     icon: Calendar,
-  },
-  {
-    key: "completed",
-    title: "Completed",
-    href: "/dashboard/advisor/evaluator/completed",
-    description: "Finished evaluations and sessions",
-    icon: CheckCircle2,
   },
   {
     key: "rubric",

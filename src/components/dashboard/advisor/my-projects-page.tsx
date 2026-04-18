@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -46,7 +47,6 @@ import {
   Github,
   ExternalLink,
   ThumbsUp,
-  CalendarDays,
   CheckCheck,
   MoreHorizontal,
   Phone,
@@ -639,19 +639,7 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
             onClick={() => onMessage(project)}
           >
             <MessageSquare className="h-4 w-4 mr-2" />
-            Message
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "flex-1",
-              project.status === 'cleared' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30"
-            )}
-            onClick={() => onClearance(project)}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            {project.status === 'cleared' ? 'Cleared' : 'Clear'}
+            Chat
           </Button>
         </div>
       </CardContent>
@@ -661,10 +649,10 @@ const ProjectCard = ({ project, onViewDetails, onClearance, onMessage }: Project
 
 // ==================== Main Component ====================
 export function AdvisorMyProjectsPage() {
+  const router = useRouter()
   const [selectedProject, setSelectedProject] = useState<AdvisorProject | null>(null)
   const [showProjectDialog, setShowProjectDialog] = useState(false)
   const [showClearanceDialog, setShowClearanceDialog] = useState(false)
-  const [showMeetingDialog, setShowMeetingDialog] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -674,14 +662,6 @@ export function AdvisorMyProjectsPage() {
   const advisorProjects = useMemo(
     () => (projectsQuery.data ?? []).map(mapApiProjectToAdvisorProject),
     [projectsQuery.data]
-  )
-
-  const reviewRequestCount = useMemo(
-    () => advisorProjects.reduce(
-      (total, project) => total + project.milestones.filter((milestone) => milestone.status === 'submitted').length,
-      0
-    ),
-    [advisorProjects]
   )
 
   const filteredProjects = useMemo(() => {
@@ -726,11 +706,7 @@ export function AdvisorMyProjectsPage() {
   }
 
   const handleMessage = (project: AdvisorProject) => {
-    toast.info(`Opening chat with ${project.groupName}`)
-  }
-
-  const handleScheduleMeeting = () => {
-    setShowMeetingDialog(true)
+    router.push(`/dashboard/advisor/messages?group=${encodeURIComponent(project.id)}`)
   }
 
   const handleConfirmClearance = () => {
@@ -755,29 +731,6 @@ export function AdvisorMyProjectsPage() {
               </p>
             </div>
             
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                onClick={handleScheduleMeeting}
-                className="gap-2"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Schedule Meeting
-              </Button>
-              
-              <Button className="gap-2 relative">
-                <ClipboardCheck className="h-4 w-4" />
-                Review Requests
-                {reviewRequestCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-                  >
-                    {reviewRequestCount}
-                  </Badge>
-                )}
-              </Button>
-            </div>
           </div>
 
           {(summaryQuery.error || projectsQuery.error) && (
@@ -1156,61 +1109,6 @@ export function AdvisorMyProjectsPage() {
                 <Button onClick={handleConfirmClearance}>
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Confirm Clearance
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Schedule Meeting Dialog */}
-          <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Schedule Meeting</DialogTitle>
-                <DialogDescription>
-                  Set up a new meeting with your project teams.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="meeting-title">Meeting Title</Label>
-                  <Input id="meeting-title" placeholder="e.g., Progress Review" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="project-select">Project</Label>
-                  <select 
-                    id="project-select"
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  >
-                    <option value="">Select a project</option>
-                    {advisorProjects.map(project => (
-                      <option key={project.id} value={project.id}>{project.title}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-date">Date</Label>
-                    <Input id="meeting-date" type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-time">Time</Label>
-                    <Input id="meeting-time" type="time" />
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => {
-                  setShowMeetingDialog(false)
-                  toast.success("Meeting scheduled successfully")
-                }}>
-                  Schedule Meeting
                 </Button>
               </DialogFooter>
             </DialogContent>

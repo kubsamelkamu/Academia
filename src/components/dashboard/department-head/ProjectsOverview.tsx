@@ -19,7 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Users,
   FolderOpen,
-  ClipboardCheck,
   Eye,
   Download,
   Calendar,
@@ -36,7 +35,6 @@ import {
   BookOpen,
   UserCheck,
   DollarSign,
-  PieChart,
   Activity,
   ChevronRight,
   ExternalLink,
@@ -965,15 +963,6 @@ export default function ProjectsOverview() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground p-0 h-8 w-8" asChild>
-            <Link
-              href="/dashboard/department-head/messages"
-              title="Contact coordinator"
-              aria-label="Contact coordinator"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Link>
-          </Button>
         </div>
       )
     },
@@ -1864,42 +1853,6 @@ export default function ProjectsOverview() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* ── Quick Stats strip ── */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-xl border bg-primary/5 border-primary/10 px-5 py-4">
-          <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <Clock className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Upcoming Deadlines</p>
-            <p className="text-2xl font-bold mt-0.5">5</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Next: May 30, 2024</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-xl border bg-emerald-500/5 border-emerald-200/40 px-5 py-4">
-          <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-            <ClipboardCheck className="h-5 w-5 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Awaiting Review</p>
-            <p className="text-2xl font-bold mt-0.5">3</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Pending evaluation</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-xl border bg-muted/40 px-5 py-4">
-          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-            <PieChart className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Top Categories</p>
-            <p className="text-2xl font-bold mt-0.5">6</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">AI, IoT, Blockchain…</p>
-          </div>
-        </div>
-      </div>
 
     </div>
   );

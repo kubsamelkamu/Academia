@@ -257,12 +257,6 @@ export function ProjectsTeamsPage() {
                       <Eye className="h-3.5 w-3.5" />
                       View
                     </Button>
-                    <Button size="sm" className="h-7 text-xs gap-1.5" asChild>
-                      <Link href="/dashboard/department-head/messages">
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        Message
-                      </Link>
-                    </Button>
                   </div>
                 </li>
               )
@@ -359,11 +353,6 @@ export function ProjectsTeamsPage() {
                         onClick={() => router.push(`/dashboard/department-head/projects/teams/${team.id}`)}
                       >
                         <Eye className="h-3.5 w-3.5" /> View
-                      </Button>
-                      <Button size="sm" className="h-7 flex-1 text-xs gap-1.5" asChild>
-                        <Link href="/dashboard/department-head/messages">
-                          <MessageSquare className="h-3.5 w-3.5" /> Message
-                        </Link>
                       </Button>
                     </div>
                   </CardContent>

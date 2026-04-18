@@ -71,11 +71,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: Megaphone,
     },
     {
-      title: "Messages",
-      href: "/dashboard/department-head/messages",
-      icon: FileText,
-    },
-    {
       title: "Profile",
       href: "/dashboard/profile",
       icon: User,
@@ -225,11 +220,6 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
           title: "Scheduled sessions",
           href: "/dashboard/advisor/evaluator/scheduled",
           icon: Calendar,
-        },
-        {
-          title: "Completed",
-          href: "/dashboard/advisor/evaluator/completed",
-          icon: CheckSquare,
         },
         {
           title: "Rubric",

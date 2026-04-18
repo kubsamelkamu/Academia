@@ -644,9 +644,7 @@ export function AdvisorEvaluatorDashboard() {
               <TabsContent value="completed" className="mt-0 outline-none focus-visible:outline-none">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-foreground">Recent completed</p>
-                  <Button variant="outline" size="sm" className="w-full rounded-lg sm:w-auto" asChild>
-                    <Link href={`/dashboard/advisor/evaluator/completed?stage=${dashboardStage}`}>Full history</Link>
-                  </Button>
+                  <p className="text-sm text-muted-foreground">Latest submitted or reviewed evaluations in this workspace.</p>
                 </div>
                 <div className="mt-4 space-y-2">
                   {completedTabLoading ? (
@@ -773,8 +771,8 @@ export function AdvisorEvaluatorDashboard() {
                 whole queue.
               </li>
               <li>
-                <span className="font-medium text-foreground">Completed</span> — recent scores for spot checks; export-ready
-                history stays on the completed page.
+                <span className="font-medium text-foreground">Completed</span> — recent scores for spot checks and quick access
+                back to the related project workspace.
               </li>
               <li>
                 <span className="font-medium text-foreground">Schedule</span> — next sessions with venue or link; open
@@ -800,12 +798,6 @@ export function AdvisorEvaluatorDashboard() {
                 <Link href={`/dashboard/advisor/evaluator/scheduled?stage=${dashboardStage}`}>
                   <Calendar className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Full schedule
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-full" asChild>
-                <Link href={`/dashboard/advisor/evaluator/completed?stage=${dashboardStage}`}>
-                  <CheckCircle className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                  Completed list
                 </Link>
               </Button>
             </div>

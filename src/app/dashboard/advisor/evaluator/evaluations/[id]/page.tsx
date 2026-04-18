@@ -13,8 +13,8 @@ export default function AdvisorEvaluatorEvaluationDetailRoutePage() {
     <AdvisorEvaluatorShell>
       <AdvisorEvaluationDetailPage
         evaluationId={id}
-        evaluationsListHref="/dashboard/advisor/evaluator/completed"
-        evaluationsListLabel="Back to completed"
+        evaluationsListHref="/dashboard/advisor/evaluator"
+        evaluationsListLabel="Back to evaluator overview"
       />
     </AdvisorEvaluatorShell>
   )
