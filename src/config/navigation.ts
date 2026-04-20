@@ -145,6 +145,11 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
       icon: FileText,
     },
     {
+      title: "Messages",
+      href: "/dashboard/coordinator/messages",
+      icon: MessageSquare,
+    },
+    {
       title: "Notifications",
       href: "/dashboard/notifications",
       icon: Bell,

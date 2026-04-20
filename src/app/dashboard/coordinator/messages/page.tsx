@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import { CoordinatorCommunicationPage } from "@/components/dashboard/coordinator/communication-page"
 
 export default function MessagesPage() {
-  redirect("/dashboard/coordinator/announcement")
+  return <CoordinatorCommunicationPage />
 }
