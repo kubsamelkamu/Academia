@@ -2297,7 +2297,7 @@ export function StudentMessagesPage() {
 
         <TabsContent
           value="chats"
-          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-190px)] lg:overflow-hidden"
         >
           <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:grid-cols-3 lg:overflow-hidden">
             {/* Conversations List */}
@@ -2924,7 +2924,7 @@ export function StudentMessagesPage() {
 
         <TabsContent
           value="advisor"
-          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-190px)] lg:overflow-hidden"
         >
           <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:grid-cols-3 lg:overflow-hidden">
             {/* Advisor conversation list (single item) */}
