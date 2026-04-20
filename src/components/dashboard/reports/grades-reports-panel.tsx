@@ -21,7 +21,6 @@ import {
   PieChart,
   RefreshCw,
   Search,
-  Share2,
   Star,
   Target,
   TrendingUp,
@@ -1592,13 +1591,6 @@ export function GradesReportsPanel({
             <div className="flex items-center gap-2 w-full lg:w-auto">
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => void handleDownload("pdf") } disabled={downloadState.pdf}>
-                {downloadState.pdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                Print Snapshot
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => toast.info("Shareable report state can be captured from the active dashboard URL.") }>
-                <Share2 className="mr-2 h-4 w-4" /> Share
               </Button>
             </div>
           </div>

@@ -115,6 +115,7 @@ export async function downloadGradesReport(
   try {
     const response = await apiClient.get<Blob>(`/reports/grades/${params.format}`, {
       params: cleanParams({
+        format: params.format,
         stage: params.stage,
         scope,
         departmentId: params.departmentId ?? undefined,
