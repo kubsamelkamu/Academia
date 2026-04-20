@@ -417,21 +417,21 @@ export default function GroupApprovalPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Total Requests", value: counts.all,      icon: Users,       bg: "bg-primary/10",        color: "text-primary" },
           { label: "Pending Review", value: counts.pending,  icon: Clock,       bg: "bg-amber-500/10",      color: "text-amber-600" },
           { label: "Approved",       value: counts.approved, icon: CheckCircle, bg: "bg-primary/10",        color: "text-primary" },
           { label: "Rejected",       value: counts.rejected, icon: XCircle,     bg: "bg-destructive/10",    color: "text-destructive" },
         ].map(s => (
-          <Card key={s.label} className="group border-none shadow-sm hover:shadow-md transition-all">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className={cn("h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.bg)}>
-                <s.icon className={cn("h-5 w-5", s.color)} />
+          <Card key={s.label} className="group border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-4">
+              <div className={cn("h-8 w-8 sm:h-11 sm:w-11 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.bg)}>
+                <s.icon className={cn("h-4 w-4", s.color)} />
               </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold tracking-tight">{s.value}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>
