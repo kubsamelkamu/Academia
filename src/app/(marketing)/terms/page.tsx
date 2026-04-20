@@ -8,7 +8,7 @@ import { FileText, Users, Shield, AlertTriangle, Scale, Clock } from 'lucide-rea
 export default function TermsOfServicePage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
         <div className="container relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -16,11 +16,11 @@ export default function TermsOfServicePage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="mx-auto max-w-4xl text-center"
           >
-            <Badge variant="secondary" className="mb-4 animate-pulse bg-blue-400/10 text-blue-400 border-blue-400/20">
+            <Badge variant="secondary" className="mb-4 animate-pulse border-[#ED5F45]/20 bg-[#ED5F45]/10 text-[#ED5F45] dark:border-[#ED5F45]/30 dark:bg-[#ED5F45]/15 dark:text-[#F47A64]">
               Legal
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#ED5F45] to-[#F47A64] bg-clip-text text-transparent">
                 Terms of Service
               </span>
             </h1>
@@ -37,7 +37,7 @@ export default function TermsOfServicePage() {
         </div>
       </section>
 
-      <section className="py-20 bg-white">
+      <section className="bg-background py-20">
         <div className="container mx-auto px-4 max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -49,7 +49,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-blue-500" />
+                  <FileText className="h-5 w-5 text-[#ED5F45]" />
                   Acceptance of Terms
                 </CardTitle>
               </CardHeader>
@@ -66,7 +66,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-blue-500" />
+                  <Users className="h-5 w-5 text-[#ED5F45]" />
                   Description of Service
                 </CardTitle>
               </CardHeader>
@@ -90,7 +90,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-blue-500" />
+                  <Shield className="h-5 w-5 text-[#ED5F45]" />
                   User Responsibilities
                 </CardTitle>
               </CardHeader>
@@ -116,7 +116,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-blue-500" />
+                  <AlertTriangle className="h-5 w-5 text-[#ED5F45]" />
                   Prohibited Activities
                 </CardTitle>
               </CardHeader>
@@ -140,7 +140,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Scale className="h-5 w-5 text-blue-500" />
+                  <Scale className="h-5 w-5 text-[#ED5F45]" />
                   Intellectual Property
                 </CardTitle>
               </CardHeader>
@@ -166,7 +166,7 @@ export default function TermsOfServicePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-blue-500" />
+                  <Clock className="h-5 w-5 text-[#ED5F45]" />
                   Termination
                 </CardTitle>
               </CardHeader>

@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth-store"
+import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useMyGroupAnnouncements, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import {
   getStudentFinalGrade,
@@ -41,6 +42,7 @@ import {
   FolderKanban,
   Users,
 } from "lucide-react"
+import type { DepartmentAnnouncementItem } from "@/types/department-announcements"
 
 interface Milestone {
   id: string
@@ -137,6 +139,28 @@ function toCountdownParts(totalSeconds: number | null): CountdownParts | null {
 
 function formatCountdown(parts: CountdownParts): string {
   return `${parts.days}d ${parts.hours}h ${parts.minutes}m ${String(parts.seconds).padStart(2, "0")}s`
+}
+
+function getRemainingSecondsFromDeadline(
+  deadlineAt: string | null | undefined,
+  nowMs: number,
+  fallbackSeconds?: number | null
+): number | null {
+  if (typeof fallbackSeconds === "number") {
+    const deadlineMs = deadlineAt ? new Date(deadlineAt).getTime() : Number.NaN
+    if (!Number.isNaN(deadlineMs)) {
+      return Math.max(0, Math.floor((deadlineMs - nowMs) / 1000))
+    }
+
+    return Math.max(0, fallbackSeconds)
+  }
+
+  if (!deadlineAt) return null
+
+  const deadlineMs = new Date(deadlineAt).getTime()
+  if (Number.isNaN(deadlineMs)) return null
+
+  return Math.max(0, Math.floor((deadlineMs - nowMs) / 1000))
 }
 
 function getMeaningfulText(value: string | null | undefined): string {
@@ -375,6 +399,14 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     limit: 20,
   })
 
+  const departmentAnnouncementsQuery = useDepartmentAnnouncements({
+    enabled: Boolean(accessToken) && Boolean(departmentId),
+    departmentId,
+    page: 1,
+    limit: 10,
+    refetchIntervalMs: 60_000,
+  })
+
   const studentFinalGradeCapstoneOneQuery = useQuery({
     queryKey: ["student", "final-grade", "CAPSTONE_I"],
     queryFn: () => getStudentFinalGrade("CAPSTONE_I"),
@@ -584,6 +616,47 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
       })[0]
   }, [myGroupAnnouncementsQuery.data?.items])
 
+  const departmentDeadlineAnnouncements = useMemo<DepartmentAnnouncementItem[]>(() => {
+    const items = departmentAnnouncementsQuery.data?.items ?? []
+    // eslint-disable-next-line react-hooks/purity
+    const nowMs = Date.now()
+
+    return items
+      .filter((item) => {
+        if (!item.deadlineAt) return false
+
+        if (typeof item.secondsRemaining === "number") {
+          return item.secondsRemaining > 0
+        }
+
+        if (item.isExpired) return false
+
+        const deadlineMs = new Date(item.deadlineAt).getTime()
+        if (Number.isNaN(deadlineMs)) return false
+
+        return deadlineMs > nowMs
+      })
+      .slice()
+      .sort((firstItem, secondItem) => {
+        const firstSeconds =
+          typeof firstItem.secondsRemaining === "number"
+            ? firstItem.secondsRemaining
+            : new Date(firstItem.deadlineAt ?? "").getTime() - nowMs
+        const secondSeconds =
+          typeof secondItem.secondsRemaining === "number"
+            ? secondItem.secondsRemaining
+            : new Date(secondItem.deadlineAt ?? "").getTime() - nowMs
+
+        if (firstSeconds !== secondSeconds) {
+          return firstSeconds - secondSeconds
+        }
+
+        const firstDeadline = new Date(firstItem.deadlineAt ?? "").getTime()
+        const secondDeadline = new Date(secondItem.deadlineAt ?? "").getTime()
+        return firstDeadline - secondDeadline
+      })
+  }, [departmentAnnouncementsQuery.data?.items])
+
   const [uiSecondsRemaining, setUiSecondsRemaining] = useState<number | null>(
     nextDeadlineAnnouncement?.secondsRemaining ?? null
   )
@@ -653,6 +726,19 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     : ""
 
   const hasAttachmentUrl = Boolean(activeDeadlineAnnouncement?.attachmentUrl?.trim())
+  const advisorDeadlinesLoading = myGroupAnnouncementsQuery.isLoading
+  const departmentDeadlinesLoading = departmentAnnouncementsQuery.isLoading
+  const departmentDeadlineErrorMessage = departmentAnnouncementsQuery.isError
+    ? getErrorMessage(
+        departmentAnnouncementsQuery.error,
+        "Department deadlines are unavailable right now."
+      )
+    : null
+  const hasDepartmentDeadlineAnnouncements = departmentDeadlineAnnouncements.length > 0
+  const hasAnyDeadlineCards = Boolean(activeDeadlineAnnouncement) || hasDepartmentDeadlineAnnouncements
+  const deadlinesCardDescription = hasAnyDeadlineCards
+    ? "Advisor and department deadlines that need your attention."
+    : "No active advisor or department deadlines right now."
 
   const myTeamMembers: TeamMember[] = myGroup
     ? [
@@ -965,61 +1051,161 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               <span>Next Deadline</span>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardTitle>
-            <CardDescription>
-              {nextDeadlineTitle}
-            </CardDescription>
+            <CardDescription>{deadlinesCardDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {myGroupAnnouncementsQuery.isLoading ? (
+            {advisorDeadlinesLoading && departmentDeadlinesLoading ? (
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm text-muted-foreground">Loading deadline...</p>
               </div>
-            ) : !activeDeadlineAnnouncement ? (
+            ) : !hasAnyDeadlineCards && !departmentDeadlineErrorMessage ? (
               <div className="rounded-lg border border-dashed p-4 text-center">
                 <p className="text-sm font-medium">No active deadline</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  No advisor announcement with a deadline is available right now.
+                  No advisor or department announcement with a deadline is available right now.
                 </p>
               </div>
             ) : (
               <>
-                <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
-                  </div>
-                  {nextDeadlineSummary ? (
-                    <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
-                  ) : null}
-                </div>
+                {activeDeadlineAnnouncement ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Advisor deadline
+                    </p>
 
-                <div className="space-y-3">
-                  <div className="rounded-lg border p-3">
-                    {announcementTitle ? (
-                      <p className="text-sm font-medium">{announcementTitle}</p>
-                    ) : null}
-                    {creatorName ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Announcement by {creatorName}</p>
-                    ) : null}
-                    {secondaryCardText ? (
-                      <p className="mt-1 text-xs text-muted-foreground">{secondaryCardText}</p>
+                    <div className={`rounded-lg border p-4 ${countdownToneClass}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">{nextDeadlineDueText}</p>
+                      </div>
+                      {nextDeadlineSummary ? (
+                        <p className="mt-2 text-xs text-muted-foreground">{nextDeadlineSummary}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                      {announcementTitle ? (
+                        <p className="text-sm font-medium">{announcementTitle}</p>
+                      ) : null}
+                      {creatorName ? (
+                        <p className="mt-1 text-xs text-muted-foreground">Announcement by {creatorName}</p>
+                      ) : null}
+                      {secondaryCardText ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{secondaryCardText}</p>
+                      ) : null}
+                    </div>
+
+                    {hasAttachmentUrl ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={isAnnouncementDisabled}
+                        onClick={() => {
+                          const target = activeDeadlineAnnouncement.attachmentUrl
+                          if (!target) return
+                          window.open(target, "_blank", "noopener,noreferrer")
+                        }}
+                      >
+                        Open attachment
+                      </Button>
                     ) : null}
                   </div>
+                ) : advisorDeadlinesLoading ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Advisor deadline
+                    </p>
 
-                  {hasAttachmentUrl ? (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={isAnnouncementDisabled}
-                      onClick={() => {
-                        const target = activeDeadlineAnnouncement.attachmentUrl
-                        if (!target) return
-                        window.open(target, "_blank", "noopener,noreferrer")
-                      }}
-                    >
-                      Open attachment
-                    </Button>
-                  ) : null}
-                </div>
+                    <div className="rounded-lg border border-dashed p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Loading advisor deadline...</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {departmentDeadlineErrorMessage ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Department deadlines
+                    </p>
+
+                    <div className="rounded-lg border border-dashed p-4 text-center">
+                      <p className="text-sm font-medium">Department deadlines unavailable</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {departmentDeadlineErrorMessage}
+                      </p>
+                    </div>
+                  </div>
+                ) : hasDepartmentDeadlineAnnouncements ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Department deadlines
+                    </p>
+
+                    {departmentDeadlineAnnouncements.map((announcement) => {
+                      const countdownParts = toCountdownParts(
+                        getRemainingSecondsFromDeadline(
+                          announcement.deadlineAt,
+                          now.getTime(),
+                          announcement.secondsRemaining
+                        )
+                      )
+                      const countdownText = countdownParts
+                        ? `${formatCountdown(countdownParts)} remaining`
+                        : "Deadline passed"
+                      const departmentCreatorName = toDisplayName([
+                        announcement.createdBy.firstName,
+                        announcement.createdBy.lastName,
+                      ])
+                      const departmentAnnouncementMessage = getMeaningfulText(announcement.message)
+                      const departmentAnnouncementTitle = getMeaningfulText(announcement.title)
+
+                      return (
+                        <div key={announcement.id} className="rounded-lg border p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <Badge variant={announcement.isExpired ? "secondary" : "outline"} className="shrink-0">
+                              {announcement.isExpired ? "Expired" : "Department"}
+                            </Badge>
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            {departmentAnnouncementMessage ? (
+                              <p className="text-sm leading-relaxed text-muted-foreground">
+                                {departmentAnnouncementMessage}
+                              </p>
+                            ) : null}
+                            {departmentAnnouncementTitle ? (
+                              <p className="text-sm font-semibold text-foreground">{departmentAnnouncementTitle}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                            <p className="text-sm font-semibold">{countdownText}</p>
+                          </div>
+
+                          {departmentCreatorName ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Announcement by {departmentCreatorName}
+                            </p>
+                          ) : null}
+                          {announcement.deadlineAt ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Deadline set for {formatDate(announcement.deadlineAt)}.
+                            </p>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : departmentDeadlinesLoading ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Department deadlines
+                    </p>
+
+                    <div className="rounded-lg border border-dashed p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Loading department deadlines...</p>
+                    </div>
+                  </div>
+                ) : null}
               </>
             )}
           </CardContent>

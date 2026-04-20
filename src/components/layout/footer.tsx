@@ -99,17 +99,35 @@ export function Footer() {
               Resources
             </h4>
             <ul className="space-y-3">
-              {["Docs", "Community", "Privacy", "Terms"].map((item) => (
-                <li key={item}>
-                  <Link 
-                    href={`/${item.toLowerCase()}`} 
-                    className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link
+                  href="https://docs.academia.et/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
+                >
+                  <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
+                  Docs
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
+                >
+                  <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
+                  Privacy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/terms"
+                  className="text-slate-400 hover:text-[#ED5F45] transition-all duration-200 flex items-center gap-2 group text-sm"
+                >
+                  <span className="w-1 h-1 rounded-full bg-[#ED5F45] scale-0 group-hover:scale-100 transition-transform" />
+                  Terms
+                </Link>
+              </li>
             </ul>
           </div>
 

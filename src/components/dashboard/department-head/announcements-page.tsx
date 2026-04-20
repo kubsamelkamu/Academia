@@ -80,15 +80,6 @@ function AnnouncementCreateForm({
   onClose: () => void
   onCreated: () => void
 }) {
-  function isValidHttpUrl(value: string): boolean {
-    try {
-      const url = new URL(value)
-      return url.protocol === "http:" || url.protocol === "https:"
-    } catch {
-      return false
-    }
-  }
-
   function toIsoFromDatetimeLocal(value: string): string | null {
     if (!value.trim()) return null
     const date = new Date(value)
@@ -103,13 +94,9 @@ function AnnouncementCreateForm({
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [actionType, setActionType] = useState<DepartmentAnnouncementActionType>("FORM_PROJECT_GROUP")
-  const [actionLabel, setActionLabel] = useState("")
-  const [actionUrl, setActionUrl] = useState("")
   const [deadlineAtLocal, setDeadlineAtLocal] = useState("")
 
   const [deadlineError, setDeadlineError] = useState<string | null>(null)
-  const [actionLabelError, setActionLabelError] = useState<string | null>(null)
-  const [actionUrlError, setActionUrlError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
     if (!title.trim() || !message.trim()) {
@@ -121,25 +108,6 @@ function AnnouncementCreateForm({
       toast.error("Department context is missing")
       return
     }
-
-    const trimmedActionLabel = actionLabel.trim()
-    const trimmedActionUrl = actionUrl.trim()
-    const hasActionLabel = Boolean(trimmedActionLabel)
-    const hasActionUrl = Boolean(trimmedActionUrl)
-
-    if (hasActionLabel !== hasActionUrl) {
-      setActionLabelError(!hasActionLabel ? "Action label is required when URL is set" : null)
-      setActionUrlError(!hasActionUrl ? "Action URL is required when label is set" : null)
-      return
-    }
-
-    if (hasActionUrl && !isValidHttpUrl(trimmedActionUrl)) {
-      setActionUrlError("Action URL must be a valid URL with protocol (https://...)" )
-      return
-    }
-
-    setActionLabelError(null)
-    setActionUrlError(null)
 
     const deadlineIso = toIsoFromDatetimeLocal(deadlineAtLocal)
     if (deadlineAtLocal && !deadlineIso) {
@@ -161,9 +129,6 @@ function AnnouncementCreateForm({
           title: title.trim(),
           message: message.trim(),
           actionType,
-          ...(hasActionLabel && hasActionUrl
-            ? { actionLabel: trimmedActionLabel, actionUrl: trimmedActionUrl }
-            : {}),
           ...(deadlineIso ? { deadlineAt: deadlineIso } : {}),
         },
       })
@@ -172,12 +137,8 @@ function AnnouncementCreateForm({
       setTitle("")
       setMessage("")
       setActionType("FORM_PROJECT_GROUP")
-      setActionLabel("")
-      setActionUrl("")
       setDeadlineAtLocal("")
       setDeadlineError(null)
-      setActionLabelError(null)
-      setActionUrlError(null)
 
       onCreated()
       onClose()
@@ -205,28 +166,23 @@ function AnnouncementCreateForm({
           title={title}
           message={message}
           actionType={actionType}
-          actionLabel={actionLabel}
-          actionUrl={actionUrl}
+          actionLabel=""
+          actionUrl=""
           deadlineAtLocal={deadlineAtLocal}
           deadlineError={deadlineError}
-          actionLabelError={actionLabelError}
-          actionUrlError={actionUrlError}
+          actionLabelError={null}
+          actionUrlError={null}
           onTitleChange={setTitle}
           onMessageChange={setMessage}
           onActionTypeChange={setActionType}
-          onActionLabelChange={(value) => {
-            setActionLabel(value)
-            setActionLabelError(null)
-          }}
-          onActionUrlChange={(value) => {
-            setActionUrl(value)
-            setActionUrlError(null)
-          }}
+          onActionLabelChange={() => {}}
+          onActionUrlChange={() => {}}
           onDeadlineAtChange={(value) => {
             setDeadlineAtLocal(value)
             setDeadlineError(null)
           }}
           showCard={false}
+          showActionFields={false}
         />
       </div>
 

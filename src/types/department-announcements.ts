@@ -1,6 +1,8 @@
 export type DepartmentAnnouncementActionType =
   | "FORM_PROJECT_GROUP"
   | "SUBMIT_PROPOSAL"
+  | "CAPSTONE_I_DEFENSE"
+  | "CAPSTONE_II_DEFENSE"
   | "UPLOAD_DOCUMENT"
   | "REGISTER_PRESENTATION"
   | "CUSTOM_ACTION"
