@@ -146,45 +146,17 @@ function AnnouncementCreateDialogContent({
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [actionType, setActionType] = useState<DepartmentAnnouncementActionType>("FORM_PROJECT_GROUP")
-  const [actionLabel, setActionLabel] = useState("")
-  const [actionUrl, setActionUrl] = useState("")
   const [deadlineAtLocal, setDeadlineAtLocal] = useState("")
   const [deadlineError, setDeadlineError] = useState<string | null>(null)
-  const [actionLabelError, setActionLabelError] = useState<string | null>(null)
-  const [actionUrlError, setActionUrlError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim()
     const trimmedMessage = message.trim()
-    const trimmedActionLabel = actionLabel.trim()
-    const trimmedActionUrl = actionUrl.trim()
 
     if (!trimmedTitle || !trimmedMessage) {
       toast.error("Title and message are required")
       return
     }
-
-    const hasActionLabel = Boolean(trimmedActionLabel)
-    const hasActionUrl = Boolean(trimmedActionUrl)
-
-    if (hasActionLabel !== hasActionUrl) {
-      setActionLabelError(!hasActionLabel ? "Action label is required when URL is set" : null)
-      setActionUrlError(!hasActionUrl ? "Action URL is required when label is set" : null)
-      return
-    }
-
-    if (hasActionLabel && trimmedActionLabel.length > 120) {
-      setActionLabelError("Action label must be 120 characters or fewer")
-      return
-    }
-
-    if (hasActionUrl && !isValidHttpUrl(trimmedActionUrl)) {
-      setActionUrlError("Action URL must be a valid URL with protocol (https://...)")
-      return
-    }
-
-    setActionLabelError(null)
-    setActionUrlError(null)
 
     const deadlineIso = toIsoFromDatetimeLocal(deadlineAtLocal)
     if (deadlineAtLocal && !deadlineIso) {
@@ -206,9 +178,6 @@ function AnnouncementCreateDialogContent({
           title: trimmedTitle,
           message: trimmedMessage,
           actionType,
-          ...(hasActionLabel && hasActionUrl
-            ? { actionLabel: trimmedActionLabel, actionUrl: trimmedActionUrl }
-            : {}),
           ...(deadlineIso ? { deadlineAt: deadlineIso } : {}),
         },
       })
@@ -236,28 +205,23 @@ function AnnouncementCreateDialogContent({
           title={title}
           message={message}
           actionType={actionType}
-          actionLabel={actionLabel}
-          actionUrl={actionUrl}
+          actionLabel=""
+          actionUrl=""
           deadlineAtLocal={deadlineAtLocal}
           deadlineError={deadlineError}
-          actionLabelError={actionLabelError}
-          actionUrlError={actionUrlError}
+          actionLabelError={null}
+          actionUrlError={null}
           onTitleChange={setTitle}
           onMessageChange={setMessage}
           onActionTypeChange={setActionType}
-          onActionLabelChange={(value) => {
-            setActionLabel(value)
-            setActionLabelError(null)
-          }}
-          onActionUrlChange={(value) => {
-            setActionUrl(value)
-            setActionUrlError(null)
-          }}
+          onActionLabelChange={() => {}}
+          onActionUrlChange={() => {}}
           onDeadlineAtChange={(value) => {
             setDeadlineAtLocal(value)
             setDeadlineError(null)
           }}
           showCard={false}
+          showActionFields={false}
         />
       </div>
 

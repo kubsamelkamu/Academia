@@ -12,6 +12,8 @@ export const departmentAnnouncementActionTypeOptions: {
 }[] = [
   { value: "FORM_PROJECT_GROUP", label: "Form Project Group" },
   { value: "SUBMIT_PROPOSAL", label: "Submit Proposal" },
+  { value: "CAPSTONE_I_DEFENSE", label: "Capstone I Defense" },
+  { value: "CAPSTONE_II_DEFENSE", label: "Capstone II Defense" },
   { value: "UPLOAD_DOCUMENT", label: "Upload Document" },
   { value: "REGISTER_PRESENTATION", label: "Register Presentation" },
   { value: "CUSTOM_ACTION", label: "Custom Action" },
@@ -34,6 +36,7 @@ interface DepartmentAnnouncementFormCardProps {
   onActionUrlChange: (value: string) => void
   onDeadlineAtChange: (value: string) => void
   showCard?: boolean
+  showActionFields?: boolean
 }
 
 export function DepartmentAnnouncementFormCard({
@@ -53,6 +56,7 @@ export function DepartmentAnnouncementFormCard({
   onActionUrlChange,
   onDeadlineAtChange,
   showCard = true,
+  showActionFields = true,
 }: DepartmentAnnouncementFormCardProps) {
   const content = (
     <div className="space-y-4">
@@ -111,35 +115,37 @@ export function DepartmentAnnouncementFormCard({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="actionLabel">Action Label (optional)</Label>
-          <Input
-            id="actionLabel"
-            value={actionLabel}
-            onChange={(e) => onActionLabelChange(e.target.value)}
-            placeholder="Example: Form Group"
-            maxLength={120}
-          />
-          {actionLabelError ? (
-            <p className="text-xs text-destructive">{actionLabelError}</p>
-          ) : null}
-        </div>
+      {showActionFields ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="actionLabel">Action Label (optional)</Label>
+            <Input
+              id="actionLabel"
+              value={actionLabel}
+              onChange={(e) => onActionLabelChange(e.target.value)}
+              placeholder="Example: Form Group"
+              maxLength={120}
+            />
+            {actionLabelError ? (
+              <p className="text-xs text-destructive">{actionLabelError}</p>
+            ) : null}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="actionUrl">Action URL (optional)</Label>
-          <Input
-            id="actionUrl"
-            type="url"
-            value={actionUrl}
-            onChange={(e) => onActionUrlChange(e.target.value)}
-            placeholder="https://example.com/path"
-          />
-          {actionUrlError ? (
-            <p className="text-xs text-destructive">{actionUrlError}</p>
-          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="actionUrl">Action URL (optional)</Label>
+            <Input
+              id="actionUrl"
+              type="url"
+              value={actionUrl}
+              onChange={(e) => onActionUrlChange(e.target.value)}
+              placeholder="https://example.com/path"
+            />
+            {actionUrlError ? (
+              <p className="text-xs text-destructive">{actionUrlError}</p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 

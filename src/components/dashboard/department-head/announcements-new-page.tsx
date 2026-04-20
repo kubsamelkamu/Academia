@@ -19,15 +19,6 @@ function toIsoFromDatetimeLocal(value: string): string | null {
   return date.toISOString()
 }
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
-  } catch {
-    return false
-  }
-}
-
 function mapCreateError(error: unknown): string {
   const message = error instanceof Error ? error.message : "Failed to create announcement"
   const normalized = message.toLowerCase()
@@ -58,12 +49,8 @@ export function AnnouncementNewPage() {
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [actionType, setActionType] = useState<DepartmentAnnouncementActionType>("FORM_PROJECT_GROUP")
-  const [actionLabel, setActionLabel] = useState("")
-  const [actionUrl, setActionUrl] = useState("")
   const [deadlineAtLocal, setDeadlineAtLocal] = useState("")
   const [deadlineError, setDeadlineError] = useState<string | null>(null)
-  const [actionLabelError, setActionLabelError] = useState<string | null>(null)
-  const [actionUrlError, setActionUrlError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,30 +62,11 @@ export function AnnouncementNewPage() {
 
     const trimmedTitle = title.trim()
     const trimmedMessage = message.trim()
-    const trimmedActionLabel = actionLabel.trim()
-    const trimmedActionUrl = actionUrl.trim()
 
     if (!trimmedTitle || !trimmedMessage) {
       toast.error("Title and message are required")
       return
     }
-
-    const hasActionLabel = Boolean(trimmedActionLabel)
-    const hasActionUrl = Boolean(trimmedActionUrl)
-
-    if (hasActionLabel !== hasActionUrl) {
-      setActionLabelError(!hasActionLabel ? "Action label is required when URL is set" : null)
-      setActionUrlError(!hasActionUrl ? "Action URL is required when label is set" : null)
-      return
-    }
-
-    if (hasActionUrl && !isValidHttpUrl(trimmedActionUrl)) {
-      setActionUrlError("Action URL must be a valid URL with protocol (https://...)")
-      return
-    }
-
-    setActionLabelError(null)
-    setActionUrlError(null)
 
     const deadlineIso = toIsoFromDatetimeLocal(deadlineAtLocal)
     if (deadlineAtLocal && !deadlineIso) {
@@ -120,12 +88,6 @@ export function AnnouncementNewPage() {
           title: trimmedTitle,
           message: trimmedMessage,
           actionType,
-          ...(hasActionLabel && hasActionUrl
-            ? {
-                actionLabel: trimmedActionLabel,
-                actionUrl: trimmedActionUrl,
-              }
-            : null),
           ...(deadlineIso ? { deadlineAt: deadlineIso } : null),
         },
       })
@@ -159,28 +121,23 @@ export function AnnouncementNewPage() {
               title={title}
               message={message}
               actionType={actionType}
-              actionLabel={actionLabel}
-              actionUrl={actionUrl}
+              actionLabel=""
+              actionUrl=""
               deadlineAtLocal={deadlineAtLocal}
               deadlineError={deadlineError}
-              actionLabelError={actionLabelError}
-              actionUrlError={actionUrlError}
+              actionLabelError={null}
+              actionUrlError={null}
               onTitleChange={setTitle}
               onMessageChange={setMessage}
               onActionTypeChange={setActionType}
-              onActionLabelChange={(value) => {
-                setActionLabel(value)
-                setActionLabelError(null)
-              }}
-              onActionUrlChange={(value) => {
-                setActionUrl(value)
-                setActionUrlError(null)
-              }}
+              onActionLabelChange={() => {}}
+              onActionUrlChange={() => {}}
               onDeadlineAtChange={(value) => {
                 setDeadlineAtLocal(value)
                 setDeadlineError(null)
               }}
               showCard={false}
+              showActionFields={false}
             />
 
             <div className="flex justify-end gap-2 pt-6">

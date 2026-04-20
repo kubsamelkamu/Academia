@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import Cropper, { type Area } from "react-easy-crop"
 import { AlertCircle, Camera, Eye, EyeOff, Trash2 } from "lucide-react"
-import { QRCodeCanvas } from "qrcode.react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -62,49 +61,11 @@ const changePasswordSchema = z
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>
 
-type TwoFactorSetup = {
-  label: string
-  secret: string
-  otpauthUrl: string
-}
-
 function initials(firstName?: string | null, lastName?: string | null) {
   const first = (firstName ?? "").trim().slice(0, 1)
   const last = (lastName ?? "").trim().slice(0, 1)
   const value = `${first}${last}`.toUpperCase()
   return value || "U"
-}
-
-function randomBackupCode(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-  const part = (len: number) =>
-    Array.from({ length: len }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("")
-  return `${part(4)}-${part(4)}`
-}
-
-function generateBackupCodes(count: number): string[] {
-  return Array.from({ length: count }, () => randomBackupCode())
-}
-
-function generateTwoFactorSecret(): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-  const raw = Array.from({ length: 16 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("")
-  return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`
-}
-
-function buildOtpAuthUrl({ email, secret }: { email: string; secret: string }): TwoFactorSetup {
-  const issuer = "Academia"
-  const normalizedSecret = secret.replace(/-/g, "")
-  const label = `${issuer}:${email || "user"}`
-  const otpauthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${encodeURIComponent(
-    normalizedSecret
-  )}&issuer=${encodeURIComponent(issuer)}`
-
-  return {
-    label,
-    secret,
-    otpauthUrl,
-  }
 }
 
 export function ProfileSettings() {
@@ -117,8 +78,6 @@ export function ProfileSettings() {
   const uploadProfileAvatar = useAuthStore((s) => s.uploadProfileAvatar)
   const deleteProfileAvatar = useAuthStore((s) => s.deleteProfileAvatar)
   const changePassword = useAuthStore((s) => s.changePassword)
-
-  const email = user?.email ?? "head@university.edu"
 
   const avatarUrl = user?.avatarUrl ?? null
 
@@ -136,18 +95,6 @@ export function ProfileSettings() {
   const [showCurrentPassword, setShowCurrentPassword] = React.useState(false)
   const [showNewPassword, setShowNewPassword] = React.useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
-
-  const [twoFactorEnabled, setTwoFactorEnabled] = React.useState<boolean>(!!user?.twoFactorEnabled)
-  const [twoFactorVerifiedAt, setTwoFactorVerifiedAt] = React.useState<string | null>(user?.twoFactorVerifiedAt ?? null)
-  const [twoFactorSetup, setTwoFactorSetup] = React.useState<TwoFactorSetup | null>(null)
-  const [twoFactorLoading, setTwoFactorLoading] = React.useState(false)
-  const [twoFactorError, setTwoFactorError] = React.useState<string | null>(null)
-
-  const [backupCodesRemaining, setBackupCodesRemaining] = React.useState<number | null>(null)
-  const [backupCodesLastGenerated, setBackupCodesLastGenerated] = React.useState<string[] | null>(null)
-  const [backupCodesDialogOpen, setBackupCodesDialogOpen] = React.useState(false)
-
-  const [verifyCode, setVerifyCode] = React.useState("")
 
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -171,11 +118,6 @@ export function ProfileSettings() {
       lastName: user?.lastName ?? "",
     })
   }, [user?.firstName, user?.lastName])
-
-  React.useEffect(() => {
-    if (!backupCodesLastGenerated?.length) return
-    setBackupCodesDialogOpen(true)
-  }, [backupCodesLastGenerated])
 
   // Avatar object URLs are managed by the backend (remote URL). No local blob URLs retained.
 
@@ -295,94 +237,6 @@ export function ProfileSettings() {
       confirmPassword: "",
     },
   })
-
-  async function copyToClipboard(value: string, successMessage: string) {
-    try {
-      await navigator.clipboard.writeText(value)
-      toast.success(successMessage)
-    } catch {
-      toast.error("Failed to copy to clipboard")
-    }
-  }
-
-  async function handleCopyAllBackupCodes() {
-    if (!backupCodesLastGenerated?.length) return
-    await copyToClipboard(backupCodesLastGenerated.join("\n"), "Backup codes copied.")
-  }
-
-  function enableTwoFactor() {
-    setTwoFactorError(null)
-    setTwoFactorLoading(true)
-
-    window.setTimeout(() => {
-      const secret = generateTwoFactorSecret()
-      setTwoFactorSetup(buildOtpAuthUrl({ email, secret }))
-      setTwoFactorLoading(false)
-    }, 600)
-  }
-
-  function disableTwoFactor() {
-    setTwoFactorError(null)
-    setTwoFactorLoading(true)
-
-    window.setTimeout(() => {
-      setTwoFactorEnabled(false)
-      setTwoFactorVerifiedAt(null)
-      setTwoFactorSetup(null)
-      setVerifyCode("")
-      setTwoFactorLoading(false)
-      setBackupCodesRemaining(null)
-      setBackupCodesLastGenerated(null)
-    }, 400)
-  }
-
-  function verifyTwoFactor(code: string) {
-    setTwoFactorError(null)
-
-    if (!twoFactorSetup) {
-      setTwoFactorError("Start setup first.")
-      return
-    }
-
-    if (!/^\d{6}$/.test(code.trim())) {
-      setTwoFactorError("Enter a valid 6-digit code.")
-      return
-    }
-
-    setTwoFactorLoading(true)
-    window.setTimeout(() => {
-      setTwoFactorEnabled(true)
-      setTwoFactorVerifiedAt(new Date().toISOString())
-      setTwoFactorSetup(null)
-      setVerifyCode("")
-      setTwoFactorLoading(false)
-      setBackupCodesRemaining(10)
-    }, 700)
-  }
-
-  async function generateCodes() {
-    setTwoFactorError(null)
-    setTwoFactorLoading(true)
-
-    window.setTimeout(() => {
-      const codes = generateBackupCodes(10)
-      setBackupCodesLastGenerated(codes)
-      setBackupCodesRemaining(10)
-      setTwoFactorLoading(false)
-    }, 600)
-  }
-
-  async function regenerateCodes() {
-    setTwoFactorError(null)
-    setTwoFactorLoading(true)
-
-    window.setTimeout(() => {
-      const codes = generateBackupCodes(10)
-      setBackupCodesLastGenerated(codes)
-      setBackupCodesRemaining(10)
-      setTwoFactorLoading(false)
-    }, 600)
-  }
 
   const currentInitials = initials(accountForm.getValues("firstName"), accountForm.getValues("lastName"))
 
@@ -755,251 +609,6 @@ export function ProfileSettings() {
               </Button>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Two-Factor Authentication (2FA)</CardTitle>
-          <CardDescription>
-            Add an extra layer of security to your account. This is UI-only for now; backend wiring can be added later.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-4 max-w-md">
-            <div className="flex items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="font-medium">2FA Status</div>
-                <div className="text-sm text-muted-foreground">
-                  {twoFactorEnabled ? "2FA is enabled." : "2FA is currently disabled."}
-                  {twoFactorEnabled && twoFactorVerifiedAt
-                    ? ` Verified at: ${new Date(twoFactorVerifiedAt).toLocaleString()}`
-                    : ""}
-                </div>
-              </div>
-
-              {twoFactorEnabled ? (
-                <Button
-                  variant="destructive"
-                  type="button"
-                  onClick={disableTwoFactor}
-                  disabled={twoFactorLoading}
-                  className="w-full sm:w-auto"
-                >
-                  {twoFactorLoading ? "Disabling..." : "Disable 2FA"}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={enableTwoFactor}
-                  disabled={twoFactorLoading}
-                  className="w-full sm:w-auto"
-                >
-                  {twoFactorLoading ? "Enabling..." : "Enable 2FA"}
-                </Button>
-              )}
-            </div>
-
-            {twoFactorError ? (
-              <p className="text-destructive text-sm">{twoFactorError}</p>
-            ) : null}
-
-            {!twoFactorEnabled && !twoFactorSetup && !twoFactorLoading ? (
-              <div className="rounded-md border p-4 bg-muted/50">
-                <div className="text-sm text-muted-foreground">
-                  Enable 2FA to add an extra layer of security to your account.
-                </div>
-              </div>
-            ) : null}
-
-            {!twoFactorEnabled && twoFactorLoading && !twoFactorSetup ? (
-              <div className="rounded-md border p-4 space-y-4">
-                <div className="animate-pulse space-y-2">
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-                <div className="animate-pulse">
-                  <div className="h-44 w-44 bg-muted rounded" />
-                </div>
-              </div>
-            ) : null}
-
-            {!twoFactorEnabled && twoFactorSetup ? (
-              <div className="rounded-md border p-4 space-y-4">
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Set up 2FA</div>
-                  <div className="text-sm text-muted-foreground">
-                    Follow these steps to enable two-factor authentication.
-                  </div>
-
-                  <div className="space-y-1 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                        1
-                      </div>
-                      <span>Scan the QR code with your authenticator app</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                        2
-                      </div>
-                      <span>Enter the verification code below</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="rounded-md border bg-background p-3">
-                    <QRCodeCanvas value={twoFactorSetup.otpauthUrl} size={176} includeMargin level="M" />
-                  </div>
-
-                  <div className="flex-1 space-y-3">
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">Label</div>
-                      <div className="text-sm break-words">{twoFactorSetup.label}</div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">Secret</div>
-                      <div className="flex items-center gap-2">
-                        <div className="font-mono text-sm break-all">{twoFactorSetup.secret}</div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyToClipboard(twoFactorSetup.secret, "Secret copied.")}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        If you can’t scan the QR code, enter this secret manually.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-md bg-muted p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-xs text-muted-foreground">otpauth URL</div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(twoFactorSetup.otpauthUrl, "Setup link copied.")}
-                    >
-                      Copy link
-                    </Button>
-                  </div>
-                  <div className="break-all text-xs font-mono">{twoFactorSetup.otpauthUrl}</div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="verifyCode" className="text-sm font-medium">
-                    Verification Code
-                  </Label>
-                  <Input
-                    id="verifyCode"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Enter 6-digit code from app"
-                    value={verifyCode}
-                    onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    disabled={twoFactorLoading}
-                    maxLength={6}
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Codes are time-sensitive. If invalid, check your device time sync.
-                  </div>
-                </div>
-
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => verifyTwoFactor(verifyCode)}
-                  disabled={twoFactorLoading || !verifyCode.trim()}
-                  className="w-full sm:w-auto"
-                >
-                  {twoFactorLoading ? "Verifying..." : "Verify 2FA Setup"}
-                </Button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="h-px w-full bg-border" />
-
-          <div className="space-y-2">
-            <div className="font-medium">Backup Codes</div>
-            <div className="text-sm text-muted-foreground">
-              Remaining codes: {backupCodesRemaining ?? "—"}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={generateCodes}
-                disabled={twoFactorLoading || !twoFactorEnabled}
-                className="w-full sm:w-auto"
-              >
-                Generate
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={regenerateCodes}
-                disabled={twoFactorLoading || !twoFactorEnabled}
-                className="w-full sm:w-auto"
-              >
-                Regenerate
-              </Button>
-            </div>
-            {!twoFactorEnabled ? (
-              <p className="text-xs text-muted-foreground">
-                Enable and verify 2FA to generate backup codes.
-              </p>
-            ) : null}
-          </div>
-
-          <Dialog
-            open={backupCodesDialogOpen}
-            onOpenChange={(open) => {
-              setBackupCodesDialogOpen(open)
-              if (!open) setBackupCodesLastGenerated(null)
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Backup Codes</DialogTitle>
-                <DialogDescription>Store these codes securely. They may not be shown again.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(backupCodesLastGenerated ?? []).map((code) => (
-                    <div key={code} className="rounded-md border px-2 py-1 font-mono text-sm">
-                      {code}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCopyAllBackupCodes}
-                    className="w-full sm:w-auto"
-                  >
-                    Copy all
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setBackupCodesDialogOpen(false)}
-                    className="w-full sm:w-auto"
-                  >
-                    Done
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         </CardContent>
       </Card>
     </div>

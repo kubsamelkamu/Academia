@@ -8,7 +8,7 @@ import { Shield, Eye, Lock, Cookie, Users, Mail } from 'lucide-react'
 export default function PrivacyPolicyPage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 py-20 md:py-32 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
         <div className="container relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -16,11 +16,11 @@ export default function PrivacyPolicyPage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="mx-auto max-w-4xl text-center"
           >
-            <Badge variant="secondary" className="mb-4 animate-pulse bg-blue-400/10 text-blue-400 border-blue-400/20">
+            <Badge variant="secondary" className="mb-4 animate-pulse border-[#ED5F45]/20 bg-[#ED5F45]/10 text-[#ED5F45] dark:border-[#ED5F45]/30 dark:bg-[#ED5F45]/15 dark:text-[#F47A64]">
               Legal
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#ED5F45] to-[#F47A64] bg-clip-text text-transparent">
                 Privacy Policy
               </span>
             </h1>
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </section>
 
-      <section className="py-20 bg-white">
+      <section className="bg-background py-20">
         <div className="container mx-auto px-4 max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Eye className="h-5 w-5 text-blue-500" />
+                  <Eye className="h-5 w-5 text-[#ED5F45]" />
                   Information We Collect
                 </CardTitle>
               </CardHeader>
@@ -81,7 +81,7 @@ export default function PrivacyPolicyPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-blue-500" />
+                  <Users className="h-5 w-5 text-[#ED5F45]" />
                   How We Use Your Information
                 </CardTitle>
               </CardHeader>
@@ -105,7 +105,7 @@ export default function PrivacyPolicyPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Lock className="h-5 w-5 text-blue-500" />
+                  <Lock className="h-5 w-5 text-[#ED5F45]" />
                   Data Security
                 </CardTitle>
               </CardHeader>
@@ -126,7 +126,7 @@ export default function PrivacyPolicyPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Cookie className="h-5 w-5 text-blue-500" />
+                  <Cookie className="h-5 w-5 text-[#ED5F45]" />
                   Cookies and Tracking
                 </CardTitle>
               </CardHeader>
@@ -152,7 +152,7 @@ export default function PrivacyPolicyPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-blue-500" />
+                  <Mail className="h-5 w-5 text-[#ED5F45]" />
                   Your Rights
                 </CardTitle>
               </CardHeader>

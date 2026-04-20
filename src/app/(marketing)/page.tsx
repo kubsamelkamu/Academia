@@ -20,7 +20,6 @@ import {
   ArrowRight,
   Star,
   Play,
-  Check,
   GraduationCap,
   Sparkles,
   Rocket,
@@ -450,9 +449,20 @@ export default function HomePage() {
                     <h3 className="text-2xl font-black mb-4 tracking-tight group-hover:text-[#ED5F45] transition-colors">{step.title}</h3>
                     <p className="text-slate-600 dark:text-slate-300 font-semibold leading-relaxed mb-8">{step.description}</p>
 
-                    <div className="mt-auto flex items-center text-[#ED5F45] font-black text-xs uppercase tracking-widest group/link cursor-pointer">
-                      Learn detail <ChevronRight className="ml-1 h-3 w-3 group-hover/link:translate-x-1 transition-transform" />
-                    </div>
+                    {step.href ? (
+                      <Link
+                        href={step.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-auto inline-flex items-center text-[#ED5F45] font-black text-xs uppercase tracking-widest group/link"
+                      >
+                        Learn detail <ChevronRight className="ml-1 h-3 w-3 group-hover/link:translate-x-1 transition-transform" />
+                      </Link>
+                    ) : (
+                      <div className="mt-auto flex items-center text-[#ED5F45] font-black text-xs uppercase tracking-widest">
+                        Learn detail <ChevronRight className="ml-1 h-3 w-3" />
+                      </div>
+                    )}
                   </div>
                 </TiltCard>
               </motion.div>
@@ -732,10 +742,10 @@ export default function HomePage() {
                     <span className="text-[#ED5F45]">Academic Workflow?</span>
                   </motion.h2>
                   <motion.p style={{ translateZ: 60 }} className="text-xl md:text-2xl text-white/60 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
-                    Join 500+ universities already using Academia to deliver exceptional
-                    thesis and capstone project experiences.
+                    Use Academia to deliver exceptional Capstone I and Capstone II
+                    project experiences with a structured academic workflow.
                   </motion.p>
-                  <motion.div style={{ translateZ: 100 }} className="flex flex-col sm:flex-row items-center justify-center gap-8">
+                  <motion.div style={{ translateZ: 100 }} className="flex items-center justify-center">
                     <MagnetButton>
                       <Button size="lg" className="h-16 px-12 text-xl font-black bg-[#ED5F45] hover:bg-white hover:text-[#ED5F45] text-white shadow-2xl rounded-2xl transition-all" asChild>
                         <Link href="/register/department">
@@ -743,16 +753,6 @@ export default function HomePage() {
                         </Link>
                       </Button>
                     </MagnetButton>
-                    <MagnetButton>
-                      <Button size="lg" variant="outline" className="h-16 px-12 text-xl font-bold border-2 border-white/20 text-white hover:bg-white/10 rounded-2xl backdrop-blur-md" asChild>
-                        <Link href="/contact">Schedule Demo</Link>
-                      </Button>
-                    </MagnetButton>
-                  </motion.div>
-                  <motion.div style={{ translateZ: 40 }} className="mt-16 text-white/30 flex flex-wrap items-center justify-center gap-8 text-sm font-bold uppercase tracking-widest leading-none">
-                    <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> No setup fees</span>
-                    <span className="flex items-center gap-2"><Check className="h-4 w-4" /> Cancel anytime</span>
-                    <span className="flex items-center gap-2"><Users className="h-4 w-4" /> Priority support</span>
                   </motion.div>
                 </CardContent>
               </Card>
@@ -771,33 +771,31 @@ export default function HomePage() {
 const steps = [
   {
     title: "Set Up Your Department",
-    description: "Launch your university profile and onboard faculty members in a matter of minutes."
+    description: "Launch your university profile and onboard faculty members in a matter of minutes.",
+    href: "https://docs.academia.et/docs/platform/roles/department-head"
   },
   {
     title: "Configure Projects",
-    description: "Define intelligent project templates, deadlines, and dynamic evaluation criteria."
+    description: "Define intelligent project templates, deadlines, and dynamic evaluation criteria.",
+    href: "https://docs.academia.et/docs/platform/project-lifecycle"
   },
   {
     title: "Launch & Monitor",
-    description: "Students submit work, faculty reviews, and defenses are scheduled with precision."
+    description: "Students submit work, faculty reviews, and defenses are scheduled with precision.",
+    href: "https://docs.academia.et/docs/platform/student-group-formation-and-approval"
   }
 ]
 
 const features = [
   {
-    title: "Project Tracking",
-    description: "Real-time visibility into every project from initial proposal to successful final defense.",
-    icon: FileText,
-  },
-  {
     title: "Team Collaboration",
-    description: "Proprietary collaboration spaces for students, advisors, and committee members.",
+    description: "Proprietary collaboration spaces for students, advisors, and evaluators.",
     icon: Users,
   },
   {
-    title: "Defense Scheduling",
-    description: "Automated committee scheduling with cloud calendar integration and resource mapping.",
-    icon: Calendar,
+    title: "Project Tracking",
+    description: "Real-time visibility into every project from initial proposal to successful final defense.",
+    icon: FileText,
   },
   {
     title: "Progress Monitoring",
@@ -806,7 +804,7 @@ const features = [
   },
   {
     title: "Vault Security",
-    description: "Enterprise-grade document storage with strict role-based access and encryption.",
+    description: "Document storage with strict role-based access and encryption.",
     icon: Shield,
   },
   {
@@ -823,6 +821,11 @@ const features = [
     title: "Communication",
     description: "Centralized notification hub keeping everyone aligned on critical deadlines.",
     icon: MessageSquare,
+  },
+  {
+    title: "Defense Scheduling",
+    description: "Automated scheduling for Capstone I and Capstone II milestones and reviews.",
+    icon: Calendar,
   },
 ]
 
