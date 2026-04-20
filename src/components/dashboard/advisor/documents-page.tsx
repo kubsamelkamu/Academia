@@ -638,72 +638,218 @@ export function AdvisorDocumentsPage({ variant = "advisor" }: { variant?: Adviso
     <>
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Document Repository</h1>
-            <p className="text-sm text-muted-foreground">Review milestone documents and submission feedback from your supervised groups.</p>
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Document Repository</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Review milestone documents and submission feedback from your supervised groups.</p>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <FileText className="h-6 w-6 text-primary" />
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className="bg-primary/5 border-primary/10 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{submittedDocumentsSummary.totalSubmittedDocuments}</p>
-                  <p className="text-sm text-muted-foreground">Total Documents</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
-                  <CheckCircle className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{submittedDocumentsSummary.approved}</p>
-                  <p className="text-sm text-muted-foreground">Approved</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold leading-none">{submittedDocumentsSummary.totalSubmittedDocuments}</p>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Total Files</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
-                  <Clock className="h-6 w-6 text-warning" />
+          <Card className="bg-success/5 border-success/10 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-success/10 shrink-0">
+                  <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-success" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{submittedDocumentsSummary.pendingReview}</p>
-                  <p className="text-sm text-muted-foreground">Pending Review</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold leading-none">{submittedDocumentsSummary.approved}</p>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Approved</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
-                  <AlertCircle className="h-6 w-6 text-destructive" />
+          <Card className="bg-warning/5 border-warning/10 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-warning/10 shrink-0">
+                  <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-warning" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{submittedDocumentsSummary.revisionRequested}</p>
-                  <p className="text-sm text-muted-foreground">Revision Requested</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold leading-none">{submittedDocumentsSummary.pendingReview}</p>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Pending</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-destructive/5 border-destructive/10 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-destructive/10 shrink-0">
+                  <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-destructive" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold leading-none">{submittedDocumentsSummary.revisionRequested}</p>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1 truncate">Revision</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardContent className="p-4">{filtersInner}</CardContent>
+        <Card className="border-primary/10 shadow-sm">
+          <CardContent className="p-3 sm:p-4">{filtersInner}</CardContent>
         </Card>
 
-        {documentsTable}
+        {/* Documents Content - Responsive Table/Grid */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-1">Submitted Documents</h2>
+          
+          {/* Desktop Table View */}
+          <Card className="hidden md:block border-primary/10 shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b p-4 sm:p-6">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Document List ({filteredDocuments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {submittedDocumentsQuery.isLoading ? (
+                <div className="space-y-3 p-6">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-xl border bg-muted/20 px-4 py-4 animate-pulse">
+                      <div className="h-4 w-1/3 rounded bg-muted" />
+                      <div className="mt-3 h-4 w-2/3 rounded bg-muted" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-muted/10">
+                    <TableRow>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest">Document</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest">Project</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest">Uploader</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest">Status</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocuments.map((document) => {
+                      const statusMeta = getSubmittedDocumentStatusMeta(document.status)
+                      const StatusIcon = statusMeta.icon
+
+                      return (
+                        <TableRow key={document.submissionId} className="hover:bg-muted/20 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="shrink-0">{getDocumentIcon(document)}</div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-sm leading-tight truncate">{document.documentName}</p>
+                                <p className="text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
+                                  {document.milestone.title}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-[150px]">
+                              <p className="text-xs font-bold text-foreground truncate">{document.project.title}</p>
+                              <p className="text-[10px] text-muted-foreground font-medium truncate">{document.group.name}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-[120px]">
+                              <p className="text-xs font-bold text-foreground truncate">{getUploaderName(document)}</p>
+                              <p className="text-[10px] text-muted-foreground font-medium truncate">{formatDateTime(document.uploadedAt)}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-wider h-5", statusMeta.className)}>
+                              <StatusIcon className="mr-1 h-3 w-3" />
+                              {statusMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={() => setSelectedDocument(document)}>
+                                <Eye className="h-4 w-4 text-primary" />
+                              </Button>
+                              <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10">
+                                <a href={document.fileUrl} target="_blank" rel="noreferrer">
+                                  <Download className="h-4 w-4 text-primary" />
+                                </a>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden grid grid-cols-1 gap-4">
+            {filteredDocuments.map((document) => {
+              const statusMeta = getSubmittedDocumentStatusMeta(document.status)
+              const StatusIcon = statusMeta.icon
+
+              return (
+                <Card key={document.submissionId} className="border-primary/10 shadow-md overflow-hidden">
+                  <CardHeader className="p-4 bg-muted/30 border-b">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="shrink-0">{getDocumentIcon(document)}</div>
+                        <div className="min-w-0">
+                          <CardTitle className="text-sm font-bold leading-tight truncate">{document.documentName}</CardTitle>
+                          <p className="text-[11px] text-muted-foreground font-medium mt-0.5 truncate">{document.project.title}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn("text-[9px] font-bold uppercase tracking-wider h-5 shrink-0", statusMeta.className)}>
+                        <StatusIcon className="mr-1 h-3 w-3" />
+                        {statusMeta.label}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Milestone</p>
+                        <p className="text-[11px] font-bold text-foreground truncate">{document.milestone.title}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Uploaded</p>
+                        <p className="text-[11px] font-bold text-foreground truncate">{formatDateTime(document.uploadedAt)}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1 border-t border-dashed">
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-[10px] font-bold uppercase tracking-wider" onClick={() => setSelectedDocument(document)}>
+                        <Eye className="h-3.5 w-3.5 mr-1.5" /> Details
+                      </Button>
+                      <Button asChild variant="default" size="sm" className="flex-1 h-9 text-[10px] font-bold uppercase tracking-wider">
+                        <a href={document.fileUrl} target="_blank" rel="noreferrer">
+                          <Download className="h-3.5 w-3.5 mr-1.5" /> Get
+                        </a>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {filteredDocuments.length === 0 && !submittedDocumentsQuery.isLoading && (
+            <div className="text-center py-20 bg-muted/10 rounded-2xl border border-dashed">
+              <Search className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No documents found</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters.</p>
+            </div>
+          )}
+        </div>
       </div>
       <DocumentDetailsDialog document={selectedDocument} onOpenChange={(open) => !open && setSelectedDocument(null)} />
     </>

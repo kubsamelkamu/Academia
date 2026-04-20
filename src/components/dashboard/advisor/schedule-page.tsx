@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -716,73 +717,82 @@ export function AdvisorSchedulePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Meeting Scheduler</h1>
-          <p className="text-muted-foreground">Schedule, update, cancel, and monitor project-group meetings.</p>
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Meeting Scheduler</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Schedule, update, cancel, and monitor project-group meetings.</p>
         </div>
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button disabled={!hasProjectSelection}>Schedule Meeting</Button>
+            <Button disabled={!hasProjectSelection} className="w-full sm:w-auto h-10 text-xs font-bold uppercase tracking-wider">
+              <CalendarClock className="mr-2 h-4 w-4" />
+              Schedule Meeting
+            </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px] rounded-2xl">
             <DialogHeader>
-              <DialogTitle>Schedule New Meeting</DialogTitle>
-              <DialogDescription>
-                This posts to the advisor meeting scheduler endpoint and prepends the new record in list.
+              <DialogTitle className="text-xl font-bold">Schedule New Meeting</DialogTitle>
+              <DialogDescription className="text-sm font-medium">
+                Set up a new checkpoint for the selected project group.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="meeting-title">Title</Label>
+                <Label htmlFor="meeting-title" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Title</Label>
                 <Input
                   id="meeting-title"
                   value={createForm.title}
                   onChange={(event) => handleCreateInputChange("title", event.target.value)}
                   placeholder="Weekly milestone checkpoint"
+                  className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="meeting-at">Meeting at</Label>
+                <Label htmlFor="meeting-at" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Meeting at</Label>
                 <Input
                   id="meeting-at"
                   type="datetime-local"
                   value={createForm.meetingAtLocal}
                   onChange={(event) => handleCreateInputChange("meetingAtLocal", event.target.value)}
+                  className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meeting-duration">Duration (minutes)</Label>
-                <Input
-                  id="meeting-duration"
-                  type="number"
-                  min={15}
-                  step={5}
-                  value={createForm.durationMinutes}
-                  onChange={(event) => handleCreateInputChange("durationMinutes", event.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="meeting-duration" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Duration (min)</Label>
+                  <Input
+                    id="meeting-duration"
+                    type="number"
+                    min={15}
+                    step={5}
+                    value={createForm.durationMinutes}
+                    onChange={(event) => handleCreateInputChange("durationMinutes", event.target.value)}
+                    className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="meeting-agenda">Agenda</Label>
+                <Label htmlFor="meeting-agenda" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Agenda</Label>
                 <Textarea
                   id="meeting-agenda"
                   value={createForm.agenda}
                   onChange={(event) => handleCreateInputChange("agenda", event.target.value)}
                   placeholder="Topics and expected outcomes"
                   rows={4}
+                  className="resize-none text-sm border-primary/20 focus-visible:ring-primary/30"
                 />
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" className="h-10 text-xs font-bold uppercase tracking-wider" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => void handleCreateMeeting()} disabled={createMeetingMutation.isPending}>
+              <Button onClick={() => void handleCreateMeeting()} disabled={createMeetingMutation.isPending} className="h-10 text-xs font-bold uppercase tracking-wider">
                 {createMeetingMutation.isPending ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -797,24 +807,24 @@ export function AdvisorSchedulePage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(240px,420px)_1fr] lg:items-end">
+      <Card className="border-primary/10 shadow-sm overflow-hidden">
+        <CardHeader className="space-y-4 bg-muted/30 border-b p-4 sm:p-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(240px,420px)_1fr] lg:items-end">
             <div className="space-y-2">
-              <Label htmlFor="advisor-project-selector">Project</Label>
+              <Label htmlFor="advisor-project-selector" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Selected Project</Label>
               <Select
                 value={selectedProjectId}
                 onValueChange={handleProjectChange}
                 disabled={projectsQuery.isLoading || projects.length === 0}
               >
-                <SelectTrigger id="advisor-project-selector">
+                <SelectTrigger id="advisor-project-selector" className="h-10 border-primary/20 bg-background">
                   <SelectValue
                     placeholder={projectsQuery.isLoading ? "Loading projects..." : "Select project"}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
+                    <SelectItem key={project.id} value={project.id} className="text-sm font-medium">
                       {project.title}
                     </SelectItem>
                   ))}
@@ -822,160 +832,234 @@ export function AdvisorSchedulePage() {
               </Select>
             </div>
 
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-primary/10 bg-background/50 p-3 shadow-sm">
               {selectedProject ? (
-                <>
-                  <span className="font-medium text-foreground">{selectedProject.title}</span>
-                  <span className="ml-2">Meeting history and upcoming schedules.</span>
-                </>
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <CalendarClock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate">{selectedProject.title}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mt-0.5">Meeting History & Schedules</p>
+                  </div>
+                </div>
               ) : (
-                <span>Select a project to load meetings.</span>
+                <p className="text-xs font-medium text-muted-foreground italic">Select a project to load meetings.</p>
               )}
             </div>
           </div>
 
           <Tabs value={activeFilter} onValueChange={handleFilterChange}>
-            <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
-              <TabsTrigger value="ALL">All</TabsTrigger>
-              <TabsTrigger value="UPCOMING_24H">Upcoming 24h</TabsTrigger>
-              <TabsTrigger value="UPCOMING_1H">Upcoming 1h</TabsTrigger>
-              <TabsTrigger value="CANCELLED">Cancelled</TabsTrigger>
+            <TabsList className="flex h-auto w-full items-center justify-start gap-1 overflow-x-auto bg-muted/50 p-1 scrollbar-hide sm:overflow-visible">
+              <TabsTrigger value="ALL" className="flex-1 py-2 text-[10px] font-bold uppercase tracking-wider sm:text-xs">All</TabsTrigger>
+              <TabsTrigger value="UPCOMING_24H" className="flex-1 py-2 text-[10px] font-bold uppercase tracking-wider sm:text-xs whitespace-nowrap">Next 24h</TabsTrigger>
+              <TabsTrigger value="UPCOMING_1H" className="flex-1 py-2 text-[10px] font-bold uppercase tracking-wider sm:text-xs whitespace-nowrap">Next 1h</TabsTrigger>
+              <TabsTrigger value="CANCELLED" className="flex-1 py-2 text-[10px] font-bold uppercase tracking-wider sm:text-xs">Cancelled</TabsTrigger>
             </TabsList>
           </Tabs>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="p-0">
           {projectsQuery.isError && (
-            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="m-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-xs font-medium text-destructive">
               Could not load advisor projects: {projectsQuery.error.message}
             </div>
           )}
 
           {hasProjectSelection && meetingsQuery.isError && (
-            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="m-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-xs font-medium text-destructive">
               Could not load meetings: {meetingsQuery.error.message}
             </div>
           )}
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Meeting</TableHead>
-                <TableHead>When</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Cancellation</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!hasProjectSelection && !projectsQuery.isLoading && (
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader className="bg-muted/10">
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    No project selected.
-                  </TableCell>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Meeting</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">When</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Duration</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Status</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">Cancellation</TableHead>
                 </TableRow>
-              )}
-
-              {projectsQuery.isLoading && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading advisor projects...
-                    </span>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {hasProjectSelection && meetingsQuery.isLoading && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading meetings...
-                    </span>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {hasProjectSelection && !meetingsQuery.isLoading && meetings.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    No meetings found for this project and filter.
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {meetings.map((meeting) => {
-                const state = meetingStateLabel(meeting)
-                const StateIcon = state.icon
-
-                return (
-                  <TableRow
-                    key={meeting.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedMeetingId(meeting.id)}
-                  >
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{meeting.title || "Untitled meeting"}</p>
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {meeting.agenda || "No agenda provided."}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{formatMeetingAt(meeting.meetingAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {meeting.durationMinutes > 0 ? `${meeting.durationMinutes} min` : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn("inline-flex items-center gap-1", state.className)}>
-                        <StateIcon className="h-3.5 w-3.5" />
-                        {state.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {meeting.isCancelled ? (
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <p>{meeting.cancellationReason || "No reason provided"}</p>
-                          {meeting.cancelledAt && <p>{formatMeetingAt(meeting.cancelledAt)}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Active</span>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {!hasProjectSelection && !projectsQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-20 text-center text-sm font-medium text-muted-foreground italic">
+                      No project selected.
                     </TableCell>
                   </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                )}
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
-            <div className="text-sm text-muted-foreground">
-              Page {pagination.page} of {Math.max(1, pagination.totalPages)}
-              <span className="ml-2">({pagination.totalItems} total)</span>
+                {projectsQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-20 text-center text-sm font-medium text-muted-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        Loading advisor projects...
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {hasProjectSelection && meetingsQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-20 text-center text-sm font-medium text-muted-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        Loading meetings...
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {hasProjectSelection && !meetingsQuery.isLoading && meetings.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-20 text-center text-sm font-medium text-muted-foreground italic">
+                      No meetings found for this project and filter.
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {meetings.map((meeting) => {
+                  const state = meetingStateLabel(meeting)
+                  const StateIcon = state.icon
+
+                  return (
+                    <TableRow
+                      key={meeting.id}
+                      className="cursor-pointer hover:bg-muted/20 transition-colors"
+                      onClick={() => setSelectedMeetingId(meeting.id)}
+                    >
+                      <TableCell>
+                        <div className="space-y-1 py-1">
+                          <p className="font-bold text-sm leading-tight">{meeting.title || "Untitled meeting"}</p>
+                          <p className="line-clamp-1 text-[11px] text-muted-foreground font-medium">
+                            {meeting.agenda || "No agenda provided."}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <Clock3 className="h-3.5 w-3.5" />
+                          <span>{formatMeetingAt(meeting.meetingAt)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-muted-foreground">
+                        {meeting.durationMinutes > 0 ? `${meeting.durationMinutes} min` : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={cn("text-[10px] font-bold uppercase tracking-wider h-5 inline-flex items-center gap-1", state.className)}>
+                          <StateIcon className="h-3 w-3" />
+                          {state.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {meeting.isCancelled ? (
+                          <div className="space-y-0.5 text-[10px] font-medium text-destructive">
+                            <p className="line-clamp-1 italic">&ldquo;{meeting.cancellationReason || "No reason"}&rdquo;</p>
+                            {meeting.cancelledAt && <p className="opacity-70">{formatMeetingAt(meeting.cancelledAt)}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">Active</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-border">
+            {meetings.map((meeting) => {
+              const state = meetingStateLabel(meeting)
+              const StateIcon = state.icon
+
+              return (
+                <div
+                  key={meeting.id}
+                  className="p-4 space-y-4 hover:bg-muted/5 transition-colors cursor-pointer"
+                  onClick={() => setSelectedMeetingId(meeting.id)}
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm leading-tight truncate">{meeting.title || "Untitled meeting"}</p>
+                      <Badge className={cn("text-[9px] font-bold uppercase tracking-wider h-4 mt-1.5 inline-flex items-center gap-1", state.className)}>
+                        <StateIcon className="h-2.5 w-2.5" />
+                        {state.label}
+                      </Badge>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Duration</p>
+                      <p className="text-xs font-bold mt-0.5">{meeting.durationMinutes}m</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 bg-muted/30 p-3 rounded-xl border border-primary/5">
+                    <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                      <Clock3 className="h-3.5 w-3.5 text-primary/70" />
+                      <span>{formatMeetingAt(meeting.meetingAt)}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-medium leading-relaxed line-clamp-2 italic">
+                      {meeting.agenda || "No agenda provided."}
+                    </p>
+                  </div>
+
+                  {meeting.isCancelled && (
+                    <div className="p-2.5 rounded-lg bg-destructive/5 border border-destructive/10">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-destructive">Cancellation Reason</p>
+                      <p className="text-[11px] font-medium text-destructive/80 mt-0.5 italic">&ldquo;{meeting.cancellationReason || "No reason provided"}&rdquo;</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+              {hasProjectSelection && !meetingsQuery.isLoading && meetings.length === 0 && (
+                <div className="py-20 text-center bg-muted/5">
+                  <CalendarClock className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No meetings found</p>
+                </div>
+              )}
+          </div>
+
+          <div className="p-4 flex items-center justify-between gap-3 border-t bg-muted/10">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Page {pagination.page} / {Math.max(1, pagination.totalPages)}
+              <span className="ml-2 opacity-70">({pagination.totalItems} total)</span>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                className="h-8 text-[10px] font-bold uppercase tracking-wider"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCurrentPage((prev) => Math.max(1, prev - 1))
+                }}
                 disabled={!pagination.hasPreviousPage || meetingsQuery.isLoading}
               >
-                Previous
+                Prev
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((prev) => prev + 1)}
+                className="h-8 text-[10px] font-bold uppercase tracking-wider"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCurrentPage((prev) => prev + 1)
+                }}
                 disabled={!pagination.hasNextPage || meetingsQuery.isLoading}
               >
                 Next
               </Button>
             </div>
           </div>
-
         </CardContent>
       </Card>
 
@@ -985,135 +1069,151 @@ export function AdvisorSchedulePage() {
           if (!open) setSelectedMeetingId(null)
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Meeting Details</DialogTitle>
-            <DialogDescription>
-              Manage update/reschedule and cancellation from this detail view.
-            </DialogDescription>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-hidden p-0 rounded-2xl border-primary/20 shadow-2xl">
+          <DialogHeader className="p-6 pb-0 bg-muted/30 border-b">
+            <div className="flex items-start justify-between pr-8 mb-4">
+              <div className="space-y-1">
+                <DialogTitle className="text-xl font-bold">Meeting Details</DialogTitle>
+                <DialogDescription className="text-sm font-medium">
+                  Manage and monitor this session.
+                </DialogDescription>
+              </div>
+              {detailMeeting && (
+                <Badge className={cn("text-[10px] font-bold uppercase tracking-wider h-6", meetingStateLabel(detailMeeting).className)}>
+                  {meetingStateLabel(detailMeeting).label}
+                </Badge>
+              )}
+            </div>
           </DialogHeader>
 
-          {detailQuery.isLoading && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading meeting details...
-              </span>
-            </div>
-          )}
-
-          {detailQuery.isError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              Could not load details: {detailQuery.error.message}
-            </div>
-          )}
-
-          {!detailQuery.isLoading && !detailQuery.isError && detailMeeting && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
-                  <p>{meetingStateLabel(detailMeeting).label}</p>
+          <ScrollArea className="max-h-[calc(90vh-12rem)]">
+            <div className="p-6 space-y-6">
+              {detailQuery.isLoading && (
+                <div className="py-12 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Loading details...</p>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Meeting ID</p>
-                  <p className="truncate">{detailMeeting.id}</p>
+              )}
+
+              {detailQuery.isError && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-xs font-medium text-destructive">
+                  Could not load details: {detailQuery.error.message}
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="update-title">Title</Label>
-                <Input
-                  id="update-title"
-                  value={updateForm.title}
-                  onChange={(event) => handleUpdateInputChange("title", event.target.value)}
-                  disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
-                />
-              </div>
+              {!detailQuery.isLoading && !detailQuery.isError && detailMeeting && (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="update-title" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Title</Label>
+                    <Input
+                      id="update-title"
+                      value={updateForm.title}
+                      onChange={(event) => handleUpdateInputChange("title", event.target.value)}
+                      disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
+                      className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="update-at">Meeting at</Label>
-                <Input
-                  id="update-at"
-                  type="datetime-local"
-                  value={updateForm.meetingAtLocal}
-                  onChange={(event) => handleUpdateInputChange("meetingAtLocal", event.target.value)}
-                  disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
-                />
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="update-at" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Meeting at</Label>
+                      <Input
+                        id="update-at"
+                        type="datetime-local"
+                        value={updateForm.meetingAtLocal}
+                        onChange={(event) => handleUpdateInputChange("meetingAtLocal", event.target.value)}
+                        disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
+                        className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="update-duration" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Duration (min)</Label>
+                      <Input
+                        id="update-duration"
+                        type="number"
+                        min={15}
+                        step={5}
+                        value={updateForm.durationMinutes}
+                        onChange={(event) => handleUpdateInputChange("durationMinutes", event.target.value)}
+                        disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
+                        className="h-10 text-sm border-primary/20 focus-visible:ring-primary/30"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="update-duration">Duration (minutes)</Label>
-                <Input
-                  id="update-duration"
-                  type="number"
-                  min={15}
-                  step={5}
-                  value={updateForm.durationMinutes}
-                  onChange={(event) => handleUpdateInputChange("durationMinutes", event.target.value)}
-                  disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="update-agenda" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Agenda</Label>
+                    <Textarea
+                      id="update-agenda"
+                      value={updateForm.agenda}
+                      onChange={(event) => handleUpdateInputChange("agenda", event.target.value)}
+                      rows={4}
+                      disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
+                      className="resize-none text-sm border-primary/20 focus-visible:ring-primary/30"
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="update-agenda">Agenda</Label>
-                <Textarea
-                  id="update-agenda"
-                  value={updateForm.agenda}
-                  onChange={(event) => handleUpdateInputChange("agenda", event.target.value)}
-                  rows={4}
-                  disabled={detailMeeting.isCancelled || updateMeetingMutation.isPending}
-                />
-              </div>
+                  {!detailMeeting.isCancelled && (
+                    <div className="space-y-2 pt-2 border-t border-dashed">
+                      <Label htmlFor="cancel-reason" className="text-xs font-bold uppercase tracking-widest text-destructive">Cancellation reason (optional)</Label>
+                      <Textarea
+                        id="cancel-reason"
+                        value={cancelReason}
+                        onChange={(event) => setCancelReason(event.target.value)}
+                        placeholder="Why is this meeting being cancelled?"
+                        rows={2}
+                        disabled={cancelMeetingMutation.isPending}
+                        className="resize-none text-sm border-destructive/20 focus-visible:ring-destructive/30"
+                      />
+                    </div>
+                  )}
 
-              <div className="space-y-2">
-                <Label htmlFor="cancel-reason">Cancellation reason (optional)</Label>
-                <Textarea
-                  id="cancel-reason"
-                  value={cancelReason}
-                  onChange={(event) => setCancelReason(event.target.value)}
-                  rows={3}
-                  disabled={detailMeeting.isCancelled || cancelMeetingMutation.isPending}
-                />
-              </div>
-
-              {detailMeeting.isCancelled && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                  <p className="font-medium text-destructive">Cancelled</p>
-                  <p className="text-muted-foreground">Reason: {detailMeeting.cancellationReason || "No reason provided"}</p>
-                  {detailMeeting.cancelledAt && (
-                    <p className="text-muted-foreground">Cancelled at: {formatMeetingAt(detailMeeting.cancelledAt)}</p>
+                  {detailMeeting.isCancelled && (
+                    <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-destructive">Cancelled Session</p>
+                      <p className="text-xs font-medium text-foreground italic">&ldquo;{detailMeeting.cancellationReason || "No reason provided"}&rdquo;</p>
+                      {detailMeeting.cancelledAt && (
+                        <p className="text-[10px] font-medium text-muted-foreground opacity-70">
+                          Timestamp: {formatMeetingAt(detailMeeting.cancelledAt)}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
             </div>
-          )}
+          </ScrollArea>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => void handleUpdateMeeting()}
-              disabled={
-                !detailMeeting ||
-                detailMeeting.isCancelled ||
-                detailQuery.isLoading ||
-                updateMeetingMutation.isPending
-              }
-            >
-              {updateMeetingMutation.isPending ? "Updating..." : "Update / Reschedule"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleCancelMeeting()}
-              disabled={
-                !detailMeeting ||
-                detailMeeting.isCancelled ||
-                detailQuery.isLoading ||
-                cancelMeetingMutation.isPending
-              }
-            >
-              {cancelMeetingMutation.isPending ? "Cancelling..." : "Cancel Meeting"}
-            </Button>
+          <DialogFooter className="p-6 bg-muted/30 border-t gap-2 sm:gap-0">
+            <div className="flex flex-col sm:flex-row w-full gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-10 text-xs font-bold uppercase tracking-wider"
+                onClick={() => void handleUpdateMeeting()}
+                disabled={
+                  !detailMeeting ||
+                  detailMeeting.isCancelled ||
+                  detailQuery.isLoading ||
+                  updateMeetingMutation.isPending
+                }
+              >
+                {updateMeetingMutation.isPending ? "Updating..." : "Update / Reschedule"}
+              </Button>
+              {!detailMeeting?.isCancelled && (
+                <Button
+                  variant="destructive"
+                  className="flex-1 h-10 text-xs font-bold uppercase tracking-wider"
+                  onClick={() => void handleCancelMeeting()}
+                  disabled={
+                    !detailMeeting ||
+                    detailQuery.isLoading ||
+                    cancelMeetingMutation.isPending
+                  }
+                >
+                  {cancelMeetingMutation.isPending ? "Cancelling..." : "Cancel Meeting"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

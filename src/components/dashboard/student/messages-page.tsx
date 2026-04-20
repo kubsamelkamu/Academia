@@ -2297,9 +2297,9 @@ export function StudentMessagesPage() {
 
         <TabsContent
           value="chats"
-          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-190px)] lg:overflow-hidden"
         >
-          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:min-h-[600px] lg:grid-cols-3 lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:grid-cols-3 lg:overflow-hidden">
             {/* Conversations List */}
             <Card className="flex min-h-0 flex-col overflow-hidden max-lg:max-h-[min(200px,30dvh)] max-lg:shrink-0 lg:col-span-1">
               <CardHeader className="pb-3">
@@ -2924,9 +2924,9 @@ export function StudentMessagesPage() {
 
         <TabsContent
           value="advisor"
-          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-230px)] lg:overflow-hidden"
+          className="flex min-h-0 flex-col space-y-4 lg:h-[calc(100dvh-190px)] lg:overflow-hidden"
         >
-          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:min-h-[600px] lg:grid-cols-3 lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-4 max-lg:min-h-0 lg:grid lg:h-full lg:grid-cols-3 lg:overflow-hidden">
             {/* Advisor conversation list (single item) */}
             <Card className="flex min-h-0 flex-col overflow-hidden max-lg:max-h-[min(160px,26dvh)] max-lg:shrink-0 lg:col-span-1 lg:max-h-none">
               <CardHeader className="pb-3">
