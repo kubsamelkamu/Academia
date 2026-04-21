@@ -80,6 +80,7 @@ export function ProfileSettings() {
   const changePassword = useAuthStore((s) => s.changePassword)
 
   const avatarUrl = user?.avatarUrl ?? null
+  const signedInEmail = user?.email ?? "No email available"
 
   const primaryRole = getPrimaryRoleFromBackendRoles(user?.roles)
   const isStudent = primaryRole === "student"
@@ -301,7 +302,7 @@ export function ProfileSettings() {
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <Badge variant="secondary" className="text-xs sm:text-sm">
-                  Signed in as: {email}
+                  Signed in as: {signedInEmail}
                 </Badge>
                 {!isStudent ? (
                   <Button type="submit" disabled={profileIsLoading} className="w-full sm:w-auto">
