@@ -36,6 +36,51 @@ const BRAND_COLOR = "#ED5F45"
 const BRAND_DARK = "#D54A32"
 const BRAND_LIGHT = "#F47A64"
 
+type PlatformStats = {
+  totalStudents: number
+  totalAdvisors: number
+  totalActiveProjects: number
+  totalCompletedProjects: number
+}
+
+type StatDisplayItem = {
+  value: string
+  label: string
+}
+
+const DEFAULT_PLATFORM_STATS: PlatformStats = {
+  totalStudents: 1280,
+  totalAdvisors: 85,
+  totalActiveProjects: 320,
+  totalCompletedProjects: 140,
+}
+
+function isPlatformStats(data: unknown): data is PlatformStats {
+  if (!data || typeof data !== "object") return false
+
+  const candidate = data as Record<string, unknown>
+  return (
+    typeof candidate.totalStudents === "number" &&
+    typeof candidate.totalAdvisors === "number" &&
+    typeof candidate.totalActiveProjects === "number" &&
+    typeof candidate.totalCompletedProjects === "number"
+  )
+}
+
+function toDisplayStats(data: PlatformStats): StatDisplayItem[] {
+  return [
+    { value: data.totalStudents.toLocaleString(), label: "Active Students" },
+    { value: data.totalAdvisors.toLocaleString(), label: "Active Advisors" },
+    { value: data.totalActiveProjects.toLocaleString(), label: "Active Projects" },
+    { value: data.totalCompletedProjects.toLocaleString(), label: "Completed Projects" },
+  ]
+}
+
+function getPlatformStatsUrl() {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001/api/v1"
+  return `${baseUrl.replace(/\/$/, "")}/public/platform-stats`
+}
+
 /* ── 3D Tilt Card Component ── */
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -299,6 +344,7 @@ function FloatingParticles() {
 export default function HomePage() {
   const isClient = useSyncExternalStore(() => () => {}, () => true, () => false)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+  const [stats, setStats] = useState<StatDisplayItem[]>(toDisplayStats(DEFAULT_PLATFORM_STATS))
   const { scrollYProgress } = useScroll()
 
   const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0])
@@ -310,6 +356,35 @@ export default function HomePage() {
     }, 5000)
 
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPlatformStats = async () => {
+      try {
+        const response = await fetch(getPlatformStatsUrl(), { cache: "no-store" })
+
+        if (!response.ok) {
+          return
+        }
+
+        const json = (await response.json()) as { data?: unknown } | PlatformStats
+        const payload = "data" in json ? json.data : json
+
+        if (isMounted && isPlatformStats(payload)) {
+          setStats(toDisplayStats(payload))
+        }
+      } catch {
+        // Keep default platform stats if the endpoint is unavailable.
+      }
+    }
+
+    void loadPlatformStats()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   return (
@@ -848,11 +923,4 @@ const testimonials = [
     role: "Program Director, UC Berkeley",
     avatar: ""
   }
-]
-
-const stats = [
-  { value: "500+", label: "Institutions" },
-  { value: "50K+", label: "Active Students" },
-  { value: "120K+", label: "Total Projects" },
-  { value: "99.9%", label: "Uptime SLA" },
 ]
