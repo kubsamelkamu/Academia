@@ -3,10 +3,8 @@
 import React, { useDeferredValue, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  Activity,
   AlertCircle,
   BarChart3,
-  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   Clock,
@@ -18,7 +16,6 @@ import {
   FolderKanban,
   GraduationCap,
   Loader2,
-  PieChart,
   RefreshCw,
   Search,
   Star,
@@ -118,6 +115,7 @@ const DEFAULT_STUDENT_FILTERS: StudentFilterState = {
 const ACTIVE_TABS: ActiveTab[] = ["projects", "students"]
 const COORDINATOR_VIEWS: CoordinatorView[] = ["generate", "history", "analytics"]
 const DEPARTMENT_CATEGORIES: DepartmentCategory[] = ["all", "academic", "administrative", "strategic", "analytics"]
+const PDF_EXPORT_DISABLED_MESSAGE = "PDF export is temporarily unavailable while the backend PDF generator is being fixed."
 
 function parseEnumValue<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T {
   if (value && allowed.includes(value as T)) {
@@ -535,10 +533,6 @@ function DrilldownWorkspace({
           <Button variant="outline" size="sm" disabled={downloadState.excel} onClick={() => void onDownload("excel")}>
             {downloadState.excel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
             Download Excel
-          </Button>
-          <Button variant="outline" size="sm" disabled={downloadState.pdf} onClick={() => void onDownload("pdf")}>
-            {downloadState.pdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-            Download PDF
           </Button>
         </div>
       </div>
@@ -1002,14 +996,6 @@ export function GradesReportsPanel({
     const overview = overviewQuery.data
     return [
       {
-        id: "grades-pdf",
-        label: "Grade Report",
-        description: `${formatStageLabel(stage)} summary with ${overview?.grades.totalPublishedStudents ?? 0} published students.`,
-        icon: GraduationCap,
-        scope: "students" as const,
-        format: "pdf" as const,
-      },
-      {
         id: "projects-excel",
         label: "Project Report",
         description: `${overview?.pipeline.readyForAggregationCount ?? 0} groups are ready for aggregation.`,
@@ -1033,37 +1019,14 @@ export function GradesReportsPanel({
         scope: "students" as const,
         format: "excel" as const,
       },
-      {
-        id: "active-view",
-        label: "Current View",
-        description: `Export the active ${activeTab} workspace with the current filters already applied.`,
-        icon: Zap,
-        scope: activeTab,
-        format: "pdf" as const,
-        dashed: true,
-      },
     ]
-  }, [overviewQuery.data, stage, activeTab])
+  }, [overviewQuery.data, stage])
 
   const departmentCatalog = useMemo<Record<Exclude<DepartmentCategory, "all">, ReportCatalogCard[]>>(() => {
     const overview = overviewQuery.data
 
     return {
       academic: [
-        {
-          id: "grade-distribution",
-          title: "Grade Distribution Analysis",
-          description: `Letter-grade and score-band analytics for ${formatStageLabel(stage)} final grades.`,
-          format: "pdf",
-          scope: "students",
-          icon: PieChart,
-          category: "academic",
-          metrics: [
-            `Average ${formatNumber(overview?.grades.averageFinalGrade)}`,
-            `${overview?.grades.totalPublishedStudents ?? 0} published students`,
-          ],
-          tags: ["grades", "distribution", "performance"],
-        },
         {
           id: "student-performance",
           title: "Student Performance Trends",
@@ -1109,20 +1072,6 @@ export function GradesReportsPanel({
           tags: ["workflow", "approval", "governance"],
         },
         {
-          id: "weights-configuration",
-          title: "Weights Configuration Snapshot",
-          description: "Advisor/evaluator weighting readiness for the active capstone stage.",
-          format: "pdf",
-          scope: "projects",
-          icon: Target,
-          category: "administrative",
-          metrics: [
-            `Advisor ${overview?.weights.advisorPercentage ?? 0}%`,
-            `Evaluator ${overview?.weights.evaluatorPercentage ?? 0}%`,
-          ],
-          tags: ["weights", "configuration", "policy"],
-        },
-        {
           id: "publication-readiness",
           title: "Publication Readiness Report",
           description: "Published versus finalized student counts for the current stage.",
@@ -1139,34 +1088,6 @@ export function GradesReportsPanel({
       ],
       strategic: [
         {
-          id: "kpi-dashboard",
-          title: "Department KPIs & Performance",
-          description: "Stage-wide KPI summary for final grade quality, review throughput, and publication coverage.",
-          format: "pdf",
-          scope: "students",
-          icon: Activity,
-          category: "strategic",
-          metrics: [
-            `High ${formatNumber(overview?.grades.highestFinalGrade)}`,
-            `Low ${formatNumber(overview?.grades.lowestFinalGrade)}`,
-          ],
-          tags: ["kpis", "strategy", "performance"],
-        },
-        {
-          id: "review-governance",
-          title: "Review Governance Snapshot",
-          description: "Approved, rejected, and pending decision counts for leadership reporting.",
-          format: "pdf",
-          scope: "projects",
-          icon: CheckCircle2,
-          category: "strategic",
-          metrics: [
-            `${overview?.review.approvedCount ?? 0} approved`,
-            `${overview?.review.rejectedCount ?? 0} rejected`,
-          ],
-          tags: ["governance", "oversight", "review"],
-        },
-        {
           id: "student-outcomes",
           title: "Student Outcome Summary",
           description: "Student-level outcome export aligned with current stage and department scope.",
@@ -1182,20 +1103,6 @@ export function GradesReportsPanel({
         },
       ],
       analytics: [
-        {
-          id: "score-bands",
-          title: "Score Band Dashboard",
-          description: "Score-band distribution and final-grade spread for the active stage.",
-          format: "pdf",
-          scope: "students",
-          icon: BarChart3,
-          category: "analytics",
-          metrics: [
-            `${scoreBandDistribution.length} score bands`,
-            `${letterGradeDistribution.filter((entry) => entry.count > 0).length} active letter grades`,
-          ],
-          tags: ["bands", "distribution", "charts"],
-        },
         {
           id: "project-pipeline",
           title: "Project Pipeline Analytics",
@@ -1255,6 +1162,14 @@ export function GradesReportsPanel({
   }, [allCatalogCards, deferredCatalogSearch, departmentCatalog, departmentCategory])
 
   async function handleDownload(format: GradesReportFormat, scope: GradesReportScope = activeTab) {
+    if (format === "pdf") {
+      setDownloadError(PDF_EXPORT_DISABLED_MESSAGE)
+      toast.info("PDF export unavailable", {
+        description: PDF_EXPORT_DISABLED_MESSAGE,
+      })
+      return
+    }
+
     setDownloadError(null)
     setDownloadState((current) => ({ ...current, [format]: true }))
 
@@ -1401,14 +1316,6 @@ export function GradesReportsPanel({
                     icon: Users,
                     format: "csv" as const,
                     scope: "students" as const,
-                  },
-                  {
-                    id: "ready-summary",
-                    title: "Executive PDF snapshot",
-                    meta: `${formatStageLabel(stage)} overview and distributions`,
-                    icon: FileText,
-                    format: "pdf" as const,
-                    scope: activeTab,
                   },
                 ].map((item) => (
                   <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover:border-primary/20 transition-all">
@@ -1750,10 +1657,6 @@ export function GradesReportsPanel({
               <Button variant="outline" className="h-auto py-3 flex-col items-start" onClick={() => void handleDownload("excel", "projects")}>
                 <FileSpreadsheet className="h-5 w-5 mb-1" />
                 <span className="text-xs font-medium">Export Projects</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-3 flex-col items-start" onClick={() => void handleDownload("pdf", "students")}>
-                <FileBarChart className="h-5 w-5 mb-1" />
-                <span className="text-xs font-medium">Student PDF</span>
               </Button>
               <Button variant="outline" className="h-auto py-3 flex-col items-start" onClick={() => setActiveTabAndUrl("projects")}>
                 <Target className="h-5 w-5 mb-1" />
