@@ -103,7 +103,7 @@ export function AdvisorStudentsRevisionPage({ projectId }: { projectId: string }
             <p className="text-sm text-muted-foreground">Project not found (ID: {projectId}).</p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/dashboard/advisor/students">
+            <Link href="/dashboard/advisor/clearance">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Link>
@@ -124,9 +124,9 @@ export function AdvisorStudentsRevisionPage({ projectId }: { projectId: string }
         </div>
 
         <Button asChild variant="outline">
-          <Link href="/dashboard/advisor/students">
+          <Link href="/dashboard/advisor/clearance">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Students
+            Back to Clearance
           </Link>
         </Button>
       </div>
@@ -169,7 +169,7 @@ export function AdvisorStudentsRevisionPage({ projectId }: { projectId: string }
 
             <div className="flex justify-end gap-2">
               <Button asChild variant="outline">
-                <Link href="/dashboard/advisor/students">Cancel</Link>
+                <Link href="/dashboard/advisor/clearance">Cancel</Link>
               </Button>
               <Button onClick={submit}>
                 <Send className="h-4 w-4 mr-2" />

@@ -1,8 +1,6 @@
-"use client"
-
-import { AdvisorStudentsPage } from "@/components/dashboard/advisor/students-page"
+import { redirect } from "next/navigation"
 
 export default function AdvisorStudentsRoutePage() {
-  return <AdvisorStudentsPage />
+  redirect("/dashboard/advisor/clearance")
 }
 

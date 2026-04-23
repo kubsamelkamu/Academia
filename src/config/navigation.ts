@@ -182,7 +182,7 @@ export const navigationConfig: Record<UserRole, NavItem[]> = {
         },
         {
           title: "Clear",
-          href: "/dashboard/advisor/students",
+          href: "/dashboard/advisor/clearance",
           icon: GraduationCap,
         },
         {

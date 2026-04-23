@@ -47,10 +47,7 @@ import Link from "next/link"
 import {
   mockProjects,
   mockEvaluations,
-  mockComplaints,
   mockUsers,
-  mockGrades,
-  Complaint,
   Grade,
 } from "@/data/mockData"
 import type { CoordinatorProjectTrackingItem, CoordinatorProjectTrackingMilestone } from "@/types/project-tracking"
@@ -354,7 +351,7 @@ export function CoordinatorDashboard() {
     return `${datePart} ${timePart}`
   }, [now])
 
-  const [localGrades] = useState<Grade[]>(mockGrades)
+  const [localGrades] = useState<Grade[]>([])
   const [timelinePage, setTimelinePage] = useState(1)
 
   const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
@@ -403,7 +400,6 @@ export function CoordinatorDashboard() {
 
   const pendingTitlesCount = departmentProposalsQuery.data?.summary.pending ?? 0
   const pendingEvaluations = mockEvaluations.filter(e => e.status === 'pending')
-  const openComplaints = mockComplaints.filter(c => c.status === 'open' || c.status === 'under_review')
 
   const advisors = mockUsers.filter(u => u.role === 'advisor')
   const evaluators = mockUsers.filter(u => u.role === 'evaluator')
@@ -567,33 +563,6 @@ export function CoordinatorDashboard() {
     { key: 'status', header: 'Status', render: (g) => <StatusBadge status={g.status} /> },
   ]
 
-  const complaintColumns: Column<Complaint>[] = [
-    { 
-      key: 'studentName', header: 'Student',
-      render: (c) => (
-        <div className="flex items-center gap-2">
-          <Avatar className="h-7 w-7">
-            <AvatarFallback className="text-xs bg-destructive/10 text-destructive">{c.studentName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <span className="font-medium text-sm">{c.studentName}</span>
-        </div>
-      )
-    },
-    { key: 'targetType', header: 'Type', render: (c) => <Badge variant="outline" className="capitalize text-xs">{c.targetType}</Badge> },
-    { key: 'reason', header: 'Issue', render: (c) => <p className="max-w-[200px] truncate text-sm text-muted-foreground">{c.reason}</p> },
-    { key: 'status', header: 'Status', render: (c) => <StatusBadge status={c.status} /> },
-    {
-      key: 'actions', header: '',
-      render: (c) => (
-        <Link href={`/dashboard/coordinator/complaints/${c.id}`}>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5">
-            <ChevronRight className="h-3.5 w-3.5" /> Review
-          </Button>
-        </Link>
-      )
-    },
-  ]
-
   const unreadAlerts = useMemo(() => {
     const items = timelineAnnouncementsQuery.data?.items ?? []
 
@@ -619,7 +588,7 @@ export function CoordinatorDashboard() {
 
   const gradeFinalizationPct = localGrades.length > 0
     ? Math.round((localGrades.filter(g => g.status === 'final').length / localGrades.length) * 100)
-    : 45
+    : 0
 
   return (
     <div className="space-y-6 animate-fade-in pb-8">
@@ -631,11 +600,10 @@ export function CoordinatorDashboard() {
             Welcome, {displayName}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {pendingTitlesCount > 0 || openComplaints.length > 0 ? (
+            {pendingTitlesCount > 0 || pendingEvaluations.length > 0 ? (
               <>
                 <span className="font-medium text-foreground">{pendingTitlesCount}</span> pending titles,{" "}
-                <span className="font-medium text-foreground">{pendingEvaluations.length}</span> evaluations and{" "}
-                <span className="font-medium text-foreground">{openComplaints.length}</span> open complaints awaiting attention.
+                <span className="font-medium text-foreground">{pendingEvaluations.length}</span> evaluations awaiting attention.
               </>
             ) : (
               "All tasks are up to date — great job keeping things running smoothly."
@@ -698,23 +666,6 @@ export function CoordinatorDashboard() {
             </div>
             <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-muted flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
               <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Open Complaints */}
-        <Card className="group border-none shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">Open Complaints</p>
-              <p className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold tracking-tight">{openComplaints.length}</p>
-              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate">Require resolution</p>
-              <div className="mt-2 sm:mt-3 h-1 rounded-full bg-muted overflow-hidden w-16 sm:w-24">
-                <div className="h-full rounded-full bg-destructive/60 transition-all" style={{ width: `${Math.min((openComplaints.length / 10) * 100, 100)}%` }} />
-              </div>
-            </div>
-            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-destructive/10 flex items-center justify-center transition-transform group-hover:scale-110 shrink-0">
-              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
             </div>
           </CardContent>
         </Card>
@@ -944,7 +895,7 @@ export function CoordinatorDashboard() {
         </CardContent>
       </Card>
 
-      {/* ── Main Tabs: Projects / Advisors / Evaluators / Grades / Complaints ── */}
+      {/* ── Main Tabs: Projects / Advisors / Evaluators / Grades ── */}
       <Tabs defaultValue="projects" className="space-y-4">
         <div className="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           <TabsList className="h-9 sm:h-10 inline-flex w-auto bg-muted/50 p-1 rounded-lg">
@@ -962,12 +913,6 @@ export function CoordinatorDashboard() {
             </TabsTrigger>
             <TabsTrigger value="grades" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
               Grades
-            </TabsTrigger>
-            <TabsTrigger value="complaints" className="gap-1.5 text-[10px] sm:text-sm px-3 sm:px-4">
-              Complaints
-              {openComplaints.length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-[9px] sm:text-xs px-1 py-0">{openComplaints.length}</Badge>
-              )}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1168,31 +1113,15 @@ export function CoordinatorDashboard() {
               </Link>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <div className="min-w-[600px] sm:min-w-0">
-                <DataTable data={capstoneGrades.slice(0, 5)} columns={gradeColumns} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Complaints */}
-        <TabsContent value="complaints">
-          <Card className="border-none shadow-sm overflow-hidden">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
-              <div>
-                <CardTitle className="text-base sm:text-xl">Complaint Management</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Review and resolve student disputes</CardDescription>
-              </div>
-              <Link href="/dashboard/coordinator/complaints" className="w-full sm:w-auto">
-                <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px] sm:text-xs h-8">
-                  View All <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
-              <div className="min-w-[600px] sm:min-w-0">
-                <DataTable data={mockComplaints} columns={complaintColumns} />
-              </div>
+              {capstoneGrades.length === 0 ? (
+                <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                  No grades loaded here yet — open Grade Management to review and publish grades.
+                </div>
+              ) : (
+                <div className="min-w-[600px] sm:min-w-0">
+                  <DataTable data={capstoneGrades.slice(0, 5)} columns={gradeColumns} />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
