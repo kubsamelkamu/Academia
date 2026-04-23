@@ -282,7 +282,9 @@ export function DcCommitteeWorkspace({
   const leadingTitle = [...voteRows].sort((left, right) => right.votes - left.votes)[0] ?? voteRows[0]
 
   const handleVote = async (groupId: string, titleIndex: ProposalTitleIndex, titleId: string, titleName: string) => {
-    if (!selectedGroup?.id) return
+    const proposalId = selectedGroup?.id
+
+    if (!proposalId) return
 
     if (!canVote) {
       toast.error("Voting is only available while the proposal is submitted.")
@@ -296,7 +298,7 @@ export function DcCommitteeWorkspace({
 
     try {
       await voteMutation.mutateAsync({
-        proposalId: selectedGroup.id,
+        proposalId,
         dto: { titleIndex },
       })
       toast.success(`Vote recorded for ${titleName}`)
@@ -469,13 +471,13 @@ export function DcCommitteeWorkspace({
                 <CardTitle className="text-lg">Titles Section</CardTitle>
                 <CardDescription>
                   {selectedGroup?.name
-                    ? `${selectedGroup.name} is ready for title review, discussion, and voting.`
+                    ? `${selectedGroup?.name} is ready for title review, discussion, and voting.`
                     : "Select a proposal from the list to start reviewing."
                   }
                 </CardDescription>
               </div>
               {selectedGroup?.forwardedBy ? (
-                <Badge variant="secondary" className="w-fit">{selectedGroup.forwardedBy}</Badge>
+                <Badge variant="secondary" className="w-fit">{selectedGroup?.forwardedBy}</Badge>
               ) : null}
             </div>
           </CardHeader>
@@ -594,14 +596,25 @@ export function DcCommitteeWorkspace({
 
                         <div className="grid gap-2 sm:grid-cols-3">
                           <Button
-                            onClick={() => handleVote(selectedGroup.id, index as ProposalTitleIndex, title.id, title.name)}
+                            onClick={() => {
+                              if (!selectedGroup) return
+                              handleVote(selectedGroup.id, index as ProposalTitleIndex, title.id, title.name)
+                            }}
                             className="gap-2"
-                            disabled={!canVote || voteMutation.isPending}
+                            disabled={!canVote || voteMutation.isPending || !selectedGroup}
                           >
                             <ThumbsUp className="h-4 w-4" />
                             Select
                           </Button>
-                          <Button variant="outline" onClick={() => toggleReject(selectedGroup.id, title.id, title.name)} className="gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              if (!selectedGroup) return
+                              toggleReject(selectedGroup.id, title.id, title.name)
+                            }}
+                            className="gap-2"
+                            disabled={!selectedGroup}
+                          >
                             <ThumbsDown className="h-4 w-4" />
                             Reject
                           </Button>
@@ -748,7 +761,9 @@ export function DcCommitteeWorkspace({
                       className="h-10 w-10 shrink-0 rounded-full shadow-sm"
                       onClick={async () => {
                         const message = commentDraft.trim()
-                        if (!selectedGroup?.id) return
+                        const proposalId = selectedGroup?.id
+
+                        if (!proposalId) return
 
                         if (!canPostFeedback) {
                           toast.error("Feedback is not allowed for your role")
@@ -767,7 +782,7 @@ export function DcCommitteeWorkspace({
 
                         try {
                           await createFeedbackMutation.mutateAsync({
-                            proposalId: selectedGroup.id,
+                            proposalId,
                             dto: { message },
                           })
                           toast.success("Feedback added")
@@ -791,7 +806,7 @@ export function DcCommitteeWorkspace({
                       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary shadow-inner">
                         <Phone className="h-8 w-8 animate-pulse" />
                       </div>
-                      <h3 className="mb-2 text-xl font-bold tracking-tight">Audio Room: {selectedGroup.name}</h3>
+                      <h3 className="mb-2 text-xl font-bold tracking-tight">Audio Room: {selectedGroup?.name ?? "No group selected"}</h3>
                       <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
                         Secure, low-latency audio channel for rapid consensus and title voting alignment.
                       </p>
@@ -925,7 +940,7 @@ export function DcCommitteeWorkspace({
                       <DialogHeader>
                         <DialogTitle>Reject All Titles</DialogTitle>
                         <DialogDescription>
-                          You are about to reject all proposed titles for <strong>{selectedGroup.name}</strong>. The students will be notified to submit new topics.
+                          You are about to reject all proposed titles for <strong>{selectedGroup?.name ?? "this group"}</strong>. The students will be notified to submit new topics.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="py-2">
@@ -958,7 +973,7 @@ export function DcCommitteeWorkspace({
                       <DialogHeader>
                         <DialogTitle>Request Revision</DialogTitle>
                         <DialogDescription>
-                          Send committee feedback to <strong>{selectedGroup.name}</strong> requesting targeted revisions before approval.
+                          Send committee feedback to <strong>{selectedGroup?.name ?? "this group"}</strong> requesting targeted revisions before approval.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="py-2">
