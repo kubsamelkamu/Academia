@@ -1,12 +1,16 @@
 import apiClient from "@/lib/api/client"
 import type {
+  CreateProjectProposalFeedbackDto,
   CreateProjectProposalRejectionReminderDto,
   CreateProjectProposalDraftDto,
   DepartmentProjectProposalsResult,
   DepartmentProjectProposalsSummary,
+  ProjectProposalTitleVote,
+  ProjectProposalTitleVotesResult,
   ProjectProposal,
   ProjectProposalFeedback,
   ProjectProposalRejectionReminder,
+  VoteProjectProposalTitleDto,
   UpdateProjectProposalStatusDto,
 } from "@/types/project-proposals"
 
@@ -106,11 +110,17 @@ function normalizeProposalFeedback(raw: unknown, index: number): ProjectProposal
     (record.createdBy && typeof record.createdBy === "object" ? record.createdBy : null) ||
     (record.user && typeof record.user === "object" ? record.user : null)
 
+  const proposalId = asNullableString(record.proposalId) || asNullableString(record.projectProposalId)
+  const authorId = asNullableString(record.authorId) || asNullableString(record.createdById) || asNullableString(record.userId)
+
   return {
     id: asNullableString(record.id) || `proposal-feedback-${index}`,
+    proposalId,
+    authorId,
     message,
     createdAt: asNullableString(record.createdAt) || asNullableString(record.timestamp),
     updatedAt: asNullableString(record.updatedAt),
+    author: author as unknown as ProjectProposalFeedback["author"],
     authorName: extractFeedbackAuthorName(author) || asNullableString(record.authorName),
     authorEmail:
       (author && typeof author === "object" ? asNullableString((author as Record<string, unknown>).email) : null) ||
@@ -199,6 +209,19 @@ export async function listMyGroupProposals(): Promise<ProjectProposal[]> {
   return extractProposalItems(response.data)
 }
 
+export async function getProjectProposalById(proposalId: string): Promise<ProjectProposal> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const response = await apiClient.get<ProjectProposal>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}`
+  )
+
+  return response.data
+}
+
 export async function listDepartmentProposals(departmentId: string): Promise<DepartmentProjectProposalsResult> {
   const trimmedDepartmentId = departmentId.trim()
   if (!trimmedDepartmentId) {
@@ -225,6 +248,66 @@ export async function listProposalFeedbacks(proposalId: string): Promise<Project
   )
 
   return extractProposalFeedbackItems(response.data)
+}
+
+export async function createProposalFeedback(
+  proposalId: string,
+  dto: CreateProjectProposalFeedbackDto
+): Promise<ProjectProposalFeedback> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const message = dto.message?.trim()
+  if (!message) {
+    throw new Error("message is required")
+  }
+
+  const response = await apiClient.post<unknown>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/feedbacks`,
+    { message }
+  )
+
+  return (
+    normalizeProposalFeedback(response.data, 0) ??
+    ({ id: `proposal-feedback-${Date.now()}`, message } satisfies ProjectProposalFeedback)
+  )
+}
+
+export async function voteProjectProposalTitle(
+  proposalId: string,
+  dto: VoteProjectProposalTitleDto
+): Promise<ProjectProposalTitleVote> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const titleIndex = dto.titleIndex
+  if (typeof titleIndex !== "number" || Number.isNaN(titleIndex) || titleIndex < 0 || titleIndex > 2) {
+    throw new Error("titleIndex must be 0, 1, or 2")
+  }
+
+  const response = await apiClient.post<ProjectProposalTitleVote>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/title-votes`,
+    { titleIndex }
+  )
+
+  return response.data
+}
+
+export async function getProjectProposalTitleVotes(proposalId: string): Promise<ProjectProposalTitleVotesResult> {
+  const trimmedProposalId = proposalId.trim()
+  if (!trimmedProposalId) {
+    throw new Error("proposalId is required")
+  }
+
+  const response = await apiClient.get<ProjectProposalTitleVotesResult>(
+    `/projects/proposals/${encodeURIComponent(trimmedProposalId)}/title-votes`
+  )
+
+  return response.data
 }
 
 export async function updateProposalStatus(

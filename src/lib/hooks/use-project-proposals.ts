@@ -2,21 +2,29 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  createProposalFeedback,
   createProposalRejectionReminder,
   createProposalDraft,
   createProposalWithProposalPdf,
+  getProjectProposalById,
+  getProjectProposalTitleVotes,
   listDepartmentProposals,
   listMyGroupProposals,
   listProposalFeedbacks,
   submitProposalForReview,
   updateProposalStatus,
+  voteProjectProposalTitle,
 } from "@/lib/api/project-proposals"
 import type {
+  CreateProjectProposalFeedbackDto,
   CreateProjectProposalRejectionReminderDto,
   DepartmentProjectProposalsResult,
   ProjectProposal,
   ProjectProposalFeedback,
   ProjectProposalRejectionReminder,
+  ProjectProposalTitleVote,
+  ProjectProposalTitleVotesResult,
+  VoteProjectProposalTitleDto,
   UpdateProjectProposalStatusDto,
 } from "@/types/project-proposals"
 
@@ -25,7 +33,9 @@ export function projectProposalKeys() {
     root: ["project-proposals"] as const,
     group: () => ["project-proposals", "group"] as const,
     department: (departmentId: string) => ["project-proposals", "department", departmentId] as const,
+    details: (proposalId: string) => ["project-proposals", "details", proposalId] as const,
     feedback: (proposalId: string) => ["project-proposals", "feedback", proposalId] as const,
+    titleVotes: (proposalId: string) => ["project-proposals", "title-votes", proposalId] as const,
   }
 }
 
@@ -86,6 +96,30 @@ export function useProjectProposalFeedbacks(params: {
   })
 }
 
+export function useProjectProposalDetails(params: {
+  proposalId: string | null | undefined
+  enabled?: boolean
+}) {
+  const proposalId = params.proposalId?.trim() ? params.proposalId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(proposalId)
+
+  return useQuery<ProjectProposal, Error>({
+    queryKey: enabled
+      ? projectProposalKeys().details(proposalId ?? "")
+      : projectProposalKeys().root,
+    queryFn: () => {
+      if (!proposalId) {
+        throw new Error("proposalId is required")
+      }
+
+      return getProjectProposalById(proposalId)
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
 export function useCreateProposalDraft() {
   return useMutation<ProjectProposal, Error, {
     titles: [string, string, string]
@@ -122,9 +156,72 @@ export function useUpdateProjectProposalStatus() {
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: projectProposalKeys().root })
       await queryClient.invalidateQueries({
+        queryKey: projectProposalKeys().details(variables.proposalId),
+      })
+      await queryClient.invalidateQueries({
         queryKey: projectProposalKeys().feedback(variables.proposalId),
       })
     },
+  })
+}
+
+export function useCreateProjectProposalFeedback() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ProjectProposalFeedback, Error, {
+    proposalId: string
+    dto: CreateProjectProposalFeedbackDto
+  }>({
+    mutationFn: ({ proposalId, dto }) => createProposalFeedback(proposalId, dto),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: projectProposalKeys().root })
+      await queryClient.invalidateQueries({
+        queryKey: projectProposalKeys().details(variables.proposalId),
+      })
+      await queryClient.invalidateQueries({
+        queryKey: projectProposalKeys().feedback(variables.proposalId),
+      })
+    },
+  })
+}
+
+export function useVoteProjectProposalTitle() {
+  const queryClient = useQueryClient()
+
+  return useMutation<ProjectProposalTitleVote, Error, {
+    proposalId: string
+    dto: VoteProjectProposalTitleDto
+  }>({
+    mutationFn: ({ proposalId, dto }) => voteProjectProposalTitle(proposalId, dto),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: projectProposalKeys().titleVotes(variables.proposalId),
+      })
+    },
+  })
+}
+
+export function useProjectProposalTitleVotes(params: {
+  proposalId: string | null | undefined
+  enabled?: boolean
+}) {
+  const proposalId = params.proposalId?.trim() ? params.proposalId.trim() : null
+  const enabled = (params.enabled ?? true) && Boolean(proposalId)
+
+  return useQuery<ProjectProposalTitleVotesResult, Error>({
+    queryKey: enabled
+      ? projectProposalKeys().titleVotes(proposalId ?? "")
+      : projectProposalKeys().root,
+    queryFn: () => {
+      if (!proposalId) {
+        throw new Error("proposalId is required")
+      }
+
+      return getProjectProposalTitleVotes(proposalId)
+    },
+    enabled,
+    staleTime: 10_000,
+    retry: false,
   })
 }
 

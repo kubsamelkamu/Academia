@@ -41,6 +41,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
+import { useAuthStore } from "@/store/auth-store"
+import {
+  useCreateProjectProposalFeedback,
+  useDepartmentProjectProposals,
+  useProjectProposalDetails,
+  useProjectProposalFeedbacks,
+  useProjectProposalTitleVotes,
+  useVoteProjectProposalTitle,
+} from "@/lib/hooks/use-project-proposals"
+import type { ProjectProposal, ProposalDocument, ProposalParty, ProposalTitleIndex } from "@/types/project-proposals"
+
 type CommitteeTitle = {
   id: string
   name: string
@@ -147,23 +158,55 @@ const committeeGroups: CommitteeGroup[] = [
   },
 ]
 
-const discussionMessages = [
-  {
-    author: "Advisor",
-    text: "Title 2 is practical, but the scope should be narrowed before approval.",
-    time: "2 min ago",
-  },
-  {
-    author: "Evaluator",
-    text: "Title 1 has stronger research value and a clearer deliverable path.",
-    time: "1 min ago",
-  },
-  {
-    author: "Department Head",
-    text: "We should align with departmental priorities and avoid duplicate topics.",
-    time: "Just now",
-  },
-]
+function formatPersonName(person?: ProposalParty | null) {
+  if (!person) return ""
+  const first = (person.firstName ?? "").trim()
+  const last = (person.lastName ?? "").trim()
+  const full = [first, last].filter(Boolean).join(" ").trim()
+  return full || (person.email ?? "").trim() || ""
+}
+
+function getProposalPdfDocument(proposal: ProjectProposal): ProposalDocument | null {
+  const docs = proposal.documents ?? []
+  const match = docs.find((doc) => String(doc.key ?? "").toLowerCase() === "proposal.pdf")
+  return match ?? docs[0] ?? null
+}
+
+function normalizeProposedTitles(proposal: ProjectProposal): string[] {
+  const titles = (proposal.proposedTitles ?? proposal.titles ?? [])
+    .map((title) => String(title ?? "").trim())
+    .filter(Boolean)
+  return titles
+}
+
+function isProposalSubmitted(status: unknown) {
+  return String(status ?? "").trim().toUpperCase() === "SUBMITTED"
+}
+
+function formatTimestamp(value?: string | null) {
+  if (!value) return ""
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) return ""
+  return timestamp.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+}
+
+function formatGroupMemberCount(proposalGroup: ProjectProposal["projectGroup"] | null | undefined) {
+  if (!proposalGroup) return "-"
+  const ids = new Set<string>()
+
+  if (proposalGroup.leader?.id) {
+    ids.add(String(proposalGroup.leader.id))
+  }
+
+  for (const member of proposalGroup.members ?? []) {
+    const id = member?.user?.id
+    if (id) {
+      ids.add(String(id))
+    }
+  }
+
+  return ids.size > 0 ? String(ids.size) : "-"
+}
 
 const communicationTabs = [
   { value: "chat", label: "Chat", icon: MessageSquare },
@@ -182,76 +225,172 @@ export function DcCommitteeWorkspace({
   backLabel = "Back to Advisor Dashboard",
   role,
 }: DcCommitteeWorkspaceProps) {
-  const [selectedGroupId, setSelectedGroupId] = React.useState(committeeGroups[0].id)
+  const authUser = useAuthStore((state) => state.user)
+  const departmentId = authUser?.departmentId ?? authUser?.department?.id ?? null
+
+  const departmentProposalsQuery = useDepartmentProjectProposals({
+    departmentId,
+    enabled: Boolean(departmentId),
+  })
+
+  const backendGroups = React.useMemo<CommitteeGroup[] | null>(() => {
+    const proposals = departmentProposalsQuery.data?.items ?? []
+    if (!proposals.length) {
+      return null
+    }
+
+    return proposals.map((proposal) => {
+      const submitterName = formatPersonName(proposal.submitter) || proposal.submittedBy || "Unknown submitter"
+      const groupName = proposal.projectGroup?.name?.trim() || submitterName || "Proposal"
+      const titles = normalizeProposedTitles(proposal)
+      const description = proposal.description?.trim() || "No description provided."
+      const document = getProposalPdfDocument(proposal)
+      const attachmentName = document?.originalName?.trim() || document?.key?.trim() || "proposal.pdf"
+
+      return {
+        id: proposal.id,
+        name: groupName,
+        forwardedBy: isProposalSubmitted(proposal.status) ? "Submitted" : `Status: ${String(proposal.status ?? "").trim() || "Unknown"}`,
+        committeeMembers: 0,
+        titles: titles.slice(0, 3).map((title, index) => ({
+          id: `${proposal.id}:${index}`,
+          name: title,
+          description,
+          attachment: attachmentName,
+          votes: 0,
+        })),
+      }
+    })
+  }, [departmentProposalsQuery.data?.items])
+
+  const groups = backendGroups ?? committeeGroups
+
+  const [selectedGroupId, setSelectedGroupId] = React.useState(() => groups[0]?.id ?? "")
   const [communicationTab, setCommunicationTab] = React.useState<(typeof communicationTabs)[number]["value"]>("chat")
-  const [votesByGroup, setVotesByGroup] = React.useState<Record<string, Record<string, number>>>(() =>
-    Object.fromEntries(
-      committeeGroups.map((group) => [
-        group.id,
-        Object.fromEntries(group.titles.map((title) => [title.id, title.votes])),
-      ])
-    )
-  )
-  const [selectedVoteByGroup, setSelectedVoteByGroup] = React.useState<Record<string, string | null>>(() =>
-    Object.fromEntries(committeeGroups.map((group) => [group.id, null]))
-  )
+  const [selectedVoteByGroup, setSelectedVoteByGroup] = React.useState<Record<string, string | null>>({})
   const [rejectedByGroup, setRejectedByGroup] = React.useState<Record<string, string[]>>(() =>
-    Object.fromEntries(committeeGroups.map((group) => [group.id, []]))
+    Object.fromEntries(groups.map((group) => [group.id, []]))
   )
-  const [commentDraft, setCommentDraft] = React.useState("Comment on the selected title")
+  const [commentDraft, setCommentDraft] = React.useState("")
+
+  React.useEffect(() => {
+    if (!groups.length) return
+
+    setSelectedGroupId((current) => {
+      if (current && groups.some((group) => group.id === current)) {
+        return current
+      }
+      return groups[0].id
+    })
+
+    setSelectedVoteByGroup((current) => {
+      const next: Record<string, string | null> = { ...current }
+      for (const group of groups) {
+        if (!(group.id in next)) {
+          next[group.id] = null
+        }
+      }
+      return next
+    })
+
+    setRejectedByGroup((current) => {
+      const next: Record<string, string[]> = { ...current }
+      for (const group of groups) {
+        if (!(group.id in next)) {
+          next[group.id] = []
+        }
+      }
+      return next
+    })
+  }, [groups])
 
   const selectedGroup = React.useMemo(
-    () => committeeGroups.find((group) => group.id === selectedGroupId) ?? committeeGroups[0],
-    [selectedGroupId]
+    () => groups.find((group) => group.id === selectedGroupId) ?? groups[0],
+    [groups, selectedGroupId]
   )
 
-  const selectedGroupVotes = votesByGroup[selectedGroup.id] ?? {}
   const selectedTitleId = selectedVoteByGroup[selectedGroup.id]
   const rejectedTitleIds = new Set(rejectedByGroup[selectedGroup.id] ?? [])
 
-  const voteRows = React.useMemo(() => {
-    return selectedGroup.titles.map((title) => {
-      const votes = selectedGroupVotes[title.id] ?? 0
-      const percentage = Math.round((votes / selectedGroup.committeeMembers) * 100)
-      return { ...title, votes, percentage }
-    })
-  }, [selectedGroup, selectedGroupVotes])
+  const proposalDetailsQuery = useProjectProposalDetails({
+    proposalId: selectedGroup?.id ?? null,
+    enabled: Boolean(selectedGroup?.id && backendGroups),
+  })
 
-  const leadingTitle = React.useMemo(() => {
-    return [...voteRows].sort((left, right) => right.votes - left.votes)[0] ?? voteRows[0]
-  }, [voteRows])
+  const effectiveProposal = proposalDetailsQuery.data ?? null
+  const effectiveStatus = effectiveProposal?.status ?? null
+  const effectiveTitles = effectiveProposal ? normalizeProposedTitles(effectiveProposal) : selectedGroup?.titles.map((t) => t.name) ?? []
+  const canVote = Boolean(effectiveProposal && isProposalSubmitted(effectiveStatus) && effectiveTitles.length === 3)
+  const canPostFeedback = role === "advisor" || role === "coordinator" || role === "department_head"
+  const feedbackEnabled = Boolean(selectedGroup?.id)
 
-  const totalVotes = React.useMemo(
-    () => voteRows.reduce((sum, row) => sum + row.votes, 0),
-    [voteRows]
-  )
+  const proposalSubmitterLabel = effectiveProposal ? (formatPersonName(effectiveProposal.submitter) || effectiveProposal.submittedBy || "-") : "-"
+  const proposalSubmitterEmail = effectiveProposal?.submitter?.email?.trim() || ""
+  const proposalAdvisorLabel = effectiveProposal ? (formatPersonName(effectiveProposal.advisor) || (effectiveProposal.advisorId ?? "")) : "-"
+  const proposalAdvisorEmail = effectiveProposal?.advisor?.email?.trim() || ""
+  const proposalGroupName = effectiveProposal?.projectGroup?.name?.trim() || selectedGroup?.name || "-"
+  const proposalDepartmentName =
+    effectiveProposal?.department?.name?.trim() ||
+    (authUser?.department && typeof authUser.department === "object" ? String((authUser.department as { name?: string | null }).name ?? "").trim() : "") ||
+    "-"
+  const proposalSubmittedAt = effectiveProposal?.submittedAt ? formatTimestamp(effectiveProposal.submittedAt) : ""
+  const proposalMemberCount = formatGroupMemberCount(effectiveProposal?.projectGroup)
 
-  const handleVote = (groupId: string, titleId: string, titleName: string) => {
-    const previousVoteId = selectedVoteByGroup[groupId]
+  const feedbacksQuery = useProjectProposalFeedbacks({
+    proposalId: selectedGroup?.id ?? null,
+    enabled: feedbackEnabled,
+  })
 
-    setVotesByGroup((currentVotes) => {
-      const nextGroupVotes = { ...(currentVotes[groupId] ?? {}) }
+  const createFeedbackMutation = useCreateProjectProposalFeedback()
+  const voteMutation = useVoteProjectProposalTitle()
 
-      if (previousVoteId && previousVoteId !== titleId) {
-        nextGroupVotes[previousVoteId] = Math.max((nextGroupVotes[previousVoteId] ?? 0) - 1, 0)
-      }
+  const canViewVoteBreakdown = role === "coordinator" || role === "department_head"
+  const titleVotesQuery = useProjectProposalTitleVotes({
+    proposalId: canViewVoteBreakdown ? (selectedGroup?.id ?? null) : null,
+    enabled: canViewVoteBreakdown && Boolean(selectedGroup?.id),
+  })
 
-      if (previousVoteId !== titleId) {
-        nextGroupVotes[titleId] = (nextGroupVotes[titleId] ?? 0) + 1
-      }
+  const voteCounts = titleVotesQuery.data?.counts ?? { "0": 0, "1": 0, "2": 0 }
+  const totalVotes = (voteCounts["0"] ?? 0) + (voteCounts["1"] ?? 0) + (voteCounts["2"] ?? 0)
 
-      return {
-        ...currentVotes,
-        [groupId]: nextGroupVotes,
-      }
-    })
+  const baseTitles = selectedGroup?.titles ?? []
+
+  const voteRows: Array<CommitteeTitle & { percentage: number }> = !baseTitles.length
+    ? []
+    : !canViewVoteBreakdown
+      ? baseTitles.map((title) => ({ ...title, votes: 0, percentage: 0 }))
+      : baseTitles.map((title, index) => {
+          const votes = voteCounts[String(index as 0 | 1 | 2) as "0" | "1" | "2"] ?? 0
+          const percentage = Math.round((votes / Math.max(totalVotes, 1)) * 100)
+          return { ...title, votes, percentage }
+        })
+
+  const leadingTitle = [...voteRows].sort((left, right) => right.votes - left.votes)[0] ?? voteRows[0]
+
+  const handleVote = async (groupId: string, titleIndex: ProposalTitleIndex, titleId: string, titleName: string) => {
+    if (!selectedGroup?.id) return
+
+    if (!canVote) {
+      toast.error("Voting is only available while the proposal is submitted.")
+      return
+    }
 
     setSelectedVoteByGroup((currentSelectedVotes) => ({
       ...currentSelectedVotes,
       [groupId]: titleId,
     }))
 
-    toast.success(`Vote recorded for ${titleName}`)
+    try {
+      await voteMutation.mutateAsync({
+        proposalId: selectedGroup.id,
+        dto: { titleIndex },
+      })
+      toast.success(`Vote recorded for ${titleName}`)
+    } catch (error) {
+      toast.error("Unable to record vote", {
+        description: error instanceof Error ? error.message : "Try again.",
+      })
+    }
   }
 
   const toggleReject = (groupId: string, titleId: string, titleName: string) => {
@@ -277,6 +416,15 @@ export function DcCommitteeWorkspace({
   }
 
   const handleDownload = (attachment: string) => {
+    const proposal = effectiveProposal
+    const doc = proposal ? getProposalPdfDocument(proposal) : null
+    const url = doc?.url
+
+    if (url && typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer")
+      return
+    }
+
     toast.success(`Downloading ${attachment}`)
   }
 
@@ -319,10 +467,10 @@ export function DcCommitteeWorkspace({
 
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-2">
             {[
-              { label: "Groups", value: committeeGroups.length, icon: Users },
-              { label: "Titles", value: selectedGroup.titles.length, icon: FileText },
-              { label: "Live votes", value: totalVotes, icon: BarChart3 },
-              { label: "Members", value: selectedGroup.committeeMembers, icon: CheckCircle2 },
+              { label: "Groups", value: groups.length, icon: Users },
+              { label: "Titles", value: selectedGroup?.titles.length ?? 0, icon: FileText },
+              { label: "Votes", value: canViewVoteBreakdown ? totalVotes : "-", icon: BarChart3 },
+              { label: "Status", value: effectiveProposal ? String(effectiveProposal.status ?? "-") : "-", icon: CheckCircle2 },
             ].map((item) => {
               const Icon = item.icon
               return (
@@ -350,7 +498,7 @@ export function DcCommitteeWorkspace({
             <CardDescription>Click a group to open its forwarded titles.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {committeeGroups.map((group) => {
+            {groups.map((group) => {
               const isActive = group.id === selectedGroupId
 
               return (
@@ -381,13 +529,57 @@ export function DcCommitteeWorkspace({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-lg">Titles Section</CardTitle>
-                <CardDescription>{selectedGroup.name} is ready for title review, discussion, and voting.</CardDescription>
+                <CardDescription>{selectedGroup?.name ?? "Selected proposal"} is ready for title review, discussion, and voting.</CardDescription>
               </div>
-              <Badge variant="secondary" className="w-fit">{selectedGroup.forwardedBy}</Badge>
+              <Badge variant="secondary" className="w-fit">{selectedGroup?.forwardedBy ?? ""}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {selectedGroup.titles.map((title, index) => {
+            {backendGroups && (
+              <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proposal Details</p>
+                    <p className="mt-1 text-sm font-semibold">{proposalGroupName}</p>
+                  </div>
+                  <Badge variant={isProposalSubmitted(effectiveStatus) ? "default" : "secondary"} className="w-fit">
+                    {String(effectiveStatus ?? "-")}
+                  </Badge>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Submitter</p>
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate">{proposalSubmitterLabel}</span>
+                    </p>
+                    {proposalSubmitterEmail && <p className="text-xs text-muted-foreground truncate">{proposalSubmitterEmail}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Advisor</p>
+                    <p className="text-sm font-medium truncate">{proposalAdvisorLabel || "-"}</p>
+                    {proposalAdvisorEmail && <p className="text-xs text-muted-foreground truncate">{proposalAdvisorEmail}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Department</p>
+                    <p className="text-sm font-medium truncate">{proposalDepartmentName}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Group Members</p>
+                    <p className="text-sm font-medium">{proposalMemberCount}</p>
+                    {proposalSubmittedAt && <p className="text-xs text-muted-foreground">Submitted {proposalSubmittedAt}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(selectedGroup?.titles ?? []).map((title, index) => {
               const voteInfo = voteRows.find((row) => row.id === title.id)
               const isRejected = rejectedTitleIds.has(title.id)
               const isSelected = selectedTitleId === title.id
@@ -404,7 +596,9 @@ export function DcCommitteeWorkspace({
                       <p className="mt-1 text-xs text-muted-foreground">Title {index + 1} • Click to expand details</p>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">{voteInfo?.votes ?? 0}</span>
+                      {canViewVoteBreakdown && (
+                        <span className="font-semibold text-foreground">{voteInfo?.votes ?? 0}</span>
+                      )}
                       <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
@@ -432,21 +626,27 @@ export function DcCommitteeWorkspace({
                       </div>
 
                       <div className="space-y-3">
-                        <div className="rounded-2xl border border-border/70 bg-background p-4">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vote Summary</p>
-                          <div className="mt-3 flex items-center justify-between">
-                            <span className="text-sm font-semibold">Votes</span>
-                            <span className="text-sm text-muted-foreground">{voteInfo?.votes ?? 0} / {selectedGroup.committeeMembers}</span>
+                        {canViewVoteBreakdown && (
+                          <div className="rounded-2xl border border-border/70 bg-background p-4">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vote Summary</p>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="text-sm font-semibold">Votes</span>
+                              <span className="text-sm text-muted-foreground">{voteInfo?.votes ?? 0} / {Math.max(totalVotes, 1)}</span>
+                            </div>
+                            <Progress value={voteInfo?.percentage ?? 0} className="mt-3 h-2" />
+                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Share of votes</span>
+                              <span>{voteInfo?.percentage ?? 0}%</span>
+                            </div>
                           </div>
-                          <Progress value={voteInfo?.percentage ?? 0} className="mt-3 h-2" />
-                          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Real-time updates</span>
-                            <span>{voteInfo?.percentage ?? 0}%</span>
-                          </div>
-                        </div>
+                        )}
 
                         <div className="grid gap-2 sm:grid-cols-3">
-                          <Button onClick={() => handleVote(selectedGroup.id, title.id, title.name)} className="gap-2">
+                          <Button
+                            onClick={() => handleVote(selectedGroup.id, index as ProposalTitleIndex, title.id, title.name)}
+                            className="gap-2"
+                            disabled={!canVote || voteMutation.isPending}
+                          >
                             <ThumbsUp className="h-4 w-4" />
                             Select
                           </Button>
@@ -537,23 +737,44 @@ export function DcCommitteeWorkspace({
 
                 <TabsContent value="chat" className="flex flex-1 flex-col justify-between px-4 pb-4 focus-visible:outline-none focus-visible:ring-0">
                   <div className="flex flex-1 flex-col justify-end space-y-4 py-4">
-                    {discussionMessages.map((message) => {
-                      const isMe = role.replace("_", " ").toLowerCase() === message.author.toLowerCase() || (message.author === "Advisor" && role === "advisor")
-                      return (
-                        <div key={`${message.author}-${message.time}`} className={cn("flex w-full gap-3", isMe ? "justify-end" : "justify-start")}>
-                          {!isMe && (
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
-                              {message.author.substring(0, 2).toUpperCase()}
+                    {(feedbacksQuery.data ?? []).length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                        No feedback yet for this proposal.
+                      </div>
+                    ) : (
+                      (feedbacksQuery.data ?? []).map((feedback) => {
+                        const authorLabel = feedback.authorName?.trim() || feedback.authorEmail?.trim() || feedback.authorRole?.trim() || "Reviewer"
+                        const isMe = feedback.authorId && authUser?.id ? String(feedback.authorId) === String(authUser.id) : false
+                        const timestamp = formatTimestamp(feedback.createdAt)
+
+                        return (
+                          <div key={feedback.id} className={cn("flex w-full gap-3", isMe ? "justify-end" : "justify-start")}>
+                            {!isMe && (
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
+                                {authorLabel.substring(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div className={cn(
+                              "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
+                              isMe
+                                ? "bg-primary text-primary-foreground rounded-br-none"
+                                : "bg-muted/40 rounded-bl-none border border-border/50"
+                            )}>
+                              {!isMe && <p className="mb-1 text-xs font-medium text-primary">{authorLabel}</p>}
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{feedback.message}</p>
+                              {timestamp && (
+                                <p className={cn(
+                                  "mt-1.5 text-[10px]",
+                                  isMe ? "text-primary-foreground/70 text-right" : "text-muted-foreground"
+                                )}>
+                                  {timestamp}
+                                </p>
+                              )}
                             </div>
-                          )}
-                          <div className={cn("max-w-[85%] rounded-2xl px-4 py-3 shadow-sm", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-muted/40 rounded-bl-none border border-border/50")}>
-                            {!isMe && <p className="mb-1 text-xs font-medium text-primary">{message.author}</p>}
-                            <p className="text-sm leading-relaxed">{message.text}</p>
-                            <p className={cn("mt-1.5 text-[10px]", isMe ? "text-primary-foreground/70 text-right" : "text-muted-foreground")}>{message.time}</p>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    )}
                   </div>
                   
                   <div className="relative mt-2 flex items-end gap-2 rounded-2xl border border-border/60 bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
@@ -564,17 +785,49 @@ export function DcCommitteeWorkspace({
                       value={commentDraft}
                       onChange={(event) => setCommentDraft(event.target.value)}
                       className="min-h-[44px] w-full resize-none border-0 bg-transparent py-3 text-sm focus-visible:ring-0 sm:min-h-[44px]"
-                      placeholder={`Message the committee about ${leadingTitle?.name ?? "the selected title"}...`}
+                      placeholder={
+                        canPostFeedback
+                          ? `Add feedback for ${selectedGroup?.name ?? "this proposal"}...`
+                          : "Feedback is not available for your role"
+                      }
                       rows={1}
                     />
                     <Button 
                       size="icon" 
                       className="h-10 w-10 shrink-0 rounded-full shadow-sm"
-                      onClick={() => {
-                        toast.success("Message sent to discussion thread")
-                        setCommentDraft("")
+                      onClick={async () => {
+                        const message = commentDraft.trim()
+                        if (!selectedGroup?.id) return
+
+                        if (!canPostFeedback) {
+                          toast.error("Feedback is not allowed for your role")
+                          return
+                        }
+
+                        if (!message) {
+                          toast.error("Feedback message is required")
+                          return
+                        }
+
+                        if (!isProposalSubmitted(effectiveStatus)) {
+                          toast.error("Feedback is only available while the proposal is submitted.")
+                          return
+                        }
+
+                        try {
+                          await createFeedbackMutation.mutateAsync({
+                            proposalId: selectedGroup.id,
+                            dto: { message },
+                          })
+                          toast.success("Feedback added")
+                          setCommentDraft("")
+                        } catch (error) {
+                          toast.error("Failed to add feedback", {
+                            description: error instanceof Error ? error.message : "Try again.",
+                          })
+                        }
                       }}
-                      disabled={!commentDraft.trim()}
+                      disabled={!commentDraft.trim() || createFeedbackMutation.isPending || !canPostFeedback}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -661,29 +914,31 @@ export function DcCommitteeWorkspace({
         </div>
 
         <div className="space-y-6">
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Voting Progress</CardTitle>
-              <CardDescription>Percentages update as committee members vote.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {voteRows.map((row) => (
-                <div key={row.id} className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate font-medium">{row.name}</span>
-                    <span className="whitespace-nowrap text-muted-foreground">{row.votes} votes • {row.percentage}%</span>
+          {canViewVoteBreakdown && (
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Voting Progress</CardTitle>
+                <CardDescription>Percentages represent share of votes.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {voteRows.map((row) => (
+                  <div key={row.id} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate font-medium">{row.name}</span>
+                      <span className="whitespace-nowrap text-muted-foreground">{row.votes} votes • {row.percentage}%</span>
+                    </div>
+                    <Progress value={row.percentage} className="h-2" />
                   </div>
-                  <Progress value={row.percentage} className="h-2" />
+                ))}
+                <Separator />
+                <div className="rounded-2xl bg-muted/40 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Leading Title</p>
+                  <p className="mt-2 text-sm font-semibold">{leadingTitle?.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{leadingTitle?.votes} votes out of {Math.max(totalVotes, 1)} total votes</p>
                 </div>
-              ))}
-              <Separator />
-              <div className="rounded-2xl bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Leading Title</p>
-                <p className="mt-2 text-sm font-semibold">{leadingTitle?.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{leadingTitle?.votes} votes out of {selectedGroup.committeeMembers} committee members</p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {role === "coordinator" && (
             <Card className="border-border/60 shadow-sm">

@@ -45,6 +45,11 @@ export interface ProposalProjectGroup {
   members?: ProposalGroupMember[] | null
 }
 
+export interface ProposalDepartmentRef {
+  id: string
+  name?: string | null
+}
+
 export interface ProposalProjectRef {
   id: string
   title?: string | null
@@ -112,12 +117,50 @@ export interface ProposalTransitionSummary {
 
 export interface ProjectProposalFeedback {
   id: string
+  proposalId?: string | null
+  authorId?: string | null
   message: string
+  author?: ProposalParty | null
   createdAt?: string | null
   updatedAt?: string | null
   authorName?: string | null
   authorEmail?: string | null
   authorRole?: string | null
+}
+
+export interface CreateProjectProposalFeedbackDto {
+  message: string
+}
+
+export type ProposalTitleIndex = 0 | 1 | 2
+
+export interface VoteProjectProposalTitleDto {
+  titleIndex: ProposalTitleIndex
+}
+
+export interface ProjectProposalTitleVoteVoter {
+  id: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatarUrl?: string | null
+}
+
+export interface ProjectProposalTitleVote {
+  id: string
+  proposalId: string
+  voterId: string
+  voterRole?: string | null
+  titleIndex: ProposalTitleIndex
+  createdAt?: string | null
+  updatedAt?: string | null
+  voter?: ProjectProposalTitleVoteVoter | null
+}
+
+export interface ProjectProposalTitleVotesResult {
+  proposalId: string
+  counts: Record<"0" | "1" | "2", number>
+  votes: ProjectProposalTitleVote[]
 }
 
 export interface CreateProjectProposalRejectionReminderDto {
@@ -164,6 +207,7 @@ export interface ProjectProposal {
   description?: string | null
   tenantId?: string | null
   departmentId?: string | null
+  department?: ProposalDepartmentRef | null
   projectGroupId?: string | null
   advisorId?: string | null
   documents?: ProposalDocument[] | null
