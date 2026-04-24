@@ -68,96 +68,6 @@ type CommitteeGroup = {
   titles: CommitteeTitle[]
 }
 
-const committeeGroups: CommitteeGroup[] = [
-  {
-    id: "group-a",
-    name: "Group A",
-    forwardedBy: "Forwarded by the Coordinator",
-    committeeMembers: 4,
-    titles: [
-      {
-        id: "group-a-title-1",
-        name: "Smart Campus Navigation",
-        description: "A mobile-first navigation system that helps students find buildings, labs, and events with live campus context.",
-        attachment: "proposal-group-a-title-1.pdf",
-        votes: 2,
-      },
-      {
-        id: "group-a-title-2",
-        name: "Academic Support Assistant",
-        description: "An AI-powered support tool for deadlines, document reminders, and guided student onboarding.",
-        attachment: "proposal-group-a-title-2.pdf",
-        votes: 1,
-      },
-      {
-        id: "group-a-title-3",
-        name: "Department Service Hub",
-        description: "A unified request desk for academic notices, approvals, and department communication.",
-        attachment: "proposal-group-a-title-3.pdf",
-        votes: 1,
-      },
-    ],
-  },
-  {
-    id: "group-b",
-    name: "Group B",
-    forwardedBy: "Forwarded by the Coordinator",
-    committeeMembers: 4,
-    titles: [
-      {
-        id: "group-b-title-1",
-        name: "Research Collaboration Tracker",
-        description: "A planning workspace for supervising student research, milestones, and shared feedback.",
-        attachment: "proposal-group-b-title-1.pdf",
-        votes: 1,
-      },
-      {
-        id: "group-b-title-2",
-        name: "Student Achievement Dashboard",
-        description: "A visual performance dashboard for tracking milestones, submissions, and readiness signals.",
-        attachment: "proposal-group-b-title-2.pdf",
-        votes: 2,
-      },
-      {
-        id: "group-b-title-3",
-        name: "Faculty Activity Monitor",
-        description: "An activity hub that summarizes advisories, evaluation workload, and scheduled meetings.",
-        attachment: "proposal-group-b-title-3.pdf",
-        votes: 1,
-      },
-    ],
-  },
-  {
-    id: "group-c",
-    name: "Group C",
-    forwardedBy: "Forwarded by the Coordinator",
-    committeeMembers: 4,
-    titles: [
-      {
-        id: "group-c-title-1",
-        name: "Thesis Title Intelligence",
-        description: "A title recommendation and validation platform that flags scope issues and duplicates early.",
-        attachment: "proposal-group-c-title-1.pdf",
-        votes: 1,
-      },
-      {
-        id: "group-c-title-2",
-        name: "Project Review Exchange",
-        description: "A committee workflow for title review, discussion threads, and final decision logging.",
-        attachment: "proposal-group-c-title-2.pdf",
-        votes: 1,
-      },
-      {
-        id: "group-c-title-3",
-        name: "Defense Preparation Suite",
-        description: "A guided prep flow for proposals, rubrics, and last-mile readiness checks.",
-        attachment: "proposal-group-c-title-3.pdf",
-        votes: 2,
-      },
-    ],
-  },
-]
-
 function formatPersonName(person?: ProposalParty | null) {
   if (!person) return ""
   const first = (person.firstName ?? "").trim()
@@ -263,9 +173,10 @@ export function DcCommitteeWorkspace({
     })
   }, [departmentProposalsQuery.data?.items])
 
-  const groups = backendGroups ?? committeeGroups
+  const groups = backendGroups ?? []
+  const hasGroups = groups.length > 0
 
-  const [selectedGroupId, setSelectedGroupId] = React.useState(() => groups[0]?.id ?? "")
+  const [selectedGroupId, setSelectedGroupId] = React.useState<string>("")
   const [communicationTab, setCommunicationTab] = React.useState<(typeof communicationTabs)[number]["value"]>("chat")
   const [selectedVoteByGroup, setSelectedVoteByGroup] = React.useState<Record<string, string | null>>({})
   const [rejectedByGroup, setRejectedByGroup] = React.useState<Record<string, string[]>>(() =>
@@ -274,7 +185,10 @@ export function DcCommitteeWorkspace({
   const [commentDraft, setCommentDraft] = React.useState("")
 
   React.useEffect(() => {
-    if (!groups.length) return
+    if (!groups.length) {
+      setSelectedGroupId("")
+      return
+    }
 
     setSelectedGroupId((current) => {
       if (current && groups.some((group) => group.id === current)) {
@@ -304,17 +218,17 @@ export function DcCommitteeWorkspace({
     })
   }, [groups])
 
-  const selectedGroup = React.useMemo(
-    () => groups.find((group) => group.id === selectedGroupId) ?? groups[0],
-    [groups, selectedGroupId]
-  )
+  const selectedGroup = React.useMemo<CommitteeGroup | null>(() => {
+    if (!groups.length) return null
+    return groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? null
+  }, [groups, selectedGroupId])
 
-  const selectedTitleId = selectedVoteByGroup[selectedGroup.id]
-  const rejectedTitleIds = new Set(rejectedByGroup[selectedGroup.id] ?? [])
+  const selectedTitleId = selectedGroup ? selectedVoteByGroup[selectedGroup.id] : null
+  const rejectedTitleIds = new Set(selectedGroup ? (rejectedByGroup[selectedGroup.id] ?? []) : [])
 
   const proposalDetailsQuery = useProjectProposalDetails({
     proposalId: selectedGroup?.id ?? null,
-    enabled: Boolean(selectedGroup?.id && backendGroups),
+    enabled: Boolean(selectedGroup?.id),
   })
 
   const effectiveProposal = proposalDetailsQuery.data ?? null
@@ -467,7 +381,7 @@ export function DcCommitteeWorkspace({
 
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-2">
             {[
-              { label: "Groups", value: groups.length, icon: Users },
+              { label: "Groups", value: departmentProposalsQuery.isLoading ? "…" : groups.length, icon: Users },
               { label: "Titles", value: selectedGroup?.titles.length ?? 0, icon: FileText },
               { label: "Votes", value: canViewVoteBreakdown ? totalVotes : "-", icon: BarChart3 },
               { label: "Status", value: effectiveProposal ? String(effectiveProposal.status ?? "-") : "-", icon: CheckCircle2 },
@@ -498,6 +412,30 @@ export function DcCommitteeWorkspace({
             <CardDescription>Click a group to open its forwarded titles.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!departmentId && (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                Your account has no department set, so proposals can’t be loaded.
+              </div>
+            )}
+
+            {departmentId && departmentProposalsQuery.isLoading && (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                Loading proposals…
+              </div>
+            )}
+
+            {departmentId && departmentProposalsQuery.isError && (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                Failed to load proposals. {departmentProposalsQuery.error?.message ?? ""}
+              </div>
+            )}
+
+            {departmentId && !departmentProposalsQuery.isLoading && !departmentProposalsQuery.isError && !hasGroups && (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                No submitted proposals found for your department.
+              </div>
+            )}
+
             {groups.map((group) => {
               const isActive = group.id === selectedGroupId
 
@@ -529,13 +467,20 @@ export function DcCommitteeWorkspace({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-lg">Titles Section</CardTitle>
-                <CardDescription>{selectedGroup?.name ?? "Selected proposal"} is ready for title review, discussion, and voting.</CardDescription>
+                <CardDescription>
+                  {selectedGroup?.name
+                    ? `${selectedGroup.name} is ready for title review, discussion, and voting.`
+                    : "Select a proposal from the list to start reviewing."
+                  }
+                </CardDescription>
               </div>
-              <Badge variant="secondary" className="w-fit">{selectedGroup?.forwardedBy ?? ""}</Badge>
+              {selectedGroup?.forwardedBy ? (
+                <Badge variant="secondary" className="w-fit">{selectedGroup.forwardedBy}</Badge>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {backendGroups && (
+            {effectiveProposal && (
               <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -576,6 +521,12 @@ export function DcCommitteeWorkspace({
                     {proposalSubmittedAt && <p className="text-xs text-muted-foreground">Submitted {proposalSubmittedAt}</p>}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {!selectedGroup && (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                No proposal selected.
               </div>
             )}
 
