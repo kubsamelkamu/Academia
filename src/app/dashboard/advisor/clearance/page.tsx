@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation"
+import { AdvisorStudentsPage } from "@/components/dashboard/advisor/students-page"
 
 export default function Page() {
-  redirect("/dashboard/advisor/students")
+  return <AdvisorStudentsPage />
 }
 

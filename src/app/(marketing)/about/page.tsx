@@ -1,9 +1,9 @@
 'use client'
 
-import { motion, useInView, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion'
+import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRef, useState, useEffect } from 'react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -35,26 +35,6 @@ const container = 'mx-auto w-full max-w-[1600px] px-6 sm:px-10 lg:px-16'
 const BRAND = "#ED5F45"
 const BRAND_DARK = "#D54A32"
 const BRAND_LIGHT = "#F47A64"
-
-function useCountUp(target: number, duration = 1800) {
-  const [count, setCount] = useState(0)
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true })
-
-  useEffect(() => {
-    if (!inView) return
-    let start = 0
-    const step = target / (duration / 16)
-    const id = setInterval(() => {
-      start += step
-      if (start >= target) { setCount(target); clearInterval(id) }
-      else setCount(Math.floor(start))
-    }, 16)
-    return () => clearInterval(id)
-  }, [inView, target, duration])
-
-  return { ref, count }
-}
 
 /* ── 3D Tilt Card Component ── */
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -123,23 +103,6 @@ function MagnetButton({ children, className }: { children: React.ReactNode; clas
     >
       {children}
     </motion.div>
-  )
-}
-
-/* ── Animated Counter Component ── */
-function AnimatedCounter({ value, suffix = "" }: { value: string; suffix?: string }) {
-  const numericValue = parseInt(value.replace(/[^0-9]/g, ""))
-  const { ref, count } = useCountUp(numericValue)
-  const hasPlus = value.includes("+")
-  const hasPercent = value.includes("%")
-  const isDecimal = value.includes(".")
-
-  return (
-    <span ref={ref}>
-      {count.toLocaleString()}
-      {hasPlus && "+"}
-      {hasPercent && "%"}
-    </span>
   )
 }
 
@@ -272,7 +235,7 @@ export default function AboutPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#ED5F45]/40 to-transparent flex items-end p-12">
                     <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
                       <p className="text-white text-lg font-black tracking-tight">ENGINEERED FOR EXCELLENCE</p>
-                      <p className="text-white/70 text-sm font-medium">Supporting 500+ institutions worldwide</p>
+                      <p className="text-white/70 text-sm font-medium">Supporting institutions worldwide</p>
                     </div>
                   </div>
                 </div>
@@ -316,34 +279,6 @@ export default function AboutPage() {
                     </div>
                     <h3 className="text-2xl font-black mb-4 tracking-tight uppercase">{item.title}</h3>
                     <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{item.body}</p>
-                  </div>
-                </TiltCard>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 md:py-32 relative">
-        <div className={container}>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: index * 0.1 }}
-                viewport={{ once: true }}
-              >
-                <TiltCard>
-                  <div className="text-center p-8 py-14 rounded-[2.5rem] bg-white dark:bg-slate-900 border-[#ED5F45]/20 border shadow-xl group">
-                    <div className="text-5xl md:text-6xl font-black text-[#ED5F45] mb-4 tracking-tighter">
-                      <AnimatedCounter value={stat.value} />
-                    </div>
-                    <div className="text-slate-500 font-bold tracking-[0.2em] uppercase text-xs">
-                      {stat.label}
-                    </div>
                   </div>
                 </TiltCard>
               </motion.div>
@@ -453,7 +388,7 @@ export default function AboutPage() {
                     <span className="text-[#ED5F45]">Future of Education?</span>
                   </motion.h2>
                   <motion.p style={{ translateZ: 60 }} className="text-xl md:text-2xl text-white/60 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
-                    Join 500+ institutions already using Academia to deliver exceptional
+                    Join institutions already using Academia to deliver exceptional
                     academic and project management experiences.
                   </motion.p>
                   <motion.div style={{ translateZ: 100 }} className="flex flex-col sm:flex-row items-center justify-center gap-8">
@@ -483,10 +418,3 @@ export default function AboutPage() {
     </div>
   )
 }
-
-const stats = [
-  { value: "500+", label: "Institutions" },
-  { value: "50K+", label: "Students" },
-  { value: "120K+", label: "Total Projects" },
-  { value: "99.9%", label: "Uptime SLA" },
-]
