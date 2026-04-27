@@ -41,7 +41,7 @@ import {
   SIGN_IN_LOGO_SURFACE,
 } from '@/components/auth/auth-campus-backdrop';
 import { cn } from '@/lib/utils';
-import { readInviteAcceptResult } from '@/lib/auth/invite-onboarding-storage';
+import { clearInviteAcceptResult, readInviteAcceptResult } from '@/lib/auth/invite-onboarding-storage';
 import {
   AuthTiltCard,
   AUTH_CONTAINER_VARIANTS,
@@ -64,14 +64,50 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const { login, isLoading, error, clearError, tenantDomain, user, logout } = useAuthStore();
   const isInviteFlow = (searchParams.get('from') ?? '') === 'invite';
-  const inviteEmailPrefill = useMemo(() => {
-    if (!isInviteFlow) return '';
-    return readInviteAcceptResult()?.result.email ?? '';
+  const isTenantDebug = useMemo(() => {
+    if (process.env.NODE_ENV === 'production') return false;
+    return (searchParams.get('debugTenant') ?? '') === '1';
+  }, [searchParams]);
+  const inviteContext = useMemo(() => {
+    if (!isInviteFlow) return null;
+    return readInviteAcceptResult();
   }, [isInviteFlow]);
+  const inviteEmailPrefill = useMemo(() => inviteContext?.result.email ?? '', [inviteContext]);
+  const inviteTenantDomain = useMemo(() => {
+    if (!isInviteFlow) return '';
+    return (searchParams.get('tenantDomain') ?? inviteContext?.tenantDomain ?? '').trim();
+  }, [inviteContext?.tenantDomain, isInviteFlow, searchParams]);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [logoOk, setLogoOk] = useState(true);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isInviteFlow) return;
+    if (!inviteTenantDomain) return;
+
+    const currentTenant = useAuthStore.getState().tenantDomain;
+    if (currentTenant !== inviteTenantDomain) {
+      useAuthStore.setState({ tenantDomain: inviteTenantDomain });
+    }
+
+    if (isTenantDebug) {
+      console.info('[tenant-debug] invite login tenant resolution', {
+        inviteTenantDomain,
+        storeTenantDomainBefore: currentTenant,
+        storeTenantDomainAfter: useAuthStore.getState().tenantDomain,
+        urlTenantDomainParam: (searchParams.get('tenantDomain') ?? '').trim() || undefined,
+        hasInviteContext: Boolean(inviteContext),
+        inviteContextTenantDomain: (inviteContext?.tenantDomain ?? '').trim() || undefined,
+      });
+    }
+  }, [inviteContext, inviteTenantDomain, isInviteFlow, isTenantDebug, searchParams]);
+
+  useEffect(() => {
+    if (!isInviteFlow) return;
+    if (!inviteContext) return;
+    clearInviteAcceptResult();
+  }, [inviteContext, isInviteFlow]);
 
   useEffect(() => {
     if (!isRateLimited) return;
@@ -95,7 +131,11 @@ function LoginPageContent() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: inviteEmailPrefill, password: '' },
+    defaultValues: {
+      email: inviteEmailPrefill,
+      password: '',
+      tenantDomain: inviteTenantDomain || undefined,
+    },
   });
 
   const emailValue = useWatch({ control, name: 'email' }) ?? '';
@@ -123,6 +163,16 @@ function LoginPageContent() {
         router.push(isInviteFlow ? '/change-password?from=invite' : '/change-password');
         return;
       }
+
+      const primaryRole = getPrimaryRoleFromBackendRoles(state.user?.roles);
+      if (primaryRole === 'department_head' && state.user?.tenantVerification !== undefined) {
+        const status = state.user.tenantVerification?.status ?? null;
+        const documentNotSubmitted = status === null;
+        if (documentNotSubmitted) {
+          router.replace('/dashboard/settings?tab=verification');
+          return;
+        }
+      }
       redirectToDashboard(state.user?.roles);
     } catch (e: unknown) {
       const message = getErrorMessage(e, '');
@@ -144,10 +194,10 @@ function LoginPageContent() {
           currentStep="login"
           title="Sign in to continue"
           description={
-            tenantDomain ? (
+            inviteTenantDomain ? (
               <>
                 Use the email and temporary password from your invitation. Institution:{' '}
-                <span className="font-medium text-slate-800 dark:text-slate-100">{tenantDomain}</span>
+                <span className="font-medium text-slate-800 dark:text-slate-100">{inviteTenantDomain}</span>
               </>
             ) : (
               'Use the email and temporary password from your invitation.'
@@ -155,6 +205,7 @@ function LoginPageContent() {
           }
         >
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <input type="hidden" {...register('tenantDomain')} />
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...register('email')} placeholder="john.doe@university.edu" className={AUTH_FORM_INPUT_CLASS} />
@@ -408,13 +459,6 @@ function LoginPageContent() {
                     </motion.div>
                   </form>
 
-                  {/* Footer */}
-                  <p className="mt-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-                    New to Academia?{' '}
-                    <Link href="/register" className="font-black text-[#ED5F45] hover:underline uppercase text-xs tracking-widest">
-                      Create account
-                    </Link>
-                  </p>
                 </div>
               </div>
             </AuthTiltCard>

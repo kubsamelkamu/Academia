@@ -12,14 +12,11 @@ import {
   FileText,
   MessageSquare,
   Paperclip,
-  Phone,
-  Send,
   Shield,
   Sparkles,
   ThumbsDown,
   ThumbsUp,
   Users,
-  Video,
   User,
 } from "lucide-react"
 
@@ -29,7 +26,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
@@ -43,10 +39,8 @@ import {
 
 import { useAuthStore } from "@/store/auth-store"
 import {
-  useCreateProjectProposalFeedback,
   useDepartmentProjectProposals,
   useProjectProposalDetails,
-  useProjectProposalFeedbacks,
   useProjectProposalTitleVotes,
   useVoteProjectProposalTitle,
 } from "@/lib/hooks/use-project-proposals"
@@ -118,12 +112,6 @@ function formatGroupMemberCount(proposalGroup: ProjectProposal["projectGroup"] |
   return ids.size > 0 ? String(ids.size) : "-"
 }
 
-const communicationTabs = [
-  { value: "chat", label: "Chat", icon: MessageSquare },
-  { value: "audio", label: "Audio Call", icon: Phone },
-  { value: "video", label: "Video Call", icon: Video },
-] as const
-
 interface DcCommitteeWorkspaceProps {
   backHref?: string
   backLabel?: string
@@ -177,12 +165,10 @@ export function DcCommitteeWorkspace({
   const hasGroups = groups.length > 0
 
   const [selectedGroupId, setSelectedGroupId] = React.useState<string>("")
-  const [communicationTab, setCommunicationTab] = React.useState<(typeof communicationTabs)[number]["value"]>("chat")
   const [selectedVoteByGroup, setSelectedVoteByGroup] = React.useState<Record<string, string | null>>({})
   const [rejectedByGroup, setRejectedByGroup] = React.useState<Record<string, string[]>>(() =>
     Object.fromEntries(groups.map((group) => [group.id, []]))
   )
-  const [commentDraft, setCommentDraft] = React.useState("")
 
   React.useEffect(() => {
     if (!groups.length) {
@@ -235,8 +221,6 @@ export function DcCommitteeWorkspace({
   const effectiveStatus = effectiveProposal?.status ?? null
   const effectiveTitles = effectiveProposal ? normalizeProposedTitles(effectiveProposal) : selectedGroup?.titles.map((t) => t.name) ?? []
   const canVote = Boolean(effectiveProposal && isProposalSubmitted(effectiveStatus) && effectiveTitles.length === 3)
-  const canPostFeedback = role === "advisor" || role === "coordinator" || role === "department_head"
-  const feedbackEnabled = Boolean(selectedGroup?.id)
 
   const proposalSubmitterLabel = effectiveProposal ? (formatPersonName(effectiveProposal.submitter) || effectiveProposal.submittedBy || "-") : "-"
   const proposalSubmitterEmail = effectiveProposal?.submitter?.email?.trim() || ""
@@ -250,12 +234,6 @@ export function DcCommitteeWorkspace({
   const proposalSubmittedAt = effectiveProposal?.submittedAt ? formatTimestamp(effectiveProposal.submittedAt) : ""
   const proposalMemberCount = formatGroupMemberCount(effectiveProposal?.projectGroup)
 
-  const feedbacksQuery = useProjectProposalFeedbacks({
-    proposalId: selectedGroup?.id ?? null,
-    enabled: feedbackEnabled,
-  })
-
-  const createFeedbackMutation = useCreateProjectProposalFeedback()
   const voteMutation = useVoteProjectProposalTitle()
 
   const canViewVoteBreakdown = role === "coordinator" || role === "department_head"
@@ -325,12 +303,6 @@ export function DcCommitteeWorkspace({
     toast.info(`${titleName} ${rejectedTitleIds.has(titleId) ? "restored" : "marked for review"}`)
   }
 
-  const handleComment = (titleName: string) => {
-    setCommentDraft(`${titleName}: `)
-    setCommunicationTab("chat")
-    toast.message(`Comment draft opened for ${titleName}`)
-  }
-
   const handleDownload = (attachment: string) => {
     const proposal = effectiveProposal
     const doc = proposal ? getProposalPdfDocument(proposal) : null
@@ -364,7 +336,7 @@ export function DcCommitteeWorkspace({
                 Review three titles from each student group in one clean workspace.
               </h1>
               <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Committee members inspect title names, descriptions, and proposal attachments, discuss them live, and vote in real time before the coordinator finalizes a decision.
+                Committee members inspect title names, descriptions, and proposal attachments, then vote before the coordinator finalizes a decision.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -664,222 +636,7 @@ export function DcCommitteeWorkspace({
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-        <div className="space-y-6">
-          <Card className="flex flex-col border-border/60 shadow-sm sm:min-h-[600px]">
-            <CardHeader className="border-b border-border/40 bg-muted/10 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    Committee Communication
-                  </CardTitle>
-                  <CardDescription className="mt-1">Coordinate and discuss decisions with your peers.</CardDescription>
-                </div>
-                <div className="flex -space-x-2">
-                  {['AD', 'DH', 'CO', 'EV'].map((initials, i) => (
-                    <div key={i} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-xs font-medium text-primary shadow-sm">
-                      {initials}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col p-0">
-              <Tabs value={communicationTab} onValueChange={(value) => setCommunicationTab(value as typeof communicationTab)} className="flex flex-1 flex-col">
-                <TabsList className="mx-4 mt-4 grid grid-cols-3 bg-muted/40">
-                  {communicationTabs.map((tab) => {
-                    const Icon = tab.icon
-                    return (
-                      <TabsTrigger key={tab.value} value={tab.value} className="gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                        <Icon className="h-4 w-4" />
-                        <span className="hidden sm:inline">{tab.label}</span>
-                      </TabsTrigger>
-                    )
-                  })}
-                </TabsList>
-
-                <TabsContent value="chat" className="flex flex-1 flex-col justify-between px-4 pb-4 focus-visible:outline-none focus-visible:ring-0">
-                  <div className="flex flex-1 flex-col justify-end space-y-4 py-4">
-                    {(feedbacksQuery.data ?? []).length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                        No feedback yet for this proposal.
-                      </div>
-                    ) : (
-                      (feedbacksQuery.data ?? []).map((feedback) => {
-                        const authorLabel = feedback.authorName?.trim() || feedback.authorEmail?.trim() || feedback.authorRole?.trim() || "Reviewer"
-                        const isMe = feedback.authorId && authUser?.id ? String(feedback.authorId) === String(authUser.id) : false
-                        const timestamp = formatTimestamp(feedback.createdAt)
-
-                        return (
-                          <div key={feedback.id} className={cn("flex w-full gap-3", isMe ? "justify-end" : "justify-start")}>
-                            {!isMe && (
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
-                                {authorLabel.substring(0, 2).toUpperCase()}
-                              </div>
-                            )}
-                            <div className={cn(
-                              "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
-                              isMe
-                                ? "bg-primary text-primary-foreground rounded-br-none"
-                                : "bg-muted/40 rounded-bl-none border border-border/50"
-                            )}>
-                              {!isMe && <p className="mb-1 text-xs font-medium text-primary">{authorLabel}</p>}
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{feedback.message}</p>
-                              {timestamp && (
-                                <p className={cn(
-                                  "mt-1.5 text-[10px]",
-                                  isMe ? "text-primary-foreground/70 text-right" : "text-muted-foreground"
-                                )}>
-                                  {timestamp}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-                  
-                  <div className="relative mt-2 flex items-end gap-2 rounded-2xl border border-border/60 bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-primary">
-                      <Paperclip className="h-5 w-5" />
-                    </Button>
-                    <Textarea
-                      value={commentDraft}
-                      onChange={(event) => setCommentDraft(event.target.value)}
-                      className="min-h-[44px] w-full resize-none border-0 bg-transparent py-3 text-sm focus-visible:ring-0 sm:min-h-[44px]"
-                      placeholder={
-                        canPostFeedback
-                          ? `Add feedback for ${selectedGroup?.name ?? "this proposal"}...`
-                          : "Feedback is not available for your role"
-                      }
-                      rows={1}
-                    />
-                    <Button 
-                      size="icon" 
-                      className="h-10 w-10 shrink-0 rounded-full shadow-sm"
-                      onClick={async () => {
-                        const message = commentDraft.trim()
-                        const proposalId = selectedGroup?.id
-
-                        if (!proposalId) return
-
-                        if (!canPostFeedback) {
-                          toast.error("Feedback is not allowed for your role")
-                          return
-                        }
-
-                        if (!message) {
-                          toast.error("Feedback message is required")
-                          return
-                        }
-
-                        if (!isProposalSubmitted(effectiveStatus)) {
-                          toast.error("Feedback is only available while the proposal is submitted.")
-                          return
-                        }
-
-                        try {
-                          await createFeedbackMutation.mutateAsync({
-                            proposalId,
-                            dto: { message },
-                          })
-                          toast.success("Feedback added")
-                          setCommentDraft("")
-                        } catch (error) {
-                          toast.error("Failed to add feedback", {
-                            description: error instanceof Error ? error.message : "Try again.",
-                          })
-                        }
-                      }}
-                      disabled={!commentDraft.trim() || createFeedbackMutation.isPending || !canPostFeedback}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="audio" className="flex flex-1 items-center px-4 pb-6 mt-0 focus-visible:outline-none focus-visible:ring-0">
-                  <div className="w-full overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-muted/30 to-background shadow-sm">
-                    <div className="p-8 text-center">
-                      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary shadow-inner">
-                        <Phone className="h-8 w-8 animate-pulse" />
-                      </div>
-                      <h3 className="mb-2 text-xl font-bold tracking-tight">Audio Room: {selectedGroup?.name ?? "No group selected"}</h3>
-                      <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
-                        Secure, low-latency audio channel for rapid consensus and title voting alignment.
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
-                        <Badge variant="secondary" className="px-3 py-1 bg-background shadow-sm"><span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>4 Online</Badge>
-                        <Badge variant="outline" className="px-3 py-1">End-to-end Encrypted</Badge>
-                      </div>
-                      <Button size="lg" className="w-full sm:w-auto px-8 rounded-full shadow-md hover:shadow-lg transition-shadow" onClick={() => toast.success("Joined audio room") }>
-                        Join Audio Call
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="video" className="flex flex-1 items-center px-4 pb-6 mt-0 focus-visible:outline-none focus-visible:ring-0">
-                  <div className="w-full overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card to-muted/20 shadow-sm relative">
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      <Badge variant="destructive" className="animate-pulse shadow-sm">REC</Badge>
-                    </div>
-                    <div className="p-8 text-center">
-                      <div className="grid grid-cols-2 gap-3 mb-6 max-w-sm mx-auto">
-                        {[1, 2, 3, 4].map(i => (
-                          <div key={i} className="aspect-video rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shadow-inner relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                            <User className="h-8 w-8 text-muted-foreground/50" />
-                          </div>
-                        ))}
-                      </div>
-                      <h3 className="mb-2 text-xl font-bold tracking-tight">Virtual Review Session</h3>
-                      <p className="mb-6 text-sm text-muted-foreground">
-                        Present proposals, share screen, and compare title rubrics face-to-face.
-                      </p>
-                      <Button size="lg" className="w-full sm:w-auto px-8 rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors" onClick={() => toast.success("Joined video session") }>
-                        <Video className="mr-2 h-4 w-4" />
-                        Join Video Meeting
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
-                <Shield className="h-4 w-4" />
-                Recent Logs
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border-l-2 border-primary/20 pl-4 py-1 relative">
-                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-primary" />
-                  <p className="text-sm font-medium">Department Head opened review</p>
-                  <p className="text-xs text-muted-foreground">1 hour ago</p>
-                </div>
-                <div className="border-l-2 border-border/50 pl-4 py-1 relative">
-                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-muted-foreground/30" />
-                  <p className="text-sm">Evaluator marked Title 1 as &quot;Strong&quot;</p>
-                  <p className="text-xs text-muted-foreground">45 minutes ago</p>
-                </div>
-                <div className="border-l-2 border-border/50 pl-4 py-1 relative">
-                  <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-muted-foreground/30" />
-                  <p className="text-sm">Coordinator forwarded new attachments</p>
-                  <p className="text-xs text-muted-foreground">10 minutes ago</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
+      <section className="space-y-6">
           {canViewVoteBreakdown && (
             <Card className="border-border/60 shadow-sm">
               <CardHeader>
@@ -1001,7 +758,6 @@ export function DcCommitteeWorkspace({
               </CardContent>
             </Card>
           )}
-        </div>
       </section>
     </div>
   )

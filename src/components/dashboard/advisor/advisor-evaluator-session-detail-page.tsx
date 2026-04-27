@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { useQuery } from "@tanstack/react-query"
 import {
   AlertCircle,
   ArrowLeft,
@@ -30,14 +31,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
+import { getAdvisorSchedule } from "@/lib/api/advisor"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 import {
-  getScheduledSessionById,
   type ScheduledSessionDetail,
   type ScheduledSessionStatus,
   type ScheduledSessionType,
 } from "./advisor-evaluator-scheduled-data"
+import { mapAdvisorMeetingToScheduledSessionDetail } from "./advisor-evaluator-scheduled-data"
 
 function formatLongDate(dateString: string) {
   const d = new Date(dateString)
@@ -94,9 +97,39 @@ function initials(name: string) {
 }
 
 export function AdvisorEvaluatorSessionDetailPage({ sessionId }: { sessionId: string }) {
-  const session = React.useMemo(() => getScheduledSessionById(sessionId), [sessionId])
+  const authHydrated = useAuthStoreHydrated()
+  const scheduleQuery = useQuery({
+    queryKey: ["advisor", "schedule", "evaluator-session", sessionId],
+    queryFn: () => getAdvisorSchedule(),
+    enabled: authHydrated && Boolean(sessionId),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const session = React.useMemo(() => {
+    const meeting = (scheduleQuery.data?.items ?? []).find((item) => item.id === sessionId)
+    return meeting ? mapAdvisorMeetingToScheduledSessionDetail(meeting) : undefined
+  }, [scheduleQuery.data?.items, sessionId])
 
   if (!session) {
+    if (scheduleQuery.isLoading) {
+      return (
+        <div className="flex w-full min-w-0 flex-col items-center gap-4 py-16 text-center animate-in fade-in">
+          <AlertCircle className="h-12 w-12 text-muted-foreground" aria-hidden />
+          <div>
+            <h1 className="text-xl font-semibold">Loading session</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Fetching meeting details from your schedule.</p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/advisor/evaluator/scheduled">
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+              Back to sessions
+            </Link>
+          </Button>
+        </div>
+      )
+    }
+
     return (
       <div className="flex w-full min-w-0 flex-col items-center gap-4 py-16 text-center animate-in fade-in">
         <AlertCircle className="h-12 w-12 text-muted-foreground" aria-hidden />
@@ -264,7 +297,7 @@ function SessionDetailContent({ session }: { session: ScheduledSessionDetail }) 
                 <p className="text-sm font-semibold text-foreground">Capture live</p>
               </div>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li>Timestamp demo hits/misses for rubric comments later.</li>
+                <li>Timestamp key hits/misses for rubric comments later.</li>
                 <li>Q&amp;A: who answered, and does it match their docs?</li>
                 <li>If they leave the agenda, note it—score what happened.</li>
               </ul>
@@ -352,7 +385,7 @@ function SessionDetailContent({ session }: { session: ScheduledSessionDetail }) 
           <Card className="border-border/80 shadow-sm">
             <CardHeader className="border-b border-border/50 bg-muted/10">
               <CardTitle className="text-lg">Session documents</CardTitle>
-              <CardDescription>Files shared for this meeting (demo — connect storage for downloads).</CardDescription>
+              <CardDescription>Files shared for this meeting (connect storage for downloads).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 pt-5">
               {session.documents.map((doc) => (

@@ -34,13 +34,25 @@ import {
   CoordinatorReportsPlaceholderPage,
   CoordinatorStudentsPlaceholderPage,
 } from "@/components/dashboard/coordinator/placeholder-pages"
-import EvaluatorAssignedProjectsPage from "@/app/dashboard/evaluator/assigned-projects/page"
-import EvaluatorEvaluationsPage from "@/app/dashboard/evaluator/evaluations/page"
-import EvaluatorSchedulePage from "@/app/dashboard/evaluator/schedule/page"
 import EvaluatorReportsPage from "@/app/dashboard/evaluator/reports/page"
 import EvaluatorMessagesPage from "@/app/dashboard/evaluator/messages/page"
 import { notFound, redirect } from "next/navigation"
 import { type ComponentType } from "react"
+
+function EvaluatorAssignedProjectsRedirect() {
+  redirect("/dashboard/advisor/evaluator/pending?stage=capstone-ii")
+  return null
+}
+
+function EvaluatorEvaluationsRedirect() {
+  redirect("/dashboard/advisor/evaluator/pending?stage=capstone-ii")
+  return null
+}
+
+function EvaluatorScheduleRedirect() {
+  redirect("/dashboard/advisor/evaluator/scheduled?stage=capstone-ii")
+  return null
+}
 
 interface RoleSectionDashboardPageProps {
   params: Promise<{
@@ -95,9 +107,9 @@ const roleSectionComponentMap: Record<UserRole, Record<string, SectionComponent>
     reports: CommitteeReportsPage,
   },
   evaluator: {
-    "assigned-projects": EvaluatorAssignedProjectsPage,
-    evaluations: EvaluatorEvaluationsPage,
-    schedule: EvaluatorSchedulePage,
+    "assigned-projects": EvaluatorAssignedProjectsRedirect,
+    evaluations: EvaluatorEvaluationsRedirect,
+    schedule: EvaluatorScheduleRedirect,
     reports: EvaluatorReportsPage,
     messages: EvaluatorMessagesPage,
   },

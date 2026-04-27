@@ -4,14 +4,20 @@ const STORAGE_KEY = "academia.invite.accept-result.v1"
 
 type StoredInviteAcceptResult = {
   token: string
+  tenantDomain?: string
   result: AcceptInvitationResult
   storedAt: number
 }
 
-export function storeInviteAcceptResult(token: string, result: AcceptInvitationResult) {
+export function storeInviteAcceptResult(
+  token: string,
+  result: AcceptInvitationResult,
+  tenantDomain?: string
+) {
   if (typeof window === "undefined") return
   const payload: StoredInviteAcceptResult = {
     token,
+    tenantDomain,
     result,
     storedAt: Date.now(),
   }

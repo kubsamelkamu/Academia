@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, useInView, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion'
+import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRef, useState, useEffect } from 'react'
@@ -31,7 +31,6 @@ import {
   ChevronRight,
   Layers,
   Globe,
-  Cpu,
   TrendingUp,
   Award,
   Heart,
@@ -46,26 +45,6 @@ const container = 'mx-auto w-full max-w-[1600px] px-6 sm:px-10 lg:px-16'
 const BRAND = "#ED5F45"
 const BRAND_DARK = "#D54A32"
 const BRAND_LIGHT = "#F47A64"
-
-function useCountUp(target: number, duration = 1800) {
-  const [count, setCount] = useState(0)
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true })
-
-  useEffect(() => {
-    if (!inView) return
-    let start = 0
-    const step = target / (duration / 16)
-    const id = setInterval(() => {
-      start += step
-      if (start >= target) { setCount(target); clearInterval(id) }
-      else setCount(Math.floor(start))
-    }, 16)
-    return () => clearInterval(id)
-  }, [inView, target, duration])
-
-  return { ref, count }
-}
 
 /* ── 3D Tilt Card Component ── */
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -111,13 +90,6 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
 
 /* ─────────────────────────── data ─────────────────────────── */
 
-const stats = [
-  { value: 500, suffix: '+', label: 'Institutions', icon: GraduationCap },
-  { value: 12000, suffix: '+', label: 'Projects managed', icon: GitBranch },
-  { value: 98, suffix: '%', label: 'Satisfaction rate', icon: Star },
-  { value: 40, suffix: '%', label: 'Time saved', icon: Zap },
-]
-
 const steps = [
   {
     step: '01',
@@ -157,7 +129,7 @@ const bentoFeatures = [
     title: 'Smart Scheduling',
     description: 'Conflict-free defense scheduling with automated room booking and calendar sync.',
     icon: Calendar,
-    details: ['Automated conflict detection', 'Room & resource booking', 'Calendar integration', 'Reminders via email & SMS'],
+    details: ['Room & resource booking', 'Calendar integration', 'Reminders via email & in app'],
     size: 'small',
   },
   {
@@ -178,7 +150,7 @@ const bentoFeatures = [
     title: 'Smart Notifications',
     description: 'Deadline reminders, status updates, and activity digests delivered intelligently.',
     icon: Bell,
-    details: ['Email & SMS alerts', 'Customisable preferences', 'Deadline reminders', 'Activity digests'],
+    details: ['Email & In app Notification', 'Customisable preferences', 'Deadline reminders', 'Activity digests'],
     size: 'small',
   },
   {
@@ -252,9 +224,6 @@ const advancedFeatures = [
   { title: 'Custom Workflows', icon: Zap, description: "Configure project workflows to match your department's unique processes and requirements." },
   { title: 'Video Integration', icon: Video, description: 'Built-in video conferencing for remote meetings and virtual defenses with recording support.' },
   { title: 'Enterprise Security', icon: Shield, description: 'Enterprise-grade security with SSO, 2FA, audit logs, and role-based access control.' },
-  { title: 'AI-Assisted Review', icon: Cpu, description: 'Smart suggestions for advisor matching, scheduling optimisation, and project similarity checks.' },
-  { title: 'Multi-campus Support', icon: Globe, description: 'Manage multiple departments or campuses under one organisation with isolated data tenants.' },
-  { title: 'Deep Integrations', icon: Layers, description: 'Connect with LMS platforms, calendar services, email providers, and institutional SSO.' },
 ]
 
 /* ─────────────────────────── campus carousel ─────────────────────────── */
@@ -334,71 +303,8 @@ function HeroCampusCarousel() {
             </div>
           </div>
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: -12, scale: 0.9, translateZ: 40 }}
-          animate={{ opacity: 1, y: 0, scale: 1, translateZ: 40 }}
-          transition={{ delay: 0.55, duration: 0.45 }}
-          className="absolute -right-4 -top-4 flex items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3.5 py-2.5 shadow-xl backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/90"
-        >
-          <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-[${BRAND}]/10`}>
-            <TrendingUp className={`h-4 w-4 text-[${BRAND}]`} />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[11px] font-medium text-muted-foreground">Projects tracked</p>
-            <p className="text-sm font-bold text-foreground">12,000+</p>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12, scale: 0.9, translateZ: 60 }}
-          animate={{ opacity: 1, y: 0, scale: 1, translateZ: 60 }}
-          transition={{ delay: 0.7, duration: 0.45 }}
-          className="absolute -bottom-5 -right-4 flex items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3.5 py-2.5 shadow-xl backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/90"
-        >
-          <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-[${BRAND}]/10`}>
-            <Award className={`h-4 w-4 text-[${BRAND}]`} />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[11px] font-medium text-muted-foreground">Satisfaction rate</p>
-            <p className="text-sm font-bold text-foreground">98%</p>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: -12, scale: 0.9, translateZ: 80 }}
-          animate={{ opacity: 1, x: 0, scale: 1, translateZ: 80 }}
-          transition={{ delay: 0.85, duration: 0.45 }}
-          className="absolute -left-5 top-1/2 -translate-y-1/2 flex items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3.5 py-2.5 shadow-xl backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/90"
-        >
-          <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-[${BRAND}]/10`}>
-            <GraduationCap className={`h-4 w-4 text-[${BRAND}]`} />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[11px] font-medium text-muted-foreground">Institutions</p>
-            <p className="text-sm font-bold text-foreground">500+</p>
-          </div>
-        </motion.div>
       </motion.div>
     </motion.div>
-  )
-}
-
-/* ─────────────────────────── stat counter ─────────────────────────── */
-
-function StatCard({ value, suffix, label, icon: Icon }: typeof stats[0]) {
-  const { ref, count } = useCountUp(value)
-  return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <div className={`mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-[${BRAND}]/10 text-[${BRAND}]`}>
-        <Icon className="h-6 w-6" />
-      </div>
-      <p className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-        <span ref={ref}>{count.toLocaleString()}</span>
-        <span className={`text-[${BRAND}]`}>{suffix}</span>
-      </p>
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-    </div>
   )
 }
 
@@ -505,33 +411,6 @@ export default function FeaturesPage() {
 
             <HeroCampusCarousel />
 
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats ── */}
-      <section className="relative py-20 overflow-hidden border-b border-border/50 bg-muted/20 dark:bg-muted/10">
-        <div className="absolute inset-x-0 -top-px h-24 bg-gradient-to-b from-background to-transparent" />
-        <div className={container}>
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
-            {stats.map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0, y: 30, rotateX: 5 }}
-                whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07, duration: 0.6 }}
-              >
-                <TiltCard>
-                  <div className="p-8 rounded-[2.5rem] bg-background border shadow-xl flex flex-col items-center text-center transition-all duration-300 hover:shadow-2xl hover:border-[#ED5F45]/30 group">
-                    <div className="mb-6 h-14 w-14 rounded-2xl bg-[#ED5F45]/10 flex items-center justify-center text-[#ED5F45] group-hover:scale-110 transition-transform">
-                      <s.icon className="h-7 w-7" />
-                    </div>
-                    <StatCard {...s} />
-                  </div>
-                </TiltCard>
-              </motion.div>
-            ))}
           </div>
         </div>
       </section>
@@ -957,8 +836,8 @@ export default function FeaturesPage() {
                     <span className="text-[#ED5F45]">Project Management?</span>
                   </motion.h2>
                   <motion.p style={{ translateZ: 60 }} className="text-xl md:text-2xl text-white/60 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
-                    Join 500+ institutions already using Academia to deliver exceptional
-                    project and thesis management experiences.
+                    Join Academia to deliver exceptional project and thesis management
+                    experiences.
                   </motion.p>
                   <motion.div style={{ translateZ: 100 }} className="flex flex-col sm:flex-row items-center justify-center gap-8">
                     <MagnetButton>

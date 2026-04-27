@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { AuthCampusBackdrop } from "@/components/auth/auth-campus-backdrop"
 import { InvitationOnboardingShell } from "@/components/auth/invitation-onboarding-shell"
 import { cn } from "@/lib/utils"
-import { clearInviteAcceptResult, readInviteAcceptResult } from "@/lib/auth/invite-onboarding-storage"
+import { readInviteAcceptResult } from "@/lib/auth/invite-onboarding-storage"
 
 export default function AcceptInvitationSuccessClient() {
   const router = useRouter()
@@ -48,7 +48,6 @@ export default function AcceptInvitationSuccessClient() {
   }
 
   function onContinue() {
-    clearInviteAcceptResult()
     router.push("/login?from=invite")
   }
 

@@ -29,7 +29,7 @@ export default function AcceptInvitationClient() {
   async function onConfirmAccept() {
     try {
       const data = await acceptMutation.mutateAsync({ token: tokenFromUrl })
-      storeInviteAcceptResult(tokenFromUrl, data)
+      storeInviteAcceptResult(tokenFromUrl, data, preview?.tenantDomain)
       toast.success("Invitation accepted")
       router.push("/accept-invitation/success")
     } catch (e) {

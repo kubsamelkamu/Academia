@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,14 +34,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
+import { getAdvisorSchedule } from "@/lib/api/advisor"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
 import {
-  ADVISOR_SCHEDULED_SESSIONS,
   type ScheduledSessionDetail,
   type ScheduledSessionStatus,
   type ScheduledSessionType,
 } from "./advisor-evaluator-scheduled-data"
+import { mapAdvisorMeetingToScheduledSessionDetail } from "./advisor-evaluator-scheduled-data"
 
 function formatSessionDate(dateString: string) {
   const d = new Date(dateString)
@@ -77,13 +80,27 @@ function typeBadgeClass(type: ScheduledSessionType) {
 type SortKey = "date" | "project" | "status"
 
 export function AdvisorEvaluatorScheduledPage() {
+  const authHydrated = useAuthStoreHydrated()
   const [search, setSearch] = React.useState("")
   const [typeFilter, setTypeFilter] = React.useState<"all" | ScheduledSessionType>("all")
   const [sort, setSort] = React.useState<SortKey>("date")
 
+  const scheduleQuery = useQuery({
+    queryKey: ["advisor", "schedule", "evaluator-scheduled"],
+    queryFn: () => getAdvisorSchedule(),
+    enabled: authHydrated,
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  const sessions = React.useMemo(
+    () => (scheduleQuery.data?.items ?? []).map(mapAdvisorMeetingToScheduledSessionDetail),
+    [scheduleQuery.data?.items],
+  )
+
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase()
-    let rows = ADVISOR_SCHEDULED_SESSIONS.filter((s) => {
+    let rows = sessions.filter((s) => {
       if (typeFilter !== "all" && s.type !== typeFilter) return false
       if (!q) return true
       return (
@@ -99,19 +116,19 @@ export function AdvisorEvaluatorScheduledPage() {
       return new Date(a.date).getTime() - new Date(b.date).getTime()
     })
     return rows
-  }, [search, sort, typeFilter])
+  }, [search, sessions, sort, typeFilter])
 
-  const upcoming = ADVISOR_SCHEDULED_SESSIONS.filter((s) => s.status === "upcoming").length
-  const inProgress = ADVISOR_SCHEDULED_SESSIONS.filter((s) => s.status === "in-progress").length
-  const virtual = ADVISOR_SCHEDULED_SESSIONS.filter((s) => s.type === "virtual").length
+  const upcoming = sessions.filter((s) => s.status === "upcoming").length
+  const inProgress = sessions.filter((s) => s.status === "in-progress").length
+  const virtual = sessions.filter((s) => s.type === "virtual").length
 
   const nextActiveSession = React.useMemo(() => {
-    const active = ADVISOR_SCHEDULED_SESSIONS.filter(
+    const active = sessions.filter(
       (s) => s.status === "upcoming" || s.status === "in-progress",
     )
     if (active.length === 0) return null
     return [...active].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0] ?? null
-  }, [])
+  }, [sessions])
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-8 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
@@ -147,8 +164,8 @@ export function AdvisorEvaluatorScheduledPage() {
       <section aria-label="Summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total scheduled"
-          value={ADVISOR_SCHEDULED_SESSIONS.length}
-          subtitle="Demo sessions"
+          value={sessions.length}
+          subtitle="Meetings"
           icon={Calendar}
           iconClassName="bg-primary/10 text-primary"
         />
@@ -364,7 +381,15 @@ export function AdvisorEvaluatorScheduledPage() {
               </p>
             </div>
 
-            {filtered.length === 0 ? (
+            {scheduleQuery.isLoading ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                  <Calendar className="h-10 w-10 text-muted-foreground/40" aria-hidden />
+                  <p className="font-medium">Loading sessions…</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">Fetching meetings from your schedule.</p>
+                </CardContent>
+              </Card>
+            ) : filtered.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                   <Calendar className="h-10 w-10 text-muted-foreground/40" aria-hidden />
