@@ -88,7 +88,6 @@ export default function RegisterPage() {
       'universityName',
       'departmentName',
       'departmentCode',
-      'departmentDescription',
     ]);
     if (valid) setStep(2);
   };
@@ -272,19 +271,6 @@ export default function RegisterPage() {
                             {errors.departmentCode && <p className="text-[11px] font-bold text-destructive px-1">{errors.departmentCode.message}</p>}
                           </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="departmentDescription" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                              <Info className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
-                              Brief Info
-                            </Label>
-                            <Input
-                              id="departmentDescription"
-                              {...register('departmentDescription')}
-                              placeholder="Optional department description"
-                              className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
-                            />
-                          </div>
-
                           <Button
                             type="button"
                             className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest")}
@@ -401,7 +387,7 @@ export default function RegisterPage() {
                   </form>
 
                   <p className="mt-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-                    Already an admin?{' '}
+                    Already have a Department Head account?{' '}
                     <Link href="/login" className="font-black text-[#ED5F45] hover:underline uppercase text-xs tracking-widest">
                       Sign in
                     </Link>

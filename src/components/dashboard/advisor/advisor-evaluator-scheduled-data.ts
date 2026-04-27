@@ -38,114 +38,78 @@ export interface ScheduledSessionDetail {
   evaluationCriteria: ScheduledSessionCriterion[]
 }
 
-export const ADVISOR_SCHEDULED_SESSIONS: ScheduledSessionDetail[] = [
-  {
-    id: "1",
-    project: "AI‑Powered Campus Navigation",
-    group: "Team Alpha",
-    date: "2026-04-25",
-    time: "10:00 AM",
-    venue: "Room 301",
-    type: "in-person",
-    status: "upcoming",
-    duration: "2 hours",
-    evaluator: "Dr. Sarah Johnson",
-    description:
-      "Final evaluation session for the AI‑powered campus navigation system. Students present their work and demonstrate the application.",
-    agenda: [
-      "Project overview (15 min)",
-      "Technical demonstration (30 min)",
-      "Q&A session (30 min)",
-      "Evaluation and feedback (45 min)",
-    ],
-    teamMembers: [
-      { name: "John Doe", role: "Team Lead", avatar: "" },
-      { name: "Jane Smith", role: "Developer", avatar: "" },
-      { name: "Mike Johnson", role: "Designer", avatar: "" },
-    ],
-    documents: [
-      { name: "Project Proposal.pdf", size: "2.5 MB", uploadedAt: "2026-01-15" },
-      { name: "Final Report.docx", size: "1.8 MB", uploadedAt: "2026-04-20" },
-      { name: "Presentation Slides.pptx", size: "5.2 MB", uploadedAt: "2026-04-22" },
-    ],
-    evaluationCriteria: [
-      { name: "Technical implementation", weight: 25, description: "Quality of code and technical solutions" },
-      { name: "Innovation", weight: 20, description: "Creativity and novel approaches" },
-      { name: "Presentation", weight: 20, description: "Clarity and effectiveness of presentation" },
-      { name: "Documentation", weight: 15, description: "Completeness of project documentation" },
-      { name: "Q&A performance", weight: 20, description: "Ability to answer questions effectively" },
-    ],
-  },
-  {
-    id: "2",
-    project: "Real‑Time Campus Analytics",
-    group: "Data Analytics Team",
-    date: "2026-04-28",
-    time: "2:30 PM",
-    venue: "Zoom · link in calendar",
-    type: "virtual",
-    status: "upcoming",
-    duration: "90 minutes",
-    evaluator: "Dr. David Martinez",
-    description:
-      "Mid-term evaluation checkpoint: architecture review, data pipeline demo, and discussion of evaluation metrics.",
-    agenda: [
-      "Architecture recap (20 min)",
-      "Live pipeline demo (25 min)",
-      "Metrics & validation (20 min)",
-      "Feedback (25 min)",
-    ],
-    teamMembers: [
-      { name: "Alex Mercer", role: "Team Lead", avatar: "" },
-      { name: "Maria Garcia", role: "Analyst", avatar: "" },
-    ],
-    documents: [
-      { name: "Architecture.pdf", size: "1.2 MB", uploadedAt: "2026-04-10" },
-      { name: "Dataset Samples.xlsx", size: "890 KB", uploadedAt: "2026-04-18" },
-    ],
-    evaluationCriteria: [
-      { name: "Technical implementation", weight: 30, description: "System design and implementation quality" },
-      { name: "Data & analysis", weight: 25, description: "Sound use of data and analytical methods" },
-      { name: "Presentation", weight: 25, description: "Clarity of demo and slides" },
-      { name: "Documentation", weight: 20, description: "Reproducibility and completeness" },
-    ],
-  },
-  {
-    id: "3",
-    project: "Secure Research Data Platform",
-    group: "Security Systems",
-    date: "2026-05-02",
-    time: "9:00 AM",
-    venue: "Lab 2B",
-    type: "in-person",
-    status: "in-progress",
-    duration: "2 hours",
-    evaluator: "Prof. Anna Williams",
-    description: "Security-focused evaluation: threat model walkthrough, access control demo, and compliance checklist.",
-    agenda: [
-      "Threat model (20 min)",
-      "Access control demo (35 min)",
-      "Compliance Q&A (30 min)",
-      "Scoring & notes (35 min)",
-    ],
-    teamMembers: [
-      { name: "Liam Johnson", role: "Team Lead", avatar: "" },
-      { name: "Sophia Chen", role: "Security Engineer", avatar: "" },
-      { name: "James Okonjo", role: "Backend", avatar: "" },
-    ],
-    documents: [
-      { name: "Threat Model.pdf", size: "3.1 MB", uploadedAt: "2026-04-12" },
-      { name: "Security Checklist.pdf", size: "400 KB", uploadedAt: "2026-04-24" },
-    ],
-    evaluationCriteria: [
-      { name: "Security posture", weight: 35, description: "Controls, hardening, and threat coverage" },
-      { name: "Implementation", weight: 25, description: "Code quality and architecture" },
-      { name: "Documentation", weight: 20, description: "Policies and technical write-ups" },
-      { name: "Presentation", weight: 20, description: "Clarity of security narrative" },
-    ],
-  },
-]
+import type { AdvisorMeeting } from "@/lib/types/advisor"
 
-export function getScheduledSessionById(id: string): ScheduledSessionDetail | undefined {
-  return ADVISOR_SCHEDULED_SESSIONS.find((s) => s.id === id)
+function normalizeSessionStatus(status: string | null | undefined, date: string | null | undefined): ScheduledSessionStatus {
+  const normalized = status?.trim().toLowerCase().replace(/[_\s]+/g, "-")
+
+  if (normalized) {
+    if (normalized.includes("cancel")) return "cancelled"
+    if (normalized.includes("complete") || normalized.includes("done") || normalized === "completed") return "completed"
+    if (normalized.includes("in-progress") || normalized.includes("ongoing") || normalized.includes("started") || normalized.includes("live")) {
+      return "in-progress"
+    }
+    if (normalized.includes("upcoming") || normalized.includes("scheduled") || normalized.includes("pending")) return "upcoming"
+  }
+
+  const scheduledDate = date ? new Date(date) : null
+  if (scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() < Date.now()) {
+    return "completed"
+  }
+
+  return "upcoming"
+}
+
+function formatDuration(minutes: number | null | undefined): string {
+  const value = typeof minutes === "number" && Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0
+  if (value === 0) return "—"
+  if (value < 60) return `${value} minute${value === 1 ? "" : "s"}`
+  const hours = Math.floor(value / 60)
+  const remainder = value % 60
+  if (remainder === 0) return `${hours} hour${hours === 1 ? "" : "s"}`
+  return `${hours}h ${remainder}m`
+}
+
+function agendaToList(agenda: string | null | undefined): string[] {
+  const raw = agenda?.trim() ?? ""
+  if (!raw) return []
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return lines.length > 0 ? lines : [raw]
+}
+
+function pickLeadName(attendees: AdvisorMeeting["attendees"] | null | undefined): string {
+  const list = attendees ?? []
+  const evaluator = list.find((a) => a.role.toLowerCase().includes("evaluator"))
+  const chair = list.find((a) => a.role.toLowerCase().includes("chair") || a.role.toLowerCase().includes("lead"))
+  return (evaluator?.name ?? chair?.name ?? list[0]?.name ?? "—").trim() || "—"
+}
+
+export function mapAdvisorMeetingToScheduledSessionDetail(meeting: AdvisorMeeting): ScheduledSessionDetail {
+  const project = meeting.project?.trim() || meeting.title?.trim() || "Scheduled session"
+  const title = meeting.title?.trim() || ""
+
+  return {
+    id: meeting.id,
+    project,
+    group: title && title !== project ? title : "—",
+    date: meeting.date,
+    time: meeting.time,
+    venue: meeting.location?.trim() || (meeting.type === "virtual" ? "Virtual" : "—"),
+    type: meeting.type,
+    status: normalizeSessionStatus(meeting.status, meeting.date),
+    duration: formatDuration(meeting.durationMinutes),
+    evaluator: pickLeadName(meeting.attendees),
+    description: title || "Evaluation meeting",
+    agenda: agendaToList(meeting.agenda),
+    teamMembers: (meeting.attendees ?? []).map((attendee) => ({
+      name: attendee.name,
+      role: attendee.role,
+      avatar: attendee.avatar,
+    })),
+    documents: [],
+    evaluationCriteria: [],
+  }
 }

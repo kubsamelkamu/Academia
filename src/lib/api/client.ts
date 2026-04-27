@@ -14,6 +14,22 @@ function shouldForceSessionTerminationOn401(config: InternalAxiosRequestConfig |
   return combined.includes("/auth/me")
 }
 
+function isTenantDebugEnabled(): boolean {
+  if (typeof window === "undefined") return false
+  if (process.env.NODE_ENV === "production") return false
+  try {
+    const params = new URLSearchParams(window.location.search)
+    return params.get("debugTenant") === "1"
+  } catch {
+    return false
+  }
+}
+
+function isAuthLoginRequest(config: InternalAxiosRequestConfig): boolean {
+  const requestUrl = String(config.url ?? "")
+  return requestUrl.includes("/auth/login")
+}
+
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001/api/v1",
   headers: {
@@ -52,6 +68,28 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`)
   }
+
+  if (isTenantDebugEnabled() && isAuthLoginRequest(config)) {
+    const contentTypeValue = headers.get("Content-Type")
+    const contentType =
+      typeof contentTypeValue === "string"
+        ? contentTypeValue
+        : contentTypeValue != null
+          ? String(contentTypeValue)
+          : undefined
+
+    const safeHeaders: Record<string, string | undefined> = {
+      "X-Tenant-Domain": tenantDomain,
+      "Content-Type": contentType,
+    }
+    console.info("[tenant-debug] /auth/login request", {
+      url: config.url,
+      baseURL: config.baseURL,
+      tenantDomain,
+      safeHeaders,
+    })
+  }
+
   config.headers = headers
 
   return config
