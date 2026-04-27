@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { mockTeams } from "./projects-teams-data"
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { DashboardBackButton, DashboardBackLink } from "@/components/dashboard/dashboard-back"
@@ -68,6 +68,10 @@ function MemberPopup({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{`${member} details`}</DialogTitle>
+          <DialogDescription>View project team member details.</DialogDescription>
+        </DialogHeader>
 
         {/* Gradient header */}
         <div className="relative h-20 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 shrink-0">

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -1031,6 +1031,12 @@ export function DepartmentHeadDashboard() {
           ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!detailUser} onOpenChange={(open) => { if (!open) setDetailUser(null) }}>
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {detailUser ? `${detailUser.name} details` : "Member details"}
+            </DialogTitle>
+            <DialogDescription>View department member profile details.</DialogDescription>
+          </DialogHeader>
           {detailUser && (
             <>
               {/* Profile header card */}
@@ -1114,6 +1120,12 @@ export function DepartmentHeadDashboard() {
           ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null) }}>
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {editUser ? `Edit ${editUser.name}` : "Edit member"}
+            </DialogTitle>
+            <DialogDescription>Update department member profile details.</DialogDescription>
+          </DialogHeader>
           {editUser && (
             <>
               {/* Header */}
@@ -1180,6 +1192,12 @@ export function DepartmentHeadDashboard() {
           ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!emailUser} onOpenChange={(open) => { if (!open) setEmailUser(null) }}>
         <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {emailUser ? `Message ${emailUser.name}` : "Compose message"}
+            </DialogTitle>
+            <DialogDescription>Compose and send a message to this member.</DialogDescription>
+          </DialogHeader>
           {emailUser && (
             <>
               {/* Email header bar */}
@@ -1266,6 +1284,12 @@ export function DepartmentHeadDashboard() {
           ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!deleteUser} onOpenChange={(open) => { if (!open) setDeleteUser(null) }}>
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {deleteUser ? `Deactivate ${deleteUser.name}` : "Deactivate member"}
+            </DialogTitle>
+            <DialogDescription>Confirm deactivating a department member.</DialogDescription>
+          </DialogHeader>
           {deleteUser && (
             <>
               {/* Danger header */}
