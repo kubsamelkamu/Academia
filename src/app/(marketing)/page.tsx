@@ -364,14 +364,6 @@ export default function HomePage() {
                   </Link>
                 </Button>
               </MagnetButton>
-
-              <MagnetButton>
-                <Button size="lg" variant="outline" className="h-16 border-2 border-white/40 bg-black/25 px-10 text-xl font-bold text-white backdrop-blur-sm hover:bg-white/10 md:border-[#ED5F45]/30 md:bg-transparent md:text-[#ED5F45] md:hover:bg-[#ED5F45]/10 rounded-2xl transition-all" asChild>
-                  <Link href="/demo">
-                    Watch Demo <Play className="ml-3 h-6 w-6" />
-                  </Link>
-                </Button>
-              </MagnetButton>
             </div>
 
             <motion.div

@@ -79,7 +79,7 @@ export function Footer() {
               Ecosystem
             </h4>
             <ul className="space-y-3">
-              {["Features", "Pricing", "About", "Contact"].map((item) => (
+              {["Features", "About", "Contact"].map((item) => (
                 <li key={item}>
                   <Link 
                     href={`/${item.toLowerCase()}`} 
