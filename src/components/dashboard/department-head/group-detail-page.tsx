@@ -6,7 +6,7 @@ import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { DashboardBackLink } from "@/components/dashboard/dashboard-back"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { mockStudentGroups } from "@/data/mockData"
 import { DepartmentHeadStudentDetailPage } from "@/components/dashboard/department-head/student-detail-page"
@@ -18,6 +18,9 @@ interface GroupDetailPageProps {
 export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
   const group = mockStudentGroups.find((g) => g.id === groupId)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const selectedMember = selectedMemberId
+    ? group?.members.find((member) => member.id === selectedMemberId)
+    : null
 
   if (!group) {
     return (
@@ -112,6 +115,12 @@ export function GroupDetailPage({ groupId }: GroupDetailPageProps) {
       {/* Student detail popup */}
       <Dialog open={!!selectedMemberId} onOpenChange={(open) => { if (!open) setSelectedMemberId(null) }}>
         <DialogContent className="sm:max-w-2xl p-0 overflow-hidden gap-0 border-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {selectedMember ? `${selectedMember.name} details` : "Student details"}
+            </DialogTitle>
+            <DialogDescription>View student profile and academic details.</DialogDescription>
+          </DialogHeader>
           {selectedMemberId && (
             <DepartmentHeadStudentDetailPage
               studentId={selectedMemberId}

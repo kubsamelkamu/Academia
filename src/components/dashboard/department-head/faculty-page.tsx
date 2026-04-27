@@ -34,6 +34,9 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -573,6 +576,12 @@ export function DepartmentHeadFacultyPage() {
         onOpenChange={(open) => { if (!open) setDetailUser(null) }}
       >
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {detailUser ? `${detailUser.name} details` : "Member details"}
+            </DialogTitle>
+            <DialogDescription>View faculty member profile details.</DialogDescription>
+          </DialogHeader>
           {detailUser && (
             <>
               {/* Gradient header */}
@@ -701,6 +710,12 @@ export function DepartmentHeadFacultyPage() {
         onOpenChange={(open) => { if (!open) setEditUser(null) }}
       >
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {editUser ? `Edit ${editUser.name}` : "Edit member"}
+            </DialogTitle>
+            <DialogDescription>Update member profile details.</DialogDescription>
+          </DialogHeader>
           {editUser && (
             <>
               <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background px-6 pt-6 pb-5">
@@ -795,6 +810,12 @@ export function DepartmentHeadFacultyPage() {
         onOpenChange={(open) => { if (!open) setEmailUser(null) }}
       >
         <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {emailUser ? `Message ${emailUser.name}` : "Compose message"}
+            </DialogTitle>
+            <DialogDescription>Compose and send an email to this member.</DialogDescription>
+          </DialogHeader>
           {emailUser && (
             <>
               {/* Email header bar */}
@@ -912,6 +933,12 @@ export function DepartmentHeadFacultyPage() {
         onOpenChange={(open) => { if (!open) setDeleteUser(null) }}
       >
         <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {deleteUser ? `Deactivate ${deleteUser.name}` : "Deactivate member"}
+            </DialogTitle>
+            <DialogDescription>Confirm deactivating a member.</DialogDescription>
+          </DialogHeader>
           {deleteUser && (
             <>
               {/* Danger header */}

@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeRouteSync } from "@/components/providers/theme-route-sync"
 import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt"
+import { BotpressWebchat } from "@/components/providers/botpress-webchat"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const removeChildGuardPatchedRef = useRef(false)
@@ -62,6 +63,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       storageKey="academia-theme-mode"
     >
       <QueryClientProvider client={queryClient}>
+        <BotpressWebchat />
         <ThemeRouteSync />
         {children}
         <Toaster />
