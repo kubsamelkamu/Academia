@@ -33,12 +33,12 @@ import {
   unpinDirectChatMessage,
   uploadDirectChatAttachment,
 } from "@/lib/api/direct-chat"
-import { useDirectChatPins, useDirectChatRoom, useInfiniteDirectChatMessages } from "@/lib/hooks/use-direct-chat"
+import { directChatKeys, useDirectChatPins, useDirectChatRoom, useInfiniteDirectChatMessages } from "@/lib/hooks/use-direct-chat"
 import { useDepartmentProjectAdvisors } from "@/lib/hooks/use-projects"
 import { acquireChatSocket, releaseChatSocket } from "@/lib/realtime/chat-socket"
-import { useTenantUsersPaged } from "@/lib/hooks/use-users"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
+import { useQueryClient } from "@tanstack/react-query"
 import type {
   ChatMessage,
   MessageDeletedPayload,
@@ -50,7 +50,6 @@ import type {
 } from "@/types/chat"
 import type { DirectChatJoinAckData } from "@/types/direct-chat"
 import type { DepartmentProjectAdvisorDirectoryItem } from "@/types/projects"
-import type { TenantUserListItem } from "@/types/tenant-users"
 
 type ActorRole = "advisor" | "coordinator"
 
@@ -127,21 +126,6 @@ function mapAdvisorOption(item: DepartmentProjectAdvisorDirectoryItem): Counterp
   }
 }
 
-function mapCoordinatorOption(item: TenantUserListItem): CounterpartOption | null {
-  const userId = item.id?.trim()
-  if (!userId) {
-    return null
-  }
-
-  return {
-    userId,
-    displayName: getDisplayName(item.firstName, item.lastName, item.email),
-    email: item.email?.trim() || "No email",
-    avatarUrl: item.avatarUrl ?? null,
-    roleLabel: "Coordinator",
-  }
-}
-
 function flattenMessages(pages: Array<{ items: ChatMessage[] }> | undefined) {
   const orderedNewestFirst = pages?.flatMap((page) => page.items) ?? []
   const seen = new Set<string>()
@@ -160,6 +144,7 @@ function flattenMessages(pages: Array<{ items: ChatMessage[] }> | undefined) {
 
 export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: ActorRole }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const currentUser = useAuthStore((state) => state.user)
   const accessToken = useAuthStore((state) => state.accessToken)
   const tenantDomain = useAuthStore((state) => state.tenantDomain)
@@ -191,27 +176,12 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
     enabled: actorRole === "coordinator" && Boolean(accessToken) && Boolean(currentUser?.departmentId),
   })
 
-  const coordinatorsQuery = useTenantUsersPaged(
-    {
-      page: 1,
-      limit: 100,
-      search: counterpartSearch,
-      roleNames: ["COORDINATOR"],
-    },
-    {
-      enabled: actorRole === "advisor" && Boolean(accessToken),
-      staleTime: 30_000,
-    }
-  )
-
   const counterpartOptions = useMemo(() => {
     const search = counterpartSearch.trim().toLowerCase()
 
     const rawOptions = actorRole === "coordinator"
       ? (advisorsQuery.data ?? []).map(mapAdvisorOption).filter((item): item is CounterpartOption => item !== null)
-      : (coordinatorsQuery.data?.users ?? [])
-          .map(mapCoordinatorOption)
-          .filter((item): item is CounterpartOption => item !== null)
+      : []
 
     return rawOptions
       .filter((item) => item.userId !== currentUser?.id)
@@ -227,8 +197,25 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
   const effectiveSelectedCounterpartUserId = selectedCounterpartUserId ?? counterpartOptions[0]?.userId ?? null
 
   const selectedCounterpart = useMemo(
-    () => counterpartOptions.find((item) => item.userId === effectiveSelectedCounterpartUserId) ?? null,
-    [counterpartOptions, effectiveSelectedCounterpartUserId]
+    () => {
+      const matchedCounterpart = counterpartOptions.find((item) => item.userId === effectiveSelectedCounterpartUserId) ?? null
+      if (matchedCounterpart) {
+        return matchedCounterpart
+      }
+
+      if (actorRole === "advisor" && effectiveSelectedCounterpartUserId) {
+        return {
+          userId: effectiveSelectedCounterpartUserId,
+          displayName: "Coordinator",
+          email: "Open from a shared direct-chat link",
+          avatarUrl: null,
+          roleLabel: "Coordinator",
+        }
+      }
+
+      return null
+    },
+    [actorRole, counterpartOptions, effectiveSelectedCounterpartUserId]
   )
 
   const handleSelectCounterpart = useCallback(
@@ -268,6 +255,11 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
     roomId,
     enabled: Boolean(accessToken) && Boolean(roomId),
   })
+
+  const directMessagesQueryKey = useMemo(
+    () => directChatKeys().messagesInfinite({ roomId: roomId ?? "", limit: 30 }),
+    [roomId]
+  )
 
   const messages = useMemo(
     () => flattenMessages(directMessagesQuery.data?.pages),
@@ -422,7 +414,7 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
     }
 
     const refetchMessages = () => {
-      void directMessagesQuery.refetch()
+      void queryClient.invalidateQueries({ queryKey: directMessagesQueryKey })
     }
 
     const handleMessageNew = (payload: unknown) => {
@@ -525,7 +517,7 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
       setOnlineUserIds([])
       setTypingUserIds([])
     }
-  }, [accessToken, currentUser?.id, directMessagesQuery, emitTypingStop, roomId, tenantDomain])
+  }, [accessToken, currentUser?.id, directMessagesQueryKey, emitTypingStop, queryClient, roomId, tenantDomain])
 
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
@@ -847,11 +839,11 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
 
   const isCounterpartLoading = actorRole === "coordinator"
     ? advisorsQuery.isLoading
-    : coordinatorsQuery.isLoading
+    : false
 
   const counterpartError = actorRole === "coordinator"
     ? advisorsQuery.error
-    : coordinatorsQuery.error
+    : null
 
   const title = actorRole === "advisor" ? "Coordinator Direct Chat" : "Advisor Direct Chat"
   const description = actorRole === "advisor"
@@ -880,13 +872,14 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
               value={counterpartSearch}
               onChange={(event) => setCounterpartSearch(event.target.value)}
               className="pl-9"
+              disabled={actorRole === "advisor"}
               placeholder={actorRole === "advisor" ? "Search coordinators..." : "Search advisors..."}
             />
           </div>
 
           {actorRole === "advisor" && (
             <p className="mt-3 text-xs text-muted-foreground">
-              Coordinators are listed from tenant users. The backend still enforces same-department room access.
+              Coordinator discovery for advisor accounts is currently blocked by backend permissions on the tenant user directory. Direct rooms still work when opened with a shared chat link containing the coordinator user id.
             </p>
           )}
         </div>
@@ -904,9 +897,15 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
             </div>
           )}
 
-          {!isCounterpartLoading && !counterpartError && counterpartOptions.length === 0 && (
+          {!isCounterpartLoading && !counterpartError && counterpartOptions.length === 0 && actorRole === "coordinator" && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               No available {actorRole === "advisor" ? "coordinators" : "advisors"} found.
+            </div>
+          )}
+
+          {actorRole === "advisor" && !selectedCounterpart && (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              Coordinator search is unavailable for advisor accounts until the backend exposes an advisor-safe coordinator directory endpoint.
             </div>
           )}
 
