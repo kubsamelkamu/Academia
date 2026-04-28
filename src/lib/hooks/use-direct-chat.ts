@@ -4,10 +4,12 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 
 import {
   getOrCreateDirectChatRoom,
+  listAdvisorVisibleCoordinators,
   listDirectChatMessages,
   listDirectChatPins,
 } from "@/lib/api/direct-chat"
 import type {
+  AdvisorVisibleCoordinatorsResponse,
   DirectChatMessagesResponse,
   DirectChatPin,
   DirectChatRoom,
@@ -23,7 +25,33 @@ export function directChatKeys() {
     messagesInfinite: (params: { roomId: string; limit: number }) =>
       [...directChatKeys().root, "rooms", params.roomId, "messages", "infinite", params] as const,
     pins: (roomId: string) => [...directChatKeys().root, "rooms", roomId, "pins"] as const,
+    advisorVisibleCoordinators: (params: { search: string; limit: number }) =>
+      [...directChatKeys().root, "advisor-visible-coordinators", params] as const,
   }
+}
+
+export function useInfiniteAdvisorVisibleCoordinators(params: {
+  enabled: boolean
+  search?: string
+  limit?: number
+}) {
+  const search = params.search?.trim() ?? ""
+  const limit = params.limit ?? 20
+
+  return useInfiniteQuery<AdvisorVisibleCoordinatorsResponse, Error>({
+    queryKey: directChatKeys().advisorVisibleCoordinators({ search, limit }),
+    queryFn: ({ pageParam }) =>
+      listAdvisorVisibleCoordinators({
+        search,
+        limit,
+        cursor: typeof pageParam === "string" ? pageParam : null,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.pagination.nextCursor ?? undefined,
+    enabled: params.enabled,
+    staleTime: 15_000,
+    retry: false,
+  })
 }
 
 export function useDirectChatRoom(params: {
