@@ -1,5 +1,6 @@
 import apiClient from "@/lib/api/client"
 import type {
+  AdvisorVisibleCoordinatorsResponse,
   DirectChatMessagesResponse,
   DirectChatPin,
   DirectChatPinMutationResponse,
@@ -23,6 +24,25 @@ function trimRequired(value: string, fieldName: string): string {
 
 function encodeId(value: string, fieldName: string): string {
   return encodeURIComponent(trimRequired(value, fieldName))
+}
+
+export async function listAdvisorVisibleCoordinators(params?: {
+  search?: string
+  limit?: number
+  cursor?: string | null
+}): Promise<AdvisorVisibleCoordinatorsResponse> {
+  const response = await apiClient.get<AdvisorVisibleCoordinatorsResponse>(
+    "/coordinator-advisor-chat/advisors/me/coordinators",
+    {
+      params: {
+        ...(params?.search?.trim() ? { search: params.search.trim() } : null),
+        limit: params?.limit ?? 20,
+        ...(params?.cursor ? { cursor: params.cursor } : null),
+      },
+    }
+  )
+
+  return response.data
 }
 
 export async function getOrCreateDirectChatRoom(counterpartUserId: string): Promise<DirectChatRoom> {

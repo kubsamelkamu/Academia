@@ -77,3 +77,28 @@ export type DirectChatPinMutationResponse = {
 }
 
 export type DirectChatSocketAck<T> = SocketAck<T>
+
+export type AdvisorVisibleCoordinatorItem = {
+  userId: string
+  firstName: string | null
+  lastName: string | null
+  email: string
+  avatarUrl: string | null
+  roleName: "COORDINATOR"
+  departmentId?: string | null
+  departmentName?: string | null
+  isDirectChatEligible: boolean
+  existingRoomId?: string | null
+}
+
+export type AdvisorVisibleCoordinatorsPagination = {
+  limit: number
+  nextCursor: string | null
+  hasNext: boolean
+  total: number
+}
+
+export type AdvisorVisibleCoordinatorsResponse = {
+  items: AdvisorVisibleCoordinatorItem[]
+  pagination: AdvisorVisibleCoordinatorsPagination
+}
