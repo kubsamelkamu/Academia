@@ -1,5 +1,5 @@
-import { CoordinatorCommunicationPage } from "@/components/dashboard/coordinator/communication-page"
+import { CoordinatorMessagesRoute } from "@/components/dashboard/coordinator/messages-route"
 
-export default function MessagesPage() {
-  return <CoordinatorCommunicationPage />
+export default function Page() {
+  return <CoordinatorMessagesRoute />
 }
