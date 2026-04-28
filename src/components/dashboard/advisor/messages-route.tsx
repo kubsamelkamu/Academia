@@ -13,6 +13,6 @@ function MessagesLoadingShell() {
 
 /** Chat UI uses Radix portals; load client-only to avoid SSR/hydration removeChild errors. */
 export const AdvisorMessagesRoute = dynamic(
-  () => import("./messages-page").then((m) => m.AdvisorMessagesPage),
+  () => import("./messages-hub-page").then((m) => m.AdvisorMessagesHubPage),
   { ssr: false, loading: MessagesLoadingShell }
 )
