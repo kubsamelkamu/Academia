@@ -192,7 +192,7 @@ export function CoordinatorAdvisorDirectChatPage({ actorRole }: { actorRole: Act
           item.email.toLowerCase().includes(search)
         )
       })
-  }, [actorRole, advisorsQuery.data, coordinatorsQuery.data?.users, counterpartSearch, currentUser?.id])
+  }, [actorRole, advisorsQuery.data, counterpartSearch, currentUser?.id])
 
   const effectiveSelectedCounterpartUserId = selectedCounterpartUserId ?? counterpartOptions[0]?.userId ?? null
 
