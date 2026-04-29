@@ -229,9 +229,11 @@ const advancedFeatures = [
 /* ─────────────────────────── campus carousel ─────────────────────────── */
 
 const campusSlides = [
-  { src: '/sign-in-campus.jpg', alt: 'Main campus administration building' },
-  { src: '/sign-in-campus2.jpg', alt: 'Campus academic block and grounds' },
-  { src: '/sign-in-campus3.jpg', alt: 'Campus dormitories surrounded by greenery' },
+  { src: "/department head.png", alt: "Department head" },
+  { src: "/students.png", alt: "Students" },
+  { src: "/advisor.png", alt: "Advisor" },
+  { src: "/evaluator.png", alt: "Evaluator" },
+  { src: "/coordinator.png", alt: "Coordinator" },
 ]
 
 function HeroCampusCarousel() {
@@ -240,7 +242,7 @@ function HeroCampusCarousel() {
   useEffect(() => {
     const id = setInterval(() => {
       setCurrent((prev) => (prev + 1) % campusSlides.length)
-    }, 4000)
+    }, 6500)
     return () => clearInterval(id)
   }, [])
 
