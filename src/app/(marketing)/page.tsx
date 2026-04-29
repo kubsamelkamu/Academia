@@ -450,32 +450,22 @@ export default function HomePage() {
 
       {/* Hero — full viewport */}
       <section className="relative h-screen bg-black text-white overflow-hidden">
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay
-          loop
-          muted
-          playsInline
-          onError={() => setVideoError(true)}
-          onCanPlay={() => setVideoError(false)}
-          controls={false}
-        >
-          <source src="https://cdn.pixabay.com/video/2019/03/29/22449-327996264_medium.mp4" />
-        </video>
-
-        {videoError && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center">
-            <div className="text-center">
-              <p className="mb-4 text-white">Background video failed to load. You can open it manually:</p>
-              <a
-                href="https://cdn.pixabay.com/video/2019/03/29/22449-327996264_medium.mp4"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block bg-white text-black px-6 py-3 rounded-lg"
-              >
-                Open Video
-              </a>
-            </div>
+        {!videoError ? (
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            onError={() => setVideoError(true)}
+            onCanPlay={() => setVideoError(false)}
+            controls={false}
+          >
+            <source src="https://cdn.pixabay.com/video/2019/03/29/22449-327996264_medium.mp4" />
+          </video>
+        ) : (
+          <div className="absolute inset-0 -z-10">
+            <Image src="/background.png" alt="Background" fill className="object-cover" priority />
           </div>
         )}
 
