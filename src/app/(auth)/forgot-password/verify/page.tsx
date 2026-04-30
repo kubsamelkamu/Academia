@@ -154,7 +154,7 @@ function ForgotPasswordVerifyPageContent() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -170,7 +170,7 @@ function ForgotPasswordVerifyPageContent() {
           <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
             Verify reset code
           </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
             Step 2 of 3 — confirm the 6-digit code we sent to your email.
           </p>
         </motion.div>
@@ -344,8 +344,8 @@ export default function ForgotPasswordVerifyPage() {
       fallback={
         <AuthCampusBackdrop>
           <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-white/60" />
-            <p className="text-sm font-medium text-white/90 drop-shadow">Loading…</p>
+            <Loader2 className="h-10 w-10 animate-spin text-slate-500" />
+            <p className="text-sm font-medium text-slate-600">Loading…</p>
           </div>
         </AuthCampusBackdrop>
       }
