@@ -140,7 +140,7 @@ export default function ForgotPasswordResetPage() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -154,7 +154,7 @@ export default function ForgotPasswordResetPage() {
             <Shield className="h-10 w-10 text-white sm:h-11 sm:w-11" />
           </motion.div>
           <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>Set a new password</h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
             Step 3 of 3 — choose a strong password for {email || 'your account'}.
           </p>
         </motion.div>

@@ -18,7 +18,7 @@ export function ForgotPasswordProgress({ currentStep, stepLinks }: ForgotPasswor
   const currentIndex = steps.findIndex((step) => step.key === currentStep)
 
   return (
-    <div className="flex items-center justify-center space-x-4 mb-2">
+    <div className="mb-2 flex items-center justify-center space-x-4">
       {steps.map((step, index) => {
         const Icon = index <= currentIndex ? CheckCircle2 : step.icon
         const isActive = step.key === currentStep
@@ -29,20 +29,20 @@ export function ForgotPasswordProgress({ currentStep, stepLinks }: ForgotPasswor
         const stepContent = (
           <>
             <div
-              className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
                 isCompleted
-                  ? 'bg-green-500 border-green-500 text-white'
+                  ? 'border-[#ED5F45] bg-[#ED5F45] text-white'
                   : isActive
-                    ? 'border-blue-500 text-blue-500'
+                    ? 'border-[#ED5F45] text-[#ED5F45]'
                     : 'border-gray-300 text-gray-400'
-              } ${canNavigate ? 'group-hover:border-blue-400 group-hover:text-blue-500' : ''}`}
+              } ${canNavigate ? 'group-hover:border-[#ED5F45] group-hover:text-[#ED5F45]' : ''}`}
             >
               <Icon className="w-5 h-5" />
             </div>
             <span
               className={`mt-2 text-sm font-medium ${
-                isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
-              } ${canNavigate ? 'group-hover:text-blue-600 transition-colors' : ''}`}
+                isActive ? 'text-[#ED5F45]' : isCompleted ? 'text-[#ED5F45]' : 'text-gray-500'
+              } ${canNavigate ? 'group-hover:text-[#ED5F45] transition-colors' : ''}`}
             >
               {step.label}
             </span>

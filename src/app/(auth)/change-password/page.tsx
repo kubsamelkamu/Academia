@@ -333,7 +333,7 @@ function ChangePasswordPageContent() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -349,7 +349,7 @@ function ChangePasswordPageContent() {
           <h1 className={cn("mb-3 text-4xl sm:text-5xl md:text-6xl", AUTH_WELCOME_HEADLINE_CLASS)}>
             Change password
           </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
             Update your password to keep your account secure.
           </p>
         </motion.div>
@@ -657,7 +657,7 @@ export default function ChangePasswordPage() {
     <Suspense
       fallback={
         <AuthCampusBackdrop>
-          <p className="text-sm font-medium text-white/90 drop-shadow">Loading…</p>
+          <p className="text-sm font-medium text-slate-600">Loading…</p>
         </AuthCampusBackdrop>
       }
     >

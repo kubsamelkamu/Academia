@@ -28,7 +28,7 @@ export default function AccountSuspendedPage() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -44,7 +44,7 @@ export default function AccountSuspendedPage() {
           <h1 className={cn('mb-3 text-3xl sm:text-4xl md:text-5xl', AUTH_WELCOME_HEADLINE_CLASS)}>
             Account suspended
           </h1>
-          <p className="text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">{description}</p>
+          <p className="text-pretty text-base font-medium text-slate-600 sm:text-lg">{description}</p>
         </motion.div>
 
         <motion.div variants={AUTH_ITEM_VARIANTS}>

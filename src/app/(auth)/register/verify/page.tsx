@@ -126,7 +126,7 @@ export default function VerifyPage() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -142,7 +142,7 @@ export default function VerifyPage() {
           <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
             Verify your email
           </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
             We&apos;ve sent a verification code to secure your academic institution account.
           </p>
         </motion.div>
