@@ -432,7 +432,7 @@ export async function approveProjectGroupReview(groupId: string): Promise<{ appr
     throw new Error("groupId is required")
   }
 
-  const response = await apiClient.patch<{ approved: boolean; id: string }>(
+  const response = await apiClient.post<{ approved: boolean; id: string }>(
     `/project-groups/review/${encodeURIComponent(trimmed)}/approve`
   )
 
@@ -453,7 +453,7 @@ export async function rejectProjectGroupReview(
     throw new Error("reason is required")
   }
 
-  const response = await apiClient.patch<{ rejected: boolean; id: string; rejectionReason?: string | null }>(
+  const response = await apiClient.post<{ rejected: boolean; id: string; rejectionReason?: string | null }>(
     `/project-groups/review/${encodeURIComponent(trimmed)}/reject`,
     { reason }
   )
