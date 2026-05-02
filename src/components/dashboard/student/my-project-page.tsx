@@ -295,7 +295,6 @@ export function StudentMyProjectPage() {
       return {
         ...templateMilestone,
         id: matchedProjectMilestone.id,
-        dueDate: matchedProjectMilestone.dueDate,
         status: mapStudentMilestoneStatus(matchedProjectMilestone.status),
         submittedAt: matchedProjectMilestone.submittedAt ?? undefined,
       }

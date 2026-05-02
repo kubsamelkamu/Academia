@@ -466,7 +466,7 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
               id: matchedProjectMilestone.id,
               name: templateMilestone.name,
               status: mapMilestoneStatus(matchedProjectMilestone.status),
-              dueDate: matchedProjectMilestone.dueDate,
+              dueDate: templateMilestone.dueDate,
               sequence: templateMilestone.sequence,
             }
           : templateMilestone
