@@ -711,8 +711,6 @@ export function StudentTeamMemberPage() {
                   <Badge variant="outline" className="text-xs">
                     Student
                   </Badge>
-                  <span>{currentUser.year}</span>
-                  <span>•</span>
                   <span>{profileDepartment || currentUser.department}</span>
                 </div>
               </div>

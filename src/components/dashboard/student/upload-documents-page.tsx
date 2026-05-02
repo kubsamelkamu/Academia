@@ -145,6 +145,8 @@ export function StudentUploadDocumentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const hasRedirectedRef = useRef(false)
+  const proposalMilestoneState = useMemo(() => toProposalMilestoneState(myGroupProposalsQuery.data), [myGroupProposalsQuery.data])
+  const proposalMilestoneLocked = proposalMilestoneState?.status === "submitted" || proposalMilestoneState?.status === "approved"
 
   const milestoneParam = searchParams.get("milestone")
   const milestoneKeyFromParam = useMemo(() => milestoneParamToKey(milestoneParam), [milestoneParam])
@@ -205,8 +207,6 @@ export function StudentUploadDocumentsPage() {
       projectMilestones.map((item) => [normalizeMilestoneName(item.title ?? ""), item])
     )
 
-    const proposalMilestoneState = toProposalMilestoneState(myGroupProposalsQuery.data)
-
     const orderedStatuses = orderedTemplateMilestones.map((templateMilestone) => {
       const matched = projectMilestonesByName.get(normalizeMilestoneName(templateMilestone.title))
       const mappedStatus = matched ? mapBackendStatus(matched.status) : ("pending" as const)
@@ -233,7 +233,7 @@ export function StudentUploadDocumentsPage() {
     const blockingMilestoneNumber =
       orderedTemplateMilestones[previousIndex].sequence ?? previousIndex + 1
     return { blocked: true, blockingMilestoneNumber }
-  }, [milestone, milestoneTemplatesData?.templates, myGroupProposalsQuery.data, projectMilestones])
+  }, [milestone, milestoneTemplatesData?.templates, proposalMilestoneState, projectMilestones])
 
   useEffect(() => {
     if (hasRedirectedRef.current) return
@@ -314,6 +314,11 @@ export function StudentUploadDocumentsPage() {
   const handleSubmit = async () => {
     if (!milestone) {
       toast.error("Milestone is required")
+      return
+    }
+
+    if (milestone === "proposal" && proposalMilestoneLocked) {
+      toast.info("Milestone 1 is already submitted or approved.")
       return
     }
 
@@ -619,12 +624,17 @@ export function StudentUploadDocumentsPage() {
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="">Select milestone</option>
-                  <option value="proposal">Proposal</option>
+                  <option value="proposal" disabled={proposalMilestoneLocked}>Proposal</option>
                   <option value="requirements">Requirements (SRS)</option>
                   <option value="design">Design (SDD)</option>
                   <option value="implementation">Implementation</option>
                   <option value="final">Final Report</option>
                 </select>
+                {proposalMilestoneLocked ? (
+                  <p className="text-xs text-muted-foreground">
+                    Milestone 1 is already submitted or approved, so it cannot be selected again.
+                  </p>
+                ) : null}
               </div>
 
               {recommendedType ? (

@@ -16,7 +16,6 @@ import { DashboardEmptyState, DashboardSectionCard } from "@/components/dashboar
 import { useAuthStore } from "@/store/auth-store"
 import { useMilestoneTemplatesList } from "@/lib/hooks/use-milestone-templates"
 import { useMilestoneTemplatesStore } from "@/store/milestone-templates-store"
-import { CreateMilestoneTemplateDialog } from "@/components/dashboard/department-head/create-milestone-template-dialog"
 import { EditMilestoneTemplateDialog } from "@/components/dashboard/department-head/edit-milestone-template-dialog"
 import type { MilestoneTemplateMilestone } from "@/types/milestone-templates"
 
@@ -115,7 +114,6 @@ export function MilestoneTemplatesSection() {
             </div>
 
             <div className="flex items-center gap-2">
-              <CreateMilestoneTemplateDialog onCreated={() => query.refetch()} />
               <Button
                 type="button"
                 variant="outline"

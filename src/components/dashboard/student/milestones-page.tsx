@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,6 @@ import {
   getLatestLinkedProposal,
   isProposalMilestoneName,
   normalizeMilestoneName,
-  toProposalMilestoneState,
 } from "@/lib/student-milestone-helpers"
 import type { MilestoneTemplate } from "@/types/milestone-templates"
 import type { ProposalProjectMilestone } from "@/types/project-proposals"
@@ -126,66 +125,6 @@ function mapBackendStatus(status: string): MilestoneStatus {
   return "pending"
 }
 
-function readProposalOverrideFromStorage(studentId: string | null): {
-  status: MilestoneStatus
-  submittedAt?: string
-} | null {
-  if (typeof window === "undefined") return null
-
-  const host = window.location.host
-  const candidateIds = [studentId?.trim() || "", "any", ""]
-
-  for (const candidateId of candidateIds) {
-    try {
-      const storageKey = ["academia:proposal:lastSubmitted", host, candidateId].join(":")
-      const raw = localStorage.getItem(storageKey)
-      if (!raw) continue
-
-      const parsed = JSON.parse(raw) as { status?: unknown; submittedAt?: unknown }
-      const status = typeof parsed.status === "string" ? parsed.status : null
-      const submittedAt = typeof parsed.submittedAt === "string" ? parsed.submittedAt : undefined
-      if (status === "submitted" || status === "approved") {
-        return { status, submittedAt }
-      }
-    } catch {
-      // keep trying
-    }
-  }
-
-  try {
-    const prefix = `academia:proposal:lastSubmitted:${host}:`
-    let best: { status: MilestoneStatus; submittedAt?: string; time: number } | null = null
-
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key || !key.startsWith(prefix)) continue
-
-      const raw = localStorage.getItem(key)
-      if (!raw) continue
-
-      try {
-        const parsed = JSON.parse(raw) as { status?: unknown; submittedAt?: unknown }
-        const status = typeof parsed.status === "string" ? parsed.status : null
-        const submittedAt = typeof parsed.submittedAt === "string" ? parsed.submittedAt : undefined
-        if (status !== "submitted" && status !== "approved") continue
-
-        const time = submittedAt ? Date.parse(submittedAt) : Number.NEGATIVE_INFINITY
-        if (!best || (Number.isFinite(time) && time > best.time)) {
-          best = { status, submittedAt, time: Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY }
-        }
-      } catch {
-        // ignore malformed items
-      }
-    }
-
-    if (best) return { status: best.status, submittedAt: best.submittedAt }
-  } catch {
-    // ignore localStorage scan failures
-  }
-
-  return null
-}
-
 export function StudentMilestonesPage() {
   const router = useRouter()
   const user = useAuthStore((state) => state.user)
@@ -194,23 +133,6 @@ export function StudentMilestonesPage() {
   const studentId = user?.id ?? null
   const myProjectGroupQuery = useMyProjectGroup(Boolean(accessToken))
   const myGroupProposalsQuery = useMyGroupProposals(Boolean(accessToken))
-  const [proposalOverride, setProposalOverride] = useState<{
-    status: MilestoneStatus
-    submittedAt?: string
-  } | null>(() => {
-    return readProposalOverrideFromStorage(studentId)
-  })
-
-  useEffect(() => {
-    const nextOverride = readProposalOverrideFromStorage(studentId)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (nextOverride) setProposalOverride(nextOverride)
-  }, [studentId])
-
-  const proposalMilestoneState = useMemo(() => {
-    const fromBackend = toProposalMilestoneState(myGroupProposalsQuery.data)
-    return fromBackend ?? proposalOverride
-  }, [myGroupProposalsQuery.data, proposalOverride])
 
   const latestLinkedProposal = useMemo(
     () => getLatestLinkedProposal(myGroupProposalsQuery.data),
@@ -315,7 +237,7 @@ export function StudentMilestonesPage() {
       return {
         ...templateMilestone,
         id: proposalMilestone?.id || fallbackMilestone?.id || templateMilestone.id,
-        dueDate: proposalMilestone?.dueDate || fallbackMilestone?.dueDate || templateMilestone.dueDate,
+        dueDate: templateMilestone.dueDate,
         status: mergedStatus,
         submittedAt:
           latestSubmission?.createdAt ||
@@ -352,19 +274,8 @@ export function StudentMilestonesPage() {
           normalizeMilestoneName(templateMilestone.name)
         )
 
-        const maybeOverride =
-          proposalMilestoneState &&
-          isProposalMilestoneName(templateMilestone.name)
-
         if (!matchedProjectMilestone && !matchedProposalMilestone) {
-          if (!maybeOverride) return templateMilestone
-
-          return {
-            ...templateMilestone,
-            status: proposalMilestoneState.status,
-            submittedAt: proposalMilestoneState.submittedAt,
-            isApproved: proposalMilestoneState.status === "approved",
-          }
+          return templateMilestone
         }
 
         const mapped = mergeMilestoneState(
@@ -372,15 +283,6 @@ export function StudentMilestonesPage() {
           matchedProposalMilestone,
           matchedProjectMilestone
         )
-
-        if (proposalMilestoneState && isProposalMilestoneName(templateMilestone.name)) {
-          return {
-            ...mapped,
-            status: proposalMilestoneState.status,
-            submittedAt: proposalMilestoneState.submittedAt ?? mapped.submittedAt,
-            isApproved: proposalMilestoneState.status === "approved",
-          }
-        }
 
         return mapped
       })

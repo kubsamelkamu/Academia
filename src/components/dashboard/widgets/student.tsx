@@ -117,7 +117,7 @@ function useStudentWidgetData() {
           ...t,
           id: matched.id,
           status: mapMilestoneStatus(matched.status),
-          dueDate: matched.dueDate,
+          dueDate: t.dueDate,
         }
       })
     }
