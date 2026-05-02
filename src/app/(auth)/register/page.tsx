@@ -209,20 +209,21 @@ export default function RegisterPage() {
 
                       <div className="space-y-2">
                         <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
-                        <div className="relative">
+                        <div className="relative isolate">
                           <Input
                             id="password"
-                            type={isPasswordVisible ? 'text' : 'password'}
                             {...register('password')}
+                            type={isPasswordVisible ? 'text' : 'password'}
                             placeholder="Enter your password"
                             className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl pr-11')}
                           />
                           <button
                             type="button"
                             onClick={() => setIsPasswordVisible((p) => !p)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
                           >
-                            {isPasswordVisible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                            {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
                         {errors.password && <p className="text-xs font-medium text-destructive">{errors.password.message}</p>}

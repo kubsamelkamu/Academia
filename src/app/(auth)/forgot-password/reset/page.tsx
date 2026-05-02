@@ -252,11 +252,11 @@ export default function ForgotPasswordResetPage() {
                         <Lock className={cn('h-3.5 w-3.5', AUTH_ACCENT_ICON)} />
                         New password
                       </Label>
-                      <div className="relative">
+                      <div className="relative isolate">
                         <Input
                           id="newPassword"
-                          type={showPassword ? 'text' : 'password'}
                           {...form.register('newPassword')}
+                          type={showPassword ? 'text' : 'password'}
                           placeholder="Strong password"
                           className={cn('h-12 rounded-xl border-2 pr-12', AUTH_FORM_INPUT_CLASS)}
                         />
@@ -264,7 +264,7 @@ export default function ForgotPasswordResetPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-1 top-1/2 -translate-y-1/2"
+                          className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                           onClick={() => setShowPassword((v) => !v)}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -283,11 +283,11 @@ export default function ForgotPasswordResetPage() {
                         <Lock className={cn('h-3.5 w-3.5', AUTH_ACCENT_ICON)} />
                         Confirm
                       </Label>
-                      <div className="relative">
+                      <div className="relative isolate">
                         <Input
                           id="confirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
                           {...form.register('confirmPassword')}
+                          type={showConfirmPassword ? 'text' : 'password'}
                           placeholder="Repeat password"
                           className={cn('h-12 rounded-xl border-2 pr-12', AUTH_FORM_INPUT_CLASS)}
                         />
@@ -295,7 +295,7 @@ export default function ForgotPasswordResetPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-1 top-1/2 -translate-y-1/2"
+                          className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                           onClick={() => setShowConfirmPassword((v) => !v)}
                         >
                           {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
