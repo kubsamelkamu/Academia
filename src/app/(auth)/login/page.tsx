@@ -200,10 +200,23 @@ function LoginPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Temporary password</Label>
-              <div className="relative">
-                <Input id="password" type={isPasswordVisible ? 'text' : 'password'} {...register('password')} placeholder="••••••••" className={cn('pr-10', AUTH_FORM_INPUT_CLASS)} />
-                <Button type="button" variant="ghost" size="icon-sm" onClick={() => setIsPasswordVisible((p) => !p)} aria-label={isPasswordVisible ? 'Hide password' : 'Show password'} className="absolute right-1 top-1/2 -translate-y-1/2">
-                  {isPasswordVisible ? <EyeOff /> : <Eye />}
+              <div className="relative isolate">
+                <Input
+                  id="password"
+                  {...register('password')}
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className={cn('pr-10', AUTH_FORM_INPUT_CLASS)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsPasswordVisible((p) => !p)}
+                  aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+                >
+                  {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
               {errors.password && <p className="text-sm text-destructive font-bold">{errors.password.message}</p>}
@@ -299,22 +312,22 @@ function LoginPageContent() {
                     Forgot Password?
                   </Link>
                 </div>
-                <div className="relative">
+                <div className="relative isolate">
                   <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="password"
-                    type={isPasswordVisible ? 'text' : 'password'}
                     {...register('password')}
+                    type={isPasswordVisible ? 'text' : 'password'}
                     placeholder="Enter your password"
                     className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-slate-300 pl-10 pr-11 text-sm')}
                   />
                   <button
                     type="button"
                     onClick={() => setIsPasswordVisible((p) => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
                   >
-                    {isPasswordVisible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                    {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <AnimatePresence>
