@@ -427,14 +427,13 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   <Badge variant="outline" className={evaluationStatusBadgeClass(group.evaluationStatus)}>
                     {formatEvaluationStatusLabel(group.evaluationStatus)}
                   </Badge>
-                  {isBlocked ? (
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
-                      Locked
-                    </Badge>
-                  ) : null}
                   {stage === "Capstone II" && prereq.checking ? (
                     <Badge variant="outline" className="bg-muted text-foreground border-border">
                       Checking Capstone I
+                    </Badge>
+                  ) : isBlocked ? (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
+                      Locked
                     </Badge>
                   ) : null}
                 </div>
