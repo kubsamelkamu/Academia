@@ -622,6 +622,7 @@ export function StudentTeamPage() {
 
   const isGroupManager = isApprovedGroupManager
   const canEditGroup = isGroupManager && groupIsDraft
+  const canInvite = isGroupManager && !groupApproved && !groupRejected
   const groupSize = groupMembers.length
   const fallbackMinGroupSize = 3
   const fallbackMaxGroupSize = 5
@@ -1738,7 +1739,7 @@ export function StudentTeamPage() {
                                       View
                                     </Button>
 
-                                    {canEditGroup && (
+                                    {canInvite && (
                                       <>
                                         <Button
                                           variant="outline"
@@ -2101,7 +2102,7 @@ export function StudentTeamPage() {
                       setInvitingUserId(null)
                     }
                   }}
-                  disabled={!canEditGroup || !canInviteMoreMembers || createInvitationMutation.isPending}
+                  disabled={!canInvite || !canInviteMoreMembers || createInvitationMutation.isPending}
                 >
                   {createInvitationMutation.isPending ? (
                     <>
