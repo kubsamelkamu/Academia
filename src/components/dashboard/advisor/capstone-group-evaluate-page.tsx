@@ -156,6 +156,22 @@ function mapDetailToGroup(detail: AdvisorProjectEvaluationDetail, stage: Capston
   }
 }
 
+function progressGateForStage(stage: CapstoneStage, progress: number | null | undefined) {
+  const normalized = typeof progress === "number" && Number.isFinite(progress) ? progress : 0
+
+  if (stage === "Capstone I") {
+    return {
+      allowed: normalized > 50,
+      message: "Capstone I evaluation unlocks after the group milestone progress exceeds 50%.",
+    }
+  }
+
+  return {
+    allowed: normalized === 100,
+    message: "Capstone II evaluation unlocks only when the group milestone progress reaches 100%.",
+  }
+}
+
 export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: CapstoneStage; groupId: string }) {
   const queryClient = useQueryClient()
   const authHydrated = useAuthStoreHydrated()
@@ -182,6 +198,28 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const detailQuery = useAdvisorProjectEvaluationDetail(resolvedProjectId, dashboardStage, {
     enabled: authHydrated && Boolean(resolvedProjectId),
   })
+
+  const capstoneIPrereqDetailQuery = useAdvisorProjectEvaluationDetail(resolvedProjectId, "CAPSTONE_I", {
+    enabled: authHydrated && stage === "Capstone II" && Boolean(resolvedProjectId),
+  })
+
+  const capstoneIPrereqChecking =
+    stage === "Capstone II" &&
+    Boolean(resolvedProjectId) &&
+    (capstoneIPrereqDetailQuery.isLoading || capstoneIPrereqDetailQuery.isFetching)
+
+  const capstoneISubmitted =
+    stage !== "Capstone II"
+      ? true
+      : Boolean(capstoneIPrereqDetailQuery.data?.evaluation?.submittedAt) ||
+        capstoneIPrereqDetailQuery.data?.evaluation?.status === "SUBMITTED"
+
+  const capstoneIPrereqBlocked =
+    stage === "Capstone II" &&
+    Boolean(resolvedProjectId) &&
+    !capstoneIPrereqChecking &&
+    (!capstoneISubmitted || Boolean(capstoneIPrereqDetailQuery.error))
+
   const [group, setGroup] = React.useState<CapstoneGroup | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [activeStudentId, setActiveStudentId] = React.useState<string | null>(null)
@@ -327,6 +365,65 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
     !isSubmitted &&
     studentsMissingScore.length === 0 &&
     (group?.students.length ?? 0) > 0
+
+  const progressGate = progressGateForStage(stage, detailQuery.data?.milestoneProgress?.progressPercent)
+  const progressGateChecking = Boolean(resolvedProjectId) && (detailQuery.isLoading || detailQuery.isFetching)
+  const progressGateBlocked = Boolean(resolvedProjectId) && !progressGateChecking && !progressGate.allowed
+
+  const isLocked =
+    Boolean(resolvedProjectId) &&
+    ((stage === "Capstone II" && (capstoneIPrereqChecking || capstoneIPrereqBlocked)) || progressGateChecking || progressGateBlocked)
+
+  if (authHydrated && resolvedProjectId && isLocked) {
+    const description =
+      stage === "Capstone II" && capstoneIPrereqChecking
+        ? "Checking whether Capstone I evaluation has been submitted for this project."
+        : stage === "Capstone II" && capstoneIPrereqDetailQuery.error
+          ? "Unable to verify Capstone I submission right now. Please refresh and try again."
+          : stage === "Capstone II" && capstoneIPrereqBlocked
+            ? "Capstone I evaluation must be submitted before you can open Capstone II evaluation."
+            : progressGateChecking
+              ? "Checking whether this group is ready for evaluation."
+              : progressGate.message
+
+    return (
+      <div className="space-y-8 animate-fade-in pb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <DashboardPageHeader
+            title={`${stage} Evaluation`}
+            description="Review the group, use the rubric as scoring guidance, and record advisor scores for each student."
+            badge={isLoading ? "Loading..." : group?.groupName ?? "—"}
+          />
+          <Button asChild variant="outline" size="sm">
+            <Link href={routeForStage(stage)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Link>
+          </Button>
+        </div>
+
+        <Card className="border-amber-200 bg-amber-500/5 dark:border-amber-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldAlert className="h-5 w-5 text-amber-600" /> Evaluation is locked
+            </CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {stage === "Capstone II" ? (
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/advisor/evaluations/capstone-i/${resolvedProjectId}/open`}>
+                  Open Capstone I evaluation
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild variant="outline">
+              <Link href={routeForStage(stage)}>Back to {stage} dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   const handleSubmitEvaluation = async () => {
     if (!resolvedProjectId) return

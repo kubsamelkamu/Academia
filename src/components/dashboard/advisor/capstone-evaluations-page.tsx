@@ -19,6 +19,7 @@ import {
   Target,
   FileText,
   BarChart3,
+  ShieldAlert,
 } from "lucide-react"
 
 import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
@@ -40,7 +41,7 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import type { AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
-import { useAdvisorProjectEvaluationDashboard } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
+import { useAdvisorProjectEvaluationDashboard, useAdvisorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
 
 type CapstoneStage = "Capstone I" | "Capstone II"
 
@@ -166,10 +167,27 @@ function stageConfig(stage: CapstoneStage) {
   }
 }
 
+function progressGateForStage(stage: CapstoneStage, progress: number) {
+  if (stage === "Capstone I") {
+    return {
+      allowed: progress > 50,
+      message: "Capstone I evaluation unlocks after the group milestone progress exceeds 50%.",
+    }
+  }
+
+  return {
+    allowed: progress === 100,
+    message: "Capstone II evaluation unlocks only when the group milestone progress reaches 100%.",
+  }
+}
+
 export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage }) {
   const router = useRouter()
   const dashboardStage = toApiStage(stage)
   const evaluationDashboardQuery = useAdvisorProjectEvaluationDashboard(dashboardStage)
+  const capstoneIPrereqDashboardQuery = useAdvisorProjectEvaluationDashboardWithOptions("CAPSTONE_I", {
+    enabled: stage === "Capstone II",
+  })
   const [search, setSearch] = React.useState("")
   const [quickFeedbackOpen, setQuickFeedbackOpen] = React.useState(false)
   const [revisionOpen, setRevisionOpen] = React.useState(false)
@@ -180,6 +198,55 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
 
   const cfg = stageConfig(stage)
   const stageCriteria = criteriaForStage(stage)
+
+  const capstoneISubmittedByProjectId = React.useMemo(() => {
+    if (stage !== "Capstone II") {
+      return new Map<string, boolean>()
+    }
+
+    const projectGroups = capstoneIPrereqDashboardQuery.data?.projectGroups ?? []
+    const mapping = new Map<string, boolean>()
+
+    projectGroups.forEach((group) => {
+      const isSubmitted = Boolean(group.evaluation.submittedAt) || group.evaluation.status === "SUBMITTED"
+      mapping.set(group.projectId, isSubmitted)
+    })
+
+    return mapping
+  }, [capstoneIPrereqDashboardQuery.data?.projectGroups, stage])
+
+  const capstoneIPrereqState = React.useCallback(
+    (projectId: string) => {
+      if (stage !== "Capstone II") {
+        return { blocked: false, checking: false }
+      }
+
+      if (capstoneIPrereqDashboardQuery.isLoading || capstoneIPrereqDashboardQuery.isFetching) {
+        return { blocked: true, checking: true }
+      }
+
+      if (capstoneIPrereqDashboardQuery.error) {
+        return { blocked: true, checking: false }
+      }
+
+      return {
+        blocked: capstoneISubmittedByProjectId.get(projectId) !== true,
+        checking: false,
+      }
+    },
+    [capstoneIPrereqDashboardQuery.error, capstoneIPrereqDashboardQuery.isFetching, capstoneIPrereqDashboardQuery.isLoading, capstoneISubmittedByProjectId, stage],
+  )
+
+  const progressGateState = React.useCallback(
+    (progress: number) => {
+      const gate = progressGateForStage(stage, progress)
+      return {
+        blocked: !gate.allowed,
+        message: gate.message,
+      }
+    },
+    [stage],
+  )
   const groups = React.useMemo(() => {
     const projectGroups = evaluationDashboardQuery.data?.projectGroups ?? []
     const mappedGroups: GroupRow[] = projectGroups.map((group) => ({
@@ -333,7 +400,18 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {groups.map((group) => (
+        {groups.map((group) => {
+          const prereq = capstoneIPrereqState(group.projectId)
+          const progressGate = progressGateState(group.progress)
+          const isBlocked = (stage === "Capstone II" && (prereq.checking || prereq.blocked)) || progressGate.blocked
+          const blockedReason =
+            stage === "Capstone II" && prereq.checking
+              ? "Checking whether Capstone I evaluation is submitted."
+              : stage === "Capstone II" && prereq.blocked
+                ? "Locked until Capstone I evaluation is submitted for this project."
+                : progressGate.message
+
+          return (
           <Card key={group.id} className="border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
@@ -349,6 +427,16 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   <Badge variant="outline" className={evaluationStatusBadgeClass(group.evaluationStatus)}>
                     {formatEvaluationStatusLabel(group.evaluationStatus)}
                   </Badge>
+                  {isBlocked ? (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
+                      Locked
+                    </Badge>
+                  ) : null}
+                  {stage === "Capstone II" && prereq.checking ? (
+                    <Badge variant="outline" className="bg-muted text-foreground border-border">
+                      Checking Capstone I
+                    </Badge>
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
@@ -364,6 +452,13 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
               <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-sm">
                 <p className="text-xs text-muted-foreground">Next action</p>
                 <p className="mt-1 font-medium">{nextActionLabel(group.nextAction)}</p>
+                {stage === "Capstone II" && prereq.checking ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Capstone II is locked while we verify Capstone I submission.</p>
+                ) : stage === "Capstone II" && prereq.blocked ? (
+                  <p className="mt-1 text-xs text-amber-700">Locked until Capstone I evaluation is submitted for this project.</p>
+                ) : progressGate.blocked ? (
+                  <p className="mt-1 text-xs text-amber-700">{progressGate.message}</p>
+                ) : null}
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-1">
@@ -376,25 +471,64 @@ export function AdvisorCapstoneEvaluationsPage({ stage }: { stage: CapstoneStage
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/detail`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Detail
-                      </Link>
-                    </DropdownMenuItem>
+                    {isBlocked ? (
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          toast.error("Evaluation is locked", {
+                            description: blockedReason,
+                          })
+                        }}
+                      >
+                        <ShieldAlert className="h-4 w-4 mr-2" />
+                        View Detail (locked)
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/detail`}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Detail
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/open`}>
-                        <PlayCircle className="h-4 w-4 mr-2" />
-                        {nextActionCta(group.nextAction, cfg.cta)}
-                      </Link>
-                    </DropdownMenuItem>
+                    {isBlocked ? (
+                      <>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault()
+                            toast.error("Evaluation is locked", {
+                              description: blockedReason,
+                            })
+                          }}
+                        >
+                          <ShieldAlert className="h-4 w-4 mr-2" />
+                          Open evaluation (locked)
+                        </DropdownMenuItem>
+                        {stage === "Capstone II" ? (
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/advisor/evaluations/capstone-i/${group.projectId}/open`}>
+                              <PlayCircle className="h-4 w-4 mr-2" />
+                              Open Capstone I evaluation
+                            </Link>
+                          </DropdownMenuItem>
+                        ) : null}
+                      </>
+                    ) : (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/advisor/evaluations/${stage === "Capstone I" ? "capstone-i" : "capstone-ii"}/${group.projectId}/open`}>
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          {nextActionCta(group.nextAction, cfg.cta)}
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       {groups.length === 0 ? (
