@@ -51,8 +51,20 @@ export default function RegisterPage() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [logoOk, setLogoOk] = useState(true);
+  const [invalidCharWarning, setInvalidCharWarning] = useState('');
 
   const DEFAULT_UNIVERSITY_NAME = 'Haramaya University';
+
+  // Handle name input validation - only allow letters and spaces
+  const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const value = e.target.value;
+    const filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+    if (value !== filteredValue) {
+      setInvalidCharWarning(`${fieldName} can only contain letters and spaces`);
+      e.target.value = filteredValue;
+      setTimeout(() => setInvalidCharWarning(''), 3000);
+    }
+  };
 
   const {
     register,
@@ -294,12 +306,18 @@ export default function RegisterPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="firstName" className="text-[10px] font-black text-slate-500 uppercase tracking-widest">First Name</Label>
-                              <Input id="firstName" {...register('firstName')} placeholder="John" className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              <Input id="firstName" {...register('firstName')} placeholder="John" onInput={(e) => handleNameInput(e as React.ChangeEvent<HTMLInputElement>, 'First name')} className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              {invalidCharWarning && invalidCharWarning.includes('First') && (
+                                <p className="text-[11px] font-bold text-amber-600 px-1">⚠️ {invalidCharWarning}</p>
+                              )}
                               {errors.firstName && <p className="text-[11px] font-bold text-destructive px-1">{errors.firstName.message}</p>}
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="lastName" className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Last Name</Label>
-                              <Input id="lastName" {...register('lastName')} placeholder="Doe" className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              <Input id="lastName" {...register('lastName')} placeholder="Doe" onInput={(e) => handleNameInput(e as React.ChangeEvent<HTMLInputElement>, 'Last name')} className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")} />
+                              {invalidCharWarning && invalidCharWarning.includes('Last') && (
+                                <p className="text-[11px] font-bold text-amber-600 px-1">⚠️ {invalidCharWarning}</p>
+                              )}
                               {errors.lastName && <p className="text-[11px] font-bold text-destructive px-1">{errors.lastName.message}</p>}
                             </div>
                           </div>

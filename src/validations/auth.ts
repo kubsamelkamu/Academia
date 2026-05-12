@@ -30,11 +30,13 @@ export const registerInstitutionSchema = z.object({
   firstName: z
     .string()
     .min(1, 'First name is required')
-    .max(50, 'First name must be less than 50 characters'),
+    .max(50, 'First name must be less than 50 characters')
+    .regex(/^(?=.*[a-zA-Z])[a-zA-Z\s]+$/, 'First name must contain at least one letter and can only contain letters and spaces'),
   lastName: z
     .string()
     .min(1, 'Last name is required')
-    .max(50, 'Last name must be less than 50 characters'),
+    .max(50, 'Last name must be less than 50 characters')
+    .regex(/^(?=.*[a-zA-Z])[a-zA-Z\s]+$/, 'Last name must contain at least one letter and can only contain letters and spaces'),
   email: z
     .string()
     .email('Please enter a valid email address')
