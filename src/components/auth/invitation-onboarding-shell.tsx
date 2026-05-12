@@ -226,7 +226,7 @@ export function InvitationOnboardingShell({
           <p
             className={cn(
               "mx-auto max-w-2xl text-lg sm:text-xl",
-              withGlassStyle ? "text-white/90 drop-shadow-md" : "text-gray-600"
+              withGlassStyle ? "text-slate-600" : "text-gray-600"
             )}
           >
             {theme.heroSubtitle}

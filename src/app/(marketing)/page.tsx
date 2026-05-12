@@ -36,6 +36,110 @@ const BRAND_COLOR = "#ED5F45"
 const BRAND_DARK = "#D54A32"
 const BRAND_LIGHT = "#F47A64"
 
+// FadeIn component
+function FadeIn({ children, delay = 0, duration = 1000 }: { children: React.ReactNode; delay?: number; duration?: number }) {
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), delay)
+    return () => clearTimeout(timer)
+  }, [delay])
+
+  return (
+    <div
+      className="transition-opacity"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transitionDuration: `${duration}ms`,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// AnimatedHeading component
+function AnimatedHeading({ text, delay = 200, className }: { text: string; delay?: number; className?: string }) {
+  const [isAnimating, setIsAnimating] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsAnimating(true), delay)
+    return () => clearTimeout(timer)
+  }, [delay])
+
+  const lines = text.split('\n')
+  const charDelay = 30
+
+  return (
+    <div className={className}>
+      {lines.map((line, lineIndex) => (
+        <div key={lineIndex}>
+          {line.split('').map((char, charIndex) => (
+            <span
+              key={`${lineIndex}-${charIndex}`}
+              className="inline-block transition-all duration-500"
+              style={{
+                opacity: isAnimating ? 1 : 0,
+                transform: isAnimating ? 'translateX(0)' : 'translateX(-18px)',
+                transitionDelay: `${(lineIndex * line.length * charDelay) + (charIndex * charDelay)}ms`,
+                letterSpacing: '-0.04em',
+              }}
+            >
+              {char === ' ' ? '\u00A0' : char}
+            </span>
+          ))}
+          {lineIndex < lines.length - 1 && <br />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+type PlatformStats = {
+  totalStudents: number
+  totalAdvisors: number
+  totalActiveProjects: number
+  totalCompletedProjects: number
+}
+
+type StatDisplayItem = {
+  value: string
+  label: string
+}
+
+const DEFAULT_PLATFORM_STATS: PlatformStats = {
+  totalStudents: 1280,
+  totalAdvisors: 85,
+  totalActiveProjects: 320,
+  totalCompletedProjects: 140,
+}
+
+function isPlatformStats(data: unknown): data is PlatformStats {
+  if (!data || typeof data !== "object") return false
+
+  const candidate = data as Record<string, unknown>
+  return (
+    typeof candidate.totalStudents === "number" &&
+    typeof candidate.totalAdvisors === "number" &&
+    typeof candidate.totalActiveProjects === "number" &&
+    typeof candidate.totalCompletedProjects === "number"
+  )
+}
+
+function toDisplayStats(data: PlatformStats): StatDisplayItem[] {
+  return [
+    { value: data.totalStudents.toLocaleString(), label: "Active Students" },
+    { value: data.totalAdvisors.toLocaleString(), label: "Active Advisors" },
+    { value: data.totalActiveProjects.toLocaleString(), label: "Active Projects" },
+    { value: data.totalCompletedProjects.toLocaleString(), label: "Completed Projects" },
+  ]
+}
+
+function getPlatformStatsUrl() {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001/api/v1"
+  return `${baseUrl.replace(/\/$/, "")}/public/platform-stats`
+}
+
 /* ── 3D Tilt Card Component ── */
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -139,14 +243,12 @@ function AnimatedCounter({ value, suffix = "" }: { value: string; suffix?: strin
 }
 
 const HERO_SLIDES = [
-  { src: "/department head.png", label: "Department head" },
-  { src: "/students.png", label: "Students" },
-  { src: "/advisor.png", label: "Advisor" },
-  { src: "/evaluator.png", label: "Evaluator" },
-  { src: "/coordinator.png", label: "Coordinator" },
+  { src: '/sign-in-campus.jpg', label: 'Main campus administration building' },
+  { src: '/sign-in-campus2.jpg', label: 'Campus academic block and grounds' },
+  { src: '/sign-in-campus3.jpg', label: 'Campus dormitories surrounded by greenery' },
 ] as const
 
-const HERO_SLIDE_INTERVAL_MS = 6500
+const HERO_SLIDE_INTERVAL_MS = 4000
 
 /* ── Hero Slideshow — full-viewport sequence with cinematic transitions ── */
 function HeroSlideshow() {
@@ -299,6 +401,8 @@ function FloatingParticles() {
 export default function HomePage() {
   const isClient = useSyncExternalStore(() => () => {}, () => true, () => false)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+  const [videoError, setVideoError] = useState(false)
+  const [stats, setStats] = useState<StatDisplayItem[]>(toDisplayStats(DEFAULT_PLATFORM_STATS))
   const { scrollYProgress } = useScroll()
 
   const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0])
@@ -312,79 +416,85 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPlatformStats = async () => {
+      try {
+        const response = await fetch(getPlatformStatsUrl(), { cache: "no-store" })
+
+        if (!response.ok) {
+          return
+        }
+
+        const json = (await response.json()) as { data?: unknown } | PlatformStats
+        const payload = "data" in json ? json.data : json
+
+        if (isMounted && isPlatformStats(payload)) {
+          setStats(toDisplayStats(payload))
+        }
+      } catch {
+        // Keep default platform stats if the endpoint is unavailable.
+      }
+    }
+
+    void loadPlatformStats()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="relative bg-slate-50 dark:bg-slate-950">
 
-      {/* Hero — full viewport; backgrounds clipped to this section only */}
-      <section className="relative isolate flex min-h-[100dvh] min-h-screen items-center overflow-hidden pt-24 pb-28 md:pb-24 md:pt-0">
-        <HeroSlideshow />
-        <FloatingParticles />
-        <div className="pointer-events-none absolute inset-0 z-[2]">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#ED5F45]/15 via-transparent to-transparent" />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#ED5F45]/50 to-transparent" />
-        </div>
-
-        <div className="relative z-10 mx-auto w-full max-w-[1600px] px-6 sm:px-10 lg:px-16">
-          <motion.div
-            style={{ opacity: heroOpacity, scale: heroScale }}
-            initial={{ opacity: 0, y: 30 }}
-            animate={isClient ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="mx-auto max-w-[1600px] text-center"
+      {/* Hero — full viewport */}
+      <section className="relative h-screen bg-black text-white overflow-hidden">
+        {!videoError ? (
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            onError={() => setVideoError(true)}
+            onCanPlay={() => setVideoError(false)}
+            controls={false}
           >
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 3, repeat: Infinity, repeatDelay: 5 }}
-              className="inline-block"
-            >
-              <Badge className="mb-8 border-[#ED5F45]/30 bg-white/60 dark:bg-[#ED5F45]/10 text-[#ED5F45] px-8 py-3 text-sm rounded-full shadow-lg backdrop-blur-md">
-                <Sparkles className="h-4 w-4 mr-2 animate-pulse" />
-                Next-Generation Academic Platform
-                <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
-              </Badge>
-            </motion.div>
+            <source src="https://cdn.pixabay.com/video/2019/03/29/22449-327996264_medium.mp4" />
+          </video>
+        ) : (
+          <div className="absolute inset-0 -z-10">
+            <Image src="/background.png" alt="Background" fill className="object-cover" priority />
+          </div>
+        )}
 
-            <h1 className="mb-8 px-4 text-4xl font-black leading-[1.1] tracking-tighter text-white sm:px-0 sm:text-6xl lg:text-7xl xl:text-8xl">
-              <span className="[text-shadow:0_2px_28px_rgba(0,0,0,0.55)]">Academic Project</span>{" "}
-              <span className="inline-block whitespace-normal text-[#ED5F45] md:whitespace-nowrap">
-                Management Excellence.
-              </span>
-            </h1>
-
-            <p className="mt-8 text-xl md:text-2xl text-slate-200 max-w-3xl mx-auto leading-relaxed font-medium drop-shadow-md md:text-slate-600 md:drop-shadow-none dark:text-slate-300">
-              Streamline your university&apos;s academic project workflow from proposal to defense.
-              Experience seamless collaboration with real-time visibility.
-            </p>
-
-            <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
-              <MagnetButton>
-                <Button size="lg" className="h-16 px-10 text-xl font-bold bg-[#ED5F45] hover:bg-[#D54A32] text-white shadow-2xl shadow-[#ED5F45]/20 rounded-2xl group transition-all duration-300 transform hover:scale-105 border-none" asChild>
-                  <Link href="/register">
-                    Launch Workspace <Rocket className="ml-3 h-6 w-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                  </Link>
-                </Button>
-              </MagnetButton>
-            </div>
-
-            <motion.div
-              className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm font-bold uppercase tracking-widest text-slate-200/95 [text-shadow:0_1px_12px_rgba(0,0,0,0.45)]"
-              initial={{ opacity: 0 }}
-              animate={isClient ? { opacity: 1 } : {}}
-              transition={{ delay: 0.6, duration: 1 }}
-            >
-              {[
-                { icon: Shield, text: "SOC 2 Compliant" },
-                { icon: Globe, text: "GDPR Ready" },
-                { icon: Clock, text: "99.9% Uptime" },
-                { icon: Award, text: "Best in Class" }
-              ].map((tag) => (
-                <div key={tag.text} className="flex items-center gap-3">
-                  <tag.icon className="h-4 w-4 text-[#ED5F45]" />
-                  <span>{tag.text}</span>
+        <div className="relative z-10 px-6 md:px-12 lg:px-16 flex-1 flex flex-col justify-end pb-20 lg:pb-28 h-full">
+          <div className="lg:grid lg:grid-cols-2 lg:items-end">
+            <div>
+              <AnimatedHeading text={"Academic Project\nManagement Excellence."} className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-normal mb-4" />
+              <FadeIn delay={800} duration={1000}>
+                <p className="text-base md:text-lg text-gray-300 mb-5 max-w-2xl">Streamline your university&apos;s academic project workflow from proposal to defense. Experience seamless collaboration with real-time visibility.</p>
+              </FadeIn>
+              <FadeIn delay={1200} duration={1000}>
+                <div className="flex flex-wrap gap-4">
+                  <Button asChild className="bg-[#ED5F45] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#D54A32] transition-colors">
+                    <Link href="/register">Launch Workspace</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="liquid-glass border border-white/20 text-white px-8 py-3 rounded-lg font-medium hover:bg-white hover:text-black transition">
+                    <Link href="/features">Explore Features</Link>
+                  </Button>
                 </div>
-              ))}
-            </motion.div>
-          </motion.div>
+              </FadeIn>
+            </div>
+            <div className="flex items-end justify-start lg:justify-end mt-8 lg:mt-0">
+              <FadeIn delay={1400} duration={1000}>
+                <div className="liquid-glass border border-white/20 px-6 py-3 rounded-xl">
+                  <p className="text-lg md:text-xl lg:text-2xl font-light">Students. Advisors. Departments.</p>
+                </div>
+              </FadeIn>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -840,11 +950,4 @@ const testimonials = [
     role: "Program Director, UC Berkeley",
     avatar: ""
   }
-]
-
-const stats = [
-  { value: "500+", label: "Institutions" },
-  { value: "50K+", label: "Active Students" },
-  { value: "120K+", label: "Total Projects" },
-  { value: "99.9%", label: "Uptime SLA" },
 ]

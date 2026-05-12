@@ -196,11 +196,11 @@ function ChangePasswordPageContent() {
           <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current password</Label>
-              <div className="relative">
+              <div className="relative isolate">
                 <Input
                   id="currentPassword"
-                  type={showCurrent ? "text" : "password"}
                   {...form.register("currentPassword")}
+                  type={showCurrent ? "text" : "password"}
                   placeholder="Enter your current password"
                   className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
@@ -208,7 +208,7 @@ function ChangePasswordPageContent() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                   onClick={() => setShowCurrent((v) => !v)}
                 >
                   {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -221,11 +221,11 @@ function ChangePasswordPageContent() {
 
             <div className="space-y-2">
               <Label htmlFor="newPassword">New password</Label>
-              <div className="relative">
+              <div className="relative isolate">
                 <Input
                   id="newPassword"
-                  type={showNew ? "text" : "password"}
                   {...form.register("newPassword")}
+                  type={showNew ? "text" : "password"}
                   placeholder="Create a strong password"
                   className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
@@ -233,7 +233,7 @@ function ChangePasswordPageContent() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                   onClick={() => setShowNew((v) => !v)}
                 >
                   {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -289,11 +289,11 @@ function ChangePasswordPageContent() {
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm new password</Label>
-              <div className="relative">
+              <div className="relative isolate">
                 <Input
                   id="confirmPassword"
-                  type={showConfirm ? "text" : "password"}
                   {...form.register("confirmPassword")}
+                  type={showConfirm ? "text" : "password"}
                   placeholder="Re-enter your new password"
                   className={cn("pr-12", AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
                 />
@@ -301,7 +301,7 @@ function ChangePasswordPageContent() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                   onClick={() => setShowConfirm((v) => !v)}
                 >
                   {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -333,7 +333,7 @@ function ChangePasswordPageContent() {
   return (
     <AuthCampusBackdrop>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
@@ -349,7 +349,7 @@ function ChangePasswordPageContent() {
           <h1 className={cn("mb-3 text-4xl sm:text-5xl md:text-6xl", AUTH_WELCOME_HEADLINE_CLASS)}>
             Change password
           </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-white/90 drop-shadow-sm sm:text-lg">
+          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
             Update your password to keep your account secure.
           </p>
         </motion.div>
@@ -443,11 +443,11 @@ function ChangePasswordPageContent() {
                       <Lock className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
                       Current password
                     </Label>
-                    <div className="relative">
+                    <div className="relative isolate">
                       <Input
                         id="currentPassword"
-                        type={showCurrent ? "text" : "password"}
                         {...form.register("currentPassword")}
+                        type={showCurrent ? "text" : "password"}
                         placeholder="Enter your current password"
                         className={cn("h-12 rounded-xl border-2 pr-12", AUTH_FORM_INPUT_CLASS)}
                       />
@@ -455,7 +455,7 @@ function ChangePasswordPageContent() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                         onClick={() => setShowCurrent((v) => !v)}
                       >
                         {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -482,11 +482,11 @@ function ChangePasswordPageContent() {
                       <Key className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
                       New password
                     </Label>
-                    <div className="relative">
+                    <div className="relative isolate">
                       <Input
                         id="newPassword"
-                        type={showNew ? "text" : "password"}
                         {...form.register("newPassword")}
+                        type={showNew ? "text" : "password"}
                         placeholder="Create a strong password"
                         className={cn("h-12 rounded-xl border-2 pr-12", AUTH_FORM_INPUT_CLASS)}
                       />
@@ -494,7 +494,7 @@ function ChangePasswordPageContent() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                         onClick={() => setShowNew((v) => !v)}
                       >
                         {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -587,11 +587,11 @@ function ChangePasswordPageContent() {
                       <CheckCircle2 className={cn("h-3.5 w-3.5", AUTH_ACCENT_ICON)} />
                       Confirm password
                     </Label>
-                    <div className="relative">
+                    <div className="relative isolate">
                       <Input
                         id="confirmPassword"
-                        type={showConfirm ? "text" : "password"}
                         {...form.register("confirmPassword")}
+                        type={showConfirm ? "text" : "password"}
                         placeholder="Re-enter your new password"
                         className={cn(
                           "h-12 rounded-xl border-2 pr-12",
@@ -604,7 +604,7 @@ function ChangePasswordPageContent() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
                         onClick={() => setShowConfirm((v) => !v)}
                       >
                         {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -657,7 +657,7 @@ export default function ChangePasswordPage() {
     <Suspense
       fallback={
         <AuthCampusBackdrop>
-          <p className="text-sm font-medium text-white/90 drop-shadow">Loading…</p>
+          <p className="text-sm font-medium text-slate-600">Loading…</p>
         </AuthCampusBackdrop>
       }
     >

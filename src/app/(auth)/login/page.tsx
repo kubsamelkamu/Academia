@@ -13,19 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Loader2,
-  LogIn,
   Mail,
   Lock,
   Eye,
   EyeOff,
   ArrowRight,
-  CheckCircle2,
   BarChart3,
-  Building2,
-  ShieldCheck,
-  Users,
-  CalendarCheck,
-  GraduationCap,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { loginSchema, LoginFormData } from '@/validations/auth';
@@ -34,11 +28,12 @@ import { DEFAULT_RATE_LIMIT_RETRY_AFTER_MS, getErrorMessage, isRateLimitMessage 
 import { InvitationOnboardingShell } from '@/components/auth/invitation-onboarding-shell';
 import {
   AuthCampusBackdrop,
-  AUTH_ACCENT_ICON,
+  AUTH_FORM_COLUMN_WRAP,
   AUTH_FORM_INPUT_CLASS,
+  AUTH_MARKETING_COLUMN_WRAP,
+  AUTH_PAGE_WRAP,
   AUTH_PRIMARY_BUTTON_CLASS,
-  AUTH_WELCOME_HEADLINE_CLASS,
-  SIGN_IN_LOGO_SURFACE,
+  AUTH_SPLIT_CARD_GRID,
 } from '@/components/auth/auth-campus-backdrop';
 import { cn } from '@/lib/utils';
 import { clearInviteAcceptResult, readInviteAcceptResult } from '@/lib/auth/invite-onboarding-storage';
@@ -46,17 +41,14 @@ import {
   AuthTiltCard,
   AUTH_CONTAINER_VARIANTS,
   AUTH_ITEM_VARIANTS,
-  AUTH_SLIDE_LEFT_VARIANTS,
-  AUTH_SLIDE_RIGHT_VARIANTS,
 } from '@/components/auth/auth-tilt-card';
 
-/* ── Feature bullets ── */
-const features = [
-  { icon: CheckCircle2,  text: 'Real-time project tracking & management' },
-  { icon: CalendarCheck, text: 'Automated defense scheduling system' },
-  { icon: Users,         text: 'Multi-role user management' },
-  { icon: BarChart3,     text: 'Comprehensive reporting & analytics' },
-  { icon: ShieldCheck,   text: 'Secure multi-tenant architecture' },
+const capabilities = [
+  'Real-time project tracking & management',
+  'Automated defense scheduling system',
+  'Multi-role user management',
+  'Comprehensive reporting & analytics',
+  'Secure multi-tenant architecture',
 ];
 
 function LoginPageContent() {
@@ -79,7 +71,6 @@ function LoginPageContent() {
   }, [inviteContext?.tenantDomain, isInviteFlow, searchParams]);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
-  const [logoOk, setLogoOk] = useState(true);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -213,10 +204,26 @@ function LoginPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Temporary password</Label>
-              <div className="relative">
-                <Input id="password" type={isPasswordVisible ? 'text' : 'password'} {...register('password')} placeholder="••••••••" className={cn('pr-10', AUTH_FORM_INPUT_CLASS)} />
-                <Button type="button" variant="ghost" size="icon-sm" onClick={() => setIsPasswordVisible((p) => !p)} aria-label={isPasswordVisible ? 'Hide password' : 'Show password'} className="absolute right-1 top-1/2 -translate-y-1/2">
-                  {isPasswordVisible ? <EyeOff /> : <Eye />}
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    id="password"
+                    {...register('password')}
+                    type={isPasswordVisible ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className={cn('pr-3', AUTH_FORM_INPUT_CLASS)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsPasswordVisible((p) => !p)}
+                  aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                  className="shrink-0 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                >
+                  {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
               {errors.password && <p className="text-sm text-destructive font-bold">{errors.password.message}</p>}
@@ -233,239 +240,217 @@ function LoginPageContent() {
 
   /* ── Main sign-in page ── */
   return (
-    <AuthCampusBackdrop>
+    <div className={AUTH_PAGE_WRAP}>
       <motion.div
-        className="mx-auto w-full max-w-6xl"
+        className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        {/* ── Hero headline ── */}
-        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
-          {/* Logo badge */}
-          <motion.div
-            className={cn(
-              'relative mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl sm:h-24 sm:w-24',
-              SIGN_IN_LOGO_SURFACE
-            )}
-            whileHover={{ scale: 1.06, rotate: -3 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-          >
-            {logoOk ? (
-              <Image src="/haramaya.png" alt="Haramaya University" fill sizes="(max-width: 640px) 80px, 96px" className="object-contain p-2.5 sm:p-3" priority onError={() => setLogoOk(false)} />
-            ) : (
-              <Building2 className="h-10 w-10 text-[#ED5F45] sm:h-11 sm:w-11" aria-hidden />
-            )}
-          </motion.div>
-
-          <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
-            Welcome to Academia
-          </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base text-white/90 drop-shadow-sm sm:text-lg font-medium">
-            The next generation of academic project management.
-          </p>
-        </motion.div>
-
-        {/* ── Two-column grid ── */}
-        <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_420px]">
-
-          {/* ── Left: features + info ── */}
-          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
-            {/* Features card */}
-            <AuthTiltCard>
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
-                {/* top edge accent */}
-                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
-                <h3 className="mb-6 flex items-center gap-3 text-lg font-black text-white sm:text-xl uppercase tracking-tight">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ED5F45]/20 border border-[#ED5F45]/30">
-                    <GraduationCap className="h-5 w-5 text-[#ED5F45]" />
-                  </span>
-                  Capabilities
-                </h3>
-                <ul className="space-y-4">
-                  {features.map(({ icon: Icon, text }, i) => (
-                    <motion.li
-                      key={text}
-                      className="flex items-start gap-4 text-sm text-slate-100 sm:text-base font-medium"
-                      initial={{ opacity: 0, x: -14 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.18 + i * 0.07 }}
-                    >
-                      <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ED5F45]/20 border border-[#ED5F45]/30">
-                        <Icon className="h-3.5 w-3.5 text-[#ED5F45]" />
-                      </span>
-                      {text}
-                    </motion.li>
-                  ))}
-                </ul>
+        <AuthTiltCard>
+          <div className={AUTH_SPLIT_CARD_GRID}>
+            <div className={AUTH_FORM_COLUMN_WRAP}>
+            <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-10 flex items-center gap-3">
+              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <Image
+                  src="/haramaya.png"
+                  alt="Haramaya University"
+                  fill
+                  sizes="36px"
+                  className="object-contain p-1"
+                  priority
+                />
               </div>
-            </AuthTiltCard>
+              <p className="text-lg font-semibold text-slate-900">Academia</p>
+            </motion.div>
 
-            {/* Info card */}
-            <AuthTiltCard>
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
-                <div className="relative z-[1]">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#ED5F45]/30 ring-4 ring-[#ED5F45]/10">
-                    <BarChart3 className="h-6 w-6 text-[#ED5F45]" />
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-8 space-y-2">
+                <h1 className="text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                  Welcome to Academia
+                </h1>
+                <p className="max-w-md text-sm leading-6 text-slate-600">
+                  The next generation of academic project management.
+                </p>
+              </motion.div>
+
+            {tenantDomain && (
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-4 inline-flex max-w-full items-center gap-2 rounded-full border border-[#ED5F45]/20 bg-[#ED5F45]/8 px-3 py-1.5 text-xs font-medium text-[#ED5F45] sm:px-4">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[#ED5F45]" />
+                <span className="min-w-0 truncate">{tenantDomain}</span>
+              </motion.div>
+            )}
+
+            {user && (
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-5 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ED5F45]/10 font-semibold text-[#ED5F45]">
+                  {(user.firstName?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
+                </div>
+                <p className="truncate font-medium">{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}</p>
+                <Button variant="ghost" size="sm" onClick={() => logout()} className="ml-auto h-8 rounded-md px-3 text-xs text-slate-600 hover:bg-slate-200">
+                  Logout
+                </Button>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    {...register('email')}
+                    placeholder="Enter your email"
+                    className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-slate-300 pl-10 text-sm')}
+                  />
+                </div>
+                <AnimatePresence>
+                  {errors.email && (
+                    <motion.p className="text-xs font-medium text-destructive" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                      {errors.email.message}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+
+              <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                    Password
+                  </Label>
+                  <Link
+                    href={forgotPasswordHref}
+                    className="text-xs font-medium text-[#ED5F45] hover:underline sm:text-right"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="password"
+                      {...register('password')}
+                      type={isPasswordVisible ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-slate-300 pl-10 pr-3 text-sm')}
+                    />
                   </div>
-                  <h3 className="mb-2 text-lg font-black sm:text-xl uppercase tracking-tight">Project Analytics</h3>
-                  <p className="text-sm leading-relaxed text-white/80 sm:text-base font-medium">
-                    Monitor progress, track deadlines, and generate institutional insights with our advanced reporting engine.
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setIsPasswordVisible((p) => !p)}
+                    aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    className="shrink-0 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                  >
+                    {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <AnimatePresence>
+                  {errors.password && (
+                    <motion.p className="text-xs font-medium text-destructive" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                      {errors.password.message}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+
+              <AnimatePresence>
+                {error && (
+                  <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                    <Alert variant="destructive" className="rounded-xl py-2.5">
+                      <AlertDescription className="text-xs font-medium">{error}</AlertDescription>
+                    </Alert>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="pt-1">
+                <Button
+                  type="submit"
+                  className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-12 w-full rounded-xl text-sm font-semibold')}
+                  disabled={isLoading || isRateLimited}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Signing In...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      Sign In
+                      <ArrowRight className="h-4.5 w-4.5" />
+                    </span>
+                  )}
+                </Button>
+              </motion.div>
+            </form>
+
+            <motion.p variants={AUTH_ITEM_VARIANTS} className="mt-8 text-center text-sm text-slate-600">
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="font-semibold text-[#ED5F45] hover:underline">
+                Sign Up
+              </Link>
+            </motion.p>
+            </div>
+
+            <div className={AUTH_MARKETING_COLUMN_WRAP}>
+              <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
+              <div className="pointer-events-none absolute -left-20 bottom-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-6 space-y-5 md:mt-10 md:space-y-6">
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <CheckCircle2 className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-white">Capabilities</h2>
+                  </div>
+                  <ul className="space-y-3">
+                    {capabilities.map((text) => (
+                      <li key={text} className="flex items-start gap-3 text-sm leading-6 text-white/90">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80" aria-hidden />
+                        <span>{text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <BarChart3 className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white">Project Analytics</h3>
+                  </div>
+                  <p className="text-sm leading-6 text-white/90">
+                    Monitor progress, track deadlines, and generate institutional insights with advanced reporting.
                   </p>
                 </div>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
+              </motion.div>
 
-          {/* ── Right: form card ── */}
-          <motion.div className="order-1 lg:order-2" variants={AUTH_SLIDE_RIGHT_VARIANTS}>
-            <AuthTiltCard>
-              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white dark:bg-slate-900 shadow-2xl backdrop-blur-2xl">
-                {/* top accent stripe */}
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
-
-                <div className="px-6 pb-10 pt-8 sm:px-10">
-                  {/* Card header */}
-                  <div className="mb-8 text-center">
-                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30">
-                      <LogIn className="h-6 w-6 text-white" />
-                    </div>
-                    <h2 className="text-2xl font-black text-slate-900 sm:text-3xl dark:text-slate-100 uppercase tracking-tight">Sign In</h2>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 font-medium text-pretty leading-snug">
-                      Authenticate to access your academic workspace
-                    </p>
-                    {tenantDomain && (
-                      <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#ED5F45]/20 bg-[#ED5F45]/5 px-4 py-1.5 text-xs font-black text-[#ED5F45] uppercase tracking-wider">
-                        <span className="h-2 w-2 rounded-full bg-[#ED5F45] animate-pulse" />
-                        {tenantDomain}
-                      </div>
-                    )}
-                    {user && (
-                      <div className="mt-5 flex items-center justify-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                         <div className="h-8 w-8 rounded-full bg-[#ED5F45]/10 flex items-center justify-center text-[#ED5F45] font-bold">
-                            {(user.firstName?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
-                         </div>
-                        <span><strong>{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}</strong></span>
-                        <Button variant="ghost" size="sm" onClick={() => logout()} className="h-8 rounded-xl px-3 text-xs font-bold text-[#ED5F45] hover:bg-[#ED5F45]/10">Logout</Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Form */}
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                    {/* Email */}
-                    <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
-                      <Label htmlFor="email" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        <Mail className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
-                        Email Address
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        {...register('email')}
-                        placeholder="email@university.edu"
-                        className={cn(AUTH_FORM_INPUT_CLASS, "h-12 rounded-xl border-2")}
-                      />
-                      <AnimatePresence>
-                        {errors.email && (
-                          <motion.p
-                            className="text-[11px] font-bold text-destructive px-1"
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                          >
-                            {errors.email.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-
-                    {/* Password */}
-                    <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="flex items-center gap-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                          <Lock className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
-                          Password
-                        </Label>
-                        <Link
-                          href={forgotPasswordHref}
-                          className="text-[10px] font-black text-[#ED5F45] transition-colors hover:underline uppercase"
-                        >
-                          Forgot?
-                        </Link>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={isPasswordVisible ? 'text' : 'password'}
-                          {...register('password')}
-                          placeholder="••••••••"
-                          className={cn('pr-12 h-12 rounded-xl border-2', AUTH_FORM_INPUT_CLASS)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setIsPasswordVisible((p) => !p)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#ED5F45]"
-                        >
-                          {isPasswordVisible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                        </button>
-                      </div>
-                      <AnimatePresence>
-                        {errors.password && (
-                          <motion.p
-                            className="text-[11px] font-bold text-destructive px-1"
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                          >
-                            {errors.password.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-
-                    {/* Error alert */}
-                    <AnimatePresence>
-                      {error && (
-                        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                          <Alert variant="destructive" className="rounded-xl border-[#ED5F45]/20 bg-[#ED5F45]/5 text-[#ED5F45] py-2 px-3">
-                            <AlertDescription className="text-xs font-bold">{error}</AlertDescription>
-                          </Alert>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Submit */}
-                    <motion.div variants={AUTH_ITEM_VARIANTS} className="pt-2">
-                      <Button
-                        type="submit"
-                        className={cn(AUTH_PRIMARY_BUTTON_CLASS, "h-14 text-base font-black uppercase tracking-widest")}
-                        disabled={isLoading || isRateLimited}
-                      >
-                        {isLoading ? (
-                          <span className="flex items-center gap-3">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            AUTHENTICATING...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-3">
-                            Sign In
-                            <ArrowRight className="h-5 w-5" />
-                          </span>
-                        )}
-                      </Button>
-                    </motion.div>
-                  </form>
-
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 space-y-4">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/80">Used by teams at</p>
+                  <div className="h-px flex-1 bg-white/30" />
                 </div>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
-        </div>
+                <div className="grid grid-cols-2 gap-3 text-sm font-medium text-white/90 lg:grid-cols-3">
+                  <span>Department Level</span>
+                  <span>Final Year Student</span>
+                  <span>Advisor</span>
+                  <span>Coordinator</span>
+                  <span>Evaluator</span>
+                  <span>Admin</span>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </AuthTiltCard>
       </motion.div>
-    </AuthCampusBackdrop>
+    </div>
   );
 }
 
@@ -474,7 +459,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <AuthCampusBackdrop>
-          <p className="text-sm font-medium text-white/90 drop-shadow">Loading…</p>
+          <p className="text-sm font-medium text-slate-600">Loading…</p>
         </AuthCampusBackdrop>
       }
     >
