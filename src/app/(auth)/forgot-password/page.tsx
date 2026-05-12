@@ -23,13 +23,7 @@ import { getErrorMessage } from '@/lib/api/errors'
 import { requestForgotPassword } from '@/lib/api/auth'
 import { clearForgotPasswordFlow, writeForgotPasswordFlow } from '@/lib/auth/forgot-password-flow'
 import { useAuthStore } from '@/store/auth-store'
-import {
-  AuthCampusBackdrop,
-  AUTH_ACCENT_ICON,
-  AUTH_FORM_INPUT_CLASS,
-  AUTH_WELCOME_HEADLINE_CLASS,
-  AUTH_PRIMARY_BUTTON_CLASS,
-} from '@/components/auth/auth-campus-backdrop'
+import { AUTH_FORM_COLUMN_WRAP, AUTH_FORM_INPUT_CLASS, AUTH_MARKETING_COLUMN_WRAP, AUTH_PAGE_WRAP, AUTH_PRIMARY_BUTTON_CLASS, AUTH_SPLIT_CARD_GRID } from '@/components/auth/auth-campus-backdrop'
 import { cn } from '@/lib/utils'
 import { AuthTiltCard, AUTH_CONTAINER_VARIANTS, AUTH_ITEM_VARIANTS } from '@/components/auth/auth-tilt-card'
 
@@ -88,7 +82,7 @@ function ForgotPasswordPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-8 md:py-10">
+    <div className={AUTH_PAGE_WRAP}>
       <motion.div
         className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
@@ -96,8 +90,8 @@ function ForgotPasswordPageContent() {
         animate="visible"
       >
         <AuthTiltCard>
-          <div className="grid min-h-[730px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-2xl md:grid-cols-2">
-            <div className="flex flex-col bg-white px-7 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
+          <div className={AUTH_SPLIT_CARD_GRID}>
+            <div className={AUTH_FORM_COLUMN_WRAP}>
               <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-10 flex items-center gap-3">
                 <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                   <Image
@@ -113,7 +107,7 @@ function ForgotPasswordPageContent() {
               </motion.div>
 
               <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-8 space-y-2">
-                <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Recovery Access</h1>
+                <h1 className="text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Recovery Access</h1>
                 <p className="max-w-md text-sm leading-6 text-slate-600">
                   Retrieve your account access securely. Step 1 of 3.
                 </p>
@@ -171,11 +165,11 @@ function ForgotPasswordPageContent() {
               </form>
             </div>
 
-            <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#B84530] via-[#D95840] to-[#ED5F45] p-10 text-white md:flex md:flex-col md:justify-between lg:p-14">
+            <div className={AUTH_MARKETING_COLUMN_WRAP}>
               <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
               <div className="pointer-events-none absolute -left-20 bottom-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
 
-              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-10 space-y-6">
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-6 space-y-5 md:mt-10 md:space-y-6">
                 <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
@@ -207,12 +201,9 @@ export default function ForgotPasswordPage() {
   return (
     <Suspense
       fallback={
-        <AuthCampusBackdrop>
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-slate-500" />
-            <p className="text-sm font-medium text-slate-600">Loading Recovery Service…</p>
-          </div>
-        </AuthCampusBackdrop>
+        <div className="flex min-h-screen items-center justify-center bg-slate-200">
+          <Loader2 className="h-10 w-10 animate-spin text-[#ED5F45]" aria-hidden />
+        </div>
       }
     >
       <ForgotPasswordPageContent />

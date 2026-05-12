@@ -57,6 +57,22 @@ export const AUTH_FORM_INPUT_CLASS =
 export const AUTH_PRIMARY_BUTTON_CLASS =
   'relative w-full overflow-hidden rounded-xl bg-[#ED5F45] py-6 text-base font-semibold text-white transition-all duration-200 hover:bg-[#D95840] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ED5F45]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-55 sm:py-5'
 
+/** Auth split-layout pages — safe-area padding, fills viewport on mobile browsers */
+export const AUTH_PAGE_WRAP =
+  'min-h-[100dvh] bg-slate-200 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 md:px-8 md:py-10'
+
+/** White + gradient split card: natural height on phones; fixed min height from tablet/desktop */
+export const AUTH_SPLIT_CARD_GRID =
+  'grid grid-cols-1 overflow-x-hidden rounded-xl border border-slate-300 bg-white shadow-xl sm:rounded-2xl sm:shadow-2xl md:min-h-[min(780px,calc(100dvh-7rem))] md:grid-cols-2'
+
+/** Left column (forms) — tighter padding on very small screens */
+export const AUTH_FORM_COLUMN_WRAP =
+  'flex min-h-0 flex-col bg-white px-4 py-7 sm:px-8 sm:py-9 lg:px-14 lg:py-12'
+
+/** Gradient / marketing column (hidden below md — matches split-card breakpoint) */
+export const AUTH_MARKETING_COLUMN_WRAP =
+  'relative hidden overflow-hidden bg-gradient-to-br from-[#B84530] via-[#D95840] to-[#ED5F45] p-6 text-white sm:p-8 md:flex md:flex-col md:justify-between lg:p-14'
+
 /** Analytics side card — rich brand tones */
 export const AUTH_CTA_CARD_CLASS =
   'border border-[#ED5F45]/20 bg-gradient-to-br from-[#B84530] via-[#D95840] to-[#ED5F45] p-5 text-white sm:p-6'

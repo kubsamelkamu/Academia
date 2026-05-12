@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -15,6 +16,7 @@ import {
   Mail,
   Shield,
   KeyRound,
+  BarChart3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,20 +28,8 @@ import { getErrorMessage } from '@/lib/api/errors'
 import { resendForgotPasswordOtp, verifyForgotPasswordOtp } from '@/lib/api/auth'
 import { clearForgotPasswordFlow, readForgotPasswordFlow, writeForgotPasswordFlow } from '@/lib/auth/forgot-password-flow'
 import { useAuthStore } from '@/store/auth-store'
-import {
-  AuthCampusBackdrop,
-  AUTH_ACCENT_ICON,
-  AUTH_FORM_INPUT_CLASS,
-  AUTH_PRIMARY_BUTTON_CLASS,
-  AUTH_WELCOME_HEADLINE_CLASS,
-} from '@/components/auth/auth-campus-backdrop'
-import {
-  AuthTiltCard,
-  AUTH_CONTAINER_VARIANTS,
-  AUTH_ITEM_VARIANTS,
-  AUTH_SLIDE_LEFT_VARIANTS,
-  AUTH_SLIDE_RIGHT_VARIANTS,
-} from '@/components/auth/auth-tilt-card'
+import { AUTH_FORM_COLUMN_WRAP, AUTH_FORM_INPUT_CLASS, AUTH_MARKETING_COLUMN_WRAP, AUTH_PAGE_WRAP, AUTH_PRIMARY_BUTTON_CLASS, AUTH_SPLIT_CARD_GRID } from '@/components/auth/auth-campus-backdrop'
+import { AuthTiltCard, AUTH_CONTAINER_VARIANTS, AUTH_ITEM_VARIANTS } from '@/components/auth/auth-tilt-card'
 import { cn } from '@/lib/utils'
 
 function ForgotPasswordVerifyPageContent() {
@@ -152,189 +142,188 @@ function ForgotPasswordVerifyPageContent() {
   }
 
   return (
-    <AuthCampusBackdrop>
+    <div className={AUTH_PAGE_WRAP}>
       <motion.div
         className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
-          <motion.div
-            className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30 sm:h-24 sm:w-24"
-            whileHover={{ scale: 1.06, rotate: -4 }}
-            whileTap={{ scale: 0.94 }}
-          >
-            <Shield className="h-10 w-10 text-white sm:h-11 sm:w-11" />
-          </motion.div>
-          <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
-            Verify reset code
-          </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
-            Step 2 of 3 — confirm the 6-digit code we sent to your email.
-          </p>
-        </motion.div>
+        <AuthTiltCard>
+          <div className={AUTH_SPLIT_CARD_GRID}>
+            <div className={AUTH_FORM_COLUMN_WRAP}>
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-10 flex items-center gap-3">
+                <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <Image
+                    src="/haramaya.png"
+                    alt="Haramaya University"
+                    fill
+                    sizes="36px"
+                    className="object-contain p-1"
+                    priority
+                  />
+                </div>
+                <p className="text-lg font-semibold text-slate-900">Academia</p>
+              </motion.div>
 
-        <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_420px]">
-          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
-            <AuthTiltCard>
-              <div className="relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
-                <h3 className="mb-6 flex items-center gap-3 text-lg font-black uppercase tracking-tight text-white sm:text-xl">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ED5F45]/30 bg-[#ED5F45]/20">
-                    <Mail className="h-5 w-5 text-[#ED5F45]" />
-                  </span>
-                  What happens next
-                </h3>
-                <ul className="space-y-4 text-sm font-medium text-slate-100 sm:text-base">
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ED5F45]/30 bg-[#ED5F45]/20 text-xs font-bold text-[#ED5F45]">
-                      1
-                    </span>
-                    Enter the code from your inbox
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ED5F45]/30 bg-[#ED5F45]/20 text-xs font-bold text-[#ED5F45]">
-                      2
-                    </span>
-                    We verify and unlock the reset step
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ED5F45]/30 bg-[#ED5F45]/20 text-xs font-bold text-[#ED5F45]">
-                      3
-                    </span>
-                    You choose a new password
-                  </li>
-                </ul>
-              </div>
-            </AuthTiltCard>
-
-            <AuthTiltCard>
-              <div className="relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
-                <CheckCircle2 className="mb-3 h-8 w-8 text-[#ED5F45]" />
-                <h3 className="mb-2 text-lg font-black uppercase tracking-tight">Code sent</h3>
-                <p className="break-all text-sm font-medium text-white/85 sm:text-base">
-                  We sent the verification code to {email || 'your email'}.
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-6 space-y-2">
+                <h1 className="text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Verify reset code</h1>
+                <p className="max-w-md text-sm leading-6 text-slate-600">
+                  Step 2 of 3 — enter the 6-digit code we sent to your email.
                 </p>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
+              </motion.div>
 
-          <motion.div className="order-1 lg:order-2" variants={AUTH_SLIDE_RIGHT_VARIANTS}>
-            <AuthTiltCard>
-              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white shadow-2xl backdrop-blur-2xl dark:bg-slate-900">
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
-                <div className="px-6 pb-10 pt-8 sm:px-10">
-                  <div className="mb-8 text-center">
-                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30">
-                      <KeyRound className="h-6 w-6 text-white" />
-                    </div>
-                    <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
-                      Enter code
-                    </h2>
-                    <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                      Sent to <strong>{email || 'your email'}</strong>
-                    </p>
-                    <div className="mt-6">
-                      <ForgotPasswordProgress
-                        currentStep="verify"
-                        stepLinks={{
-                          request: '/forgot-password',
-                        }}
-                      />
-                    </div>
-                  </div>
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-6">
+                <ForgotPasswordProgress
+                  currentStep="verify"
+                  stepLinks={{
+                    request: '/forgot-password',
+                  }}
+                />
+              </motion.div>
 
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="otp"
-                        className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
-                      >
-                        <Shield className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
-                        6-digit code
-                      </Label>
-                      <Input
-                        id="otp"
-                        {...form.register('otp')}
-                        placeholder="123456"
-                        maxLength={6}
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                  <Label htmlFor="otp" className="text-sm font-medium text-slate-700">
+                    6-digit code
+                  </Label>
+                  <Input
+                    id="otp"
+                    {...form.register('otp')}
+                    placeholder="000000"
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                         className={cn(
                           AUTH_FORM_INPUT_CLASS,
-                          'h-14 rounded-xl border-2 text-center font-mono text-2xl tracking-[0.35em]',
+                          'h-12 w-full min-w-0 rounded-xl border-slate-300 text-center font-mono text-base tracking-[0.22em] sm:tracking-[0.35em]',
                         )}
-                      />
-                      {form.formState.errors.otp ? (
-                        <p className="text-center text-[11px] font-bold text-destructive">
-                          {form.formState.errors.otp.message}
-                        </p>
-                      ) : null}
-                    </div>
+                  />
+                  {form.formState.errors.otp ? (
+                    <p className="text-xs font-medium text-destructive">{form.formState.errors.otp.message}</p>
+                  ) : null}
+                </motion.div>
 
-                    <AnimatePresence>
-                      {error ? (
-                        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>
-                          <Alert variant="destructive" className="rounded-xl border-[#ED5F45]/20 bg-[#ED5F45]/5 text-[#ED5F45]">
-                            <AlertDescription className="text-xs font-bold">{error}</AlertDescription>
-                          </Alert>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
+                <AnimatePresence>
+                  {error ? (
+                    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                      <Alert variant="destructive" className="rounded-xl py-2.5">
+                        <AlertDescription className="text-xs font-medium">{error}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
-                    <Button
-                      type="submit"
-                      className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-14 text-base font-black uppercase tracking-widest')}
-                      disabled={verifyLoading}
-                    >
-                      {verifyLoading ? (
-                        <span className="z-[1] flex items-center gap-2">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Verifying…
-                        </span>
-                      ) : (
-                        <span className="z-[1] flex items-center justify-center gap-3">
-                          Verify code
-                          <ArrowRight className="h-5 w-5" />
-                        </span>
-                      )}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-12 w-full rounded-xl border-2 border-[#ED5F45]/30 font-bold text-[#ED5F45] hover:bg-[#ED5F45]/10"
-                      disabled={resendLoading || countdown > 0}
-                      onClick={onResend}
-                    >
-                      {countdown > 0 ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Resend in {countdown}s
-                        </span>
-                      ) : resendLoading ? (
+                <motion.div variants={AUTH_ITEM_VARIANTS}>
+                  <Button
+                    type="submit"
+                    className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-12 w-full rounded-xl text-sm font-semibold')}
+                    disabled={verifyLoading}
+                  >
+                    {verifyLoading ? (
+                      <span className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Resend code'
-                      )}
-                    </Button>
+                        Verifying…
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        Verify code
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    )}
+                  </Button>
+                </motion.div>
 
-                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      <button type="button" className="text-[#ED5F45] hover:underline" onClick={handleUseDifferentEmail}>
-                        Different email
-                      </button>
-                      <Link href="/login" className="text-[#ED5F45] hover:underline">
-                        Back to sign in
-                      </Link>
-                    </div>
-                  </form>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-full rounded-xl border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  disabled={resendLoading || countdown > 0}
+                  onClick={() => void onResend()}
+                >
+                  {countdown > 0 ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Resend in {countdown}s
+                    </span>
+                  ) : resendLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Resend code
+                    </span>
+                  )}
+                </Button>
+
+                <div className="flex flex-col gap-3 pt-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <button
+                    type="button"
+                    className="font-medium text-[#ED5F45] hover:underline"
+                    onClick={handleUseDifferentEmail}
+                  >
+                    Use a different email
+                  </button>
+                  <Link href="/login" className="font-medium text-[#ED5F45] hover:underline">
+                    Back to sign in
+                  </Link>
                 </div>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
-        </div>
+              </form>
+            </div>
+
+            <div className={AUTH_MARKETING_COLUMN_WRAP}>
+              <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
+              <div className="pointer-events-none absolute -left-20 bottom-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-6 space-y-5 md:mt-10 md:space-y-6">
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <KeyRound className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-white">Recovery steps</h2>
+                  </div>
+                  <ul className="space-y-3 text-sm leading-6 text-white/90">
+                    <li className="flex items-start gap-3">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80" aria-hidden />
+                      <span>Enter the code from your inbox</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80" aria-hidden />
+                      <span>We verify and unlock the reset step</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80" aria-hidden />
+                      <span>Choose a strong new password</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <BarChart3 className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white">Why we verify</h3>
+                  </div>
+                  <p className="text-sm leading-6 text-white/90">
+                    A one-time code confirms it&apos;s really you before your password can be changed.
+                  </p>
+                </div>
+              </motion.div>
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 space-y-4">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/80">Code sent to</p>
+                  <div className="h-px flex-1 bg-white/30" />
+                </div>
+                <p className="break-all text-sm font-medium text-white/95">{email || 'your email'}</p>
+              </motion.div>
+            </div>
+          </div>
+        </AuthTiltCard>
       </motion.div>
-    </AuthCampusBackdrop>
+    </div>
   )
 }
 
@@ -342,12 +331,9 @@ export default function ForgotPasswordVerifyPage() {
   return (
     <Suspense
       fallback={
-        <AuthCampusBackdrop>
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-slate-500" />
-            <p className="text-sm font-medium text-slate-600">Loading…</p>
-          </div>
-        </AuthCampusBackdrop>
+        <div className="flex min-h-screen items-center justify-center bg-slate-200">
+          <Loader2 className="h-10 w-10 animate-spin text-[#ED5F45]" aria-hidden />
+        </div>
       }
     >
       <ForgotPasswordVerifyPageContent />

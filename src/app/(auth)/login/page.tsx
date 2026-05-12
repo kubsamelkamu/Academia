@@ -28,8 +28,12 @@ import { DEFAULT_RATE_LIMIT_RETRY_AFTER_MS, getErrorMessage, isRateLimitMessage 
 import { InvitationOnboardingShell } from '@/components/auth/invitation-onboarding-shell';
 import {
   AuthCampusBackdrop,
+  AUTH_FORM_COLUMN_WRAP,
   AUTH_FORM_INPUT_CLASS,
+  AUTH_MARKETING_COLUMN_WRAP,
+  AUTH_PAGE_WRAP,
   AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_SPLIT_CARD_GRID,
 } from '@/components/auth/auth-campus-backdrop';
 import { cn } from '@/lib/utils';
 import { clearInviteAcceptResult, readInviteAcceptResult } from '@/lib/auth/invite-onboarding-storage';
@@ -200,21 +204,24 @@ function LoginPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Temporary password</Label>
-              <div className="relative isolate">
-                <Input
-                  id="password"
-                  {...register('password')}
-                  type={isPasswordVisible ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className={cn('pr-10', AUTH_FORM_INPUT_CLASS)}
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    id="password"
+                    {...register('password')}
+                    type={isPasswordVisible ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className={cn('pr-3', AUTH_FORM_INPUT_CLASS)}
+                  />
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => setIsPasswordVisible((p) => !p)}
                   aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
-                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+                  className="shrink-0 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
                 >
                   {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -233,7 +240,7 @@ function LoginPageContent() {
 
   /* ── Main sign-in page ── */
   return (
-    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-8 md:py-10">
+    <div className={AUTH_PAGE_WRAP}>
       <motion.div
         className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
@@ -241,8 +248,8 @@ function LoginPageContent() {
         animate="visible"
       >
         <AuthTiltCard>
-          <div className="grid min-h-[730px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-2xl md:grid-cols-2">
-            <div className="flex flex-col bg-white px-7 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
+          <div className={AUTH_SPLIT_CARD_GRID}>
+            <div className={AUTH_FORM_COLUMN_WRAP}>
             <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-10 flex items-center gap-3">
               <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <Image
@@ -258,16 +265,18 @@ function LoginPageContent() {
             </motion.div>
 
               <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-8 space-y-2">
-                <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Welcome to Academia</h1>
+                <h1 className="text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                  Welcome to Academia
+                </h1>
                 <p className="max-w-md text-sm leading-6 text-slate-600">
                   The next generation of academic project management.
                 </p>
               </motion.div>
 
             {tenantDomain && (
-              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#ED5F45]/20 bg-[#ED5F45]/8 px-4 py-1.5 text-xs font-medium text-[#ED5F45]">
-                <span className="h-2 w-2 rounded-full bg-[#ED5F45]" />
-                {tenantDomain}
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-4 inline-flex max-w-full items-center gap-2 rounded-full border border-[#ED5F45]/20 bg-[#ED5F45]/8 px-3 py-1.5 text-xs font-medium text-[#ED5F45] sm:px-4">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[#ED5F45]" />
+                <span className="min-w-0 truncate">{tenantDomain}</span>
               </motion.div>
             )}
 
@@ -306,29 +315,39 @@ function LoginPageContent() {
               </motion.div>
 
               <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
-                  <Link href={forgotPasswordHref} className="text-xs font-medium text-[#ED5F45] hover:underline">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                    Password
+                  </Label>
+                  <Link
+                    href={forgotPasswordHref}
+                    className="text-xs font-medium text-[#ED5F45] hover:underline sm:text-right"
+                  >
                     Forgot Password?
                   </Link>
                 </div>
-                <div className="relative isolate">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    id="password"
-                    {...register('password')}
-                    type={isPasswordVisible ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-slate-300 pl-10 pr-11 text-sm')}
-                  />
-                  <button
+                <div className="flex items-center gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="password"
+                      {...register('password')}
+                      type={isPasswordVisible ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-slate-300 pl-10 pr-3 text-sm')}
+                    />
+                  </div>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => setIsPasswordVisible((p) => !p)}
-                    className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    className="shrink-0 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
                   >
                     {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  </Button>
                 </div>
                 <AnimatePresence>
                   {errors.password && (
@@ -378,11 +397,11 @@ function LoginPageContent() {
             </motion.p>
             </div>
 
-            <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#B84530] via-[#D95840] to-[#ED5F45] p-10 text-white md:flex md:flex-col md:justify-between lg:p-14">
+            <div className={AUTH_MARKETING_COLUMN_WRAP}>
               <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
               <div className="pointer-events-none absolute -left-20 bottom-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
 
-              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-10 space-y-6">
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-6 space-y-5 md:mt-10 md:space-y-6">
                 <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
