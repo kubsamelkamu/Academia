@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { StatusIndicator } from "@/components/timeline/StatusIndicator"
 import { useCoordinatorAdvisorOverview, useCoordinatorProjectTracking } from "@/lib/hooks/use-coordinator-analytics"
+import { useCoordinatorEvaluatorNotificationRecipients } from "@/lib/hooks/use-coordinator-evaluator-notifications"
 import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcements"
 import { useDepartmentProjectProposals } from "@/lib/hooks/use-project-proposals"
 import { useDepartmentProjectsOverview } from "@/lib/hooks/use-projects"
@@ -45,9 +46,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import {
-  mockProjects,
-  mockEvaluations,
-  mockUsers,
   Grade,
 } from "@/data/mockData"
 import type { CoordinatorProjectTrackingItem, CoordinatorProjectTrackingMilestone } from "@/types/project-tracking"
@@ -380,6 +378,24 @@ export function CoordinatorDashboard() {
     enabled: Boolean(accessToken) && Boolean(departmentId),
   })
 
+  const evaluatorRecipientsCapstoneIQuery = useCoordinatorEvaluatorNotificationRecipients(
+    {
+      stage: "CAPSTONE_I",
+      page: 1,
+      limit: 100,
+    },
+    Boolean(accessToken) && Boolean(departmentId)
+  )
+
+  const evaluatorRecipientsCapstoneIIQuery = useCoordinatorEvaluatorNotificationRecipients(
+    {
+      stage: "CAPSTONE_II",
+      page: 1,
+      limit: 100,
+    },
+    Boolean(accessToken) && Boolean(departmentId)
+  )
+
   const timelineAnnouncementsQuery = useDepartmentAnnouncements({
     enabled: Boolean(accessToken) && Boolean(departmentId),
     departmentId,
@@ -399,10 +415,44 @@ export function CoordinatorDashboard() {
   })
 
   const pendingTitlesCount = departmentProposalsQuery.data?.summary.pending ?? 0
-  const pendingEvaluations = mockEvaluations.filter(e => e.status === 'pending')
+  const advisors = advisorOverviewQuery.data?.advisors ?? []
 
-  const advisors = mockUsers.filter(u => u.role === 'advisor')
-  const evaluators = mockUsers.filter(u => u.role === 'evaluator')
+  const evaluators = useMemo(() => {
+    const combined = new Map<string, {
+      id: string
+      name: string
+      email: string
+      assigned: number
+      submitted: number
+      pending: number
+    }>()
+
+    for (const item of [
+      ...(evaluatorRecipientsCapstoneIQuery.data?.items ?? []),
+      ...(evaluatorRecipientsCapstoneIIQuery.data?.items ?? []),
+    ]) {
+      const existing = combined.get(item.evaluatorUserId) ?? {
+        id: item.evaluatorUserId,
+        name: item.fullName,
+        email: item.email,
+        assigned: 0,
+        submitted: 0,
+        pending: 0,
+      }
+
+      existing.assigned += item.assignedProjectsCount
+      existing.submitted += item.submittedEvaluationsCount
+      existing.pending += item.pendingEvaluationsCount
+      combined.set(item.evaluatorUserId, existing)
+    }
+
+    return Array.from(combined.values()).sort((left, right) => left.name.localeCompare(right.name))
+  }, [evaluatorRecipientsCapstoneIQuery.data?.items, evaluatorRecipientsCapstoneIIQuery.data?.items])
+
+  const pendingEvaluations = useMemo(
+    () => evaluators.reduce((sum, evaluator) => sum + evaluator.pending, 0),
+    [evaluators]
+  )
   const activeProjectRows = useMemo(
     () => (activeProjectsTableQuery.data?.items ?? []).map(mapTrackingItemToActiveProjectRow),
     [activeProjectsTableQuery.data?.items]
@@ -578,13 +628,14 @@ export function CoordinatorDashboard() {
   const trackedTimelineTotal = timelineTrackingQuery.data?.pagination.totalItems ?? 0
   const trackedTimelinePages = Math.max(1, timelineTrackingQuery.data?.pagination.totalPages ?? 1)
 
-  const evaluatorMetrics = useMemo(() => evaluators.map(ev => {
-    const assigned = mockProjects.filter(p => (p.evaluatorIds ?? []).includes(ev.id))
-    const submitted = mockEvaluations.filter(e => e.evaluatorId === ev.id && (e.status === 'submitted' || e.status === 'reviewed')).length
-    const pending = mockEvaluations.filter(e => e.evaluatorId === ev.id && e.status === 'pending').length
-    const completion = assigned.length > 0 ? Math.round((submitted / assigned.length) * 100) : 0
-    return { ...ev, assigned: assigned.length, submitted, pending, completion }
-  }), [evaluators])
+  const evaluatorMetrics = useMemo(
+    () =>
+      evaluators.map((evaluator) => {
+        const completion = evaluator.assigned > 0 ? Math.round((evaluator.submitted / evaluator.assigned) * 100) : 0
+        return { ...evaluator, completion }
+      }),
+    [evaluators]
+  )
 
   const gradeFinalizationPct = localGrades.length > 0
     ? Math.round((localGrades.filter(g => g.status === 'final').length / localGrades.length) * 100)

@@ -49,6 +49,17 @@ export default function RegisterPage() {
 
   const DEFAULT_UNIVERSITY_NAME = 'Haramaya University';
 
+  // Handle name input validation - only allow letters and spaces
+  const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const value = e.target.value;
+    const filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+    if (value !== filteredValue) {
+      setInvalidCharWarning(`${fieldName} can only contain letters and spaces`);
+      e.target.value = filteredValue;
+      setTimeout(() => setInvalidCharWarning(''), 3000);
+    }
+  };
+
   const {
     register,
     handleSubmit,
