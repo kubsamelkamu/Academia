@@ -681,43 +681,19 @@ export function DcCommitteeWorkspace({
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <Button className="gap-2" onClick={() => handleDecision(`Approved ${leadingTitle?.name ?? "selected title"}`)}>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Approve Selected Title
+                  <Button asChild className="gap-2">
+                    <Link href="/dashboard/coordinator/title-management">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Approve Selected Title
+                    </Link>
                   </Button>
-                  
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <ThumbsDown className="h-4 w-4" />
-                        Reject All Titles
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Reject All Titles</DialogTitle>
-                        <DialogDescription>
-                          You are about to reject all proposed titles for <strong>{selectedGroup?.name ?? "this group"}</strong>. The students will be notified to submit new topics.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="py-2">
-                        <Textarea 
-                          placeholder="Provide the reason for rejecting all titles (required)..." 
-                          className="min-h-[100px] resize-none"
-                        />
-                      </div>
-                      <DialogFooter>
-                        <DialogTrigger asChild>
-                          <Button variant="outline">Cancel</Button>
-                        </DialogTrigger>
-                        <DialogTrigger asChild>
-                          <Button variant="destructive" onClick={() => handleDecision("All titles rejected. Please submit new titles.") }>
-                            Confirm Rejection
-                          </Button>
-                        </DialogTrigger>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+
+                  <Button asChild variant="outline" className="gap-2">
+                    <Link href="/dashboard/coordinator/title-management">
+                      <ThumbsDown className="h-4 w-4" />
+                      Reject All Titles
+                    </Link>
+                  </Button>
 
                   <Dialog>
                     <DialogTrigger asChild>
