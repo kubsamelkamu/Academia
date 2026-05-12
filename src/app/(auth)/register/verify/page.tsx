@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,7 +14,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Loader2,
   Mail,
-  Shield,
   CheckCircle2,
   ArrowRight,
   Clock,
@@ -21,21 +22,9 @@ import {
 } from 'lucide-react'
 import { RegistrationProgress } from '@/components/auth/registration-progress'
 import { useAuthStore } from '@/store/auth-store'
-import { verifyOtpSchema, VerifyOtpFormData, resendOtpSchema, ResendOtpFormData } from '@/validations/auth'
-import {
-  AuthCampusBackdrop,
-  AUTH_ACCENT_ICON,
-  AUTH_FORM_INPUT_CLASS,
-  AUTH_PRIMARY_BUTTON_CLASS,
-  AUTH_WELCOME_HEADLINE_CLASS,
-} from '@/components/auth/auth-campus-backdrop'
-import {
-  AuthTiltCard,
-  AUTH_CONTAINER_VARIANTS,
-  AUTH_ITEM_VARIANTS,
-  AUTH_SLIDE_LEFT_VARIANTS,
-  AUTH_SLIDE_RIGHT_VARIANTS,
-} from '@/components/auth/auth-tilt-card'
+import { verifyOtpSchema, VerifyOtpFormData } from '@/validations/auth'
+import { AUTH_FORM_COLUMN_WRAP, AUTH_FORM_INPUT_CLASS, AUTH_MARKETING_COLUMN_WRAP, AUTH_PAGE_WRAP, AUTH_PRIMARY_BUTTON_CLASS, AUTH_SPLIT_CARD_GRID } from '@/components/auth/auth-campus-backdrop'
+import { AuthTiltCard, AUTH_CONTAINER_VARIANTS, AUTH_ITEM_VARIANTS } from '@/components/auth/auth-tilt-card'
 import { cn } from '@/lib/utils'
 
 const verifySteps = [
@@ -70,13 +59,6 @@ export default function VerifyPage() {
     resolver: zodResolver(verifyOtpSchema),
   })
 
-  const {
-    register: registerResend,
-    handleSubmit: handleResendSubmit,
-  } = useForm<ResendOtpFormData>({
-    resolver: zodResolver(resendOtpSchema),
-  })
-
   useEffect(() => {
     if (!registration || !tenantDomain) {
       router.push('/register')
@@ -105,11 +87,11 @@ export default function VerifyPage() {
     }
   }
 
-  const onResend = async (data: ResendOtpFormData) => {
-    if (!tenantDomain || countdown > 0) return
+  const onResend = async () => {
+    if (!tenantDomain || countdown > 0 || !registration) return
     try {
       setResendLoading(true)
-      await resendEmailOtp({ email: data.email })
+      await resendEmailOtp({ email: registration.departmentHead.email })
       setResendMessage('OTP sent successfully! Check your email.')
       setCountdown(60)
     } catch {
@@ -120,207 +102,210 @@ export default function VerifyPage() {
   }
 
   if (!registration) {
-    return null
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-slate-200 px-4">
+        <Loader2 className="h-10 w-10 animate-spin text-[#ED5F45]" aria-hidden />
+      </div>
+    )
   }
 
   return (
-    <AuthCampusBackdrop>
+    <div className={AUTH_PAGE_WRAP}>
       <motion.div
         className="mx-auto w-full max-w-5xl"
         variants={AUTH_CONTAINER_VARIANTS}
         initial="hidden"
         animate="visible"
       >
-        <motion.div className="mb-10 text-center sm:mb-12" variants={AUTH_ITEM_VARIANTS}>
-          <motion.div
-            className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30 sm:h-24 sm:w-24"
-            whileHover={{ scale: 1.06, rotate: -4 }}
-            whileTap={{ scale: 0.94 }}
-          >
-            <Shield className="h-10 w-10 text-white sm:h-11 sm:w-11" />
-          </motion.div>
-          <h1 className={cn('mb-3 text-4xl sm:text-5xl md:text-6xl', AUTH_WELCOME_HEADLINE_CLASS)}>
-            Verify your email
-          </h1>
-          <p className="mx-auto max-w-lg text-pretty text-base font-medium text-slate-600 sm:text-lg">
-            We&apos;ve sent a verification code to secure your academic institution account.
-          </p>
-        </motion.div>
+        <AuthTiltCard>
+          <div className={AUTH_SPLIT_CARD_GRID}>
+            <div className={AUTH_FORM_COLUMN_WRAP}>
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-10 flex items-center gap-3">
+                <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <Image
+                    src="/haramaya.png"
+                    alt="Haramaya University"
+                    fill
+                    sizes="36px"
+                    className="object-contain p-1"
+                    priority
+                  />
+                </div>
+                <p className="text-lg font-semibold text-slate-900">Academia</p>
+              </motion.div>
 
-        <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_420px]">
-          <motion.div className="order-2 space-y-6 lg:order-1" variants={AUTH_SLIDE_LEFT_VARIANTS}>
-            <AuthTiltCard>
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-slate-950/40 p-8 shadow-2xl backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-[#ED5F45] opacity-90" />
-                <h3 className="mb-6 flex items-center gap-3 text-lg font-black uppercase tracking-tight text-white sm:text-xl">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ED5F45]/30 bg-[#ED5F45]/20">
-                    <Mail className="h-5 w-5 text-[#ED5F45]" />
-                  </span>
-                  What happens next
-                </h3>
-                <ul className="space-y-4">
-                  {verifySteps.map((step, i) => (
-                    <motion.li
-                      key={step}
-                      className="flex items-start gap-4 text-sm font-medium text-slate-100 sm:text-base"
-                      initial={{ opacity: 0, x: -14 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.18 + i * 0.07 }}
-                    >
-                      <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#ED5F45]/30 bg-[#ED5F45]/20 text-xs font-bold text-[#ED5F45]">
-                        {i + 1}
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-6 space-y-2">
+                <h1 className="text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Verify your email</h1>
+                <p className="max-w-md text-sm leading-6 text-slate-600">
+                  Enter the 6-digit code we sent to secure your department head account.
+                </p>
+              </motion.div>
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="mb-6">
+                <RegistrationProgress currentStep="verify" />
+              </motion.div>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
+                  <Label htmlFor="otp" className="text-sm font-medium text-slate-700">
+                    Verification code
+                  </Label>
+                  <Input
+                    id="otp"
+                    {...register('otp')}
+                    placeholder="000000"
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className={cn(
+                      AUTH_FORM_INPUT_CLASS,
+                      'h-12 w-full min-w-0 rounded-xl border-slate-300 text-center font-mono text-base tracking-[0.22em] sm:tracking-[0.35em]',
+                    )}
+                  />
+                  <AnimatePresence>
+                    {errors.otp ? (
+                      <motion.p
+                        className="text-xs font-medium text-destructive"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        {errors.otp.message}
+                      </motion.p>
+                    ) : null}
+                  </AnimatePresence>
+                </motion.div>
+
+                <AnimatePresence>
+                  {error ? (
+                    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                      <Alert variant="destructive" className="rounded-xl py-2.5">
+                        <AlertDescription className="text-xs font-medium">{error}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                <motion.div variants={AUTH_ITEM_VARIANTS}>
+                  <Button
+                    type="submit"
+                    className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-12 w-full rounded-xl text-sm font-semibold')}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Verifying…
                       </span>
-                      {step}
-                    </motion.li>
-                  ))}
-                </ul>
-              </div>
-            </AuthTiltCard>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        Verify email
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    )}
+                  </Button>
+                </motion.div>
+              </form>
 
-            <AuthTiltCard>
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-[#ED5F45]/20 bg-gradient-to-br from-[#ED5F45]/10 via-slate-900/40 to-slate-950/80 p-8 text-white backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45] opacity-80" />
-                <div className="relative z-[1]">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#ED5F45]/30 ring-4 ring-[#ED5F45]/10">
-                    <GraduationCap className="h-6 w-6 text-[#ED5F45]" />
+              <div className="mt-8 border-t border-slate-200 pt-8">
+                <p className="mb-4 text-center text-sm text-slate-600">Didn&apos;t receive the code?</p>
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-full rounded-xl border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    disabled={resendLoading || countdown > 0}
+                    onClick={() => void onResend()}
+                  >
+                    {resendLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : countdown > 0 ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Resend in {countdown}s
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Resend code
+                      </span>
+                    )}
+                  </Button>
+                </div>
+                {resendMessage ? (
+                  <Alert className="mt-4 rounded-xl border-emerald-200 bg-emerald-50 text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <AlertDescription className="text-xs font-medium">{resendMessage}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </div>
+
+              <motion.p variants={AUTH_ITEM_VARIANTS} className="mt-8 flex flex-col gap-2 text-center text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-2">
+                <span>
+                  Wrong email?{' '}
+                  <Link href="/register" className="font-semibold text-[#ED5F45] hover:underline">
+                    Start over
+                  </Link>
+                </span>
+                <span className="hidden text-slate-400 sm:inline">·</span>
+                <span>
+                  <Link href="/login" className="font-semibold text-[#ED5F45] hover:underline">
+                    Sign in
+                  </Link>
+                </span>
+              </motion.p>
+            </div>
+
+            <div className={AUTH_MARKETING_COLUMN_WRAP}>
+              <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
+              <div className="pointer-events-none absolute -left-20 bottom-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 mt-6 space-y-5 md:mt-10 md:space-y-6">
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <Mail className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-white">Next steps</h2>
                   </div>
-                  <h3 className="mb-2 text-lg font-black uppercase tracking-tight sm:text-xl">Secure & protected</h3>
-                  <p className="text-sm font-medium leading-relaxed text-white/80 sm:text-base">
-                    Your verification code ensures only authorized personnel can access your institution&apos;s academic
-                    management system.
+                  <ul className="space-y-3">
+                    {verifySteps.map((text) => (
+                      <li key={text} className="flex items-start gap-3 text-sm leading-6 text-white/90">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80" aria-hidden />
+                        <span>{text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <BarChart3 className="h-5 w-5 text-white/90" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white">Secure verification</h3>
+                  </div>
+                  <p className="text-sm leading-6 text-white/90">
+                    Codes expire quickly and can only be used once—keeping your institution workspace safe.
                   </p>
                 </div>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
+              </motion.div>
 
-          <motion.div className="order-1 lg:order-2" variants={AUTH_SLIDE_RIGHT_VARIANTS}>
-            <AuthTiltCard>
-              <div className="relative overflow-hidden rounded-[2.5rem] border border-white/20 bg-white shadow-2xl backdrop-blur-2xl dark:bg-slate-900">
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#ED5F45] via-[#F47A64] to-[#ED5F45]" />
-                <div className="px-6 pb-10 pt-8 sm:px-10">
-                  <div className="mb-8 text-center">
-                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ED5F45] to-[#F47A64] shadow-lg shadow-[#ED5F45]/30">
-                      <BarChart3 className="h-6 w-6 text-white" />
-                    </div>
-                    <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
-                      Enter verification code
-                    </h2>
-                    <p className="mt-2 text-sm font-medium leading-snug text-pretty text-slate-500 dark:text-slate-400">
-                      We sent a code to <strong>{registration.departmentHead.email}</strong>
-                    </p>
-                    <div className="mt-6">
-                      <RegistrationProgress currentStep="verify" />
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                    <motion.div className="space-y-2" variants={AUTH_ITEM_VARIANTS}>
-                      <Label
-                        htmlFor="otp"
-                        className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
-                      >
-                        <Shield className={cn('h-3.5 w-3.5 shrink-0', AUTH_ACCENT_ICON)} />
-                        6-digit code
-                      </Label>
-                      <Input
-                        id="otp"
-                        {...register('otp')}
-                        placeholder="123456"
-                        maxLength={6}
-                        className={cn(
-                          AUTH_FORM_INPUT_CLASS,
-                          'h-14 rounded-xl border-2 text-center font-mono text-2xl tracking-[0.35em]',
-                        )}
-                      />
-                      <AnimatePresence>
-                        {errors.otp ? (
-                          <motion.p
-                            className="text-center text-[11px] font-bold text-destructive"
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                          >
-                            {errors.otp.message}
-                          </motion.p>
-                        ) : null}
-                      </AnimatePresence>
-                    </motion.div>
-
-                    <AnimatePresence>
-                      {error ? (
-                        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                          <Alert variant="destructive" className="rounded-xl border-[#ED5F45]/20 bg-[#ED5F45]/5 text-[#ED5F45]">
-                            <AlertDescription className="text-xs font-bold">{error}</AlertDescription>
-                          </Alert>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
-
-                    <Button
-                      type="submit"
-                      className={cn(AUTH_PRIMARY_BUTTON_CLASS, 'h-14 text-base font-black uppercase tracking-widest')}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <span className="flex items-center gap-2">
-                          <Loader2 className="z-[1] h-5 w-5 animate-spin" />
-                          Verifying…
-                        </span>
-                      ) : (
-                        <span className="z-[1] flex items-center justify-center gap-3">
-                          Verify email
-                          <ArrowRight className="h-5 w-5" />
-                        </span>
-                      )}
-                    </Button>
-                  </form>
-
-                  <div className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-700">
-                    <p className="mb-4 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-                      Didn&apos;t receive the code?
-                    </p>
-                    <form onSubmit={handleResendSubmit(onResend)} className="space-y-3">
-                      <Input
-                        {...registerResend('email')}
-                        defaultValue={registration.departmentHead.email}
-                        placeholder="Email"
-                        disabled={countdown > 0}
-                        className={cn(AUTH_FORM_INPUT_CLASS, 'h-12 rounded-xl border-2')}
-                      />
-                      <Button
-                        type="submit"
-                        variant="outline"
-                        className="h-12 w-full rounded-xl border-2 border-[#ED5F45]/30 font-bold text-[#ED5F45] hover:bg-[#ED5F45]/10"
-                        disabled={resendLoading || countdown > 0}
-                      >
-                        {resendLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {countdown > 0 ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            Resend in {countdown}s
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            Resend code
-                          </span>
-                        )}
-                      </Button>
-                    </form>
-                    {resendMessage ? (
-                      <Alert className="mt-4 rounded-xl">
-                        <CheckCircle2 className="h-4 w-4 text-[#ED5F45]" />
-                        <AlertDescription>{resendMessage}</AlertDescription>
-                      </Alert>
-                    ) : null}
-                  </div>
+              <motion.div variants={AUTH_ITEM_VARIANTS} className="relative z-10 space-y-4">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/80">Sent to</p>
+                  <div className="h-px flex-1 bg-white/30" />
                 </div>
-              </div>
-            </AuthTiltCard>
-          </motion.div>
-        </div>
+                <p className="break-all text-sm font-medium text-white/95">{registration.departmentHead.email}</p>
+                <div className="flex items-center gap-2 text-xs text-white/75">
+                  <GraduationCap className="h-4 w-4 shrink-0" />
+                  <span>Department head onboarding</span>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </AuthTiltCard>
       </motion.div>
-    </AuthCampusBackdrop>
+    </div>
   )
 }
