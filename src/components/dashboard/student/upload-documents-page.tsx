@@ -612,7 +612,7 @@ export function StudentUploadDocumentsPage() {
                 <Input
                   id="document-file"
                   type="file"
-                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/zip,.zip"
+                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/zip,application/x-zip-compressed,application/octet-stream,.zip"
                   onChange={(e) => setMilestoneFile(e.target.files?.[0] ?? null)}
                 />
                 <p className="text-xs text-muted-foreground">
