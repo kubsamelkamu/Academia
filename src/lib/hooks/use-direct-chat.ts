@@ -49,7 +49,7 @@ export function useInfiniteAdvisorVisibleCoordinators(params: {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.pagination.nextCursor ?? undefined,
     enabled: params.enabled,
-    staleTime: 15_000,
+    staleTime: 60_000,
     retry: false,
   })
 }

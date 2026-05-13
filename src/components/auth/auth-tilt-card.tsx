@@ -35,7 +35,7 @@ export function AuthTiltCard({ children, className = '' }: { children: ReactNode
         transformStyle: 'preserve-3d',
         perspective: '1000px',
       }}
-      className={`relative ${className}`}
+      className={`relative touch-manipulation ${className}`}
     >
       <motion.div
         style={{ transformStyle: 'preserve-3d' }}

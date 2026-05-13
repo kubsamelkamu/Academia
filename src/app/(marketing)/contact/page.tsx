@@ -370,7 +370,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Us</p>
-                    <p className="text-sm font-black uppercase">hello@academia.com</p>
+                    <p className="text-sm font-black uppercase">kerazal71@gmail.com</p>
                   </div>
                 </div>
               </div>
@@ -622,27 +622,27 @@ export default function ContactPage() {
 
 const contactInfo: ContactInfoItem[] = [
   {
-    title: 'Sales',
-    description: 'Pricing, pilots, and institution-wide rollout.',
-    contact: 'sales@academia.com',
+    title: 'Institutional',
+    description: 'For universities and administrators requesting system access.',
+    contact: 'haramaya@academia.com',
     icon: Building,
   },
   {
     title: 'Support',
     description: 'Account access, bugs, and day-to-day help.',
-    contact: 'support@academia.com',
+    contact: 'Kerazal71@gmail.com',
     icon: MessageSquare,
   },
   {
     title: 'Partnerships',
-    description: 'Integrations, resellers, and research collaborations.',
-    contact: 'partners@academia.com',
+    description: 'For API integrations, academic collaborations, system extensions.',
+    contact: 'contact@kubsamelkamu.dev',
     icon: Users,
   },
   {
     title: 'General',
-    description: 'Anything else—we read every message.',
-    contact: 'hello@academia.com',
+    description: 'For general questions, feedback, or non-specific requests.',
+    contact: 'omerzal71@gmail.com',
     icon: Mail,
   },
 ]

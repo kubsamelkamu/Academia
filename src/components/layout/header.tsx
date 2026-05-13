@@ -131,67 +131,66 @@ export function Header() {
             : "border-b border-transparent bg-background/0"
         )}
       >
-        <div className="flex h-20 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
+        <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
           {/* ── Logo ── */}
           <Link
             href="/"
-            className="group relative flex items-center gap-3 outline-none"
+            className="group relative flex items-center gap-2.5 outline-none"
             aria-label="Academia home"
           >
             <motion.div
               whileHover={{ scale: 1.08, rotate: -3 }}
               whileTap={{ scale: 0.94 }}
               transition={{ type: "spring", stiffness: 400, damping: 20 }}
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#ED5F45] via-[#F47A64] to-[#ED5F45] transition-shadow duration-300"
+              className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#ED5F45] via-[#F47A64] to-[#ED5F45] transition-shadow duration-300"
             >
-              <GraduationCap className="h-5.5 w-5.5 text-white" aria-hidden />
+              <GraduationCap className="h-4 w-4 text-white" aria-hidden />
             </motion.div>
 
             <div className="flex flex-col leading-tight">
-              <span className="text-xl font-black tracking-tight text-[#ED5F45] sm:text-2xl">
+              <span className="text-base font-black tracking-tight text-[#ED5F45] sm:text-lg">
                 Academia<span className="text-[#ED5F45]">.</span>
               </span>
-              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+              <span className="text-[0.55rem] font-bold uppercase tracking-[0.16em] text-black/70 dark:text-white/70">
                 Innovation Platform
               </span>
             </div>
           </Link>
 
-          {/* ── Desktop nav ── */}
-          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex" aria-label="Main navigation">
-            {navLinks.map(({ href, label }) => {
-              const active = pathname === href || pathname?.startsWith(href + "/")
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "relative px-4 py-2 text-[0.875rem] font-black uppercase tracking-widest transition-all duration-300",
-                    active
-                      ? "text-[#ED5F45]"
-                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
-                  )}
-                >
-                  <span className="relative z-10">{label}</span>
-                  {active && <ActiveIndicator />}
-                  <motion.span
-                    className="absolute inset-0 rounded-xl bg-[#ED5F45]/0"
-                    whileHover={{ backgroundColor: "rgba(237,95,69,0.08)" }}
-                  />
-                </Link>
-              )
-            })}
-          </nav>
-
           {/* ── Desktop tools ── */}
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="hidden items-center gap-2.5 md:flex">
+            <nav className="hidden items-center gap-3 lg:flex mr-4 lg:mr-6" aria-label="Main navigation">
+              {navLinks.map(({ href, label }) => {
+                const active = pathname === href || pathname?.startsWith(href + "/")
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      "relative px-2 py-1 text-[0.7rem] font-black uppercase tracking-widest transition-all duration-300",
+                      active
+                        ? "text-[#ED5F45]"
+                        : "text-black hover:text-black dark:text-white/80 dark:hover:text-white",
+                    )}
+                  >
+                    <span className="relative z-10">{label}</span>
+                    {active && <ActiveIndicator />}
+                    <motion.span
+                      className="absolute inset-0 rounded-xl bg-[#ED5F45]/0"
+                      whileHover={{ backgroundColor: "rgba(237,95,69,0.08)" }}
+                    />
+                  </Link>
+                )
+              })}
+            </nav>
+
             <ThemeToggle />
-            
-            <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />
+
+            <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
 
             <Link
               href="/login"
-              className="text-sm font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-[#ED5F45] dark:text-slate-400 dark:hover:text-[#ED5F45]"
+              className="text-[0.7rem] font-black uppercase tracking-widest text-black transition-colors hover:text-black dark:text-white dark:hover:text-white"
             >
               Sign in
             </Link>
@@ -199,11 +198,11 @@ export function Header() {
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
               <Link
                 href="/register"
-                className="group relative flex h-11 items-center gap-2 overflow-hidden rounded-xl bg-slate-900 px-6 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-[#ED5F45] dark:bg-white dark:text-slate-900 dark:hover:bg-[#ED5F45] dark:hover:text-white"
+                className="group relative flex h-8 items-center gap-2 overflow-hidden rounded-xl bg-slate-900 px-4.5 text-[0.65rem] font-black uppercase tracking-widest text-white transition-all hover:bg-[#ED5F45] dark:bg-white dark:text-slate-900 dark:hover:bg-[#ED5F45] dark:hover:text-white"
               >
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                <Sparkles className="h-2.5 w-2.5" aria-hidden />
                 Get Started
-                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
+                <ArrowRight className="h-2.5 w-2.5 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
               </Link>
             </motion.div>
           </div>
