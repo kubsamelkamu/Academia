@@ -106,8 +106,11 @@ function isAllowedMilestoneFile(file: File | null): boolean {
   return (
     file.type === "application/pdf" ||
     file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    file.type === "application/zip" ||
+    file.type === "application/x-zip-compressed" ||
     name.endsWith(".pdf") ||
-    name.endsWith(".docx")
+    name.endsWith(".docx") ||
+    name.endsWith(".zip")
   )
 }
 
@@ -209,7 +212,7 @@ export function StudentUploadDocumentsPage() {
 
     const orderedStatuses = orderedTemplateMilestones.map((templateMilestone) => {
       const matched = projectMilestonesByName.get(normalizeMilestoneName(templateMilestone.title))
-      const mappedStatus = matched ? mapBackendStatus(matched.status) : ("pending" as const)
+      const mappedStatus = matched && matched.status ? mapBackendStatus(matched.status) : ("pending" as const)
 
       if (proposalMilestoneState && isProposalMilestoneName(templateMilestone.title)) {
         return proposalMilestoneState.status
@@ -333,7 +336,7 @@ export function StudentUploadDocumentsPage() {
     }
 
     if (!isAllowedMilestoneFile(milestoneFile)) {
-      toast.error("Only PDF and DOCX files are allowed")
+      toast.error("Only PDF, DOCX, and ZIP files are allowed")
       return
     }
 
@@ -608,11 +611,11 @@ export function StudentUploadDocumentsPage() {
                 <Input
                   id="document-file"
                   type="file"
-                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/zip,.zip"
                   onChange={(e) => setMilestoneFile(e.target.files?.[0] ?? null)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Accepted formats: PDF, DOCX
+                  Accepted formats: PDF, DOCX, ZIP
                 </p>
               </div>
 
