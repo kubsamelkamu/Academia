@@ -108,6 +108,7 @@ function isAllowedMilestoneFile(file: File | null): boolean {
     file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     file.type === "application/zip" ||
     file.type === "application/x-zip-compressed" ||
+    file.type === "application/octet-stream" ||
     name.endsWith(".pdf") ||
     name.endsWith(".docx") ||
     name.endsWith(".zip")
