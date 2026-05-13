@@ -33,6 +33,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -48,7 +54,10 @@ import {
   type EvaluatorProjectDocument,
   type MilestoneStatus,
 } from "./advisor-evaluator-project-detail-data"
-import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
+import {
+  dashboardStageToEvaluatorRouteStage,
+  getAdvisorEvaluatorEvaluationHref,
+} from "./advisor-evaluator-stage-menu"
 
 function formatDate(dateString: string) {
   const d = new Date(dateString)
@@ -380,6 +389,10 @@ function ProjectDetailBody({
           detail.evaluationHistory.reduce((s, e) => s + e.score, 0) / detail.evaluationHistory.length
         ).toFixed(1)
       : null
+
+  const primaryRouteStage = dashboardStageToEvaluatorRouteStage(stage)
+  const otherRouteStage = primaryRouteStage === "capstone-ii" ? "capstone-i" : "capstone-ii"
+  const otherStageLabel = otherRouteStage === "capstone-ii" ? "Capstone II" : "Capstone I"
 
   return (
     <div className="flex w-full max-w-none flex-col gap-8 pb-10 animate-in fade-in duration-300">
@@ -756,19 +769,40 @@ function ProjectDetailBody({
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <AdvisorEvaluatorStageMenu
-                projectId={detail.id}
-                trigger={
-                  <Button
-                    size="lg"
-                    className="btn-gradient group h-12 min-h-12 gap-2 rounded-xl px-8 text-base font-semibold shadow-lg shadow-primary/25 transition-[transform,box-shadow] hover:shadow-xl hover:shadow-primary/30"
-                  >
+              <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
+                <Button
+                  size="lg"
+                  className="btn-gradient group h-12 min-h-12 flex-1 gap-2 rounded-xl px-8 text-base font-semibold shadow-lg shadow-primary/25 transition-[transform,box-shadow] hover:shadow-xl hover:shadow-primary/30"
+                  asChild
+                >
+                  <Link href={getAdvisorEvaluatorEvaluationHref(detail.id, primaryRouteStage)}>
                     <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden />
                     Start evaluation
                     <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                  </Button>
-                }
-              />
+                  </Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="h-12 min-h-12 shrink-0 rounded-xl px-4 sm:w-12 sm:px-0"
+                      aria-label="Open other capstone stage"
+                    >
+                      <span className="sm:sr-only">Other stage: {otherStageLabel}</span>
+                      <span className="hidden sm:inline">⋯</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem asChild>
+                      <Link href={getAdvisorEvaluatorEvaluationHref(detail.id, otherRouteStage)}>
+                        Start as {otherStageLabel}
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <Button variant="outline" size="lg" className="h-12 min-h-12 rounded-xl border-primary/25 bg-background/90" asChild>
                 <Link href={`/dashboard/advisor/evaluator/rubric?stage=${stage}`}>
                   <BookOpen className="mr-2 h-5 w-5" aria-hidden />

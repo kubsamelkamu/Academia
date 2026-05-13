@@ -24,6 +24,12 @@ import StatCard from "@/components/shared/StatCard"
 import StatusBadge from "@/components/shared/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   type AdvisorEvaluationDashboardStage,
@@ -35,7 +41,10 @@ import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
 import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
 import { useEvaluatorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-evaluator-project-evaluation-dashboard"
 
-import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
+import {
+  dashboardStageToEvaluatorRouteStage,
+  getAdvisorEvaluatorEvaluationHref,
+} from "./advisor-evaluator-stage-menu"
 import {
   TimelineStatusRow,
 } from "./advisor-evaluator-timeline"
@@ -346,6 +355,12 @@ export function AdvisorEvaluatorDashboard() {
   const completedTabLoading = authHydrated && evaluatorDashboardQuery.isLoading
   const scheduleTabLoading = authHydrated && scheduleQuery.isLoading
   const evaluatedButtonLabel = `Evaluated ${formatDashboardStageLabel(dashboardStage)}`
+  const primaryEvaluatorRouteStage = React.useMemo(
+    () => dashboardStageToEvaluatorRouteStage(dashboardStage),
+    [dashboardStage],
+  )
+  const otherEvaluatorRouteStage = primaryEvaluatorRouteStage === "capstone-ii" ? "capstone-i" : "capstone-ii"
+  const otherEvaluatorStageLabel = otherEvaluatorRouteStage === "capstone-ii" ? "Capstone II" : "Capstone I"
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-2 animate-in fade-in duration-500 sm:gap-8 lg:gap-10">
@@ -620,19 +635,40 @@ export function AdvisorEvaluatorDashboard() {
                                 {evaluatedButtonLabel}
                               </Button>
                             ) : (
-                              <AdvisorEvaluatorStageMenu
-                                projectId={project.id}
-                                trigger={
-                                  <Button
-                                    className="group w-full rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
-                                    size="sm"
-                                  >
+                              <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
+                                <Button
+                                  className="group w-full min-w-0 rounded-xl btn-gradient shadow-md shadow-primary/20 transition-[transform,box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:w-auto"
+                                  size="sm"
+                                  asChild
+                                >
+                                  <Link href={getAdvisorEvaluatorEvaluationHref(project.id, primaryEvaluatorRouteStage)}>
                                     <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                                     Start evaluation
                                     <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                                  </Button>
-                                }
-                              />
+                                  </Link>
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-9 w-full shrink-0 rounded-xl sm:w-10 sm:px-0"
+                                      aria-label="Open other capstone stage"
+                                    >
+                                      <span className="sm:sr-only">Other stage: {otherEvaluatorStageLabel}</span>
+                                      <span className="hidden sm:inline">⋯</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-52">
+                                    <DropdownMenuItem asChild>
+                                      <Link href={getAdvisorEvaluatorEvaluationHref(project.id, otherEvaluatorRouteStage)}>
+                                        Start as {otherEvaluatorStageLabel}
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             )}
                           </div>
                         </CardContent>

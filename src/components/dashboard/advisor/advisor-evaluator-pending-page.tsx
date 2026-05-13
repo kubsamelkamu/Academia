@@ -33,6 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { formatDate } from "@/data/mockData"
 import {
   getAdvisorSubmittedDocuments,
@@ -43,7 +49,10 @@ import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
 import { useEvaluatorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-evaluator-project-evaluation-dashboard"
 
 import { RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
-import { AdvisorEvaluatorStageMenu } from "./advisor-evaluator-stage-menu"
+import {
+  dashboardStageToEvaluatorRouteStage,
+  getAdvisorEvaluatorEvaluationHref,
+} from "./advisor-evaluator-stage-menu"
 import {
   TimelineStatusRow,
 } from "./advisor-evaluator-timeline"
@@ -461,6 +470,9 @@ function PendingProjectCard({
 }) {
   const dueSoon = project.daysRemaining !== null && project.daysRemaining >= 0 && project.daysRemaining <= 7 && project.progress < 100
   const evaluatedButtonLabel = `Evaluated ${formatDashboardStageLabel(activeStage)}`
+  const primaryRouteStage = dashboardStageToEvaluatorRouteStage(activeStage)
+  const otherRouteStage = primaryRouteStage === "capstone-ii" ? "capstone-i" : "capstone-ii"
+  const otherStageLabel = otherRouteStage === "capstone-ii" ? "Capstone II" : "Capstone I"
 
   return (
     <Card className="flex min-w-0 flex-col overflow-hidden border-border/80 shadow-sm transition-[box-shadow,transform] hover:shadow-md">
@@ -534,16 +546,43 @@ function PendingProjectCard({
               {evaluatedButtonLabel}
             </Button>
           ) : (
-            <AdvisorEvaluatorStageMenu
-              projectId={project.id}
-              trigger={
-                <Button className="group h-10 w-full btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:min-w-0 sm:flex-[1.15]" size="sm">
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-[1.15] sm:flex-row sm:items-stretch">
+              <Button
+                className="group h-10 w-full min-w-0 btn-gradient shadow-md shadow-primary/20 transition-[box-shadow] hover:shadow-lg hover:shadow-primary/25 sm:flex-1"
+                size="sm"
+                asChild
+              >
+                <Link href={getAdvisorEvaluatorEvaluationHref(project.id, primaryRouteStage)}>
                   <ClipboardCheck className="mr-2 h-4 w-4 shrink-0" aria-hidden />
                   Evaluate now
+                  <span className="ml-1 hidden text-xs font-normal opacity-90 sm:inline">
+                    ({formatDashboardStageLabel(activeStage)})
+                  </span>
                   <ArrowRight className="ml-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </Button>
-              }
-            />
+                </Link>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 w-full shrink-0 sm:w-11 sm:px-0"
+                    aria-label="Open other capstone stage"
+                  >
+                    <span className="sm:sr-only">Other stage: {otherStageLabel}</span>
+                    <span className="hidden sm:inline">⋯</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem asChild>
+                    <Link href={getAdvisorEvaluatorEvaluationHref(project.id, otherRouteStage)}>
+                      Evaluate as {otherStageLabel}
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
       </CardContent>

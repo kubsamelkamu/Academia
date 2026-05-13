@@ -3,16 +3,23 @@
 import * as React from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { ArrowLeft, BookOpen, ClipboardCheck, FileText, Layers, ListOrdered, Scale } from "lucide-react"
+import { ArrowLeft, BookOpen, ClipboardCheck, Layers, ListOrdered, Scale } from "lucide-react"
 
 import PageHeader from "@/components/shared/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type AdvisorEvaluationDashboardStage } from "@/lib/api/advisor"
 
-import { EVALUATION_CRITERIA, RUBRIC_TOTAL_MAX_PERCENT } from "./advisor-evaluator-shared"
+import {
+  CAPSTONE_I_RUBRICS,
+  CAPSTONE_II_RUBRICS,
+  EVALUATION_CRITERIA,
+  RUBRIC_TOTAL_MAX_PERCENT,
+  type RubricDefinition,
+} from "./advisor-evaluator-shared"
 
 const TOP_WEIGHTS = [...EVALUATION_CRITERIA].sort((a, b) => b.maxPercent - a.maxPercent).slice(0, 5)
 
@@ -32,6 +39,11 @@ export function AdvisorEvaluatorRubricPage() {
     [searchParams],
   )
   const stageLabel = formatDashboardStageLabel(activeStage)
+  const capstoneIRubrics = React.useMemo(() => (activeStage === "CAPSTONE_I" ? CAPSTONE_I_RUBRICS : null), [activeStage])
+  const capstoneIIRubrics = React.useMemo(() => (activeStage === "CAPSTONE_II" ? CAPSTONE_II_RUBRICS : null), [activeStage])
+  const structuredRubrics = capstoneIRubrics ?? capstoneIIRubrics
+  const defaultStructuredTab =
+    capstoneIRubrics?.[0]?.id ?? capstoneIIRubrics?.[0]?.id ?? "proposal"
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 pb-10 animate-in fade-in duration-300 sm:gap-8 lg:gap-10">
@@ -51,10 +63,61 @@ export function AdvisorEvaluatorRubricPage() {
 
       <PageHeader
         title={`${stageLabel} evaluation rubric`}
-        description={`Weighted criteria for the ${stageLabel} advisor evaluator workspace. Each line shows its share of the ${RUBRIC_TOTAL_MAX_PERCENT}% rubric total.`}
+        description={
+          structuredRubrics
+            ? `Weighted criteria for ${stageLabel}. Expand each row for checkpoints; category weights are validated against a 100% cap per sheet.`
+            : `Weighted criteria for the ${stageLabel} advisor evaluator workspace. Each line shows its share of the ${RUBRIC_TOTAL_MAX_PERCENT}% rubric total.`
+        }
       />
 
       <div className="flex min-w-0 flex-col gap-8">
+        {structuredRubrics ? (
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="border-b border-border/60 bg-muted/15">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <BookOpen className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div>
+                    <CardTitle className="text-lg">Criteria (line weights)</CardTitle>
+                    <CardDescription>
+                      Expand each criterion to see the sub-points. Totals are validated to never exceed 100%.
+                      {activeStage === "CAPSTONE_II" ? (
+                        <>
+                          {" "}
+                          Implementation uses twelve weighted rows (A–L) that sum to 100%; penalty sheet is reference-only.
+                        </>
+                      ) : null}
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Tabs defaultValue={defaultStructuredTab}>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <TabsList className="w-full flex-wrap sm:w-auto">
+                    {structuredRubrics.map((rubric) => (
+                      <TabsTrigger key={rubric.id} value={rubric.id} className="min-w-[6rem] flex-1 sm:flex-none">
+                        {rubricTabLabel(rubric.id, activeStage)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  <p className="text-xs text-muted-foreground">
+                    Tip: Use the dropdown rows below as a checklist while you score.
+                  </p>
+                </div>
+
+                {structuredRubrics.map((rubric) => (
+                  <TabsContent key={rubric.id} value={rubric.id}>
+                    <RubricSection rubric={rubric} />
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        ) : (
         <Card className="border-border/80 shadow-sm">
             <CardHeader className="border-b border-border/60 bg-muted/15">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -101,6 +164,7 @@ export function AdvisorEvaluatorRubricPage() {
               </div>
             </CardContent>
           </Card>
+        )}
 
         <section
           aria-label="Rubric reference notes"
@@ -160,6 +224,169 @@ export function AdvisorEvaluatorRubricPage() {
           </div>
         </section>
       </div>
+    </div>
+  )
+}
+
+function rubricTabLabel(id: string, stage: AdvisorEvaluationDashboardStage) {
+  if (stage === "CAPSTONE_I") {
+    if (id === "proposal") return "Proposal"
+    return id.toUpperCase()
+  }
+  if (id === "implementation") return "Implementation"
+  if (id === "demonstration") return "Demo"
+  if (id === "penalties") return "Penalties"
+  return id
+}
+
+function RubricPenaltyTable({
+  columns,
+  rows,
+}: {
+  columns: readonly [string, string]
+  rows: readonly { left: string; right: string }[]
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border/60 bg-muted/30">
+            <th className="px-4 py-3 text-left font-semibold text-foreground">{columns[0]}</th>
+            <th className="px-4 py-3 text-left font-semibold text-foreground">{columns[1]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.left}-${row.right}`} className="border-b border-border/40 last:border-0">
+              <td className="px-4 py-3 align-top font-medium text-foreground">{row.left}</td>
+              <td className="px-4 py-3 align-top text-muted-foreground">{row.right}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function RubricSection({ rubric }: { rubric: RubricDefinition }) {
+  const total = React.useMemo(
+    () => rubric.criteria.reduce((sum, c) => sum + c.weightPercent, 0),
+    [rubric.criteria],
+  )
+  const exceedsMax = !rubric.referenceOnly && total > rubric.totalMaxPercent
+  const remaining = rubric.totalMaxPercent - total
+
+  if (rubric.referenceOnly && rubric.penaltyTable && rubric.criteria.length === 0) {
+    return (
+      <div className="mt-5 space-y-5">
+        <div>
+          <p className="text-base font-semibold text-foreground">{rubric.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Reference-only — apply deductions according to your department policy.
+          </p>
+        </div>
+        <RubricPenaltyTable columns={rubric.penaltyTable.columns} rows={rubric.penaltyTable.rows} />
+        <Separator />
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-5 space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-base font-semibold text-foreground">{rubric.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Total weight:{" "}
+            <span className={exceedsMax ? "font-semibold text-destructive" : "font-semibold text-foreground"}>
+              {total}%
+            </span>{" "}
+            {exceedsMax ? (
+              <span className="ml-1">(exceeds 100%)</span>
+            ) : remaining === 0 ? (
+              <span className="ml-1">(exactly 100%)</span>
+            ) : (
+              <span className="ml-1">({remaining}% remaining)</span>
+            )}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+          <p className="text-xs font-medium text-muted-foreground">Max total</p>
+          <p className="text-lg font-bold tabular-nums text-foreground">{rubric.totalMaxPercent}%</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {rubric.criteria.map((criterion) => (
+          <details
+            key={`${rubric.id}-${criterion.key}`}
+            className="group rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm open:bg-card"
+          >
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium leading-snug text-foreground">
+                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-muted text-xs font-bold text-foreground/80">
+                    {criterion.key}
+                  </span>
+                  {criterion.label}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {criterion.points.length} checkpoints
+                  {criterion.supplements?.length ? ` · ${criterion.supplements.length} extra lists` : ""}
+                  {criterion.referenceTable ? " · scoring guide" : ""}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="tabular-nums text-sm font-semibold text-primary">{criterion.weightPercent}%</p>
+                <p className="mt-1 text-[11px] text-muted-foreground group-open:hidden">Show</p>
+                <p className="mt-1 hidden text-[11px] text-muted-foreground group-open:block">Hide</p>
+              </div>
+            </summary>
+
+            <div className="mt-3 space-y-3">
+              <Progress value={rubric.totalMaxPercent > 0 ? (criterion.weightPercent / rubric.totalMaxPercent) * 100 : 0} className="h-2.5 bg-muted/80" />
+              <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-1">
+                {criterion.points.map((p, idx) => (
+                  <li key={`${criterion.key}-p-${idx}`} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" aria-hidden />
+                    <span className="leading-relaxed">{p}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {criterion.referenceTable ? (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scoring guide</p>
+                  <RubricPenaltyTable columns={criterion.referenceTable.columns} rows={criterion.referenceTable.rows} />
+                </div>
+              ) : null}
+
+              {criterion.supplements?.map((block) => (
+                <div key={block.title} className="rounded-xl border border-border/60 bg-muted/15 px-3 py-3">
+                  <p className="text-xs font-semibold text-foreground">{block.title}</p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                    {block.items.map((item, i) => (
+                      <li key={`${block.title}-${i}`} className="flex gap-2">
+                        <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground/25" aria-hidden />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
+        ))}
+      </div>
+
+      {rubric.penaltyTable && rubric.criteria.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-foreground">Common penalties (reference)</p>
+          <RubricPenaltyTable columns={rubric.penaltyTable.columns} rows={rubric.penaltyTable.rows} />
+        </div>
+      ) : null}
+
+      <Separator />
     </div>
   )
 }
