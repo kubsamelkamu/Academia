@@ -18,10 +18,11 @@ import PageHeader from "@/components/shared/PageHeader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { Separator } from "@/components/ui/separator"
+import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import {
   getEvaluatorProjectEvaluationDetail,
   saveEvaluatorProjectEvaluationDraft,
@@ -75,17 +76,23 @@ function parseMissingStudentIdsFromError(message: string) {
     .filter(Boolean)
 }
 
-function normalizeScoreInput(value: string) {
-  if (value.trim() === "") {
-    return null
-  }
+/** Maps all rubric line points (stage-specific + common) to one 0–100 score for the API. */
+function percentScoreFromRubricBreakdown(
+  breakdown: Record<string, number> | undefined,
+  allCriteria: { id: string; maxPercent: number }[],
+  rubricMaxSum: number,
+): number {
+  if (!breakdown || !allCriteria.length || rubricMaxSum <= 0) return 0
+  const earned = allCriteria.reduce((sum, c) => sum + (breakdown[c.id] ?? 0), 0)
+  return Math.min(100, Math.max(0, Math.round((earned / rubricMaxSum) * 100)))
+}
 
-  const parsed = Number(value)
-  if (Number.isNaN(parsed)) {
-    return null
-  }
-
-  return Math.min(100, Math.max(0, parsed))
+function linePointsEarned(
+  breakdown: Record<string, number> | undefined,
+  criteria: { id: string }[],
+): number {
+  if (!breakdown) return 0
+  return criteria.reduce((sum, c) => sum + (breakdown[c.id] ?? 0), 0)
 }
 
 function getEvaluationStatusLabel(status?: string | null) {
@@ -139,6 +146,26 @@ export function AdvisorEvaluatorEvaluatePage({
     [stage],
   )
 
+  const stageSpecificMaxSum = React.useMemo(
+    () => stageSpecificCriteria.reduce((sum, c) => sum + c.maxPercent, 0),
+    [stageSpecificCriteria],
+  )
+
+  const commonMaxSum = React.useMemo(
+    () => commonCriteria.reduce((sum, c) => sum + c.maxPercent, 0),
+    [commonCriteria],
+  )
+
+  const allRubricCriteria = React.useMemo(
+    () => [...stageSpecificCriteria, ...commonCriteria],
+    [stageSpecificCriteria, commonCriteria],
+  )
+
+  const rubricMaxSum = React.useMemo(
+    () => stageSpecificMaxSum + commonMaxSum,
+    [stageSpecificMaxSum, commonMaxSum],
+  )
+
   const teamMembers = React.useMemo(() => {
     return (detail?.students ?? []).map((student) => ({
       id: student.userId,
@@ -149,6 +176,11 @@ export function AdvisorEvaluatorEvaluatePage({
   }, [detail?.students])
 
   const [studentEvaluations, setStudentEvaluations] = React.useState<Record<string, StudentEvaluationDraft>>({})
+  /** Per student: points per rubric line (stage-specific + common), each 0 … line max. */
+  const [criterionScoresByStudent, setCriterionScoresByStudent] = React.useState<
+    Record<string, Record<string, number>>
+  >({})
+  const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null)
   const [evaluationSummary, setEvaluationSummary] = React.useState<EvaluatorProjectEvaluationMutationSummary | null>(null)
   const [submitErrorMessage, setSubmitErrorMessage] = React.useState<string | null>(null)
   const [submitMissingStudentIds, setSubmitMissingStudentIds] = React.useState<string[]>([])
@@ -192,6 +224,76 @@ export function AdvisorEvaluatorEvaluatePage({
     })
   }, [detail?.students])
 
+  React.useEffect(() => {
+    if (!detail?.students?.length || !stage) return
+
+    const { stageSpecificCriteria: sc, commonCriteria: cc } = getEvaluateCriteriaByStage(stage)
+    const allCrit = [...sc, ...cc]
+    const maxSum = allCrit.reduce((s, c) => s + c.maxPercent, 0)
+
+    setCriterionScoresByStudent(() => {
+      const next: Record<string, Record<string, number>> = {}
+      for (const st of detail.students) {
+        const rawScore = st.evaluation.score
+        if (rawScore === null || rawScore === undefined || Number.isNaN(Number(rawScore))) {
+          next[st.userId] = Object.fromEntries(allCrit.map((c) => [c.id, 0]))
+        } else {
+          const scoreNum = Number(rawScore)
+          next[st.userId] = Object.fromEntries(
+            allCrit.map((c) => {
+              const earned = maxSum > 0 ? (c.maxPercent / maxSum) * scoreNum : 0
+              return [c.id, Math.round(earned * 10) / 10]
+            }),
+          )
+        }
+      }
+      return next
+    })
+  }, [detail?.students, stage, projectId])
+
+  React.useEffect(() => {
+    if (teamMembers.length === 0) {
+      setSelectedStudentId(null)
+      return
+    }
+    setSelectedStudentId((prev) => (prev && teamMembers.some((m) => m.id === prev) ? prev : teamMembers[0].id))
+  }, [teamMembers])
+
+  React.useEffect(() => {
+    if (!teamMembers.length || !allRubricCriteria.length) return
+
+    setStudentEvaluations((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const m of teamMembers) {
+        const breakdown = criterionScoresByStudent[m.id]
+        if (!breakdown) continue
+
+        const earned = allRubricCriteria.reduce((sum, c) => sum + (breakdown[c.id] ?? 0), 0)
+        const pct = percentScoreFromRubricBreakdown(breakdown, allRubricCriteria, rubricMaxSum)
+        const apiRow = detail?.students?.find((s) => s.userId === m.id)
+        const hadApiScore =
+          apiRow?.evaluation.score !== null &&
+          apiRow?.evaluation.score !== undefined &&
+          !Number.isNaN(Number(apiRow.evaluation.score))
+        const nextScore = earned > 0 || hadApiScore ? pct : null
+
+        const existing = next[m.id]
+        if (!existing || existing.score !== nextScore) {
+          changed = true
+          next[m.id] = {
+            studentUserId: m.id,
+            score: nextScore,
+            comment: existing?.comment ?? "",
+            savedAt: existing?.savedAt ?? null,
+            evaluationStatus: existing?.evaluationStatus ?? "NOT_STARTED",
+          }
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [criterionScoresByStudent, teamMembers, allRubricCriteria, rubricMaxSum, detail?.students])
+
   const effectiveEvaluationSummary = evaluationSummary ?? detail?.evaluation ?? null
   const isSubmitted =
     Boolean(effectiveEvaluationSummary?.submittedAt) ||
@@ -214,25 +316,25 @@ export function AdvisorEvaluatorEvaluatePage({
     [studentEvaluations, teamMembers],
   )
 
-  const updateStudentScore = React.useCallback(
-    (studentId: string, rawValue: string) => {
+  const updateCriterionScore = React.useCallback(
+    (studentId: string, criterionId: string, raw: number) => {
       if (isSubmitted) return
 
-      const nextScore = normalizeScoreInput(rawValue)
+      const critDef = allRubricCriteria.find((c) => c.id === criterionId)
+      const max = critDef?.maxPercent ?? 0
+      const clamped = Math.min(max, Math.max(0, raw))
+
       setSubmitErrorMessage(null)
       setSubmitMissingStudentIds([])
-      setStudentEvaluations((prev) => ({
+      setCriterionScoresByStudent((prev) => ({
         ...prev,
         [studentId]: {
-          studentUserId: prev[studentId]?.studentUserId ?? studentId,
-          score: nextScore,
-          comment: prev[studentId]?.comment ?? "",
-          savedAt: prev[studentId]?.savedAt ?? null,
-          evaluationStatus: prev[studentId]?.evaluationStatus ?? "NOT_STARTED",
+          ...(prev[studentId] ?? {}),
+          [criterionId]: clamped,
         },
       }))
     },
-    [isSubmitted],
+    [isSubmitted, allRubricCriteria],
   )
 
   const updateStudentComment = React.useCallback(
@@ -497,7 +599,7 @@ export function AdvisorEvaluatorEvaluatePage({
 
       <PageHeader
         title={`${selectedStage} evaluation`}
-        description={`${project.title} · ${project.groupName ?? "Group"} — enter a score from 0 to 100 for each student, save drafts, then submit after all rows are complete.`}
+        description={`${project.title} · ${project.groupName ?? "Group"} — select a student, score every stage-specific and common rubric line with sliders (all lines together map to 0–100), then save drafts and submit when everyone is complete.`}
       />
 
       {detail ? (
@@ -584,8 +686,8 @@ export function AdvisorEvaluatorEvaluatePage({
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-        <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-6 xl:gap-8">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start">
           <Card className="border-border/80 shadow-sm">
             <CardHeader className="border-b border-border/60 bg-background/60">
               <CardTitle className="text-base">Scoring context</CardTitle>
@@ -621,103 +723,63 @@ export function AdvisorEvaluatorEvaluatePage({
                   <p className="text-sm font-semibold text-foreground">Evaluator workflow</p>
                 </div>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>1. Review the rubric reference for {selectedStage}.</p>
-                  <p>2. Enter each student score from 0 to 100.</p>
-                  <p>3. Save all entered scores as draft.</p>
-                  <p>4. Submit after every student row is complete.</p>
+                  <p>1. Select a student in the score sheet.</p>
+                  <p>2. Use sliders for stage-specific and common criteria (combined total maps to a score out of 100).</p>
+                  <p>3. Add an optional comment for that student below the rubric.</p>
+                  <p>4. Save drafts, then submit when every student has a score.</p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
                   <span className="font-medium text-foreground">Draft completion:</span>{" "}
-                  <span className="text-muted-foreground">{studentsReadyForSubmit}/{totalStudents} students scored</span>
+                  <span className="text-muted-foreground">{`${studentsReadyForSubmit}/${totalStudents}`} students scored</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="border-b border-border/60 bg-muted/15">
-              <CardTitle className="text-base sm:text-lg">Rubric reference</CardTitle>
-              <CardDescription>
-                {selectedStage} criteria are shown here as read-only guidance for scoring.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {stage ? (
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <section className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                        {selectedStage} specific criteria
-                      </h3>
-                      <Badge variant="outline">{stageSpecificCriteria.length} items</Badge>
+          <div className="min-w-0 lg:sticky lg:top-6">
+            <Card className="border-border/80 shadow-sm">
+              <CardHeader className="border-b border-border/60 bg-muted/10">
+                <CardTitle className="text-base">Team members</CardTitle>
+                <CardDescription>Student list for this evaluator assignment.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-6">
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2"
+                  >
+                    <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.email}</p>
                     </div>
-                    <div className="space-y-3">
-                      {stageSpecificCriteria.map((criterion) => {
-                        const pct = criterion.maxPercent > 0 ? (criterion.maxPercent / criterion.maxPercent) * 100 : 0
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-                        return (
-                          <div key={criterion.id} className="space-y-3 rounded-xl border border-border/70 bg-card/50 p-4 shadow-sm">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold leading-snug text-foreground">{criterion.label}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">{criterion.description}</p>
-                              </div>
-                              <span className="shrink-0 tabular-nums text-sm font-semibold text-foreground">
-                                <span className="text-primary">Reference</span>
-                                <span className="text-muted-foreground"> {criterion.maxPercent}%</span>
-                              </span>
-                            </div>
-                            <Progress value={pct} className="h-2.5 bg-muted/80" />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </section>
-
-                  <section className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                        Common criteria
-                      </h3>
-                      <Badge variant="outline">{commonCriteria.length} items</Badge>
-                    </div>
-                    <div className="space-y-3">
-                      {commonCriteria.map((criterion) => {
-                        const pct = criterion.maxPercent > 0 ? (criterion.maxPercent / criterion.maxPercent) * 100 : 0
-
-                        return (
-                          <div key={criterion.id} className="space-y-3 rounded-xl border border-border/70 bg-card/50 p-4 shadow-sm">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold leading-snug text-foreground">{criterion.label}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">{criterion.description}</p>
-                              </div>
-                              <span className="shrink-0 tabular-nums text-sm font-semibold text-foreground">
-                                <span className="text-primary">Reference</span>
-                                <span className="text-muted-foreground"> {criterion.maxPercent}%</span>
-                              </span>
-                            </div>
-                            <Progress value={pct} className="h-2.5 bg-muted/80" />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </section>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm text-muted-foreground">
-                  Select Capstone I or Capstone II to load the correct rubric reference.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80 shadow-sm">
+          <Card className="border-border/80 shadow-sm w-full">
             <CardHeader className="border-b border-border/60 bg-muted/15">
               <CardTitle className="text-lg">Student score sheet</CardTitle>
-              <CardDescription>Keep the rubric as reference, then draft scores for all students here.</CardDescription>
+              <CardDescription>
+                {isSubmitted ? (
+                  <>
+                    This evaluation is <span className="font-medium text-foreground">submitted</span>. Click a student to
+                    review their final score, rubric breakdown, and comment. You can switch between students; editing is
+                    disabled.
+                  </>
+                ) : (
+                  <>
+                    Click a student to select them. Their overall score (0–100) is computed from{" "}
+                    <span className="font-medium text-foreground">all rubric lines</span> (stage-specific + common) in the
+                    section below.
+                  </>
+                )}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-6">
+            <CardContent className="space-y-3 pt-6">
               {teamMembers.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm text-muted-foreground">
                   No students are assigned to this project yet.
@@ -732,17 +794,22 @@ export function AdvisorEvaluatorEvaluatePage({
                     evaluationStatus: "NOT_STARTED",
                   }
                   const isMissing = submitMissingStudentIds.includes(member.id)
+                  const isSelected = member.id === selectedStudentId
 
                   return (
-                    <div
+                    <button
                       key={member.id}
-                      className={
+                      type="button"
+                      onClick={() => setSelectedStudentId(member.id)}
+                      className={cn(
+                        "w-full rounded-2xl border p-4 text-left shadow-sm transition-[box-shadow,ring,border-color] outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                         isMissing
-                          ? "rounded-2xl border border-amber-300 bg-amber-50/70 p-4 shadow-sm dark:border-amber-800 dark:bg-amber-950/20"
-                          : "rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm"
-                      }
+                          ? "border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/20"
+                          : "border-border/70 bg-card/60 hover:bg-card",
+                        isSelected && "ring-2 ring-primary border-primary/40 bg-primary/[0.04]",
+                      )}
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-semibold text-foreground">{member.name}</p>
@@ -750,6 +817,11 @@ export function AdvisorEvaluatorEvaluatePage({
                               {getEvaluationStatusLabel(memberEvaluation.evaluationStatus)}
                             </Badge>
                             {isMissing ? <Badge variant="destructive">Missing score</Badge> : null}
+                            {isSelected ? (
+                              <Badge variant="default" className="bg-primary text-primary-foreground">
+                                {isSubmitted ? "Reviewing" : "Selected"}
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="text-sm text-muted-foreground">ID: {member.studentId}</p>
                           <p className="text-sm text-muted-foreground">{member.email}</p>
@@ -758,128 +830,268 @@ export function AdvisorEvaluatorEvaluatePage({
                           </p>
                         </div>
 
-                        <div className="w-full max-w-full rounded-xl border border-primary/20 bg-primary/[0.04] p-3 lg:w-56">
-                          <Label
-                            htmlFor={`student-score-${member.id}`}
-                            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                          >
-                            Score
-                          </Label>
-                          <div className="mt-2 flex items-end gap-2">
-                            <Input
-                              id={`student-score-${member.id}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              max={100}
-                              step={1}
-                              value={memberEvaluation.score ?? ""}
-                              onChange={(event) => updateStudentScore(member.id, event.target.value)}
-                              placeholder="0 - 100"
-                              disabled={isSubmitted || saveDraftMutation.isPending || submitMutation.isPending}
-                              className="text-lg font-semibold"
-                            />
-                            <span className="pb-2 text-sm text-muted-foreground">/100</span>
-                          </div>
+                        <div className="w-full shrink-0 rounded-xl border border-primary/20 bg-background/80 px-4 py-3 sm:w-52">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score total</p>
+                          <p className="mt-1 font-semibold tabular-nums text-foreground">
+                            <span className="text-2xl">{memberEvaluation.score ?? "—"}</span>
+                            <span className="text-sm font-normal text-muted-foreground"> /100</span>
+                          </p>
+                          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                            From {allRubricCriteria.length} rubric lines ({stageSpecificCriteria.length} stage +{" "}
+                            {commonCriteria.length} common); combined points scale to a score out of 100.
+                          </p>
                         </div>
                       </div>
-
-                      <div className="mt-4 space-y-2">
-                        <Label htmlFor={`student-comment-${member.id}`}>Comment</Label>
-                        <Textarea
-                          id={`student-comment-${member.id}`}
-                          placeholder="Optional evaluator note for this student"
-                          value={memberEvaluation.comment}
-                          onChange={(event) => updateStudentComment(member.id, event.target.value)}
-                          className="min-h-[96px] resize-y"
-                          disabled={isSubmitted || saveDraftMutation.isPending || submitMutation.isPending}
-                        />
-                      </div>
-                    </div>
+                    </button>
                   )
                 })
               )}
             </CardContent>
           </Card>
-        </div>
 
-        <div className="min-w-0 space-y-6">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="border-b border-border/60 bg-muted/10">
-              <CardTitle className="text-base sm:text-lg">Draft and submit</CardTitle>
+          <Card className="border-border/80 shadow-sm w-full">
+            <CardHeader className="border-b border-border/60 bg-muted/15">
+              <CardTitle className="text-base sm:text-lg">Rubric reference</CardTitle>
               <CardDescription>
-                Save all entered scores first, then submit once every student has a grade.
+                {isSubmitted ? (
+                  <>
+                    Submitted breakdown for the <span className="font-medium text-foreground">selected student</span>{" "}
+                    (read-only). Switch students in the score sheet to compare. Line totals reflect the saved 0–100
+                    score (distributed across criteria for display).
+                  </>
+                ) : (
+                  <>
+                    Slide each line for the <span className="font-medium text-foreground">selected student</span>. Earned
+                    points across lines convert to the 0–100 score shown on their row.
+                  </>
+                )}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5 pt-6">
-              {!isSubmitted ? (
-                <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
-                  Ready to submit: <span className="font-medium text-foreground">{studentsReadyForSubmit}/{totalStudents}</span>
-                  {missingStudentIds.length > 0
-                    ? ` · Missing ${missingStudentIds.map((student) => student.name).join(", ")}`
-                    : " · All students scored"}
+            <CardContent className="space-y-8 pt-6">
+              {stage ? (
+                <>
+                  {selectedStudentId && rubricMaxSum > 0 ? (
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.06] px-4 py-3">
+                      <span className="text-sm font-semibold text-foreground">Rubric total</span>
+                      <Badge variant="secondary" className="max-w-full whitespace-normal tabular-nums text-xs sm:text-sm">
+                        {`Σ ${linePointsEarned(criterionScoresByStudent[selectedStudentId], allRubricCriteria)}/${rubricMaxSum} pts across all lines → `}
+                        <span className="font-semibold">{studentEvaluations[selectedStudentId]?.score ?? "—"}</span>
+                        {" /100"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {`Stage ${linePointsEarned(criterionScoresByStudent[selectedStudentId], stageSpecificCriteria)}/${stageSpecificMaxSum} · Common ${linePointsEarned(criterionScoresByStudent[selectedStudentId], commonCriteria)}/${commonMaxSum}`}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
+                  <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        {selectedStage} specific criteria
+                      </h3>
+                      <Badge variant="outline" className="tabular-nums">
+                        {stageSpecificCriteria.length} lines · max {stageSpecificMaxSum} pts ({stageSpecificMaxSum}% of total)
+                      </Badge>
+                    </div>
+
+                    {!selectedStudentId ? (
+                      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm text-muted-foreground">
+                        {isSubmitted
+                          ? "Select a student in the score sheet to view their submitted rubric breakdown."
+                          : "Select a student in the score sheet to enable sliders."}
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {stageSpecificCriteria.map((criterion) => {
+                          const raw = criterionScoresByStudent[selectedStudentId]?.[criterion.id] ?? 0
+                          const max = criterion.maxPercent
+                          const fillPct = max > 0 ? (raw / max) * 100 : 0
+
+                          return (
+                            <div
+                              key={criterion.id}
+                              className="space-y-4 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-sm"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold leading-snug text-foreground">{criterion.label}</p>
+                                  <p className="mt-1 text-sm text-muted-foreground">{criterion.description}</p>
+                                </div>
+                                <span className="shrink-0 tabular-nums text-sm font-semibold text-primary">
+                                  {raw}
+                                  <span className="font-normal text-muted-foreground"> / {max}</span>
+                                </span>
+                              </div>
+                              <Slider
+                                min={0}
+                                max={max}
+                                step={1}
+                                value={[raw]}
+                                disabled={isSubmitted}
+                                onValueChange={(v) =>
+                                  updateCriterionScore(selectedStudentId, criterion.id, v[0] ?? 0)
+                                }
+                                aria-label={`${criterion.label} score`}
+                              />
+                              <Progress value={fillPct} className="h-2 bg-muted/80" />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Common criteria
+                      </h3>
+                      <Badge variant="outline" className="tabular-nums">
+                        {commonCriteria.length} lines · max {commonMaxSum} pts ({commonMaxSum}% of total)
+                      </Badge>
+                    </div>
+
+                    {!selectedStudentId ? (
+                      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm text-muted-foreground">
+                        {isSubmitted
+                          ? "Select a student in the score sheet to view their submitted common criteria."
+                          : "Select a student to score presentation & professionalism criteria."}
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {commonCriteria.map((criterion) => {
+                          const raw = criterionScoresByStudent[selectedStudentId]?.[criterion.id] ?? 0
+                          const max = criterion.maxPercent
+                          const fillPct = max > 0 ? (raw / max) * 100 : 0
+
+                          return (
+                            <div
+                              key={criterion.id}
+                              className="space-y-4 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-sm"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold leading-snug text-foreground">{criterion.label}</p>
+                                  <p className="mt-1 text-sm text-muted-foreground">{criterion.description}</p>
+                                </div>
+                                <span className="shrink-0 tabular-nums text-sm font-semibold text-primary">
+                                  {raw}
+                                  <span className="font-normal text-muted-foreground"> / {max}</span>
+                                </span>
+                              </div>
+                              <Slider
+                                min={0}
+                                max={max}
+                                step={1}
+                                value={[raw]}
+                                disabled={isSubmitted}
+                                onValueChange={(v) =>
+                                  updateCriterionScore(selectedStudentId, criterion.id, v[0] ?? 0)
+                                }
+                                aria-label={`${criterion.label} score`}
+                              />
+                              <Progress value={fillPct} className="h-2 bg-muted/80" />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </section>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm text-muted-foreground">
+                  Select Capstone I or Capstone II to load the correct rubric reference.
                 </div>
+              )}
+
+              {teamMembers.length > 0 && selectedStudentId ? (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Comment for selected student</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Optional note for{" "}
+                        <span className="font-medium text-foreground">
+                          {teamMembers.find((m) => m.id === selectedStudentId)?.name ?? "student"}
+                        </span>
+                        .
+                      </p>
+                    </div>
+                    <Textarea
+                      id="evaluator-comment-selected"
+                      placeholder="Optional evaluator note for this student"
+                      value={studentEvaluations[selectedStudentId]?.comment ?? ""}
+                      onChange={(event) => updateStudentComment(selectedStudentId, event.target.value)}
+                      className="min-h-[120px] resize-y"
+                      disabled={isSubmitted || saveDraftMutation.isPending || submitMutation.isPending}
+                    />
+                  </div>
+                </>
               ) : null}
 
-              {!isSubmitted ? (
-                <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-muted-foreground">
-                  Save drafts as often as needed, then submit once after the full Capstone II evaluator review is complete.
-                </div>
-              ) : null}
+              <Separator />
 
-              <div className="flex flex-col gap-2">
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Draft and submit</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Save all entered scores first, then submit once every student has a grade.
+                  </p>
+                </div>
                 {!isSubmitted ? (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                    Ready to submit:{" "}
+                    <span className="font-medium text-foreground">{`${studentsReadyForSubmit}/${totalStudents}`}</span>
+                    {missingStudentIds.length > 0
+                      ? ` · Missing ${missingStudentIds.map((student) => student.name).join(", ")}`
+                      : " · All students scored"}
+                  </div>
+                ) : null}
+
+                {!isSubmitted ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-sm text-muted-foreground">
+                    Save drafts as often as needed, then submit once the full evaluator review is complete.
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {!isSubmitted ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 sm:min-w-[200px] sm:flex-1"
+                      onClick={handleSaveDraft}
+                      disabled={!apiStage || saveDraftMutation.isPending || submitMutation.isPending}
+                    >
+                      <FileText className="h-4 w-4" aria-hidden />
+                      {saveDraftMutation.isPending ? "Saving drafts..." : "Save all drafts"}
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleSaveDraft}
-                    disabled={!apiStage || saveDraftMutation.isPending || submitMutation.isPending}
+                    className="btn-gradient w-full gap-2 sm:min-w-[200px] sm:flex-1"
+                    onClick={handleSubmit}
+                    disabled={
+                      !apiStage ||
+                      isSubmitted ||
+                      saveDraftMutation.isPending ||
+                      submitMutation.isPending ||
+                      missingStudentIds.length > 0
+                    }
                   >
-                    <FileText className="h-4 w-4" aria-hidden />
-                    {saveDraftMutation.isPending ? "Saving drafts..." : "Save all drafts"}
+                    <Send className="h-4 w-4" aria-hidden />
+                    {submitMutation.isPending ? "Submitting..." : isSubmitted ? "Submitted" : "Submit all scores"}
                   </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  className="btn-gradient w-full gap-2"
-                  onClick={handleSubmit}
-                  disabled={
-                    !apiStage ||
-                    isSubmitted ||
-                    saveDraftMutation.isPending ||
-                    submitMutation.isPending ||
-                    missingStudentIds.length > 0
-                  }
-                >
-                  <Send className="h-4 w-4" aria-hidden />
-                  {submitMutation.isPending ? "Submitting..." : isSubmitted ? "Submitted" : "Submit all scores"}
-                </Button>
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/dashboard/advisor/evaluator/pending${stageQuery}`}>Cancel</Link>
-                </Button>
+                  <Button variant="outline" className="w-full sm:w-auto" asChild>
+                    <Link href={`/dashboard/advisor/evaluator/pending${stageQuery}`}>Cancel</Link>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="border-b border-border/60 bg-muted/10">
-              <CardTitle className="text-base">Team members</CardTitle>
-              <CardDescription>Student list for this evaluator assignment.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-6">
-              {teamMembers.map((member) => (
-                <div key={member.id} className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2">
-                  <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{member.name}</p>
-                    <p className="text-xs text-muted-foreground">{member.email}</p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   )
