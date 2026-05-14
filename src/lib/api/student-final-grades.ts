@@ -78,3 +78,20 @@ export async function getStudentFinalGrade(stage: StudentFinalGradeStage = "CAPS
 
   return response.data
 }
+
+const STUDENT_GRADE_COMPLAINT_PATH = "/project-evaluations/students/me/grade-complaints"
+
+export interface SubmitStudentGradeComplaintPayload {
+  stage: StudentFinalGradeStage
+  projectId: string
+  reason: string
+}
+
+export async function submitStudentGradeComplaint(payload: SubmitStudentGradeComplaintPayload) {
+  const response = await apiClient.post<{ id?: string; submittedAt?: string }>(STUDENT_GRADE_COMPLAINT_PATH, {
+    stage: payload.stage,
+    projectId: payload.projectId,
+    reason: payload.reason.trim(),
+  })
+  return response.data
+}
