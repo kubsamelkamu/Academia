@@ -10,7 +10,6 @@ import { DashboardPageHeader } from "@/components/dashboard/page-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -18,12 +17,29 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import type { AdvisorEvaluationDashboardStage, AdvisorProjectEvaluationDetail } from "@/lib/api/advisor"
+import { cn } from "@/lib/utils"
 import { useAuthStoreHydrated } from "@/lib/hooks/use-auth-store-hydrated"
 import { advisorProjectEvaluationDashboardKeys, useAdvisorProjectEvaluationDashboardWithOptions } from "@/lib/hooks/use-advisor-project-evaluation-dashboard"
 import { advisorProjectEvaluationDetailKeys, useAdvisorProjectEvaluationDetail } from "@/lib/hooks/use-advisor-project-evaluation-detail"
 import { useAdvisorProjectsWithOptions } from "@/lib/hooks/use-advisor-projects"
 import { useSaveAdvisorProjectEvaluationDraft } from "@/lib/hooks/use-save-advisor-project-evaluation-draft"
 import { useSubmitAdvisorProjectEvaluation } from "@/lib/hooks/use-submit-advisor-project-evaluation"
+import { AdvisorCapstoneIMajorScoringPanel } from "./advisor-capstone-i-major-scoring-panel"
+import { AdvisorCapstoneIIMajorScoringPanel } from "./advisor-capstone-ii-major-scoring-panel"
+import { AdvisorCapstoneIIImplementationRubricReadonly } from "./advisor-capstone-ii-implementation-rubric-readonly"
+import { AdvisorCapstoneSrsSddRubricReadonly } from "./advisor-capstone-srs-sdd-rubric-readonly"
+import {
+  ADVISOR_CAPSTONE_II_MAJOR_CRITERIA,
+  ADVISOR_CII_RUBRIC_TOTAL_PERCENT,
+  initialCapstoneIIMajorScoresFromHolistic,
+  sumCapstoneIIMajorScores,
+} from "./advisor-capstone-ii-implementation-rubric-data"
+import {
+  ADVISOR_CAPSTONE_I_MAJOR_CRITERIA,
+  ADVISOR_SRS_SDD_RUBRIC_TOTAL_PERCENT,
+  initialCapstoneIMajorScoresFromHolistic,
+  sumCapstoneIMajorScores,
+} from "./advisor-capstone-srs-sdd-rubric-data"
 import { CAPSTONE_GROUPS, type CapstoneCriterion, type CapstoneGroup, type CapstoneStage, type EvaluationStatus } from "./capstone-evaluation-data"
 
 const STATUS_CLASSES: Record<EvaluationStatus, string> = {
@@ -223,7 +239,10 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const [group, setGroup] = React.useState<CapstoneGroup | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [activeStudentId, setActiveStudentId] = React.useState<string | null>(null)
-  const [advisorScore, setAdvisorScore] = React.useState("")
+  /** Capstone I: per major SRS/SDD criterion points (sum → holistic 0–100). */
+  const [capstoneIMajorScores, setCapstoneIMajorScores] = React.useState<Record<string, number>>({})
+  /** Capstone II: per implementation criterion I.1–I.20 (sum → holistic 0–100). */
+  const [capstoneIIMajorScores, setCapstoneIIMajorScores] = React.useState<Record<string, number>>({})
   const [feedback, setFeedback] = React.useState("")
   const [submitErrorMessage, setSubmitErrorMessage] = React.useState<string | null>(null)
   const [submitMissingStudentIds, setSubmitMissingStudentIds] = React.useState<string[]>([])
@@ -236,7 +255,6 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
     }
   }, [detailQuery.data, stage])
 
-  const criteria = React.useMemo(() => criteriaForStage(stage), [stage])
   const isLoading = !authHydrated || projectsQuery.isLoading || dashboardQuery.isLoading || (Boolean(resolvedProjectId) && detailQuery.isLoading)
 
   const activeStudent = React.useMemo(
@@ -250,7 +268,13 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
     if (!student) return
 
     const detailStudent = detailQuery.data?.students.find((item) => item.userId === studentId)
-    setAdvisorScore(detailStudent?.evaluation.score !== null && detailStudent?.evaluation.score !== undefined ? String(detailStudent.evaluation.score) : "")
+    if (stage === "Capstone I") {
+      setCapstoneIMajorScores(initialCapstoneIMajorScoresFromHolistic(detailStudent?.evaluation.score ?? null))
+      setCapstoneIIMajorScores({})
+    } else {
+      setCapstoneIIMajorScores(initialCapstoneIIMajorScoresFromHolistic(detailStudent?.evaluation.score ?? null))
+      setCapstoneIMajorScores({})
+    }
     setFeedback(detailStudent?.evaluation.comment ?? "")
     setSubmitErrorMessage(null)
     setActiveStudentId(studentId)
@@ -258,17 +282,37 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   }
 
   const handleSaveEvaluation = async () => {
+    if (isSubmitted) return
     if (!activeStudent || !group) return
 
-    const normalizedScore = Number(advisorScore)
-    if (Number.isNaN(normalizedScore) || normalizedScore < 0 || normalizedScore > ADVISOR_MAX_SCORE) {
-      toast.error("Invalid advisor score", {
-        description: `Enter a value between 0 and ${ADVISOR_MAX_SCORE}.`,
-      })
-      return
+    let finalScore: number
+    if (stage === "Capstone I") {
+      const total = sumCapstoneIMajorScores(capstoneIMajorScores)
+      if (total > ADVISOR_MAX_SCORE + 0.001) {
+        toast.error("Total exceeds 100%", {
+          description: "Lower one or more criteria so the sum is at most 100.",
+        })
+        return
+      }
+      if (Number.isNaN(total) || total < 0) {
+        toast.error("Invalid advisor score", { description: "Check each criterion value." })
+        return
+      }
+      finalScore = Math.round(Math.min(ADVISOR_MAX_SCORE, total) * 10) / 10
+    } else {
+      const total = sumCapstoneIIMajorScores(capstoneIIMajorScores)
+      if (total > ADVISOR_MAX_SCORE + 0.001) {
+        toast.error("Total exceeds 100%", {
+          description: "Lower one or more criteria so the sum is at most 100.",
+        })
+        return
+      }
+      if (Number.isNaN(total) || total < 0) {
+        toast.error("Invalid advisor score", { description: "Check each criterion value." })
+        return
+      }
+      finalScore = Math.round(Math.min(ADVISOR_MAX_SCORE, total) * 10) / 10
     }
-
-    const finalScore = Math.round(normalizedScore * 10) / 10
 
     try {
       const result = await saveDraftMutation.mutateAsync({
@@ -328,7 +372,8 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       ])
 
       setSheetOpen(false)
-      setAdvisorScore("")
+      setCapstoneIMajorScores({})
+      setCapstoneIIMajorScores({})
       setFeedback("")
       setActiveStudentId(null)
       setSubmitErrorMessage(null)
@@ -356,6 +401,40 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
   const evaluatedStudents = group?.evaluated ?? 0
   const evaluationSummary = detailQuery.data?.evaluation ?? null
   const isSubmitted = Boolean(evaluationSummary?.submittedAt) || evaluationSummary?.status === "SUBMITTED"
+
+  const updateCapstoneIMajorScore = React.useCallback(
+    (id: string, raw: number) => {
+      if (isSubmitted) return
+      const meta = ADVISOR_CAPSTONE_I_MAJOR_CRITERIA.find((c) => c.id === id)
+      if (!meta) return
+      setCapstoneIMajorScores((prev) => {
+        const othersSum = ADVISOR_CAPSTONE_I_MAJOR_CRITERIA.filter((c) => c.id !== id).reduce((acc, c) => acc + (prev[c.id] ?? 0), 0)
+        const maxAllowedForRow = Math.min(meta.maxPercent, ADVISOR_SRS_SDD_RUBRIC_TOTAL_PERCENT - othersSum)
+        const clamped = Math.min(maxAllowedForRow, Math.max(0, raw))
+        return { ...prev, [id]: clamped }
+      })
+    },
+    [isSubmitted],
+  )
+
+  const updateCapstoneIIMajorScore = React.useCallback(
+    (id: string, raw: number) => {
+      if (isSubmitted) return
+      const meta = ADVISOR_CAPSTONE_II_MAJOR_CRITERIA.find((c) => c.id === id)
+      if (!meta) return
+      setCapstoneIIMajorScores((prev) => {
+        const othersSum = ADVISOR_CAPSTONE_II_MAJOR_CRITERIA.filter((c) => c.id !== id).reduce((acc, c) => acc + (prev[c.id] ?? 0), 0)
+        const maxAllowedForRow = Math.min(meta.maxPercent, ADVISOR_CII_RUBRIC_TOTAL_PERCENT - othersSum)
+        const clamped = Math.min(maxAllowedForRow, Math.max(0, raw))
+        return { ...prev, [id]: clamped }
+      })
+    },
+    [isSubmitted],
+  )
+
+  const capstoneIMajorTotalEarned = React.useMemo(() => sumCapstoneIMajorScores(capstoneIMajorScores), [capstoneIMajorScores])
+
+  const capstoneIIMajorTotalEarned = React.useMemo(() => sumCapstoneIIMajorScores(capstoneIIMajorScores), [capstoneIIMajorScores])
   const studentsMissingScore = React.useMemo(() => {
     return (group?.students ?? []).filter((student) => getStudentStageScore(student, stage) === undefined)
   }, [group?.students, stage])
@@ -391,7 +470,11 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <DashboardPageHeader
             title={`${stage} Evaluation`}
-            description="Review the group, use the rubric as scoring guidance, and record advisor scores for each student."
+            description={
+              stage === "Capstone I"
+                ? "Capstone I uses the SRS/SDD weighted checklist (Σ 100%) per student in the evaluate sheet; one holistic score is still stored for the coordinator."
+                : "Capstone II uses the weighted implementation checklist (20 criteria, Σ 100%) per student in the evaluate sheet; one holistic score is still stored for the coordinator."
+            }
             badge={isLoading ? "Loading..." : group?.groupName ?? "—"}
           />
           <Button asChild variant="outline" size="sm">
@@ -473,7 +556,11 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <DashboardPageHeader
           title={`${stage} Evaluation`}
-          description="Review the group, use the rubric as scoring guidance, and record advisor scores for each student."
+          description={
+            stage === "Capstone I"
+              ? "Open each student to score ten SRS/SDD major criteria (max points sum to 100). The full rubric reference stays on this page below."
+              : "Open each student to score twenty implementation criteria (I.1–I.20; Σ 100%). The full rubric reference stays on this page below."
+          }
           badge={isLoading ? "Loading..." : group?.groupName ?? "—"}
         />
         <Button asChild variant="outline" size="sm">
@@ -624,18 +711,29 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Criteria</CardTitle>
-          <CardDescription>{stage} rubric items for this group.</CardDescription>
+          <CardTitle className="text-lg">
+            {stage === "Capstone I" ? "Advisor evaluation rubric (Capstone I)" : "Advisor evaluation rubric (Capstone II)"}
+          </CardTitle>
+          <CardDescription>
+            {stage === "Capstone I" ? (
+              <>
+                Complete SRS (Section A) and SDD (Section B) reference with weighted checkpoints totaling 100%. In the
+                per-student sheet, use sliders for each major criterion; the sum is saved as the holistic 0–100 mark.
+              </>
+            ) : (
+              <>
+                System implementation checklist (I.1–I.20) plus a final assessment reference block. In the per-student sheet,
+                use sliders for each scored criterion; the sum is saved as the holistic 0–100 mark.
+              </>
+            )}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {criteria.map((criterion) => (
-            <div key={criterion.title} className="rounded-lg border p-4">
-              <div>
-                <p className="font-medium">{criterion.title}</p>
-                <p className="text-sm text-muted-foreground">{criterion.description}</p>
-              </div>
-            </div>
-          ))}
+        <CardContent>
+          {stage === "Capstone I" ? (
+            <AdvisorCapstoneSrsSddRubricReadonly stage="Capstone I" />
+          ) : (
+            <AdvisorCapstoneIIImplementationRubricReadonly />
+          )}
         </CardContent>
       </Card>
 
@@ -687,11 +785,15 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
                         size="sm"
                         className="gap-1.5"
                         variant={actionStatus === "Pending Review" ? "default" : "outline"}
-                        disabled={!canEdit || isSubmitted}
+                        disabled={!isSubmitted && !canEdit}
                         onClick={() => openEvaluationSheet(student.id)}
                       >
                         <PlayCircle className="h-4 w-4" />
-                        {isSubmitted ? "Submitted" : actionStatus === "Pending Review" ? "Evaluate" : "Edit saved score"}
+                        {isSubmitted
+                          ? "View"
+                          : actionStatus === "Pending Review"
+                            ? "Evaluate"
+                            : "Edit saved score"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -703,73 +805,143 @@ export function AdvisorCapstoneGroupEvaluatePage({ stage, groupId }: { stage: Ca
       </Card>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-lg">
-          <SheetHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
-            <SheetTitle className="text-base">Evaluate {stage}</SheetTitle>
+        <SheetContent
+          side="right"
+          className={cn(
+            "flex w-full flex-col gap-0 overflow-hidden p-0",
+            stage === "Capstone II" ? "sm:max-w-3xl" : "sm:max-w-2xl",
+          )}
+        >
+          <SheetHeader className="shrink-0 border-b bg-background px-6 py-4">
+            <SheetTitle className="text-base">
+              {isSubmitted ? "View" : "Evaluate"} {stage}
+              {stage === "Capstone I" ? " · SRS / SDD" : " · Implementation"}
+            </SheetTitle>
             <SheetDescription>
               {activeStudent ? `${activeStudent.name} • ${activeStudent.studentId}` : "Select a student to evaluate."}
+              {isSubmitted ? " — submitted; read-only." : ""}
+              {stage === "Capstone I" && !isSubmitted
+                ? " Adjust the ten criterion sliders; earned points sum to your saved 0–100 mark (Σ ≤ 100%)."
+                : null}
+              {stage === "Capstone II" && !isSubmitted
+                ? " Adjust twenty implementation sliders (I.1–I.20); earned points sum to your saved 0–100 mark (Σ ≤ 100%)."
+                : null}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-5 p-6">
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>
-              <p className="mt-1 font-medium">{group?.projectTitle ?? "—"}</p>
-              <p className="text-sm text-muted-foreground">{group?.groupName ?? "—"}</p>
-            </div>
+          {stage === "Capstone I" ? (
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>
+                <p className="mt-1 font-medium">{group?.projectTitle ?? "—"}</p>
+                <p className="text-sm text-muted-foreground">{group?.groupName ?? "—"}</p>
+              </div>
 
-            <div className="space-y-3 rounded-xl border p-4">
+              <Separator />
+
               <div>
-                <p className="text-sm font-medium">Rubric Guidance</p>
-                <p className="text-sm text-muted-foreground">Review these criteria while assigning one final advisor mark.</p>
+                <p className="text-sm font-semibold text-foreground">Advisor score breakdown</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Score each major criterion (five under SRS, five under SDD). Earned points add up to the holistic 0–100 mark
+                  saved for this student.
+                </p>
               </div>
-              <div className="space-y-2">
-                {criteria.map((criterion) => (
-                  <div key={criterion.title} className="rounded-lg border bg-muted/20 p-3">
-                    <p className="text-sm font-medium">{criterion.title}</p>
-                    <p className="text-sm text-muted-foreground">{criterion.description}</p>
-                  </div>
-                ))}
+
+              <AdvisorCapstoneIMajorScoringPanel
+                scores={capstoneIMajorScores}
+                onScoreChange={updateCapstoneIMajorScore}
+                totalEarned={capstoneIMajorTotalEarned}
+                disabled={isSubmitted}
+                compact
+              />
+
+              <div className="space-y-1.5">
+                <Label>Advisor Feedback</Label>
+                <Textarea
+                  placeholder="Add short evaluation remarks..."
+                  value={feedback}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  className="min-h-[100px]"
+                  disabled={isSubmitted}
+                />
               </div>
-            </div>
 
-            <div className="space-y-1.5 rounded-xl border p-4">
-              <Label htmlFor="advisor-score">Advisor Score</Label>
-              <Input
-                id="advisor-score"
-                type="number"
-                min={0}
-                max={ADVISOR_MAX_SCORE}
-                step={0.5}
-                placeholder="Enter score out of 100"
-                value={advisorScore}
-                onChange={(event) => setAdvisorScore(event.target.value)}
+              <Button
+                className="w-full"
+                onClick={handleSaveEvaluation}
+                disabled={
+                  saveDraftMutation.isPending ||
+                  !activeStudent ||
+                  isSubmitted ||
+                  capstoneIMajorTotalEarned > ADVISOR_MAX_SCORE + 0.001
+                }
+              >
+                {saveDraftMutation.isPending ? "Saving..." : `Save ${stage} Evaluation`}
+              </Button>
+
+              {isSubmitted ? (
+                <p className="text-sm text-muted-foreground">
+                  This advisor evaluation has already been submitted and is now read-only.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Project</p>
+                <p className="mt-1 font-medium">{group?.projectTitle ?? "—"}</p>
+                <p className="text-sm text-muted-foreground">{group?.groupName ?? "—"}</p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <p className="text-sm font-semibold text-foreground">Advisor score breakdown</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Score each implementation criterion (I.1–I.20). Earned points add up to the holistic 0–100 mark saved for
+                  this student.
+                </p>
+              </div>
+
+              <AdvisorCapstoneIIMajorScoringPanel
+                scores={capstoneIIMajorScores}
+                onScoreChange={updateCapstoneIIMajorScore}
+                totalEarned={capstoneIIMajorTotalEarned}
                 disabled={isSubmitted}
+                compact
               />
-              <p className="text-sm text-muted-foreground">Enter one final mark from 0 to {ADVISOR_MAX_SCORE}. The rubric above is read-only guidance.</p>
+
+              <div className="space-y-1.5">
+                <Label>Advisor Feedback</Label>
+                <Textarea
+                  placeholder="Add short evaluation remarks..."
+                  value={feedback}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  className="min-h-[100px]"
+                  disabled={isSubmitted}
+                />
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleSaveEvaluation}
+                disabled={
+                  saveDraftMutation.isPending ||
+                  !activeStudent ||
+                  isSubmitted ||
+                  capstoneIIMajorTotalEarned > ADVISOR_MAX_SCORE + 0.001
+                }
+              >
+                {saveDraftMutation.isPending ? "Saving..." : `Save ${stage} Evaluation`}
+              </Button>
+
+              {isSubmitted ? (
+                <p className="text-sm text-muted-foreground">
+                  This advisor evaluation has already been submitted and is now read-only.
+                </p>
+              ) : null}
             </div>
-
-            <div className="space-y-1.5">
-              <Label>Advisor Feedback</Label>
-              <Textarea
-                placeholder="Add short evaluation remarks..."
-                value={feedback}
-                onChange={(event) => setFeedback(event.target.value)}
-                className="min-h-[100px]"
-                disabled={isSubmitted}
-              />
-            </div>
-
-            <Button className="w-full" onClick={handleSaveEvaluation} disabled={saveDraftMutation.isPending || !activeStudent || isSubmitted}>
-              {saveDraftMutation.isPending ? "Saving..." : `Save ${stage} Evaluation`}
-            </Button>
-
-            {isSubmitted ? (
-              <p className="text-sm text-muted-foreground">
-                This advisor evaluation has already been submitted and is now read-only.
-              </p>
-            ) : null}
-          </div>
+          )}
         </SheetContent>
       </Sheet>
     </div>

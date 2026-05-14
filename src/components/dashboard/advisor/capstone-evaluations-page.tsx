@@ -122,8 +122,8 @@ function toApiStage(stage: CapstoneStage): AdvisorEvaluationDashboardStage {
 
 function criteriaForStage(stage: CapstoneStage) {
   return stage === "Capstone I"
-    ? ["Proposal clarity", "SDD readiness", "Problem definition", "Advisor approval"]
-    : ["Implementation completeness", "Testing evidence", "Final results", "Defense readiness"]
+    ? ["SRS Section A checklist", "SDD Section B checklist", "Weighted checkpoints (Σ 100%)", "Holistic 0–100 score per student"]
+    : ["Implementation I.1–I.20", "Final assessment reference", "Weighted checkpoints (Σ 100%)", "Holistic 0–100 score per student"]
 }
 
 function formatDueLabel(submittedAt: string | null, nextAction: string) {
