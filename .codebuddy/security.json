@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/olasunkanmi-SE/codebuddy/main/schemas/security-config-v1.json",
+  "version": 1,
+  "allowedPaths": [
+    {
+      "path": "c:\\Users\\melkias\\Academia",
+      "allowReadWrite": true,
+      "description": "Academia"
+    }
+  ],
+  "commandDenyPatterns": [],
+  "networkAllowPatterns": [],
+  "networkDenyPatterns": [],
+  "blockedPathPatterns": []
+}
