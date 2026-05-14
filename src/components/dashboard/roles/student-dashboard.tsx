@@ -1,13 +1,24 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import axios from "axios"
 import { getErrorMessage } from "@/lib/api/errors"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,6 +28,7 @@ import { useDepartmentAnnouncements } from "@/lib/hooks/use-department-announcem
 import { useMyGroupAnnouncements, useMyProjectGroup } from "@/lib/hooks/use-project-groups"
 import {
   getStudentFinalGrade,
+  submitStudentGradeComplaint,
   type StudentFinalGradeResponse,
   type StudentFinalGradeStage,
 } from "@/lib/api/student-final-grades"
@@ -40,9 +52,12 @@ import {
   CheckCircle2,
   Clock3,
   FolderKanban,
+  MessageSquare,
   Users,
 } from "lucide-react"
 import type { DepartmentAnnouncementItem } from "@/types/department-announcements"
+
+const MIN_GRADE_COMPLAINT_REASON_CHARS = 25
 
 interface Milestone {
   id: string
@@ -421,6 +436,29 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
     enabled: Boolean(accessToken),
     staleTime: 30_000,
     retry: 1,
+  })
+
+  const [gradeComplaintDialogOpen, setGradeComplaintDialogOpen] = useState(false)
+  const [gradeComplaintReason, setGradeComplaintReason] = useState("")
+
+  const gradeComplaintMutation = useMutation({
+    mutationFn: submitStudentGradeComplaint,
+    onSuccess: () => {
+      toast.success("Complaint submitted", {
+        description: "Your coordinator will review your concern about this published grade.",
+      })
+      setGradeComplaintDialogOpen(false)
+      setGradeComplaintReason("")
+    },
+    onError: (err) => {
+      if (axios.isAxiosError(err) && (err.response?.status === 404 || err.response?.status === 405)) {
+        toast.error("Complaint service unavailable", {
+          description: "Please use Messages to contact your coordinator about your grade.",
+        })
+        return
+      }
+      toast.error(getErrorMessage(err, "Could not submit your complaint. Try again or use Messages."))
+    },
   })
 
   const backendMilestones = useMemo<Milestone[]>(() => {
@@ -813,6 +851,33 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
   const capstone1KpiValue = capstoneOneGradeState.kpiValue
   const capstone2KpiValue = capstoneTwoGradeState.kpiValue
   const studentGradesFootnote = activeGradeState.footnote
+  const prevGradePhaseRef = useRef<StudentGradePhase | null>(null)
+
+  useEffect(() => {
+    if (prevGradePhaseRef.current !== null && prevGradePhaseRef.current !== selectedGradePhase) {
+      setGradeComplaintDialogOpen(false)
+      setGradeComplaintReason("")
+    }
+    prevGradePhaseRef.current = selectedGradePhase
+  }, [selectedGradePhase])
+
+  const handleSubmitGradeComplaint = useCallback(() => {
+    const grade = publishedStudentFinalGrade
+    if (!grade) return
+    const trimmed = gradeComplaintReason.trim()
+    if (trimmed.length < MIN_GRADE_COMPLAINT_REASON_CHARS) {
+      toast.error("Please add more detail", {
+        description: `Explain your concern in at least ${MIN_GRADE_COMPLAINT_REASON_CHARS} characters.`,
+      })
+      return
+    }
+    gradeComplaintMutation.mutate({
+      stage: studentGradePhaseToStage(selectedGradePhase),
+      projectId: grade.project.id,
+      reason: trimmed,
+    })
+  }, [publishedStudentFinalGrade, gradeComplaintReason, selectedGradePhase, gradeComplaintMutation])
+
   const setSelectedGradePhase = (phase: StudentGradePhase) => {
     const nextParams = new URLSearchParams(searchParams.toString())
     nextParams.set("grade-stage", studentGradePhaseQueryValue(phase))
@@ -1401,6 +1466,29 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
                     This view is read-only and only shows the approved {gradePhaseLabel(selectedGradePhase)} final result for your own record.
                   </p>
                 </div>
+
+                <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    If you believe this published {gradePhaseLabel(selectedGradePhase)} grade is incorrect, you can file a formal complaint for coordinator review.
+                  </p>
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        setGradeComplaintReason("")
+                        setGradeComplaintDialogOpen(true)
+                      }}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      File grade complaint
+                    </Button>
+                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                      <Link href="/dashboard/student/messages">Open Messages</Link>
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : studentFinalGrade?.status === "FINALIZED_PENDING_DEPARTMENT_HEAD" || studentFinalGrade?.status === "REJECTED" ? (
               <div className="space-y-4">
@@ -1457,6 +1545,74 @@ export function StudentDashboard({ userName }: StudentDashboardProps = {}) {
         </Card>
         </div>
       </div>
+
+      <Dialog
+        open={gradeComplaintDialogOpen}
+        onOpenChange={(open) => {
+          setGradeComplaintDialogOpen(open)
+          if (!open) setGradeComplaintReason("")
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>File a grade complaint</DialogTitle>
+            <DialogDescription>
+              Describe why you believe your published {gradePhaseLabel(selectedGradePhase)} grade should be reviewed. Your coordinator will receive this request.
+            </DialogDescription>
+          </DialogHeader>
+          {publishedStudentFinalGrade ? (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                <p className="font-medium">{publishedStudentFinalGrade.project.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {gradePhaseLabel(selectedGradePhase)} · Letter {publishedStudentFinalGrade.scores.letterGrade} · Final{" "}
+                  {formatFinalGradeValue(
+                    publishedStudentFinalGrade.scores.finalGrade,
+                    publishedStudentFinalGrade.roundedToDecimalPlaces,
+                  )}
+                  %
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grade-complaint-reason">Your explanation</Label>
+                <Textarea
+                  id="grade-complaint-reason"
+                  value={gradeComplaintReason}
+                  onChange={(e) => setGradeComplaintReason(e.target.value)}
+                  placeholder="Explain your concern clearly (e.g. calculation, missing evaluation, or documentation you believe was overlooked)."
+                  rows={5}
+                  className="resize-y min-h-[120px]"
+                  disabled={gradeComplaintMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minimum {MIN_GRADE_COMPLAINT_REASON_CHARS} characters. Be specific so your coordinator can investigate.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setGradeComplaintDialogOpen(false)}
+              disabled={gradeComplaintMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmitGradeComplaint}
+              disabled={
+                gradeComplaintMutation.isPending
+                || gradeComplaintReason.trim().length < MIN_GRADE_COMPLAINT_REASON_CHARS
+                || !publishedStudentFinalGrade
+              }
+            >
+              {gradeComplaintMutation.isPending ? "Submitting…" : "Submit complaint"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
